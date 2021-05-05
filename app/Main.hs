@@ -26,6 +26,7 @@ import Data.Time.Clock
 import Data.Time.Format (formatTime, defaultTimeLocale)
 import System.Timeout (timeout)
 import Control.Concurrent.STM
+import Text.Printf (printf)
 
 main :: IO ()
 main = do
@@ -71,28 +72,36 @@ background startu maxu count online nickCache = go startu
                 putStrLn "new minute!"
                 atomically $ writeTVar count 0
                 putStrLn "new minute done!"
+        let mint = formatTime defaultTimeLocale "%M" time
         b <- isInBowDuels =<< atomically do
-          onl <- readTVar online
-          return . fst $ onl !! cu
-        uname <- uuidToName =<< atomically do
           onl <- readTVar online
           return . fst $ onl !! cu
         atomically $ do
           onl <- readTVar online
           let (updated,_) = onl !! cu
           writeTVar online $ setAt cu (updated, b) onl
-          nc <- readTVar nickCache
-          case uname of
-            (Just n) -> writeTVar nickCache $ setAt cu (updated, n) nc
-            Nothing -> pure ()
-      threadDelay 1500000
+        nick <- atomically do
+          onl <- readTVar nickCache
+          return . snd $ onl !! cu
+        when (nick == "" || mint == "00") $ do
+          uname <- uuidToName =<< atomically do
+                    onl <- readTVar online
+                    return . fst $ onl !! cu
+          atomically do
+            nc <- readTVar nickCache
+            let (updated,_) = nc !! cu
+            when (mint == "00" || snd (nc !! cu) == "") $ do
+              case uname of
+                (Just n) -> writeTVar nickCache $ setAt cu (updated, n) nc
+                Nothing -> pure ()
+      threadDelay 750000
       go (if cu == maxu - 1 then 0 else cu + 1)
 
 data Stats = Stats
   { playerName :: String,
     bowWins :: Integer,
     bowLosses :: Integer,
-    wlRatio :: Rational,
+    wlRatio :: Maybe Rational,
     bestWinstreak :: Integer,
     currentWinstreak :: Integer
   }
@@ -111,7 +120,11 @@ getStats uuid = do
         (Just (Object st)) -> case st HM.!? "Duels" of
           (Just (Object ds)) -> case (pl HM.!? "displayname", ds HM.!? "current_bow_winstreak", ds HM.!? "best_bow_winstreak", ds HM.!? "bow_duel_wins", ds HM.!? "bow_duel_losses") of
             (Just (String (unpack -> playerName)), Just (Number (round -> currentWinstreak)), Just (Number (round -> bestWinstreak)), Just (Number (round -> bowWins)), Just (Number (round -> bowLosses)))
-              -> return . Just $ Stats {wlRatio = if bowLosses == 0 then 0 else bowWins % bowLosses, ..}
+              -> return . Just $ Stats {wlRatio = if bowLosses == 0 then Nothing else Just $ bowWins % bowLosses, ..}
+            (Just (String (unpack -> playerName)), Just (Number (round -> currentWinstreak)), Just (Number (round -> bestWinstreak)), Just (Number (round -> bowWins)), Nothing)
+              -> return . Just $ Stats {wlRatio = Nothing, bowLosses = 0, ..}
+            (Just (String (unpack -> playerName)), _, _, Nothing, Just (Number (round -> bowLosses)))
+              -> return . Just $ Stats {bowWins = 0, currentWinstreak = 0, bestWinstreak = 0, wlRatio = Just 0, ..}
             _ -> return Nothing
           _ -> return Nothing
         _ -> return Nothing
@@ -132,9 +145,18 @@ isInBowDuels uuid = do
         _ -> return False
       _ -> return False
 
+showWL :: Maybe Rational -> String
+showWL Nothing = "∞"
+showWL (Just r) = printf "%.04f" (fromRational r :: Double)
+
 showStats :: Stats -> String
 showStats Stats {..} =
-  "**" ++ playerName ++":**\n - *Bow Duels Wins:* **"++ show bowWins ++"**\n - *Bow Duels Losses:* **" ++ show bowLosses ++ "**\n - *Bow Duels Win/Loss Ratio:* **" ++ show (fromRational wlRatio :: Double)++ "**\n - *Best Bow Duels winstreak:* **"++ show bestWinstreak ++"**\n - *Current Bow Duels winstreak:* **"++ show currentWinstreak ++ "**"
+  "**" ++ playerName ++":**\n" ++
+  "- *Bow Duels Wins:* **"++ show bowWins ++"**\n"++
+  " - *Bow Duels Losses:* **" ++ show bowLosses ++ "**\n"++
+  " - *Bow Duels Win/Loss Ratio:* **" ++ showWL wlRatio ++ "**\n"++
+  " - *Best Bow Duels winstreak:* **"++ show bestWinstreak ++"**\n"++
+  " - *Current Bow Duels winstreak:* **"++ show currentWinstreak ++ "**"
 
 nameToUUID :: String -> IO (Maybe String)
 nameToUUID name = do
@@ -142,9 +164,7 @@ nameToUUID name = do
   putStrLn url
   res <- simpleHttp url
   case decode res :: Maybe Object of
-    Nothing -> do
-      putStrLn $ "no response for " ++ name
-      return Nothing
+    Nothing -> return Nothing
     (Just js) -> case js HM.!? "id" of
       (Just (String text)) -> do
         return . Just $ unpack text
@@ -156,9 +176,7 @@ uuidToName uuid = do
   putStrLn url
   res <- simpleHttp url
   case decode res :: Maybe [Object] of
-    Nothing -> do
-      putStrLn $ "no response for " ++ uuid
-      return Nothing
+    Nothing -> return Nothing
     (Just js) -> do
       case last js HM.! "name" of
         (String text) -> do
@@ -170,18 +188,14 @@ nameToUUID' :: TVar [(String, String)] -> String -> IO (Maybe String)
 nameToUUID' nameCache name = do
   cache <- atomically $ readTVar nameCache
   case filter ((==name) . snd) cache of
-    [] -> do
-      putStrLn "Player not in cache!"
-      nameToUUID name
+    [] -> nameToUUID name
     ((uuid,_):_) -> return $ Just uuid
 
 uuidToName' :: TVar [(String, String)] -> String -> IO (Maybe String)
 uuidToName' nameCache uuid = do
   cache <- atomically $ readTVar nameCache
   case filter ((==uuid) . fst) cache of
-    [] -> do
-      putStrLn "Player not in cache!"
-      uuidToName uuid
+    [] -> uuidToName uuid
     ((_,name):_) -> return $ Just name
 
 eventHandler :: TVar Int -> TVar [(String, Bool)] -> TVar [(String, String)] -> Event -> DiscordHandler ()
@@ -226,12 +240,13 @@ eventHandler count online nameCache event = case event of
       "?help" -> do
         liftIO . putStrLn $ "recieved " ++ unpack (messageText m)
         _ <- restCall . R.CreateMessage (messageChannel m) $
-          "**Bow bot help:**\n" <>
+          "**Bow bot help:**\n\n" <>
           "**Commands:**\n" <>
           " - **?help** - *display this message*\n" <>
-          " - **?online** - *show all people from watchlist currently in Bow Duels (data might not be fully up-to-date depending on amount of players watchListed)*\n"<>
-          " - **?list** - *show all players in wathlist*\n"<>
-          " - **?s [name]** - *show player's Bow Duels stats*\n"
+          " - **?online** - *show all people from watchList currently in Bow Duels (data might not be fully up-to-date depending on amount of players watchListed)*\n"<>
+          " - **?list** - *show all players in watchList*\n"<>
+          " - **?s [name]** - *show player's Bow Duels stats*\n\n"<>
+          "Made by **GregC**#9698"
         pure ()
       _ -> pure ()
   _ -> pure ()
