@@ -68,19 +68,24 @@ background startu maxu count online nickCache = go startu
         time <- getCurrentTime
         let f = formatTime defaultTimeLocale "%S" time
         when (f == "00") . void . forkIO $ do
-          putStrLn "new minute!"
-          atomically $ writeTVar count 0
-          new <- traverse (\(uuid, name) -> (uuid,) . fromMaybe name <$> uuidToName uuid) =<< atomically (readTVar nickCache)
-          atomically $ writeTVar nickCache new
-          putStrLn "new minute done!"
+                putStrLn "new minute!"
+                atomically $ writeTVar count 0
+                putStrLn "new minute done!"
         b <- isInBowDuels =<< atomically do
+          onl <- readTVar online
+          return . fst $ onl !! cu
+        uname <- uuidToName =<< atomically do
           onl <- readTVar online
           return . fst $ onl !! cu
         atomically $ do
           onl <- readTVar online
           let (updated,_) = onl !! cu
           writeTVar online $ setAt cu (updated, b) onl
-      threadDelay 750000
+          nc <- readTVar nickCache
+          case uname of
+            (Just n) -> writeTVar nickCache $ setAt cu (updated, n) nc
+            Nothing -> pure ()
+      threadDelay 1000000
       go (if cu == maxu - 1 then 0 else cu + 1)
 
 data Stats = Stats
