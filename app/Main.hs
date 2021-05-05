@@ -142,7 +142,9 @@ nameToUUID name = do
   putStrLn url
   res <- simpleHttp url
   case decode res :: Maybe Object of
-    Nothing -> return Nothing
+    Nothing -> do
+      putStrLn $ "no response for " ++ name
+      return Nothing
     (Just js) -> case js HM.!? "id" of
       (Just (String text)) -> do
         return . Just $ unpack text
@@ -154,7 +156,9 @@ uuidToName uuid = do
   putStrLn url
   res <- simpleHttp url
   case decode res :: Maybe [Object] of
-    Nothing -> return Nothing
+    Nothing -> do
+      putStrLn $ "no response for " ++ uuid
+      return Nothing
     (Just js) -> do
       case last js HM.! "name" of
         (String text) -> do
@@ -166,14 +170,18 @@ nameToUUID' :: TVar [(String, String)] -> String -> IO (Maybe String)
 nameToUUID' nameCache name = do
   cache <- atomically $ readTVar nameCache
   case filter ((==name) . snd) cache of
-    [] -> nameToUUID name
+    [] -> do
+      putStrLn "Player not in cache!"
+      nameToUUID name
     ((uuid,_):_) -> return $ Just uuid
 
 uuidToName' :: TVar [(String, String)] -> String -> IO (Maybe String)
 uuidToName' nameCache uuid = do
   cache <- atomically $ readTVar nameCache
   case filter ((==uuid) . fst) cache of
-    [] -> uuidToName uuid
+    [] -> do
+      putStrLn "Player not in cache!"
+      uuidToName uuid
     ((_,name):_) -> return $ Just name
 
 eventHandler :: TVar Int -> TVar [(String, Bool)] -> TVar [(String, String)] -> Event -> DiscordHandler ()
