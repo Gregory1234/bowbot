@@ -139,6 +139,7 @@ showStats Stats {..} =
 nameToUUID :: String -> IO (Maybe String)
 nameToUUID name = do
   let url = "https://api.mojang.com/users/profiles/minecraft/" ++ name
+  putStrLn url
   res <- simpleHttp url
   case decode res :: Maybe Object of
     Nothing -> return Nothing
@@ -150,6 +151,7 @@ nameToUUID name = do
 uuidToName :: String -> IO (Maybe String)
 uuidToName uuid = do
   let url = "https://api.mojang.com/user/profiles/" ++ uuid ++ "/names"
+  putStrLn url
   res <- simpleHttp url
   case decode res :: Maybe [Object] of
     Nothing -> return Nothing
