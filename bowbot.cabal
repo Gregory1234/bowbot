@@ -37,6 +37,7 @@ library
     , containers
     , discord-haskell
     , http-conduit
+    , stm
     , text
     , time
     , unordered-containers
@@ -57,6 +58,7 @@ executable bowbot-exe
     , containers
     , discord-haskell
     , http-conduit
+    , stm
     , text
     , time
     , unordered-containers
@@ -78,6 +80,7 @@ test-suite bowbot-test
     , containers
     , discord-haskell
     , http-conduit
+    , stm
     , text
     , time
     , unordered-containers

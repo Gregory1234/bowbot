@@ -29,6 +29,7 @@ dependencies:
 - bytestring
 - unordered-containers
 - time
+- stm
 
 library:
   source-dirs: src

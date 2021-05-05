@@ -3,17 +3,15 @@
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ViewPatterns #-}
+{-# LANGUAGE BlockArguments #-}
 
 module Main where
 
-import Control.Concurrent.MVar
 import Control.Monad (when, void, forever, unless)
 import Control.Monad.IO.Class (liftIO)
 import Data.Aeson
-import qualified Data.ByteString.Lazy.Char8 as BL
 import qualified Data.HashMap.Strict as HM
-import qualified Data.Map as M
-import Data.Maybe (catMaybes, fromMaybe, listToMaybe)
+import Data.Maybe (catMaybes, fromMaybe)
 import Data.Text (Text, isPrefixOf, pack, toLower, unpack, strip)
 import qualified Data.Text as T
 import qualified Data.Text.IO as TIO
@@ -23,30 +21,30 @@ import Discord.Types
 import Network.HTTP.Conduit
 import System.Environment.Blank (getEnv)
 import Data.Ratio ((%))
-import Control.Concurrent (forkIO, threadDelay, forkOS, forkFinally)
+import Control.Concurrent (forkIO, threadDelay, forkFinally)
 import Data.Time.Clock
 import Data.Time.Format (formatTime, defaultTimeLocale)
-import Data.Foldable (toList)
-import Data.List (intercalate)
 import System.Timeout (timeout)
+import Control.Concurrent.STM
 
 main :: IO ()
 main = do
-  count <- newMVar 0
-  currentUpdate <- newMVar 0
+  count <- atomically $ newTVar 0
+  currentUpdate <- atomically $ newTVar 0
   f <- readFile "people.txt"
-  online <- newMVar $ (,False) <$> lines f
+  online <- atomically $ newTVar $ (,False) <$> lines f
   mkBackground count online currentUpdate
   apiKey <- fromMaybe "" <$> getEnv "API_KEY"
-  userFacingError <-
-    runDiscord $
-      def
-        { discordToken = pack apiKey,
-          discordOnEvent = eventHandler count online
-        }
-  TIO.putStrLn userFacingError
+  unless (apiKey == "") . forever $ do
+    userFacingError <-
+      runDiscord $
+        def
+          { discordToken = pack apiKey,
+            discordOnEvent = eventHandler count online
+          }
+    TIO.putStrLn userFacingError
 
-mkBackground :: MVar Int -> MVar [(String, Bool)] -> MVar Int -> IO ()
+mkBackground :: TVar Int -> TVar [(String, Bool)] -> TVar Int -> IO ()
 mkBackground count online currentUpdate = void $ forkFinally (background count online currentUpdate) $ \e -> do
   print e
   mkBackground count online currentUpdate
@@ -62,19 +60,24 @@ setAt i a ls
 {-# INLINE setAt #-}
 
 
-background :: MVar Int -> MVar [(String, Bool)] -> MVar Int -> IO ()
+background :: TVar Int -> TVar [(String, Bool)] -> TVar Int -> IO ()
 background count online currentUpdate = forever go
   where
     go = do
-      _ <- timeout 1000000 $ do
+      _ <- timeout 1000000 . forkIO $ do
         time <- getCurrentTime
         let f = formatTime defaultTimeLocale "%S" time
-        when (f == "00") $ putMVar count 0
-        modifyMVar_ currentUpdate $ \cu ->
-          modifyMVar online $ \onl -> do
-            let (updated,_) = onl !! cu
-            b <- isInBowDuels updated
-            pure (setAt cu (updated, b) onl, if cu == length onl - 1 then 0 else cu + 1)
+        when (f == "00") $ atomically $ writeTVar count 0
+        b <- isInBowDuels =<< atomically do
+          cu <- readTVar currentUpdate
+          onl <- readTVar online
+          return . fst $ onl !! cu
+        atomically $ do
+          cu <- readTVar currentUpdate
+          onl <- readTVar online
+          let (updated,_) = onl !! cu
+          writeTVar online $ setAt cu (updated, b) onl
+          writeTVar currentUpdate $ if cu == length onl - 1 then 0 else cu + 1
       threadDelay 1000000
 
 data Stats = Stats
@@ -149,12 +152,12 @@ uuidToName uuid = do
         _ -> do
           return Nothing
 
-eventHandler :: MVar Int -> MVar [(String, Bool)] -> Event -> DiscordHandler ()
+eventHandler :: TVar Int -> TVar [(String, Bool)] -> Event -> DiscordHandler ()
 eventHandler count online event = case event of
   MessageCreate m -> do
     unless (fromBot m) $ case unpack $ T.takeWhile (/=' ') $ messageText m of
       "?s" -> do
-        cv <- liftIO $ readMVar count
+        cv <- liftIO . atomically $ readTVar count
         if cv < 15
           then do
             let name = unpack . strip . T.drop 2 $ messageText m
@@ -166,7 +169,7 @@ eventHandler count online event = case event of
               (Just uuid) -> do
                 stats <- liftIO $ getStats uuid
                 _ <- restCall . R.CreateMessage (messageChannel m) . maybe "*The player doesn't exist!*" (pack . showStats) $ stats
-                liftIO $ modifyMVar_ count (pure . (+ 1))
+                liftIO . atomically $ modifyTVar count (+ 1)
                 pure ()
           else do
             time <- liftIO getCurrentTime
@@ -174,13 +177,13 @@ eventHandler count online event = case event of
             _ <- restCall . R.CreateMessage (messageChannel m) . pack $ "**Too many requests! Wait another " ++ show (60-read f :: Int) ++ " seconds!**"
             pure ()
       "?online" -> do
-        st <- liftIO $ readMVar online
+        st <- liftIO . atomically $ readTVar online
         people <- traverse (liftIO . uuidToName . fst) . filter snd $ st
         let msg = if null people then "```None of the watchListed players are currently in bow duels.```" else "**WatchListed players currently in bow duels are:**```\n" <> (T.unlines . map (pack . (" - " ++)) . catMaybes) people <> "```"
         _ <- restCall $ R.CreateMessage (messageChannel m) msg
         pure ()
       "?list" -> do
-        st <- liftIO $ readMVar online
+        st <- liftIO . atomically $ readTVar online
         people <- traverse (liftIO . uuidToName . fst) st
         let str = T.unwords . map pack . catMaybes $ people
         _ <- restCall . R.CreateMessage (messageChannel m) $ "**Players in wachList:**" <> "```\n" <> str <> "```"
