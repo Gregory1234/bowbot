@@ -30,24 +30,24 @@ import Control.Concurrent.STM
 main :: IO ()
 main = do
   count <- atomically $ newTVar 0
-  currentUpdate <- atomically $ newTVar 0
   f <- readFile "people.txt"
   online <- atomically $ newTVar $ (,False) <$> lines f
-  mkBackground count online currentUpdate
+  nickCache <- atomically $ newTVar $ (,"") <$> lines f
+  mkBackground 0 (length $ lines f) count online nickCache
   apiKey <- fromMaybe "" <$> getEnv "API_KEY"
   unless (apiKey == "") . forever $ do
     userFacingError <-
       runDiscord $
         def
           { discordToken = pack apiKey,
-            discordOnEvent = eventHandler count online
+            discordOnEvent = eventHandler count online nickCache
           }
     TIO.putStrLn userFacingError
 
-mkBackground :: TVar Int -> TVar [(String, Bool)] -> TVar Int -> IO ()
-mkBackground count online currentUpdate = void $ forkFinally (background count online currentUpdate) $ \e -> do
+mkBackground :: Int -> Int -> TVar Int -> TVar [(String, Bool)] -> TVar [(String, String)] -> IO ()
+mkBackground cu maxu count online nickCache = void $ forkFinally (background cu maxu count online nickCache) $ \e -> do
   print e
-  mkBackground count online currentUpdate
+  mkBackground cu maxu count online nickCache
 
 setAt :: Int -> a -> [a] -> [a]
 setAt i a ls
@@ -60,25 +60,28 @@ setAt i a ls
 {-# INLINE setAt #-}
 
 
-background :: TVar Int -> TVar [(String, Bool)] -> TVar Int -> IO ()
-background count online currentUpdate = forever go
+background :: Int -> Int -> TVar Int -> TVar [(String, Bool)] -> TVar [(String, String)] -> IO ()
+background startu maxu count online nickCache = go startu
   where
-    go = do
+    go cu = do
       _ <- timeout 1000000 . forkIO $ do
         time <- getCurrentTime
         let f = formatTime defaultTimeLocale "%S" time
-        when (f == "00") $ atomically $ writeTVar count 0
+        when (f == "00") . void . forkIO $ do
+          putStrLn "new minute!"
+          atomically $ writeTVar count 0
+          new <- traverse (\(uuid, name) -> (uuid,) . fromMaybe name <$> uuidToName uuid) =<< atomically (readTVar nickCache)
+          atomically $ writeTVar nickCache new
+          putStrLn "new minute done!"
         b <- isInBowDuels =<< atomically do
-          cu <- readTVar currentUpdate
           onl <- readTVar online
           return . fst $ onl !! cu
         atomically $ do
-          cu <- readTVar currentUpdate
           onl <- readTVar online
           let (updated,_) = onl !! cu
           writeTVar online $ setAt cu (updated, b) onl
-          writeTVar currentUpdate $ if cu == length onl - 1 then 0 else cu + 1
-      threadDelay 1000000
+      threadDelay 750000
+      go (if cu == maxu - 1 then 0 else cu + 1)
 
 data Stats = Stats
   { playerName :: String,
@@ -152,8 +155,22 @@ uuidToName uuid = do
         _ -> do
           return Nothing
 
-eventHandler :: TVar Int -> TVar [(String, Bool)] -> Event -> DiscordHandler ()
-eventHandler count online event = case event of
+nameToUUID' :: TVar [(String, String)] -> String -> IO (Maybe String)
+nameToUUID' nameCache name = do
+  cache <- atomically $ readTVar nameCache
+  case filter ((==name) . snd) cache of
+    [] -> nameToUUID name
+    ((uuid,_):_) -> return $ Just uuid
+
+uuidToName' :: TVar [(String, String)] -> String -> IO (Maybe String)
+uuidToName' nameCache uuid = do
+  cache <- atomically $ readTVar nameCache
+  case filter ((==uuid) . fst) cache of
+    [] -> uuidToName uuid
+    ((_,name):_) -> return $ Just name
+
+eventHandler :: TVar Int -> TVar [(String, Bool)] -> TVar [(String, String)] -> Event -> DiscordHandler ()
+eventHandler count online nameCache event = case event of
   MessageCreate m -> do
     unless (fromBot m) $ case unpack $ T.takeWhile (/=' ') $ messageText m of
       "?s" -> do
@@ -161,7 +178,7 @@ eventHandler count online event = case event of
         if cv < 15
           then do
             let name = unpack . strip . T.drop 2 $ messageText m
-            uuid' <- liftIO $ nameToUUID name
+            uuid' <- liftIO $ nameToUUID' nameCache name
             case uuid' of
               Nothing -> do
                 _ <- restCall $ R.CreateMessage (messageChannel m) "*The player doesn't exist!*"
@@ -178,13 +195,13 @@ eventHandler count online event = case event of
             pure ()
       "?online" -> do
         st <- liftIO . atomically $ readTVar online
-        people <- traverse (liftIO . uuidToName . fst) . filter snd $ st
+        people <- traverse (liftIO . uuidToName' nameCache . fst) . filter snd $ st
         let msg = if null people then "```None of the watchListed players are currently in bow duels.```" else "**WatchListed players currently in bow duels are:**```\n" <> (T.unlines . map (pack . (" - " ++)) . catMaybes) people <> "```"
         _ <- restCall $ R.CreateMessage (messageChannel m) msg
         pure ()
       "?list" -> do
         st <- liftIO . atomically $ readTVar online
-        people <- traverse (liftIO . uuidToName . fst) st
+        people <- traverse (liftIO . uuidToName' nameCache . fst) st
         let str = T.unwords . map pack . catMaybes $ people
         _ <- restCall . R.CreateMessage (messageChannel m) $ "**Players in wachList:**" <> "```\n" <> str <> "```"
         pure ()
