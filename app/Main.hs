@@ -85,7 +85,7 @@ background startu maxu count online nickCache = go startu
           case uname of
             (Just n) -> writeTVar nickCache $ setAt cu (updated, n) nc
             Nothing -> pure ()
-      threadDelay 1000000
+      threadDelay 1500000
       go (if cu == maxu - 1 then 0 else cu + 1)
 
 data Stats = Stats
@@ -181,6 +181,7 @@ eventHandler count online nameCache event = case event of
   MessageCreate m -> do
     unless (fromBot m) $ case unpack $ T.takeWhile (/=' ') $ messageText m of
       "?s" -> do
+        liftIO . putStrLn $ "recieved " ++ unpack (messageText m)
         cv <- liftIO . atomically $ readTVar count
         if cv < 15
           then do
@@ -201,18 +202,21 @@ eventHandler count online nameCache event = case event of
             _ <- restCall . R.CreateMessage (messageChannel m) . pack $ "**Too many requests! Wait another " ++ show (60-read f :: Int) ++ " seconds!**"
             pure ()
       "?online" -> do
+        liftIO . putStrLn $ "recieved " ++ unpack (messageText m)
         st <- liftIO . atomically $ readTVar online
         people <- traverse (liftIO . uuidToName' nameCache . fst) . filter snd $ st
         let msg = if null people then "```None of the watchListed players are currently in bow duels.```" else "**WatchListed players currently in bow duels are:**```\n" <> (T.unlines . map (pack . (" - " ++)) . catMaybes) people <> "```"
         _ <- restCall $ R.CreateMessage (messageChannel m) msg
         pure ()
       "?list" -> do
+        liftIO . putStrLn $ "recieved " ++ unpack (messageText m)
         st <- liftIO . atomically $ readTVar online
         people <- traverse (liftIO . uuidToName' nameCache . fst) st
         let str = T.unwords . map pack . catMaybes $ people
         _ <- restCall . R.CreateMessage (messageChannel m) $ "**Players in wachList:**" <> "```\n" <> str <> "```"
         pure ()
       "?help" -> do
+        liftIO . putStrLn $ "recieved " ++ unpack (messageText m)
         _ <- restCall . R.CreateMessage (messageChannel m) $
           "**Bow bot help:**\n" <>
           "**Commands:**\n" <>
