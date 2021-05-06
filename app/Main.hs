@@ -32,23 +32,22 @@ main :: IO ()
 main = do
   count <- atomically $ newTVar 0
   f <- readFile "people.txt"
-  online <- atomically $ newTVar $ (,False) <$> lines f
   nickCache <- atomically $ newTVar $ (,"") <$> lines f
-  mkBackground 0 (length $ lines f) count online nickCache
+  mkBackground 0 (length $ lines f) count nickCache
   apiKey <- fromMaybe "" <$> getEnv "API_KEY"
   unless (apiKey == "") . forever $ do
     userFacingError <-
       runDiscord $
         def
           { discordToken = pack apiKey,
-            discordOnEvent = eventHandler count online nickCache
+            discordOnEvent = eventHandler count nickCache
           }
     TIO.putStrLn userFacingError
 
-mkBackground :: Int -> Int -> TVar Int -> TVar [(String, Bool)] -> TVar [(String, String)] -> IO ()
-mkBackground cu maxu count online nickCache = void $ forkFinally (background cu maxu count online nickCache) $ \e -> do
+mkBackground :: Int -> Int -> TVar Int -> TVar [(String, String)] -> IO ()
+mkBackground cu maxu count nickCache = void $ forkFinally (background cu maxu count nickCache) $ \e -> do
   print e
-  mkBackground cu maxu count online nickCache
+  mkBackground cu maxu count nickCache
 
 setAt :: Int -> a -> [a] -> [a]
 setAt i a ls
@@ -61,8 +60,8 @@ setAt i a ls
 {-# INLINE setAt #-}
 
 
-background :: Int -> Int -> TVar Int -> TVar [(String, Bool)] -> TVar [(String, String)] -> IO ()
-background startu maxu count online nickCache = go startu
+background :: Int -> Int -> TVar Int -> TVar [(String, String)] -> IO ()
+background startu maxu count nickCache = go startu
   where
     go cu = do
       _ <- timeout 1000000 . forkIO $ do
@@ -73,19 +72,12 @@ background startu maxu count online nickCache = go startu
                 atomically $ writeTVar count 0
                 putStrLn "new minute done!"
         let mint = formatTime defaultTimeLocale "%M" time
-        b <- isInBowDuels =<< atomically do
-          onl <- readTVar online
-          return . fst $ onl !! cu
-        atomically $ do
-          onl <- readTVar online
-          let (updated,_) = onl !! cu
-          writeTVar online $ setAt cu (updated, b) onl
         nick <- atomically do
           onl <- readTVar nickCache
           return . snd $ onl !! cu
         when (nick == "" || mint == "00") $ do
           uname <- uuidToName =<< atomically do
-                    onl <- readTVar online
+                    onl <- readTVar nickCache
                     return . fst $ onl !! cu
           atomically do
             nc <- readTVar nickCache
@@ -198,8 +190,8 @@ uuidToName' nameCache uuid = do
     [] -> uuidToName uuid
     ((_,name):_) -> return $ Just name
 
-eventHandler :: TVar Int -> TVar [(String, Bool)] -> TVar [(String, String)] -> Event -> DiscordHandler ()
-eventHandler count online nameCache event = case event of
+eventHandler :: TVar Int -> TVar [(String, String)] -> Event -> DiscordHandler ()
+eventHandler count nameCache event = case event of
   MessageCreate m -> do
     unless (fromBot m) $ case unpack $ T.takeWhile (/=' ') $ messageText m of
       "?s" -> do
@@ -225,14 +217,11 @@ eventHandler count online nameCache event = case event of
             pure ()
       "?online" -> do
         liftIO . putStrLn $ "recieved " ++ unpack (messageText m)
-        st <- liftIO . atomically $ readTVar online
-        people <- traverse (liftIO . uuidToName' nameCache . fst) . filter snd $ st
-        let msg = if null people then "```None of the watchListed players are currently in bow duels.```" else "**WatchListed players currently in bow duels are:**```\n" <> (T.unlines . map (pack . (" - " ++)) . catMaybes) people <> "```"
-        _ <- restCall $ R.CreateMessage (messageChannel m) msg
+        _ <- restCall $ R.CreateMessage (messageChannel m) "```Sorry, ?online command is currently under maintnence and isn't avaliable. It is way too costly and not used very often. There is a good chance nobody will even see this message. I will try to create a solution that is both fast and cheap but right now I'm disabling this.\n\n- GregC```"
         pure ()
       "?list" -> do
         liftIO . putStrLn $ "recieved " ++ unpack (messageText m)
-        st <- liftIO . atomically $ readTVar online
+        st <- liftIO . atomically $ readTVar nameCache
         people <- traverse (liftIO . uuidToName' nameCache . fst) st
         let str = T.unwords . map pack . catMaybes $ people
         _ <- restCall . R.CreateMessage (messageChannel m) $ "**Players in wachList:**" <> "```\n" <> str <> "```"
