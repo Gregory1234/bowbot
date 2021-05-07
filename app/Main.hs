@@ -230,6 +230,7 @@ eventHandler count countBorder online onlineBorder nameCache event = case event 
         o <- case onlo <|> onlb of
           (Just onl) -> pure onl
           Nothing -> do
+            _ <- restCall . R.CreateMessage (messageChannel m) $ "**Please wait a couple of seconds...**"
             people <- liftIO $ lines <$> readFile "people.txt"
             status <- liftIO $ mapConcurrently (\u -> (u,) <$> isInBowDuels u) people
             t <- liftIO $ read @Int <$> getTime "%S"
@@ -253,7 +254,7 @@ eventHandler count countBorder online onlineBorder nameCache event = case event 
           "**Bow bot help:**\n\n" <>
           "**Commands:**\n" <>
           " - **?help** - *display this message*\n" <>
-          " - **?online** - *show all people from watchList currently in Bow Duels (data might not be fully up-to-date depending on amount of players watchListed)*\n"<>
+          " - **?online** - *show all people from watchList currently in Bow Duels*\n"<>
           " - **?list** - *show all players in watchList*\n"<>
           " - **?s [name]** - *show player's Bow Duels stats*\n\n"<>
           "Made by **GregC**#9698"
