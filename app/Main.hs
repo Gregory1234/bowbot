@@ -114,7 +114,9 @@ getStats uuid = do
   res <- simpleHttp url
   case decode res :: Maybe Object of
     Nothing -> return Nothing
-    (Just js) -> case js HM.!? "player" of
+    (Just js) -> do
+     putStrLn $ "Received response from: " ++ url
+     case js HM.!? "player" of
       (Just (Object pl)) -> case pl HM.!? "stats" of
         (Just (Object st)) -> case st HM.!? "Duels" of
           (Just (Object ds)) -> case (pl HM.!? "displayname", ds HM.!? "current_bow_winstreak", ds HM.!? "best_bow_winstreak", ds HM.!? "bow_duel_wins", ds HM.!? "bow_duel_losses") of
@@ -138,7 +140,9 @@ isInBowDuels uuid = do
   res <- simpleHttp url
   case decode res :: Maybe Object of
     Nothing -> return False
-    (Just js) -> case js HM.!? "session" of
+    (Just js) -> do
+     putStrLn $ "Received response from: " ++ url
+     case js HM.!? "session" of
       (Just (Object ses)) -> case ses HM.!? "mode" of
         (Just (String name)) -> return $ name == "BOW_DUEL"
         _ -> return False
@@ -164,7 +168,9 @@ nameToUUID name = do
   res <- simpleHttp url
   case decode res :: Maybe Object of
     Nothing -> return Nothing
-    (Just js) -> case js HM.!? "id" of
+    (Just js) -> do
+     putStrLn $ "Received response from: " ++ url
+     case js HM.!? "id" of
       (Just (String text)) -> do
         return . Just $ unpack text
       _ -> return Nothing
@@ -177,6 +183,7 @@ uuidToName uuid = do
   case decode res :: Maybe [Object] of
     Nothing -> return Nothing
     (Just js) -> do
+      putStrLn $ "Received response from: " ++ url
       case last js HM.! "name" of
         (String text) -> do
           return . Just $ unpack text
