@@ -100,7 +100,6 @@ data Stats = Stats
   { playerName :: String,
     bowWins :: Integer,
     bowLosses :: Integer,
-    wlRatio :: Maybe Rational,
     bestWinstreak :: Integer,
     currentWinstreak :: Integer
   }
@@ -121,11 +120,11 @@ getStats uuid = do
         (Just (Object st)) -> case st HM.!? "Duels" of
           (Just (Object ds)) -> case (pl HM.!? "displayname", ds HM.!? "current_bow_winstreak", ds HM.!? "best_bow_winstreak", ds HM.!? "bow_duel_wins", ds HM.!? "bow_duel_losses") of
             (Just (String (unpack -> playerName)), Just (Number (round -> currentWinstreak)), Just (Number (round -> bestWinstreak)), Just (Number (round -> bowWins)), Just (Number (round -> bowLosses)))
-              -> return . Just $ Stats {wlRatio = if bowLosses == 0 then Nothing else Just $ bowWins % bowLosses, ..}
+              -> return . Just $ Stats {..}
             (Just (String (unpack -> playerName)), Just (Number (round -> currentWinstreak)), Just (Number (round -> bestWinstreak)), Just (Number (round -> bowWins)), Nothing)
-              -> return . Just $ Stats {wlRatio = Nothing, bowLosses = 0, ..}
+              -> return . Just $ Stats {bowLosses = 0, ..}
             (Just (String (unpack -> playerName)), _, _, Nothing, Just (Number (round -> bowLosses)))
-              -> return . Just $ Stats {bowWins = 0, currentWinstreak = 0, bestWinstreak = 0, wlRatio = Just 0, ..}
+              -> return . Just $ Stats {bowWins = 0, currentWinstreak = 0, bestWinstreak = 0, ..}
             _ -> return Nothing
           _ -> return Nothing
         _ -> return Nothing
@@ -148,16 +147,17 @@ isInBowDuels uuid = do
         _ -> return $ Just False
       _ -> return $ Just False
 
-showWL :: Maybe Rational -> String
-showWL Nothing = "∞"
-showWL (Just r) = printf "%.04f" (fromRational r :: Double)
+showWL :: Integer -> Integer -> String
+showWL _ 0 = "∞"
+showWL a b = printf "%.04f" (fromRational (a%b) :: Double)
 
 showStats :: Stats -> String
 showStats Stats {..} =
   "**" ++ playerName ++":**\n" ++
   "- *Bow Duels Wins:* **"++ show bowWins ++"**\n"++
   " - *Bow Duels Losses:* **" ++ show bowLosses ++ "**\n"++
-  " - *Bow Duels Win/Loss Ratio:* **" ++ showWL wlRatio ++ "**\n"++
+  " - *Bow Duels Win/Loss Ratio:* **" ++ showWL bowWins bowLosses ++ "**\n"++
+  (if bowLosses /= 0 then " - *Bow Duels wins until " ++ show ((bowWins `div` bowLosses) + 1) ++ " WLR:* **" ++ show (bowLosses - (bowWins `mod` bowLosses)) ++ "**\n" else "") ++
   " - *Best Bow Duels winstreak:* **"++ show bestWinstreak ++"**\n"++
   " - *Current Bow Duels winstreak:* **"++ show currentWinstreak ++ "**"
 
