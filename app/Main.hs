@@ -4,6 +4,7 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE BlockArguments #-}
+{-# LANGUAGE TypeApplications #-}
 
 module Main where
 
@@ -27,27 +28,35 @@ import Data.Time.Format (formatTime, defaultTimeLocale)
 import System.Timeout (timeout)
 import Control.Concurrent.STM
 import Text.Printf (printf)
+import Control.Concurrent.Async (mapConcurrently)
 
 main :: IO ()
 main = do
   count <- atomically $ newTVar 0
+  countBorder <- atomically $ newTVar 0
   f <- readFile "people.txt"
   nickCache <- atomically $ newTVar $ (,"") <$> lines f
-  mkBackground 0 (length $ lines f) count nickCache
+  updateNicks nickCache
+  mkBackground count countBorder nickCache
   apiKey <- fromMaybe "" <$> getEnv "API_KEY"
   unless (apiKey == "") . forever $ do
     userFacingError <-
       runDiscord $
         def
           { discordToken = pack apiKey,
-            discordOnEvent = eventHandler count nickCache
+            discordOnEvent = eventHandler count countBorder nickCache
           }
     TIO.putStrLn userFacingError
 
-mkBackground :: Int -> Int -> TVar Int -> TVar [(String, String)] -> IO ()
-mkBackground cu maxu count nickCache = void $ forkFinally (background cu maxu count nickCache) $ \e -> do
+updateNicks :: TVar [(String, String)] -> IO ()
+updateNicks nickCache = do
+  updatedNicks <- mapConcurrently (\(u, n) -> (u,) . fromMaybe n <$> uuidToName u) =<< atomically (readTVar nickCache)
+  atomically $ writeTVar nickCache updatedNicks
+
+mkBackground :: TVar Int -> TVar Int -> TVar [(String, String)] -> IO ()
+mkBackground count countBorder nickCache = void $ forkFinally (background count countBorder nickCache) $ \e -> do
   print e
-  mkBackground cu maxu count nickCache
+  mkBackground count countBorder nickCache
 
 setAt :: Int -> a -> [a] -> [a]
 setAt i a ls
@@ -59,35 +68,26 @@ setAt i a ls
     go _ []     = []
 {-# INLINE setAt #-}
 
+getTime :: String -> IO String
+getTime f = formatTime defaultTimeLocale f <$> getCurrentTime
 
-background :: Int -> Int -> TVar Int -> TVar [(String, String)] -> IO ()
-background startu maxu count nickCache = go startu
+background :: TVar Int -> TVar Int -> TVar [(String, String)] -> IO ()
+background count countBorder nickCache = do
+    sec <- read @Int <$> getTime "%S"
+    threadDelay ((65 - sec `mod` 60) * 1000000)
+    forever go
   where
-    go cu = do
+    go = do
       _ <- timeout 1000000 . forkIO $ do
-        time <- getCurrentTime
-        let f = formatTime defaultTimeLocale "%S" time
-        when (f == "00") . void . forkIO $ do
-                putStrLn "new minute!"
-                atomically $ writeTVar count 0
-                putStrLn "new minute done!"
-        let mint = formatTime defaultTimeLocale "%M" time
-        nick <- atomically do
-          onl <- readTVar nickCache
-          return . snd $ onl !! cu
-        when (nick == "" || mint == "00") $ do
-          uname <- uuidToName =<< atomically do
-                    onl <- readTVar nickCache
-                    return . fst $ onl !! cu
-          atomically do
-            nc <- readTVar nickCache
-            let (updated,_) = nc !! cu
-            when (mint == "00" || snd (nc !! cu) == "") $ do
-              case uname of
-                (Just n) -> writeTVar nickCache $ setAt cu (updated, n) nc
-                Nothing -> pure ()
-      threadDelay 750000
-      go (if cu == maxu - 1 then 0 else cu + 1)
+        min <- getTime "%M"
+        putStrLn "New minute!"
+        atomically $ do
+          bc <- readTVar countBorder
+          writeTVar count bc
+          writeTVar countBorder 0
+        when (min == "00") $ updateNicks nickCache
+        putStrLn "New minute finished!"
+      threadDelay 60000000
 
 data Stats = Stats
   { playerName :: String,
@@ -190,8 +190,8 @@ uuidToName' nameCache uuid = do
     [] -> uuidToName uuid
     ((_,name):_) -> return $ Just name
 
-eventHandler :: TVar Int -> TVar [(String, String)] -> Event -> DiscordHandler ()
-eventHandler count nameCache event = case event of
+eventHandler :: TVar Int -> TVar Int -> TVar [(String, String)] -> Event -> DiscordHandler ()
+eventHandler count countBorder nameCache event = case event of
   MessageCreate m -> do
     unless (fromBot m) $ case unpack $ T.takeWhile (/=' ') $ messageText m of
       "?s" -> do
@@ -208,7 +208,8 @@ eventHandler count nameCache event = case event of
               (Just uuid) -> do
                 stats <- liftIO $ getStats uuid
                 _ <- restCall . R.CreateMessage (messageChannel m) . maybe "*The player doesn't exist!*" (pack . showStats) $ stats
-                liftIO . atomically $ modifyTVar count (+ 1)
+                t <- liftIO $ read @Int <$> getTime "%S"
+                liftIO . atomically $ modifyTVar (if t <= 5 || t >= 55 then countBorder else count) (+ 1)
                 pure ()
           else do
             time <- liftIO getCurrentTime

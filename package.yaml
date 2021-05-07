@@ -30,6 +30,7 @@ dependencies:
 - unordered-containers
 - time
 - stm
+- async
 
 library:
   source-dirs: src
