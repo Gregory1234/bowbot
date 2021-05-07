@@ -157,9 +157,9 @@ showStats Stats {..} =
   "- *Bow Duels Wins:* **"++ show bowWins ++"**\n"++
   " - *Bow Duels Losses:* **" ++ show bowLosses ++ "**\n"++
   " - *Bow Duels Win/Loss Ratio:* **" ++ showWL bowWins bowLosses ++ "**\n"++
-  (if bowLosses /= 0 then " - *Bow Duels wins until " ++ show ((bowWins `div` bowLosses) + 1) ++ " WLR:* **" ++ show (bowLosses - (bowWins `mod` bowLosses)) ++ "**\n" else "") ++
-  " - *Best Bow Duels winstreak:* **"++ show bestWinstreak ++"**\n"++
-  " - *Current Bow Duels winstreak:* **"++ show currentWinstreak ++ "**"
+  (if bowLosses /= 0 then " - *Bow Duels Wins until " ++ show ((bowWins `div` bowLosses) + 1) ++ " WLR:* **" ++ show (bowLosses - (bowWins `mod` bowLosses)) ++ "**\n" else "") ++
+  " - *Best Bow Duels Winstreak:* **"++ show bestWinstreak ++"**\n"++
+  " - *Current Bow Duels Winstreak:* **"++ show currentWinstreak ++ "**"
 
 nameToUUID :: String -> IO (Maybe String)
 nameToUUID name = do
