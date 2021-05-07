@@ -232,21 +232,7 @@ eventHandler count countBorder online onlineBorder nameCache event = case event 
             pure ()
       "?online" -> do
         liftIO . putStrLn $ "recieved " ++ unpack (messageText m)
-        onlo <- liftIO . atomically $ readTVar online
-        onlb <- liftIO . atomically $ readTVar online
-        o <- case onlo <|> onlb of
-          (Just onl) -> pure onl
-          Nothing -> do
-            _ <- restCall . R.CreateMessage (messageChannel m) $ "**Please wait a couple of seconds...**"
-            people <- liftIO $ lines <$> readFile "people.txt"
-            status <- liftIO $ traverse (\u -> (u,) . fromMaybe False . fmap (fromMaybe False) <$> timeout 1000000 (isInBowDuels u)) people
-            t <- liftIO $ read @Int <$> getTime "%S"
-            let onl = map fst $ filter snd status
-            liftIO . atomically $ writeTVar (if t <= 5 || t >= 55 then onlineBorder else online) $ Just onl
-            pure onl
-        names <- liftIO $ traverse (uuidToName' nameCache) o
-        let msg = if null names then "None of the watchListed players are currently in bow duels." else pack . unlines . map (" - "++) . catMaybes $ names
-        _ <- restCall . R.CreateMessage (messageChannel m) $ "```\n" <> msg <> "```"
+        _ <- restCall $ R.CreateMessage (messageChannel m) "```Sorry, ?online command is currently under maintnence and isn't avaliable. It is way too costly and not used very often. There is a good chance nobody will even see this message. I will try to create a solution that is both fast and cheap but right now I'm disabling this.\n\n- GregC```"
         pure ()
       "?list" -> do
         liftIO . putStrLn $ "recieved " ++ unpack (messageText m)
