@@ -132,21 +132,21 @@ getStats uuid = do
       _ -> return Nothing
 
 
-isInBowDuels :: String -> IO Bool
+isInBowDuels :: String -> IO (Maybe Bool)
 isInBowDuels uuid = do
   apiKey <- fromMaybe "" <$> getEnv "HYPIXEL_API"
   let url = "https://api.hypixel.net/status?key=" ++ apiKey ++ "&uuid=" ++ uuid
   putStrLn url
   res <- simpleHttp url
   case decode res :: Maybe Object of
-    Nothing -> return False
+    Nothing -> return Nothing
     (Just js) -> do
      putStrLn $ "Received response from: " ++ url
      case js HM.!? "session" of
       (Just (Object ses)) -> case ses HM.!? "mode" of
-        (Just (String name)) -> return $ name == "BOW_DUEL"
-        _ -> return False
-      _ -> return False
+        (Just (String name)) -> return . Just $ name == "BOW_DUEL"
+        _ -> return $ Just False
+      _ -> return $ Just False
 
 showWL :: Maybe Rational -> String
 showWL Nothing = "∞"
@@ -204,13 +204,13 @@ uuidToName' nameCache uuid = do
     [] -> uuidToName uuid
     ((_,name):_) -> return $ Just name
 
-retries :: Int -> Int -> IO a -> IO (Maybe a)
+retries :: Int -> Int -> IO (Maybe a) -> IO (Maybe a)
 retries 0 _ _ = pure Nothing
 retries k t a = do
   v <- timeout t a
   case v of
-    (Just x) -> pure $ Just x
-    Nothing -> retries (k-1) t a
+    (Just (Just x)) -> pure $ Just x
+    _ -> retries (k-1) t a
 
 eventHandler :: TVar Int -> TVar Int -> TVar (Maybe [String]) -> TVar (Maybe [String]) -> TVar [(String, String)] -> Event -> DiscordHandler ()
 eventHandler count countBorder online onlineBorder nameCache event = case event of
@@ -247,7 +247,7 @@ eventHandler count countBorder online onlineBorder nameCache event = case event 
           Nothing -> do
             _ <- restCall . R.CreateMessage (messageChannel m) $ "**Please wait a couple of seconds...**"
             people <- liftIO $ lines <$> readFile "people.txt"
-            status <- liftIO $ mapConcurrently (\u -> (u,) . fromMaybe False <$> retries 2 15000000 (isInBowDuels u)) people
+            status <- liftIO $ mapConcurrently (\u -> (u,) . fromMaybe False <$> retries 2 5000000 (isInBowDuels u)) people
             t <- liftIO $ read @Int <$> getTime "%S"
             let onl = map fst $ filter snd status
             liftIO . atomically $ writeTVar (if t <= 5 || t >= 55 then onlineBorder else online) $ Just onl
