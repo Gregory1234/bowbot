@@ -204,14 +204,6 @@ uuidToName' nameCache uuid = do
     [] -> uuidToName uuid
     ((_,name):_) -> return $ Just name
 
-retries :: Int -> Int -> IO (Maybe a) -> IO (Maybe a)
-retries 0 _ _ = pure Nothing
-retries k t a = do
-  v <- timeout t a
-  case v of
-    (Just (Just x)) -> pure $ Just x
-    _ -> retries (k-1) t a
-
 eventHandler :: TVar Int -> TVar Int -> TVar (Maybe [String]) -> TVar (Maybe [String]) -> TVar [(String, String)] -> Event -> DiscordHandler ()
 eventHandler count countBorder online onlineBorder nameCache event = case event of
   MessageCreate m -> do
@@ -247,7 +239,7 @@ eventHandler count countBorder online onlineBorder nameCache event = case event 
           Nothing -> do
             _ <- restCall . R.CreateMessage (messageChannel m) $ "**Please wait a couple of seconds...**"
             people <- liftIO $ lines <$> readFile "people.txt"
-            status <- liftIO $ mapConcurrently (\u -> (u,) . fromMaybe False <$> retries 2 5000000 (isInBowDuels u)) people
+            status <- liftIO $ traverse (\u -> (u,) . fromMaybe False . fmap (fromMaybe False) <$> timeout 1000000 (isInBowDuels u)) people
             t <- liftIO $ read @Int <$> getTime "%S"
             let onl = map fst $ filter snd status
             liftIO . atomically $ writeTVar (if t <= 5 || t >= 55 then onlineBorder else online) $ Just onl
