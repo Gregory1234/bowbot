@@ -29,6 +29,7 @@ import System.Timeout (timeout)
 import Control.Concurrent.STM
 import Text.Printf (printf)
 import Control.Concurrent.Async (mapConcurrently)
+import Control.Applicative ((<|>))
 
 main :: IO ()
 main = do
@@ -36,15 +37,17 @@ main = do
   countBorder <- atomically $ newTVar 0
   f <- readFile "people.txt"
   nickCache <- atomically $ newTVar $ (,"") <$> lines f
+  online <- atomically $ newTVar Nothing
+  onlineBorder <- atomically $ newTVar Nothing
   updateNicks nickCache
-  mkBackground count countBorder nickCache
+  mkBackground count countBorder online onlineBorder nickCache
   apiKey <- fromMaybe "" <$> getEnv "API_KEY"
   unless (apiKey == "") . forever $ do
     userFacingError <-
       runDiscord $
         def
           { discordToken = pack apiKey,
-            discordOnEvent = eventHandler count countBorder nickCache
+            discordOnEvent = eventHandler count countBorder online onlineBorder nickCache
           }
     TIO.putStrLn userFacingError
 
@@ -53,10 +56,10 @@ updateNicks nickCache = do
   updatedNicks <- mapConcurrently (\(u, n) -> (u,) . fromMaybe n <$> uuidToName u) =<< atomically (readTVar nickCache)
   atomically $ writeTVar nickCache updatedNicks
 
-mkBackground :: TVar Int -> TVar Int -> TVar [(String, String)] -> IO ()
-mkBackground count countBorder nickCache = void $ forkFinally (background count countBorder nickCache) $ \e -> do
+mkBackground :: TVar Int -> TVar Int -> TVar (Maybe [String]) -> TVar (Maybe [String])  -> TVar [(String, String)] -> IO ()
+mkBackground count countBorder online onlineBorder nickCache = void $ forkFinally (background count countBorder online onlineBorder nickCache) $ \e -> do
   print e
-  mkBackground count countBorder nickCache
+  mkBackground count countBorder online onlineBorder nickCache
 
 setAt :: Int -> a -> [a] -> [a]
 setAt i a ls
@@ -71,21 +74,25 @@ setAt i a ls
 getTime :: String -> IO String
 getTime f = formatTime defaultTimeLocale f <$> getCurrentTime
 
-background :: TVar Int -> TVar Int -> TVar [(String, String)] -> IO ()
-background count countBorder nickCache = do
+background :: TVar Int -> TVar Int -> TVar (Maybe [String]) -> TVar (Maybe [String]) -> TVar [(String, String)] -> IO ()
+background count countBorder online onlineBorder nickCache = do
     sec <- read @Int <$> getTime "%S"
     threadDelay ((65 - sec `mod` 60) * 1000000)
     forever go
   where
     go = do
       _ <- timeout 1000000 . forkIO $ do
-        min <- getTime "%M"
+        mint <- getTime "%M"
         putStrLn "New minute!"
         atomically $ do
           bc <- readTVar countBorder
           writeTVar count bc
           writeTVar countBorder 0
-        when (min == "00") $ updateNicks nickCache
+        atomically $ do
+          onl <- readTVar onlineBorder
+          writeTVar online onl
+          writeTVar onlineBorder Nothing
+        when (mint == "00") $ updateNicks nickCache
         putStrLn "New minute finished!"
       threadDelay 60000000
 
@@ -190,8 +197,8 @@ uuidToName' nameCache uuid = do
     [] -> uuidToName uuid
     ((_,name):_) -> return $ Just name
 
-eventHandler :: TVar Int -> TVar Int -> TVar [(String, String)] -> Event -> DiscordHandler ()
-eventHandler count countBorder nameCache event = case event of
+eventHandler :: TVar Int -> TVar Int -> TVar (Maybe [String]) -> TVar (Maybe [String]) -> TVar [(String, String)] -> Event -> DiscordHandler ()
+eventHandler count countBorder online onlineBorder nameCache event = case event of
   MessageCreate m -> do
     unless (fromBot m) $ case unpack $ T.takeWhile (/=' ') $ messageText m of
       "?s" -> do
@@ -214,11 +221,24 @@ eventHandler count countBorder nameCache event = case event of
           else do
             time <- liftIO getCurrentTime
             let f = formatTime defaultTimeLocale "%S" time
-            _ <- restCall . R.CreateMessage (messageChannel m) . pack $ "**Too many requests! Wait another " ++ show (60-read f :: Int) ++ " seconds!**"
+            _ <- restCall . R.CreateMessage (messageChannel m) . pack $ "**Too many requests! Wait another " ++ show ((65-read @Int f) `mod` 60) ++ " seconds!**"
             pure ()
       "?online" -> do
         liftIO . putStrLn $ "recieved " ++ unpack (messageText m)
-        _ <- restCall $ R.CreateMessage (messageChannel m) "```Sorry, ?online command is currently under maintnence and isn't avaliable. It is way too costly and not used very often. There is a good chance nobody will even see this message. I will try to create a solution that is both fast and cheap but right now I'm disabling this.\n\n- GregC```"
+        onlo <- liftIO . atomically $ readTVar online
+        onlb <- liftIO . atomically $ readTVar online
+        o <- case onlo <|> onlb of
+          (Just onl) -> pure onl
+          Nothing -> do
+            people <- liftIO $ lines <$> readFile "people.txt"
+            status <- liftIO $ mapConcurrently (\u -> (u,) <$> isInBowDuels u) people
+            t <- liftIO $ read @Int <$> getTime "%S"
+            let onl = map fst $ filter snd status
+            liftIO . atomically $ writeTVar (if t <= 5 || t >= 55 then onlineBorder else online) $ Just onl
+            pure onl
+        names <- liftIO $ traverse (uuidToName' nameCache) o
+        let msg = if null names then "None of the watchListed players are currently in bow duels." else pack . unlines . map (" - "++) . catMaybes $ names
+        _ <- restCall . R.CreateMessage (messageChannel m) $ "```\n" <> msg <> "```"
         pure ()
       "?list" -> do
         liftIO . putStrLn $ "recieved " ++ unpack (messageText m)

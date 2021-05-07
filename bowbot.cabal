@@ -24,8 +24,6 @@ source-repository head
   location: https://github.com/Github username here/bowbot
 
 library
-  exposed-modules:
-      Lib
   other-modules:
       Paths_bowbot
   hs-source-dirs:
