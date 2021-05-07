@@ -232,7 +232,7 @@ eventHandler count countBorder online onlineBorder nameCache event = case event 
           Nothing -> do
             _ <- restCall . R.CreateMessage (messageChannel m) $ "**Please wait a couple of seconds...**"
             people <- liftIO $ lines <$> readFile "people.txt"
-            status <- liftIO $ mapConcurrently (\u -> (u,) . fromMaybe False <$> timeout 5000000 (isInBowDuels u)) people
+            status <- liftIO $ mapConcurrently (\u -> (u,) . fromMaybe False <$> timeout 15000000 (isInBowDuels u)) people
             t <- liftIO $ read @Int <$> getTime "%S"
             let onl = map fst $ filter snd status
             liftIO . atomically $ writeTVar (if t <= 5 || t >= 55 then onlineBorder else online) $ Just onl
