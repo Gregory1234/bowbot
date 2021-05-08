@@ -137,17 +137,19 @@ getStats manager uuid = do
     (Just js) -> do
      putStrLn $ "Received response from: " ++ url
      case js HM.!? "player" of
-      (Just (Object pl)) -> case pl HM.!? "stats" of
-        (Just (Object st)) -> case st HM.!? "Duels" of
-          (Just (Object ds)) -> case (pl HM.!? "displayname", ds HM.!? "current_bow_winstreak", ds HM.!? "best_bow_winstreak", ds HM.!? "bow_duel_wins", ds HM.!? "bow_duel_losses") of
-            (Just (String (unpack -> playerName)), Just (Number (round -> currentWinstreak)), Just (Number (round -> bestWinstreak)), Just (Number (round -> bowWins)), Just (Number (round -> bowLosses)))
+      (Just (Object pl)) -> case (pl HM.!? "displayname", pl HM.!? "stats") of
+        (Just (String (unpack -> playerName)), Just (Object st)) -> case st HM.!? "Duels" of
+          (Just (Object ds)) -> case (ds HM.!? "current_bow_winstreak", ds HM.!? "best_bow_winstreak", ds HM.!? "bow_duel_wins", ds HM.!? "bow_duel_losses") of
+            (Just (Number (round -> currentWinstreak)), Just (Number (round -> bestWinstreak)), Just (Number (round -> bowWins)), Just (Number (round -> bowLosses)))
               -> return . Just $ Stats {..}
-            (Just (String (unpack -> playerName)), Just (Number (round -> currentWinstreak)), Just (Number (round -> bestWinstreak)), Just (Number (round -> bowWins)), Nothing)
+            (Just (Number (round -> currentWinstreak)), Just (Number (round -> bestWinstreak)), Just (Number (round -> bowWins)), Nothing)
               -> return . Just $ Stats {bowLosses = 0, ..}
-            (Just (String (unpack -> playerName)), _, _, Nothing, Just (Number (round -> bowLosses)))
+            (_, _, Nothing, Just (Number (round -> bowLosses)))
               -> return . Just $ Stats {bowWins = 0, currentWinstreak = 0, bestWinstreak = 0, ..}
+            (_, _, Nothing, Nothing)
+              -> return . Just $ Stats {bowWins = 0, bowLosses = 0, currentWinstreak = 0, bestWinstreak = 0, ..}
             _ -> return Nothing
-          _ -> return Nothing
+          _ -> return . Just $ Stats {bowWins = 0, bowLosses = 0, currentWinstreak = 0, bestWinstreak = 0, ..}
         _ -> return Nothing
       _ -> return Nothing
 
@@ -167,19 +169,27 @@ isInBowDuels manager uuid = do
         _ -> return $ Just False
       _ -> return $ Just False
 
-showWL :: Integer -> Integer -> String
-showWL _ 0 = "∞"
-showWL a b = printf "%.04f" (fromRational (a%b) :: Double)
-
 showStats :: Stats -> String
 showStats Stats {..} =
   "**" ++ playerName ++":**\n" ++
   "- *Bow Duels Wins:* **"++ show bowWins ++"**\n"++
   " - *Bow Duels Losses:* **" ++ show bowLosses ++ "**\n"++
-  " - *Bow Duels Win/Loss Ratio:* **" ++ showWL bowWins bowLosses ++ "**\n"++
-  (if bowLosses /= 0 then " - *Bow Duels Wins until " ++ show ((bowWins `div` bowLosses) + 1) ++ " WLR:* **" ++ show (bowLosses - (bowWins `mod` bowLosses)) ++ "**\n" else "") ++
+  " - *Bow Duels Win/Loss Ratio:* **" ++ winLossRatio ++ "**\n"++
+  " - *Bow Duels Wins until " ++ nextWinLossRatio ++ " WLR:* **" ++ winsRemaining ++ "**\n" ++
   " - *Best Bow Duels Winstreak:* **"++ show bestWinstreak ++"**\n"++
   " - *Current Bow Duels Winstreak:* **"++ show currentWinstreak ++ "**"
+  where
+    winLossRatio 
+      | bowWins == 0, bowLosses == 0 = "NaN"
+      | bowLosses == 0 = "∞"
+      | otherwise = printf "%.04f" (fromRational (bowWins%bowLosses) :: Double)
+    nextWinLossRatio
+      | bowLosses == 0 = "∞"
+      | otherwise = show $ (bowWins `div` bowLosses) + 1
+    winsRemaining
+      | bowWins == 0, bowLosses == 0 = "1"
+      | bowLosses == 0 = "N/A"
+      | otherwise = show (bowLosses - (bowWins `mod` bowLosses))
 
 nameToUUID :: Manager -> String -> IO (Maybe String)
 nameToUUID manager name = do
