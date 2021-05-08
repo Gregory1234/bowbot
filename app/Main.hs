@@ -30,36 +30,38 @@ import Control.Concurrent.STM
 import Text.Printf (printf)
 import Control.Concurrent.Async (mapConcurrently)
 import Control.Applicative ((<|>))
+import Data.ByteString.Lazy (ByteString)
 
 main :: IO ()
 main = do
+  manager <- newManager tlsManagerSettings
   count <- atomically $ newTVar 0
   countBorder <- atomically $ newTVar 0
   f <- readFile "people.txt"
   nickCache <- atomically $ newTVar $ (,"") <$> lines f
   online <- atomically $ newTVar Nothing
   onlineBorder <- atomically $ newTVar Nothing
-  updateNicks nickCache
-  mkBackground count countBorder online onlineBorder nickCache
+  updateNicks manager nickCache
+  mkBackground manager count countBorder online onlineBorder nickCache
   apiKey <- fromMaybe "" <$> getEnv "API_KEY"
   unless (apiKey == "") . forever $ do
     userFacingError <-
       runDiscord $
         def
           { discordToken = pack apiKey,
-            discordOnEvent = eventHandler count countBorder online onlineBorder nickCache
+            discordOnEvent = eventHandler manager count countBorder online onlineBorder nickCache
           }
     TIO.putStrLn userFacingError
 
-updateNicks :: TVar [(String, String)] -> IO ()
-updateNicks nickCache = do
-  updatedNicks <- mapConcurrently (\(u, n) -> (u,) . fromMaybe n <$> uuidToName u) =<< atomically (readTVar nickCache)
+updateNicks :: Manager -> TVar [(String, String)] -> IO ()
+updateNicks manager nickCache = do
+  updatedNicks <- mapConcurrently (\(u, n) -> (u,) . fromMaybe n <$> uuidToName manager u) =<< atomically (readTVar nickCache)
   atomically $ writeTVar nickCache updatedNicks
 
-mkBackground :: TVar Int -> TVar Int -> TVar (Maybe [String]) -> TVar (Maybe [String])  -> TVar [(String, String)] -> IO ()
-mkBackground count countBorder online onlineBorder nickCache = void $ forkFinally (background count countBorder online onlineBorder nickCache) $ \e -> do
+mkBackground :: Manager -> TVar Int -> TVar Int -> TVar (Maybe [String]) -> TVar (Maybe [String])  -> TVar [(String, String)] -> IO ()
+mkBackground manager count countBorder online onlineBorder nickCache = void $ forkFinally (background manager count countBorder online onlineBorder nickCache) $ \e -> do
   print e
-  mkBackground count countBorder online onlineBorder nickCache
+  mkBackground manager count countBorder online onlineBorder nickCache
 
 setAt :: Int -> a -> [a] -> [a]
 setAt i a ls
@@ -74,8 +76,8 @@ setAt i a ls
 getTime :: String -> IO String
 getTime f = formatTime defaultTimeLocale f <$> getCurrentTime
 
-background :: TVar Int -> TVar Int -> TVar (Maybe [String]) -> TVar (Maybe [String]) -> TVar [(String, String)] -> IO ()
-background count countBorder online onlineBorder nickCache = do
+background :: Manager -> TVar Int -> TVar Int -> TVar (Maybe [String]) -> TVar (Maybe [String]) -> TVar [(String, String)] -> IO ()
+background manager count countBorder online onlineBorder nickCache = do
     sec <- read @Int <$> getTime "%S"
     threadDelay ((65 - sec `mod` 60) * 1000000)
     forever go
@@ -92,9 +94,17 @@ background count countBorder online onlineBorder nickCache = do
           onl <- readTVar onlineBorder
           writeTVar online onl
           writeTVar onlineBorder Nothing
-        when (mint == "00") $ updateNicks nickCache
+        when (mint == "00") $ updateNicks manager nickCache
         putStrLn "New minute finished!"
       threadDelay 60000000
+
+sendRequestTo :: Manager -> String -> IO ByteString
+sendRequestTo manager url = do
+  putStrLn url
+  request <- parseRequest url
+  res <- httpLbs request manager
+  return $ responseBody res
+
 
 data Stats = Stats
   { playerName :: String,
@@ -105,12 +115,11 @@ data Stats = Stats
   }
   deriving (Show)
 
-getStats :: String -> IO (Maybe Stats)
-getStats uuid = do
+getStats :: Manager -> String -> IO (Maybe Stats)
+getStats manager uuid = do
   apiKey <- fromMaybe "" <$> getEnv "HYPIXEL_API"
   let url = "https://api.hypixel.net/player?key=" ++ apiKey ++ "&uuid=" ++ uuid
-  putStrLn url
-  res <- simpleHttp url
+  res <- sendRequestTo manager url
   case decode res :: Maybe Object of
     Nothing -> return Nothing
     (Just js) -> do
@@ -131,12 +140,11 @@ getStats uuid = do
       _ -> return Nothing
 
 
-isInBowDuels :: String -> IO (Maybe Bool)
-isInBowDuels uuid = do
+isInBowDuels :: Manager -> String -> IO (Maybe Bool)
+isInBowDuels manager uuid = do
   apiKey <- fromMaybe "" <$> getEnv "HYPIXEL_API"
   let url = "https://api.hypixel.net/status?key=" ++ apiKey ++ "&uuid=" ++ uuid
-  putStrLn url
-  res <- simpleHttp url
+  res <- sendRequestTo manager url
   case decode res :: Maybe Object of
     Nothing -> return Nothing
     (Just js) -> do
@@ -161,11 +169,10 @@ showStats Stats {..} =
   " - *Best Bow Duels Winstreak:* **"++ show bestWinstreak ++"**\n"++
   " - *Current Bow Duels Winstreak:* **"++ show currentWinstreak ++ "**"
 
-nameToUUID :: String -> IO (Maybe String)
-nameToUUID name = do
+nameToUUID :: Manager -> String -> IO (Maybe String)
+nameToUUID manager name = do
   let url = "https://api.mojang.com/users/profiles/minecraft/" ++ name
-  putStrLn url
-  res <- simpleHttp url
+  res <- sendRequestTo manager url
   case decode res :: Maybe Object of
     Nothing -> return Nothing
     (Just js) -> do
@@ -175,11 +182,10 @@ nameToUUID name = do
         return . Just $ unpack text
       _ -> return Nothing
 
-uuidToName :: String -> IO (Maybe String)
-uuidToName uuid = do
+uuidToName :: Manager -> String -> IO (Maybe String)
+uuidToName manager uuid = do
   let url = "https://api.mojang.com/user/profiles/" ++ uuid ++ "/names"
-  putStrLn url
-  res <- simpleHttp url
+  res <- sendRequestTo manager url
   case decode res :: Maybe [Object] of
     Nothing -> return Nothing
     (Just js) -> do
@@ -190,22 +196,22 @@ uuidToName uuid = do
         _ -> do
           return Nothing
 
-nameToUUID' :: TVar [(String, String)] -> String -> IO (Maybe String)
-nameToUUID' nameCache name = do
+nameToUUID' :: Manager -> TVar [(String, String)] -> String -> IO (Maybe String)
+nameToUUID' manager nameCache name = do
   cache <- atomically $ readTVar nameCache
   case filter ((==name) . snd) cache of
-    [] -> nameToUUID name
+    [] -> nameToUUID manager name
     ((uuid,_):_) -> return $ Just uuid
 
-uuidToName' :: TVar [(String, String)] -> String -> IO (Maybe String)
-uuidToName' nameCache uuid = do
+uuidToName' :: Manager -> TVar [(String, String)] -> String -> IO (Maybe String)
+uuidToName' manager nameCache uuid = do
   cache <- atomically $ readTVar nameCache
   case filter ((==uuid) . fst) cache of
-    [] -> uuidToName uuid
+    [] -> uuidToName manager uuid
     ((_,name):_) -> return $ Just name
 
-eventHandler :: TVar Int -> TVar Int -> TVar (Maybe [String]) -> TVar (Maybe [String]) -> TVar [(String, String)] -> Event -> DiscordHandler ()
-eventHandler count countBorder online onlineBorder nameCache event = case event of
+eventHandler :: Manager -> TVar Int -> TVar Int -> TVar (Maybe [String]) -> TVar (Maybe [String]) -> TVar [(String, String)] -> Event -> DiscordHandler ()
+eventHandler manager count countBorder online onlineBorder nameCache event = case event of
   MessageCreate m -> do
     unless (fromBot m) $ case unpack $ T.takeWhile (/=' ') $ messageText m of
       "?s" -> do
@@ -214,13 +220,13 @@ eventHandler count countBorder online onlineBorder nameCache event = case event 
         if cv < 15
           then do
             let name = unpack . strip . T.drop 2 $ messageText m
-            uuid' <- liftIO $ nameToUUID' nameCache name
+            uuid' <- liftIO $ nameToUUID' manager nameCache name
             case uuid' of
               Nothing -> do
                 _ <- restCall $ R.CreateMessage (messageChannel m) "*The player doesn't exist!*"
                 pure ()
               (Just uuid) -> do
-                stats <- liftIO $ getStats uuid
+                stats <- liftIO $ getStats manager uuid
                 _ <- restCall . R.CreateMessage (messageChannel m) . maybe "*The player doesn't exist!*" (pack . showStats) $ stats
                 t <- liftIO $ read @Int <$> getTime "%S"
                 liftIO . atomically $ modifyTVar (if t <= 5 || t >= 55 then countBorder else count) (+ 1)
@@ -232,12 +238,28 @@ eventHandler count countBorder online onlineBorder nameCache event = case event 
             pure ()
       "?online" -> do
         liftIO . putStrLn $ "recieved " ++ unpack (messageText m)
-        _ <- restCall $ R.CreateMessage (messageChannel m) "```Sorry, ?online command is currently under maintnence and isn't avaliable. It is way too costly and not used very often. There is a good chance nobody will even see this message. I will try to create a solution that is both fast and cheap but right now I'm disabling this.\n\n- GregC```"
+        onlo <- liftIO . atomically $ readTVar online
+        onlb <- liftIO . atomically $ readTVar online
+        o <- case onlo <|> onlb of
+          (Just onl) -> do
+            _ <- restCall . R.CreateMessage (messageChannel m) $ "**Players in wachList currently in bow duels:** (cached response)"
+            pure onl
+          Nothing -> do
+            people <- liftIO $ lines <$> readFile "people.txt"
+            status <- liftIO $ mapConcurrently (\u -> (u,) . fromMaybe False <$> isInBowDuels manager u) people
+            t <- liftIO $ read @Int <$> getTime "%S"
+            let onl = map fst $ filter snd status
+            liftIO . atomically $ writeTVar (if t <= 5 || t >= 55 then onlineBorder else online) $ Just onl
+            _ <- restCall . R.CreateMessage (messageChannel m) $ "**Players in wachList currently in bow duels:**"
+            pure onl
+        names <- liftIO $ traverse (uuidToName' manager nameCache) o
+        let msg = if null names then "None of the watchListed players are currently in bow duels." else pack . unlines . map (" - "++) . catMaybes $ names
+        _ <- restCall . R.CreateMessage (messageChannel m) $ "```" <> msg <> "```"
         pure ()
       "?list" -> do
         liftIO . putStrLn $ "recieved " ++ unpack (messageText m)
         st <- liftIO . atomically $ readTVar nameCache
-        people <- traverse (liftIO . uuidToName' nameCache . fst) st
+        people <- traverse (liftIO . uuidToName' manager nameCache . fst) st
         let str = T.unwords . map pack . catMaybes $ people
         _ <- restCall . R.CreateMessage (messageChannel m) $ "**Players in wachList:**" <> "```\n" <> str <> "```"
         pure ()

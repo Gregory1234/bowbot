@@ -31,6 +31,7 @@ dependencies:
 - time
 - stm
 - async
+- http-client-tls
 
 library:
   source-dirs: src
