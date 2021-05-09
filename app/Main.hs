@@ -31,7 +31,6 @@ import Text.Printf (printf)
 import Control.Concurrent.Async (mapConcurrently)
 import Control.Applicative ((<|>))
 import Data.ByteString.Lazy (ByteString)
-import Network.HTTP.Client.Conduit (withManager)
 
 data BowBotData = BowBotData
   { count :: TVar Int,
@@ -266,8 +265,8 @@ eventHandler BowBotData {..} event = case event of
         t <- liftIO $ read @Int <$> getTime "%S"
         cv <- liftIO . atomically $ do
           c <- readTVar onlineBusy
-          when c $ writeTVar onlineBusy True
-          return c
+          unless c $ writeTVar onlineBusy True
+          return (not c)
         if cv then do
           onlo <- liftIO . atomically $ readTVar online
           onlb <- liftIO . atomically $ readTVar online
