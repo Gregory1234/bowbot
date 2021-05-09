@@ -31,20 +31,18 @@ import Text.Printf (printf)
 import Control.Concurrent.Async (mapConcurrently)
 import Control.Applicative ((<|>))
 import Data.ByteString.Lazy (ByteString)
+import Network.HTTP.Client.Conduit (withManager)
 
 data BowBotData = BowBotData
-  { manager :: Manager,
-    count :: TVar Int,
+  { count :: TVar Int,
     countBorder :: TVar Int,
     nickCache :: TVar [(String, String)],
     online :: TVar (Maybe [String]),
     onlineBorder :: TVar (Maybe [String]),
     onlineBusy :: TVar Bool
   }
-
 main :: IO ()
 main = do
-  manager <- newManager tlsManagerSettings
   count <- atomically $ newTVar 0
   countBorder <- atomically $ newTVar 0
   f <- readFile "people.txt"
@@ -53,7 +51,7 @@ main = do
   onlineBorder <- atomically $ newTVar Nothing
   onlineBusy <- atomically $ newTVar False
   let bbdata = BowBotData {..}
-  updateNicks manager nickCache
+  updateNicks nickCache
   mkBackground bbdata
   apiKey <- fromMaybe "" <$> getEnv "API_KEY"
   unless (apiKey == "") . forever $ do
@@ -65,8 +63,9 @@ main = do
           }
     TIO.putStrLn userFacingError
 
-updateNicks :: Manager -> TVar [(String, String)] -> IO ()
-updateNicks manager nickCache = do
+updateNicks :: TVar [(String, String)] -> IO ()
+updateNicks nickCache = do
+  manager <- newManager tlsManagerSettings
   updatedNicks <- mapConcurrently (\(u, n) -> (u,) . fromMaybe n <$> uuidToName manager u) =<< atomically (readTVar nickCache)
   atomically $ writeTVar nickCache updatedNicks
 
@@ -106,7 +105,7 @@ background BowBotData {..} = do
           onl <- readTVar onlineBorder
           writeTVar online onl
           writeTVar onlineBorder Nothing
-        when (mint == "00") $ updateNicks manager nickCache
+        when (mint == "00") $ updateNicks nickCache
         putStrLn "New minute finished!"
       threadDelay 60000000
 
@@ -247,6 +246,7 @@ eventHandler BowBotData {..} event = case event of
           return $ c < 15
         if cv
           then do
+            manager <- liftIO $ newManager tlsManagerSettings
             let name = unpack . strip . T.drop 2 $ messageText m
             uuid' <- liftIO $ nameToUUID' manager nickCache name
             case uuid' of
@@ -271,6 +271,7 @@ eventHandler BowBotData {..} event = case event of
         if cv then do
           onlo <- liftIO . atomically $ readTVar online
           onlb <- liftIO . atomically $ readTVar online
+          manager <- liftIO $ newManager tlsManagerSettings
           o <- case onlo <|> onlb of
             (Just onl) -> do
               _ <- restCall . R.CreateMessage (messageChannel m) $ "**Players in wachList currently in bow duels:** (cached response)"
@@ -293,6 +294,7 @@ eventHandler BowBotData {..} event = case event of
       "?list" -> do
         liftIO . putStrLn $ "recieved " ++ unpack (messageText m)
         st <- liftIO . atomically $ readTVar nickCache
+        manager <- liftIO $ newManager tlsManagerSettings
         people <- traverse (liftIO . uuidToName' manager nickCache . fst) st
         let str = T.unwords . map pack . catMaybes $ people
         _ <- restCall . R.CreateMessage (messageChannel m) $ "**Players in wachList:**" <> "```\n" <> str <> "```"
