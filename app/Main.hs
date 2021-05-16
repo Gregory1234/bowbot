@@ -17,7 +17,7 @@ import Control.Monad.IO.Class (liftIO)
 import Data.Aeson
 import Data.ByteString.Lazy (ByteString)
 import qualified Data.HashMap.Strict as HM
-import Data.Maybe (catMaybes, fromMaybe, mapMaybe, listToMaybe)
+import Data.Maybe (catMaybes, fromMaybe, mapMaybe, listToMaybe, maybeToList)
 import Data.Ratio ((%))
 import Data.Text (Text, isPrefixOf, pack, strip, unpack)
 import qualified Data.Text as T
@@ -288,20 +288,27 @@ maybeToDidYouMeanStats :: Maybe a -> StatsResponse a
 maybeToDidYouMeanStats Nothing = NoResponse
 maybeToDidYouMeanStats (Just x) = DidYouMeanResponse x
 
-searchForStats :: BowBotData -> Manager -> (String, String) -> IO (StatsResponse Stats)
-searchForStats BowBotData {..} manager (uuid, name) = do
-  stats <- if null uuid then return Nothing else liftIO $ getStats manager uuid
+flatNickList :: BowBotData -> IO [(String, String)]
+flatNickList BowBotData {..} = do
   people <- atomically $ readTVar nickCache
-  let people' = [(n,u) | (n,us) <- people, u <- us]
+  let currentNicks = [(n,u) | (n,us) <- people, u <- maybeToList (listToMaybe us)]
+  let restOfNicks = [(n,u) | (n,us) <- people, u <- drop 1 us]
+  return $ currentNicks ++ restOfNicks
+  
+
+searchForStats :: BowBotData -> Manager -> (String, String) -> IO (StatsResponse Stats)
+searchForStats bbd manager (uuid, name) = do
+  stats <- if null uuid then return Nothing else liftIO $ getStats manager uuid
+  people <- flatNickList bbd
   case stats of
     Nothing -> do
-      let dists = map (\(u,n) -> (u, dist (map toLower n) (map toLower name))) people'
+      let dists = map (\(u,n) -> (u, dist (map toLower n) (map toLower name))) people
       let filtered = map fst . filter (\(u,d) -> d <= 2) $ dists
       case filtered of
         [] -> return NoResponse
         (nu:_) -> liftIO $ maybeToDidYouMeanStats <$> getStats manager nu
     s@(Just Stats {bowWins = 0, bowLosses = 0}) -> do
-      let dists = map (\(u,n) -> (u, dist (map toLower n) (map toLower name))) people'
+      let dists = map (\(u,n) -> (u, dist (map toLower n) (map toLower name))) people
       let filtered = map fst . filter (\(u,d) -> d <= 2) $ dists
       case filtered of
         [] -> return $ maybeToJustStats s
