@@ -235,7 +235,7 @@ uuidToNames manager uuid = do
 nameToUUID' :: Manager -> TVar [(String, [String])] -> String -> IO (Maybe String)
 nameToUUID' manager nameCache name = do
   cache <- atomically $ readTVar nameCache
-  case filter ((name`elem`) . snd) cache of
+  case filter ((name==) . head . snd) cache of
     [] -> nameToUUID manager name
     ((uuid, _) : _) -> return $ Just uuid
 
