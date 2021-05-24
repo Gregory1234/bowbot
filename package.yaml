@@ -32,6 +32,7 @@ dependencies:
 - stm
 - async
 - http-client-tls
+- vector
 
 library:
   source-dirs: src

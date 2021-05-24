@@ -17,7 +17,7 @@ import Control.Monad.IO.Class (liftIO)
 import Data.Aeson
 import Data.ByteString.Lazy (ByteString)
 import qualified Data.HashMap.Strict as HM
-import Data.Maybe (fromMaybe, mapMaybe, listToMaybe, maybeToList)
+import Data.Maybe (fromMaybe, mapMaybe, listToMaybe, maybeToList, isNothing)
 import Data.Text (Text, isPrefixOf, pack, strip, unpack)
 import qualified Data.Text as T
 import qualified Data.Text.IO as TIO
@@ -29,8 +29,9 @@ import Discord.Types
 import Network.HTTP.Conduit
 import System.Environment.Blank (getEnv)
 import System.Timeout (timeout)
-import Data.Char (toLower, isSpace)
+import Data.Char (toLower, isSpace, isDigit)
 import Control.Exception.Base (try, SomeException)
+import qualified Data.Vector as V
 import Stats
 
 data BowBotData = BowBotData
@@ -39,7 +40,9 @@ data BowBotData = BowBotData
     nickCache :: TVar [(String, [String])],
     online :: TVar (Maybe [String]),
     onlineBorder :: TVar (Maybe [String]),
-    onlineBusy :: TVar Bool
+    onlineBusy :: TVar Bool,
+    peopleSettings :: TVar [(UserId, StatsSettings)],
+    peopleNicks :: TVar [(UserId, String)]
   }
 
 main :: IO ()
@@ -48,13 +51,16 @@ main = do
   unless (apiKey == "") $ do
     count <- atomically $ newTVar 0
     countBorder <- atomically $ newTVar 0
-    f <- readFile "nicks.txt"
-    nickCache <- atomically $ newTVar $ (,[]) <$> lines f
+    nickCache <- atomically $ newTVar []
     online <- atomically $ newTVar Nothing
     onlineBorder <- atomically $ newTVar Nothing
     onlineBusy <- atomically $ newTVar False
+    peopleSettings <- atomically $ newTVar []
+    peopleNicks <- atomically $ newTVar []
     let bbdata = BowBotData {..}
-    updateNicks nickCache
+    manager <- newManager tlsManagerSettings
+    updateNicks manager nickCache
+    updateSettings manager peopleSettings peopleNicks
     mkBackground bbdata
     forever $ do
       userFacingError <-
@@ -65,11 +71,18 @@ main = do
             }
       TIO.putStrLn userFacingError
 
-updateNicks :: TVar [(String, [String])] -> IO ()
-updateNicks nickCache = do
-  manager <- newManager tlsManagerSettings
-  updatedNicks <- mapConcurrently (\(u, _) -> (u,) <$> uuidToNames manager u) =<< atomically (readTVar nickCache)
+updateNicks :: Manager -> TVar [(String, [String])] -> IO ()
+updateNicks manager nickCache = do
+  nickList <- getFullNickUUIDList manager
+  updatedNicks <- mapConcurrently (\u -> (u,) <$> uuidToNames manager u) nickList
   atomically $ writeTVar nickCache updatedNicks
+
+updateSettings :: Manager -> TVar [(UserId, StatsSettings)] -> TVar [(UserId, String)] -> IO ()
+updateSettings manager peopleSettings peopleNicks = do
+  settings <- getAllSettings manager
+  nicks <- getDiscordNicks manager
+  atomically $ writeTVar peopleSettings settings
+  atomically $ writeTVar peopleNicks nicks
 
 mkBackground :: BowBotData -> IO ()
 mkBackground bbdata = void $
@@ -108,7 +121,10 @@ background BowBotData {..} = do
           onl <- readTVar onlineBorder
           writeTVar online onl
           writeTVar onlineBorder Nothing
-        when (mint == "00") $ updateNicks nickCache
+        when (mint == "00") $ do
+          manager <- newManager tlsManagerSettings
+          updateNicks manager nickCache
+          updateSettings manager peopleSettings peopleNicks
         putStrLn "New minute finished!"
       threadDelay 60000000
 
@@ -180,14 +196,21 @@ statsCommand dt@BowBotData {..} sett m = do
   if cv
     then do
       manager <- liftIO $ newManager tlsManagerSettings
-      let name = unpack . strip . T.dropWhile isSpace . T.dropWhile (not . isSpace) $ messageText m
-      uuid <- liftIO $ nameToUUID' manager nickCache name
-      stats <- liftIO $ searchForStats dt manager (fromMaybe "" uuid, name)
-      _ <- case stats of
-        NoResponse -> restCall $ R.CreateMessage (messageChannel m) "*The player doesn't exist!*"
-        (JustResponse s) -> restCall . R.CreateMessage (messageChannel m) . pack . showStats sett $ s
-        (DidYouMeanResponse s) -> restCall . R.CreateMessage (messageChannel m) . ("*Did you mean* "<>) . pack . showStats sett $ s
-      pure ()
+      (uuid, name) <- if T.length (messageText m) <= 4
+      then do
+        pns <- liftIO $ atomically $ readTVar peopleNicks
+        liftIO $ print $ lookup (userId $ messageAuthor m) pns
+        return (lookup (userId $ messageAuthor m) pns, undefined)
+      else do
+        let name = unpack . strip . T.dropWhile isSpace . T.dropWhile (not . isSpace) $ messageText m
+        fmap (, name) $ liftIO $ nameToUUID' manager nickCache name
+      unless (isNothing uuid) $ do
+        stats <- liftIO $ searchForStats dt manager (fromMaybe "" uuid, name)
+        _ <- case stats of
+          NoResponse -> restCall $ R.CreateMessage (messageChannel m) "*The player doesn't exist!*"
+          (JustResponse s) -> restCall . R.CreateMessage (messageChannel m) . pack . showStats sett $ s
+          (DidYouMeanResponse s) -> restCall . R.CreateMessage (messageChannel m) . ("*Did you mean* "<>) . pack . showStats sett $ s
+        pure ()
     else do
       f <- liftIO $ read @Int <$> getTime "%S"
       _ <- restCall . R.CreateMessage (messageChannel m) . pack $ "**Too many requests! Wait another " ++ show ((65 - f) `mod` 60) ++ " seconds!**"
@@ -234,6 +257,111 @@ uuidToNames' manager nameCache uuid = do
   case filter ((== uuid) . fst) cache of
     [] -> uuidToNames manager uuid
     ((_, names) : _) -> return names
+
+getWatchlist :: Manager -> IO [String]
+getWatchlist manager = do
+  website <- fromMaybe "" <$> getEnv "DB_SITE"
+  apiKey <- fromMaybe "" <$> getEnv "DB_KEY"
+  let url = "http://" ++ website ++ "/watchlist.php?key=" ++ apiKey
+  res <- sendRequestTo manager url
+  case decode res :: Maybe Object of
+    Nothing -> return []
+    (Just js) -> do
+      putStrLn $ "Received response from: " ++ url
+      case js HM.!? "data" of
+        (Just (Array (V.toList -> list))) -> return $ mapMaybe str list
+        _ -> return []
+  where
+    str (String (unpack -> d)) = Just d
+    str _ = Nothing
+
+getFullNickUUIDList :: Manager -> IO [String]
+getFullNickUUIDList manager = do
+  website <- fromMaybe "" <$> getEnv "DB_SITE"
+  apiKey <- fromMaybe "" <$> getEnv "DB_KEY"
+  let url = "http://" ++ website ++ "/autocorrect.php?key=" ++ apiKey
+  res <- sendRequestTo manager url
+  case decode res :: Maybe Object of
+   Nothing -> return []
+   (Just js) -> do
+     putStrLn $ "Received response from: " ++ url
+     case js HM.!? "data" of
+       (Just (Array (V.toList -> list))) -> return $ mapMaybe str list
+       _ -> return []
+  where
+   str (String (unpack -> d)) = Just d
+   str _ = Nothing
+
+getAllSettings :: Manager -> IO [(UserId, StatsSettings)]
+getAllSettings manager = do
+  website <- fromMaybe "" <$> getEnv "DB_SITE"
+  apiKey <- fromMaybe "" <$> getEnv "DB_KEY"
+  let url = "http://" ++ website ++ "/settings.php?key=" ++ apiKey
+  res <- sendRequestTo manager url
+  case decode res :: Maybe Object of
+    Nothing -> return []
+    (Just js) -> do
+      putStrLn $ "Received response from: " ++ url
+      case js HM.!? "data" of
+        (Just (Array (V.toList -> list))) -> return $ mapMaybe parseSettings list
+        _ -> return []
+  where
+    parseSettings (Object js) = let
+      discord = maybe 0 read $ str (js HM.!? "discord")
+      sWins = parseBool (js HM.!? "wins")
+      sLosses = parseBool (js HM.!? "losses")
+      sWLR = parseSense (js HM.!? "wlr")
+      sWinsUntil = parseSense (js HM.!? "winsUntil")
+      sBestStreak = parseBool (js HM.!? "bestStreak")
+      sCurrentStreak = parseBool (js HM.!? "currentStreak")
+      sBestDailyStreak = parseBool (js HM.!? "bestDailyStreak")
+      sBowHits = parseBool (js HM.!? "bowHits")
+      sBowShots = parseBool (js HM.!? "bowShots")
+      sAccuracy = parseSense (js HM.!? "accuracy")
+      in Just (discord, StatsSettings {..})
+    parseSettings _ = Nothing
+    parseBool (Just "yes") = True
+    parseBool (Just "no") = False
+    parseBool _ = True
+    parseSense (Just "always") = Always
+    parseSense (Just "sensibly") = WhenSensible
+    parseSense (Just "never") = Never
+    parseSense _ = Always
+    str (Just (String (unpack -> d))) = Just d
+    str _ = Nothing
+
+getDiscordNicks :: Manager -> IO [(UserId, String)]
+getDiscordNicks manager = do
+  website <- fromMaybe "" <$> getEnv "DB_SITE"
+  apiKey <- fromMaybe "" <$> getEnv "DB_KEY"
+  let url = "http://" ++ website ++ "/people.php?key=" ++ apiKey
+  res <- sendRequestTo manager url
+  case decode res :: Maybe Object of
+   Nothing -> return []
+   (Just js) -> do
+     putStrLn $ "Received response from: " ++ url
+     case js HM.!? "data" of
+       (Just (Array (V.toList -> list))) -> return $ mapMaybe parsePerson list
+       _ -> return []
+  where
+   parsePerson (Object js) = let
+         discord = maybe 0 read $ str (js HM.!? "discord")
+         uuid = fromMaybe "" $ str (js HM.!? "minecraft")
+         in Just (discord, uuid)
+   parsePerson _ = Nothing
+   str (Just (String (unpack -> d))) = Just d
+   str _ = Nothing
+
+addNick :: Manager -> TVar [(UserId, String)] -> UserId -> String -> IO ()
+addNick manager peopleNicks id uuid = do
+  atomically $ do
+    n <- readTVar peopleNicks
+    writeTVar peopleNicks $ (id, uuid):filter ((/=id).fst) n
+  website <- fromMaybe "" <$> getEnv "DB_SITE"
+  apiKey <- fromMaybe "" <$> getEnv "DB_KEY"
+  let url = "http://" ++ website ++ "/addPerson.php?key=" ++ apiKey ++ "&discord=" ++ show id ++ "&minecraft=" ++ uuid
+  sendRequestTo manager url
+  pure ()
 
 dist :: Eq a => [a] -> [a] -> Int
 dist a b =
@@ -310,7 +438,8 @@ eventHandler dt@BowBotData {..} event = case event of
     unless (fromBot m) $ case unpack $ T.toLower . T.takeWhile (/= ' ') $ messageText m of
       "?s" -> do
         liftIO . putStrLn $ "recieved " ++ unpack (messageText m)
-        statsCommand dt defSettings m
+        settings <- liftIO $ atomically $ readTVar peopleSettings
+        statsCommand dt (fromMaybe defSettings $ lookup (userId $ messageAuthor m) settings) m
       "?sd" -> do
         liftIO . putStrLn $ "recieved " ++ unpack (messageText m)
         statsCommand dt defSettings m
@@ -334,7 +463,7 @@ eventHandler dt@BowBotData {..} event = case event of
                 _ <- restCall . R.CreateMessage (messageChannel m) $ "**Players in wachList currently in bow duels:** (cached response)"
                 pure onl
               Nothing -> do
-                people <- liftIO $ lines <$> readFile "watchlist.txt"
+                people <- liftIO $ getWatchlist manager
                 status <- liftIO $ mapConcurrently (\u -> (u,) . fromMaybe False <$> isInBowDuels manager u) people
                 let onl = map fst $ filter snd status
                 liftIO . atomically $ writeTVar (if t <= 5 || t >= 55 then onlineBorder else online) $ Just onl
@@ -350,8 +479,8 @@ eventHandler dt@BowBotData {..} event = case event of
             pure ()
       "?list" -> do
         liftIO . putStrLn $ "recieved " ++ unpack (messageText m)
-        st <- liftIO $ lines <$> readFile "watchlist.txt"
         manager <- liftIO $ newManager tlsManagerSettings
+        st <- liftIO $ getWatchlist manager
         people <- traverse (liftIO . uuidToNames' manager nickCache) st
         let str = T.unwords . map pack . mapMaybe listToMaybe $ people
         _ <- restCall . R.CreateMessage (messageChannel m) $ "**Players in wachList:**" <> "```\n" <> str <> "```"
@@ -366,9 +495,20 @@ eventHandler dt@BowBotData {..} event = case event of
               <> " - **?online** - *show all people from watchList currently in Bow Duels*\n"
               <> " - **?list** - *show all players in watchList*\n"
               <> " - **?s [name]** - *show player's Bow Duels stats*\n"
-              <> " - **?sa [name]** - *show all of player's Bow Duels stats*\n\n"
+              <> " - **?sa [name]** - *show all Bow Duels stats*\n\n"
+              <> " - **?sd [name]** - *show a default set of Bow Duels stats*\n\n"
               <> "Made by **GregC**#9698"
         pure ()
+      "?add" -> when (isAdmin (messageAuthor m)) $ do
+        liftIO . putStrLn $ "recieved " ++ unpack (messageText m)
+        manager <- liftIO $ newManager tlsManagerSettings
+        let wrds = tail $ words $ unpack $ messageText m
+        case wrds of
+          [id, "u", uuid] -> liftIO $ addNick manager peopleNicks (read (filter isDigit id)) uuid
+          [id, "n", name] -> do
+            Just uuid <- liftIO $ nameToUUID' manager nickCache name
+            liftIO $ addNick manager peopleNicks (read (filter isDigit id)) uuid
+          _ -> pure ()
       _ -> pure ()
   _ -> pure ()
 
@@ -380,3 +520,6 @@ command m c = when (not (fromBot m) && isCommand c (messageText m))
 
 isCommand :: Text -> Text -> Bool
 isCommand c = (c `isPrefixOf`) . T.toLower
+
+isAdmin :: User -> Bool
+isAdmin user = userId user == 422051538391793675
