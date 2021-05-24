@@ -46,6 +46,7 @@ library
 executable bowbot-exe
   main-is: Main.hs
   other-modules:
+      Stats
       Paths_bowbot
   hs-source-dirs:
       app

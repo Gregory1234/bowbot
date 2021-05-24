@@ -12,13 +12,12 @@ import Control.Applicative ((<|>))
 import Control.Concurrent (forkFinally, forkIO, threadDelay)
 import Control.Concurrent.Async (mapConcurrently)
 import Control.Concurrent.STM
-import Control.Monad (forever, unless, void, when, join)
+import Control.Monad (forever, unless, void, when)
 import Control.Monad.IO.Class (liftIO)
 import Data.Aeson
 import Data.ByteString.Lazy (ByteString)
 import qualified Data.HashMap.Strict as HM
-import Data.Maybe (catMaybes, fromMaybe, mapMaybe, listToMaybe, maybeToList)
-import Data.Ratio ((%))
+import Data.Maybe (fromMaybe, mapMaybe, listToMaybe, maybeToList)
 import Data.Text (Text, isPrefixOf, pack, strip, unpack)
 import qualified Data.Text as T
 import qualified Data.Text.IO as TIO
@@ -30,9 +29,9 @@ import Discord.Types
 import Network.HTTP.Conduit
 import System.Environment.Blank (getEnv)
 import System.Timeout (timeout)
-import Text.Printf (printf)
 import Data.Char (toLower, isSpace)
 import Control.Exception.Base (try, SomeException)
+import Stats
 
 data BowBotData = BowBotData
   { count :: TVar Int,
@@ -139,19 +138,6 @@ isInBowDuels manager uuid = do
           _ -> return $ Just False
         _ -> return $ Just False
 
-data BoolSense = Never | WhenSensible | Always deriving (Show, Eq, Ord, Enum)
-
-data Stats = Stats
-  { playerName :: String,
-    bowWins :: Integer,
-    bowLosses :: Integer,
-    bestWinstreak :: Integer,
-    currentWinstreak :: Integer,
-    bestDailyWinstreak :: Integer,
-    bowHits :: Integer,
-    bowShots :: Integer
-  }
-  deriving (Show)
 
 getStats :: Manager -> String -> IO (Maybe Stats)
 getStats manager uuid = do
@@ -181,46 +167,6 @@ getStats manager uuid = do
     roundNum _ (Just (Number (round -> x))) = x
     roundNum y _ = y
 
-data StatsSettings = StatsSettings
-  { sWins :: Bool
-  , sLosses :: Bool
-  , sWLR :: BoolSense
-  , sWinsUntil :: BoolSense
-  , sBestStreak :: Bool
-  , sCurrentStreak :: Bool
-  , sBestDailyStreak :: Bool
-  , sBowHits :: Bool
-  , sBowShots :: Bool
-  , sAccuracy :: BoolSense
-  } deriving (Eq, Show)
-
-defSettings :: StatsSettings
-defSettings = StatsSettings
-  { sWins = True
-  , sLosses = True
-  , sWLR = Always
-  , sWinsUntil = Always
-  , sBestStreak = True
-  , sCurrentStreak = True
-  , sBestDailyStreak = False
-  , sBowHits = False
-  , sBowShots = False
-  , sAccuracy = Never
-  }
-
-allSettings :: StatsSettings
-allSettings = StatsSettings
-  { sWins = True
-  , sLosses = True
-  , sWLR = Always
-  , sWinsUntil = Always
-  , sBestStreak = True
-  , sCurrentStreak = True
-  , sBestDailyStreak = True
-  , sBowHits = True
-  , sBowShots = True
-  , sAccuracy = Always
-  }
 
 statsCommand :: BowBotData -> StatsSettings -> Message -> DiscordHandler ()
 statsCommand dt@BowBotData {..} sett m = do
@@ -247,74 +193,6 @@ statsCommand dt@BowBotData {..} sett m = do
       _ <- restCall . R.CreateMessage (messageChannel m) . pack $ "**Too many requests! Wait another " ++ show ((65 - f) `mod` 60) ++ " seconds!**"
       pure ()
 
-
-showStats :: StatsSettings -> Stats -> String
-showStats StatsSettings {..} Stats {..} = unlines $ catMaybes
-  [ onlyIf True
-  $ "**" ++ playerName ++ ":**"
-  , onlyIf sWins
-  $ "- *Bow Duels Wins:* **"
-  ++ show bowWins
-  ++ "**"
-  , onlyIf sLosses
-  $ " - *Bow Duels Losses:* **"
-  ++ show bowLosses
-  ++ "**"
-  , onlyIf (sense sWLR (bowWins + bowLosses /= 0))
-  $ " - *Bow Duels Win/Loss Ratio:* **"
-  ++ winLossRatio
-  ++ "**"
-  , onlyIf (sense sWinsUntil (bowLosses /= 0))
-  $ " - *Bow Duels Wins until "
-  ++ nextWinLossRatio
-  ++ " WLR:* **"
-  ++ winsRemaining
-  ++ "**"
-  , onlyIf sBestStreak
-  $ " - *Best Bow Duels Winstreak:* **"
-  ++ show bestWinstreak
-  ++ "**"
-  , onlyIf sCurrentStreak
-  $ " - *Current Bow Duels Winstreak:* **"
-  ++ show currentWinstreak
-  ++ "**"
-  , onlyIf sBestDailyStreak
-  $ " - *Best Daily Bow Duels Winstreak(?):* **"
-  ++ show bestDailyWinstreak
-  ++ "**"
-  , onlyIf sBowHits
-  $ " - *Bow Hits in Bow Duels:* **"
-  ++ show bowHits
-  ++ "**"
-  , onlyIf sBowShots
-  $ " - *Bow Shots in Bow Duels:* **"
-  ++ show bowShots
-  ++ "**"
-  , onlyIf (sense sAccuracy (bowShots /= 0))
-  $ " - *Bow Accuracy:* **"
-  ++ accuracy
-  ++ "**"
-  ]
-  where
-    sense Always _ = True
-    sense Never _ = False
-    sense WhenSensible x = x
-    onlyIf True a = Just a
-    onlyIf False _ = Nothing
-    winLossRatio
-      | bowWins == 0, bowLosses == 0 = "NaN"
-      | bowLosses == 0 = "∞"
-      | otherwise = printf "%.04f" (fromRational (bowWins % bowLosses) :: Double)
-    nextWinLossRatio
-      | bowLosses == 0 = "∞"
-      | otherwise = show $ (bowWins `div` bowLosses) + 1
-    winsRemaining
-      | bowWins == 0, bowLosses == 0 = "1"
-      | bowLosses == 0 = "N/A"
-      | otherwise = show (bowLosses - (bowWins `mod` bowLosses))
-    accuracy
-      | bowShots == 0 = "N/A"
-      | otherwise = show (round ((bowHits*100) % bowShots) :: Integer) ++ "%"
 
 nameToUUID :: Manager -> String -> IO (Maybe String)
 nameToUUID manager name = do
@@ -487,7 +365,7 @@ eventHandler dt@BowBotData {..} event = case event of
               <> " - **?help** - *display this message*\n"
               <> " - **?online** - *show all people from watchList currently in Bow Duels*\n"
               <> " - **?list** - *show all players in watchList*\n"
-              <> " - **?s [name]** - *show player's Bow Duels stats*\n\n"
+              <> " - **?s [name]** - *show player's Bow Duels stats*\n"
               <> " - **?sa [name]** - *show all of player's Bow Duels stats*\n\n"
               <> "Made by **GregC**#9698"
         pure ()
