@@ -495,9 +495,9 @@ eventHandler dt@BowBotData {..} event = case event of
               <> " - **?online** - *show all people from watchList currently in Bow Duels*\n"
               <> " - **?list** - *show all players in watchList*\n"
               <> " - **?s [name]** - *show player's Bow Duels stats*\n"
-              <> " - **?sa [name]** - *show all Bow Duels stats*\n\n"
-              <> " - **?sd [name]** - *show a default set of Bow Duels stats*\n\n"
-              <> "Made by **GregC**#9698"
+              <> " - **?sa [name]** - *show all Bow Duels stats*\n"
+              <> " - **?sd [name]** - *show a default set of Bow Duels stats*\n"
+              <> "\nMade by **GregC**#9698"
         pure ()
       "?add" -> when (isAdmin (messageAuthor m)) $ do
         liftIO . putStrLn $ "recieved " ++ unpack (messageText m)
