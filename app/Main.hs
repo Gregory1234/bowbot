@@ -31,7 +31,8 @@ import Network.HTTP.Conduit
 import System.Environment.Blank (getEnv)
 import System.Timeout (timeout)
 import Text.Printf (printf)
-import Data.Char (toLower)
+import Data.Char (toLower, isSpace)
+import Control.Exception.Base (try, SomeException)
 
 data BowBotData = BowBotData
   { count :: TVar Int,
@@ -116,43 +117,12 @@ sendRequestTo :: Manager -> String -> IO ByteString
 sendRequestTo manager url = do
   putStrLn url
   request <- parseRequest url
-  res <- httpLbs request manager
-  return $ responseBody res
-
-data Stats = Stats
-  { playerName :: String,
-    bowWins :: Integer,
-    bowLosses :: Integer,
-    bestWinstreak :: Integer,
-    currentWinstreak :: Integer
-  }
-  deriving (Show)
-
-getStats :: Manager -> String -> IO (Maybe Stats)
-getStats manager uuid = do
-  apiKey <- fromMaybe "" <$> getEnv "HYPIXEL_API"
-  let url = "https://api.hypixel.net/player?key=" ++ apiKey ++ "&uuid=" ++ uuid
-  res <- sendRequestTo manager url
-  case decode res :: Maybe Object of
-    Nothing -> return Nothing
-    (Just js) -> do
-      putStrLn $ "Received response from: " ++ url
-      case js HM.!? "player" of
-        (Just (Object pl)) -> case (pl HM.!? "displayname", pl HM.!? "stats") of
-          (Just (String (unpack -> playerName)), Just (Object st)) -> case st HM.!? "Duels" of
-            (Just (Object ds)) -> case (ds HM.!? "current_bow_winstreak", ds HM.!? "best_bow_winstreak", ds HM.!? "bow_duel_wins", ds HM.!? "bow_duel_losses") of
-              (Just (Number (round -> currentWinstreak)), Just (Number (round -> bestWinstreak)), Just (Number (round -> bowWins)), Just (Number (round -> bowLosses))) ->
-                return . Just $ Stats {..}
-              (Just (Number (round -> currentWinstreak)), Just (Number (round -> bestWinstreak)), Just (Number (round -> bowWins)), Nothing) ->
-                return . Just $ Stats {bowLosses = 0, ..}
-              (_, _, Nothing, Just (Number (round -> bowLosses))) ->
-                return . Just $ Stats {bowWins = 0, currentWinstreak = 0, bestWinstreak = 0, ..}
-              (_, _, Nothing, Nothing) ->
-                return . Just $ Stats {bowWins = 0, bowLosses = 0, currentWinstreak = 0, bestWinstreak = 0, ..}
-              _ -> return Nothing
-            _ -> return . Just $ Stats {bowWins = 0, bowLosses = 0, currentWinstreak = 0, bestWinstreak = 0, ..}
-          _ -> return Nothing
-        _ -> return Nothing
+  res <- try $ httpLbs request manager
+  case res of
+    (Left (e :: SomeException)) -> do
+      print e
+      sendRequestTo manager url
+    (Right v) -> return $ responseBody v
 
 isInBowDuels :: Manager -> String -> IO (Maybe Bool)
 isInBowDuels manager uuid = do
@@ -169,30 +139,168 @@ isInBowDuels manager uuid = do
           _ -> return $ Just False
         _ -> return $ Just False
 
-showStats :: Stats -> String
-showStats Stats {..} =
-  "**" ++ playerName ++ ":**\n"
-    ++ "- *Bow Duels Wins:* **"
-    ++ show bowWins
-    ++ "**\n"
-    ++ " - *Bow Duels Losses:* **"
-    ++ show bowLosses
-    ++ "**\n"
-    ++ " - *Bow Duels Win/Loss Ratio:* **"
-    ++ winLossRatio
-    ++ "**\n"
-    ++ " - *Bow Duels Wins until "
-    ++ nextWinLossRatio
-    ++ " WLR:* **"
-    ++ winsRemaining
-    ++ "**\n"
-    ++ " - *Best Bow Duels Winstreak:* **"
-    ++ show bestWinstreak
-    ++ "**\n"
-    ++ " - *Current Bow Duels Winstreak:* **"
-    ++ show currentWinstreak
-    ++ "**"
+data BoolSense = Never | WhenSensible | Always deriving (Show, Eq, Ord, Enum)
+
+data Stats = Stats
+  { playerName :: String,
+    bowWins :: Integer,
+    bowLosses :: Integer,
+    bestWinstreak :: Integer,
+    currentWinstreak :: Integer,
+    bestDailyWinstreak :: Integer,
+    bowHits :: Integer,
+    bowShots :: Integer
+  }
+  deriving (Show)
+
+getStats :: Manager -> String -> IO (Maybe Stats)
+getStats manager uuid = do
+  apiKey <- fromMaybe "" <$> getEnv "HYPIXEL_API"
+  let url = "https://api.hypixel.net/player?key=" ++ apiKey ++ "&uuid=" ++ uuid
+  res <- sendRequestTo manager url
+  case decode res :: Maybe Object of
+    Nothing -> return Nothing
+    (Just js) -> do
+      putStrLn $ "Received response from: " ++ url
+      case js HM.!? "player" of
+        (Just (Object pl)) -> case (pl HM.!? "displayname", pl HM.!? "stats") of
+          (Just (String (unpack -> playerName)), Just (Object st)) -> case st HM.!? "Duels" of
+            (Just (Object ds)) -> let
+              bowWins = roundNum 0 $ ds HM.!? "bow_duel_wins"
+              bowLosses = roundNum 0 $ ds HM.!? "bow_duel_losses"
+              currentWinstreak = roundNum 0 $ ds HM.!? "current_bow_winstreak"
+              bestWinstreak = roundNum 0 $ ds HM.!? "best_bow_winstreak"
+              bestDailyWinstreak = roundNum 0 $ ds HM.!? "duels_winstreak_best_bow_duel"
+              bowHits = roundNum 0 $ ds HM.!? "bow_duel_bow_hits"
+              bowShots = roundNum 0 $ ds HM.!? "bow_duel_bow_shots"
+              in return . Just $ Stats {..}
+            _ -> return . Just $ Stats {bowWins = 0, bowLosses = 0, currentWinstreak = 0, bestWinstreak = 0, bestDailyWinstreak = 0, bowHits = 0, bowShots = 0, ..}
+          _ -> return Nothing
+        _ -> return Nothing
   where
+    roundNum _ (Just (Number (round -> x))) = x
+    roundNum y _ = y
+
+data StatsSettings = StatsSettings
+  { sWins :: Bool
+  , sLosses :: Bool
+  , sWLR :: BoolSense
+  , sWinsUntil :: BoolSense
+  , sBestStreak :: Bool
+  , sCurrentStreak :: Bool
+  , sBestDailyStreak :: Bool
+  , sBowHits :: Bool
+  , sBowShots :: Bool
+  , sAccuracy :: BoolSense
+  } deriving (Eq, Show)
+
+defSettings :: StatsSettings
+defSettings = StatsSettings
+  { sWins = True
+  , sLosses = True
+  , sWLR = Always
+  , sWinsUntil = Always
+  , sBestStreak = True
+  , sCurrentStreak = True
+  , sBestDailyStreak = False
+  , sBowHits = False
+  , sBowShots = False
+  , sAccuracy = Never
+  }
+
+allSettings :: StatsSettings
+allSettings = StatsSettings
+  { sWins = True
+  , sLosses = True
+  , sWLR = Always
+  , sWinsUntil = Always
+  , sBestStreak = True
+  , sCurrentStreak = True
+  , sBestDailyStreak = True
+  , sBowHits = True
+  , sBowShots = True
+  , sAccuracy = Always
+  }
+
+statsCommand :: BowBotData -> StatsSettings -> Message -> DiscordHandler ()
+statsCommand dt@BowBotData {..} sett m = do
+  t <- liftIO $ read @Int <$> getTime "%S"
+  cv <- liftIO . atomically $ do
+    c1 <- readTVar count
+    c2 <- readTVar countBorder
+    let c = c1 + c2
+    when (c < 15) $ modifyTVar (if t <= 5 || t >= 55 then countBorder else count) (+ 1)
+    return $ c < 15
+  if cv
+    then do
+      manager <- liftIO $ newManager tlsManagerSettings
+      let name = unpack . strip . T.dropWhile isSpace . T.dropWhile (not . isSpace) $ messageText m
+      uuid <- liftIO $ nameToUUID' manager nickCache name
+      stats <- liftIO $ searchForStats dt manager (fromMaybe "" uuid, name)
+      _ <- case stats of
+        NoResponse -> restCall $ R.CreateMessage (messageChannel m) "*The player doesn't exist!*"
+        (JustResponse s) -> restCall . R.CreateMessage (messageChannel m) . pack . showStats sett $ s
+        (DidYouMeanResponse s) -> restCall . R.CreateMessage (messageChannel m) . ("*Did you mean* "<>) . pack . showStats sett $ s
+      pure ()
+    else do
+      f <- liftIO $ read @Int <$> getTime "%S"
+      _ <- restCall . R.CreateMessage (messageChannel m) . pack $ "**Too many requests! Wait another " ++ show ((65 - f) `mod` 60) ++ " seconds!**"
+      pure ()
+
+
+showStats :: StatsSettings -> Stats -> String
+showStats StatsSettings {..} Stats {..} = unlines $ catMaybes
+  [ onlyIf True
+  $ "**" ++ playerName ++ ":**"
+  , onlyIf sWins
+  $ "- *Bow Duels Wins:* **"
+  ++ show bowWins
+  ++ "**"
+  , onlyIf sLosses
+  $ " - *Bow Duels Losses:* **"
+  ++ show bowLosses
+  ++ "**"
+  , onlyIf (sense sWLR (bowWins + bowLosses /= 0))
+  $ " - *Bow Duels Win/Loss Ratio:* **"
+  ++ winLossRatio
+  ++ "**"
+  , onlyIf (sense sWinsUntil (bowLosses /= 0))
+  $ " - *Bow Duels Wins until "
+  ++ nextWinLossRatio
+  ++ " WLR:* **"
+  ++ winsRemaining
+  ++ "**"
+  , onlyIf sBestStreak
+  $ " - *Best Bow Duels Winstreak:* **"
+  ++ show bestWinstreak
+  ++ "**"
+  , onlyIf sCurrentStreak
+  $ " - *Current Bow Duels Winstreak:* **"
+  ++ show currentWinstreak
+  ++ "**"
+  , onlyIf sBestDailyStreak
+  $ " - *Best Daily Bow Duels Winstreak(?):* **"
+  ++ show bestDailyWinstreak
+  ++ "**"
+  , onlyIf sBowHits
+  $ " - *Bow Hits in Bow Duels:* **"
+  ++ show bowHits
+  ++ "**"
+  , onlyIf sBowShots
+  $ " - *Bow Shots in Bow Duels:* **"
+  ++ show bowShots
+  ++ "**"
+  , onlyIf (sense sAccuracy (bowShots /= 0))
+  $ " - *Bow Accuracy:* **"
+  ++ accuracy
+  ++ "**"
+  ]
+  where
+    sense Always _ = True
+    sense Never _ = False
+    sense WhenSensible x = x
+    onlyIf True a = Just a
+    onlyIf False _ = Nothing
     winLossRatio
       | bowWins == 0, bowLosses == 0 = "NaN"
       | bowLosses == 0 = "∞"
@@ -204,6 +312,9 @@ showStats Stats {..} =
       | bowWins == 0, bowLosses == 0 = "1"
       | bowLosses == 0 = "N/A"
       | otherwise = show (bowLosses - (bowWins `mod` bowLosses))
+    accuracy
+      | bowShots == 0 = "N/A"
+      | otherwise = show (round ((bowHits*100) % bowShots) :: Integer) ++ "%"
 
 nameToUUID :: Manager -> String -> IO (Maybe String)
 nameToUUID manager name = do
@@ -321,28 +432,13 @@ eventHandler dt@BowBotData {..} event = case event of
     unless (fromBot m) $ case unpack $ T.toLower . T.takeWhile (/= ' ') $ messageText m of
       "?s" -> do
         liftIO . putStrLn $ "recieved " ++ unpack (messageText m)
-        t <- liftIO $ read @Int <$> getTime "%S"
-        cv <- liftIO . atomically $ do
-          c1 <- readTVar count
-          c2 <- readTVar countBorder
-          let c = c1 + c2
-          when (c < 15) $ modifyTVar (if t <= 5 || t >= 55 then countBorder else count) (+ 1)
-          return $ c < 15
-        if cv
-          then do
-            manager <- liftIO $ newManager tlsManagerSettings
-            let name = unpack . strip . T.drop 2 $ messageText m
-            uuid <- liftIO $ nameToUUID' manager nickCache name
-            stats <- liftIO $ searchForStats dt manager (fromMaybe "" uuid, name)
-            _ <- case stats of
-              NoResponse -> restCall $ R.CreateMessage (messageChannel m) "*The player doesn't exist!*"
-              (JustResponse s) -> restCall . R.CreateMessage (messageChannel m) . pack . showStats $ s
-              (DidYouMeanResponse s) -> restCall . R.CreateMessage (messageChannel m) . ("*Did you mean* "<>) . pack . showStats $ s
-            pure ()
-          else do
-            f <- liftIO $ read @Int <$> getTime "%S"
-            _ <- restCall . R.CreateMessage (messageChannel m) . pack $ "**Too many requests! Wait another " ++ show ((65 - f) `mod` 60) ++ " seconds!**"
-            pure ()
+        statsCommand dt defSettings m
+      "?sd" -> do
+        liftIO . putStrLn $ "recieved " ++ unpack (messageText m)
+        statsCommand dt defSettings m
+      "?sa" -> do
+        liftIO . putStrLn $ "recieved " ++ unpack (messageText m)
+        statsCommand dt allSettings m
       "?online" -> do
         liftIO . putStrLn $ "recieved " ++ unpack (messageText m)
         t <- liftIO $ read @Int <$> getTime "%S"
@@ -392,6 +488,7 @@ eventHandler dt@BowBotData {..} event = case event of
               <> " - **?online** - *show all people from watchList currently in Bow Duels*\n"
               <> " - **?list** - *show all players in watchList*\n"
               <> " - **?s [name]** - *show player's Bow Duels stats*\n\n"
+              <> " - **?sa [name]** - *show all of player's Bow Duels stats*\n\n"
               <> "Made by **GregC**#9698"
         pure ()
       _ -> pure ()
