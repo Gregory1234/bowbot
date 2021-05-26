@@ -193,14 +193,14 @@ eventHandler dt@BowBotData {..} sm event = case event of
         liftIO . putStrLn $ "recieved " ++ unpack (messageText m)
         _ <-
           restCall . R.CreateMessage (messageChannel m) $
-            "**Bow bot settings help:**\n\n"
-              <> "**Settings:** wins, losses, wlr, winsuntil, beststreak, currentstreak, bestdailystreak, bowhits, bowshots, accuracy\n"
+            "**Bow bot stat settings help:**\n\n"
+              <> "**Stat names:** wins, losses, wlr, winsuntil, beststreak, currentstreak, bestdailystreak, bowhits, bowshots, accuracy\n"
               <> "**Commands:**\n"
               <> " - **?settings** - *display this message*\n"
-              <> " - **?show [setting]** - *makes the setting visible*\n"
-              <> " - **?hide [setting]** - *makes the setting hidden*\n"
-              <> " - **?show [setting] [yes|always|show|no|never|hide|maybe|defined]** - *sets the visibility of the setting*\n"
-              <> "*Visibility 'maybe' and 'defined' hide the setting when the value is undefined.*\n"
+              <> " - **?show [stat]** - *makes the stat visible*\n"
+              <> " - **?hide [stat]** - *makes the stat hidden*\n"
+              <> " - **?show [stat] [yes|always|show|no|never|hide|maybe|defined]** - *sets the visibility of the stat*\n"
+              <> "*Visibility 'maybe' and 'defined' hide the stat when the value is undefined.*\n"
               <> "\nMade by **GregC**#9698"
         pure ()
       "?show" -> commandTimeout 2 $ do
