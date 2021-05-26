@@ -173,6 +173,7 @@ eventHandler dt@BowBotData {..} sm event = case event of
               <> " - **?s [name]** - *show player's Bow Duels stats*\n"
               <> " - **?sa [name]** - *show all Bow Duels stats*\n"
               <> " - **?sd [name]** - *show a default set of Bow Duels stats*\n"
+              <> " - **?settings** - *display help for settings*\n"
               <> "\nMade by **GregC**#9698"
         pure ()
       "?add" -> commandTimeout 2 $ when (isAdmin (messageAuthor m)) $ do
@@ -188,6 +189,31 @@ eventHandler dt@BowBotData {..} sm event = case event of
       "?refresh" -> commandTimeout 2 $ when (isAdmin (messageAuthor m)) $ do
         liftIO . putStrLn $ "recieved " ++ unpack (messageText m)
         liftIO $ updateData dt
+      "?settings" -> commandTimeout 2 $ do
+        liftIO . putStrLn $ "recieved " ++ unpack (messageText m)
+        _ <-
+          restCall . R.CreateMessage (messageChannel m) $
+            "**Bow bot settings help:**\n\n"
+              <> "**Settings:** wins, losses, wlr, winsuntil, beststreak, currentstreak, bestdailystreak, bowhits, bowshots, accuracy\n"
+              <> "**Commands:**\n"
+              <> " - **?settings** - *display this message*\n"
+              <> " - **?show [setting]** - *makes the setting visible*\n"
+              <> " - **?hide [setting]** - *makes the setting hidden*\n"
+              <> " - **?hide [setting] [yes|always|show|no|never|hide|maybe|defined]** - *sets the visibility of the setting*\n"
+              <> "*Visibility 'maybe' and 'defined' hide the setting when the value is undefined.*\n"
+              <> "\nMade by **GregC**#9698"
+        pure ()
+      "?show" -> commandTimeout 2 $ do
+        let wrds = tail $ words $ unpack $ messageText m
+        case wrds of
+          [setting] -> setSetting dt sm m setting Nothing
+          [setting, value] -> setSetting dt sm m setting (Just value)
+          _ -> void $ restCall $ R.CreateMessage (messageChannel m) "*Wrong command syntax*"
+      "?hide" -> commandTimeout 2 $ do
+        let wrds = tail $ words $ unpack $ messageText m
+        case wrds of
+          [setting] -> setSetting dt sm m setting (Just "hide")
+          _ -> void $ restCall $ R.CreateMessage (messageChannel m) "*Wrong command syntax*"
       _ -> pure ()
   _ -> pure ()
 
