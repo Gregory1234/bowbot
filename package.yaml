@@ -33,6 +33,8 @@ dependencies:
 - async
 - http-client-tls
 - vector
+- transformers
+- split
 
 library:
   source-dirs: src

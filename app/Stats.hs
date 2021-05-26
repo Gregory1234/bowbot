@@ -67,7 +67,7 @@ showStats StatsSettings {..} Stats {..} = unlines $ catMaybes
   [ onlyIf True
   $ "**" ++ playerName ++ ":**"
   , onlyIf sWins
-  $ "- *Bow Duels Wins:* **"
+  $ " - *Bow Duels Wins:* **"
   ++ show bowWins
   ++ "**"
   , onlyIf sLosses

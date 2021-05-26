@@ -37,9 +37,11 @@ library
     , discord-haskell
     , http-client-tls
     , http-conduit
+    , split
     , stm
     , text
     , time
+    , transformers
     , unordered-containers
     , vector
   default-language: Haskell2010
@@ -47,7 +49,10 @@ library
 executable bowbot-exe
   main-is: Main.hs
   other-modules:
+      API
+      Commands
       Stats
+      Utils
       Paths_bowbot
   hs-source-dirs:
       app
@@ -62,9 +67,11 @@ executable bowbot-exe
     , discord-haskell
     , http-client-tls
     , http-conduit
+    , split
     , stm
     , text
     , time
+    , transformers
     , unordered-containers
     , vector
   default-language: Haskell2010
@@ -87,9 +94,11 @@ test-suite bowbot-test
     , discord-haskell
     , http-client-tls
     , http-conduit
+    , split
     , stm
     , text
     , time
+    , transformers
     , unordered-containers
     , vector
   default-language: Haskell2010
