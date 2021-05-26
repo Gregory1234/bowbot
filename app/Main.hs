@@ -199,7 +199,7 @@ eventHandler dt@BowBotData {..} sm event = case event of
               <> " - **?settings** - *display this message*\n"
               <> " - **?show [setting]** - *makes the setting visible*\n"
               <> " - **?hide [setting]** - *makes the setting hidden*\n"
-              <> " - **?hide [setting] [yes|always|show|no|never|hide|maybe|defined]** - *sets the visibility of the setting*\n"
+              <> " - **?show [setting] [yes|always|show|no|never|hide|maybe|defined]** - *sets the visibility of the setting*\n"
               <> "*Visibility 'maybe' and 'defined' hide the setting when the value is undefined.*\n"
               <> "\nMade by **GregC**#9698"
         pure ()
