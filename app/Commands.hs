@@ -16,7 +16,7 @@ import System.Environment.Blank (getEnv)
 import Stats
 import Utils
 import API
-import Data.Maybe (fromMaybe, maybeToList, listToMaybe, isNothing)
+import Data.Maybe (fromMaybe, maybeToList, listToMaybe, isNothing, isJust)
 import Data.Char (toLower, isSpace)
 import Control.Monad (when, unless, void)
 import Data.Text (unpack, strip, pack)
@@ -98,20 +98,24 @@ statsCommand dt@BowBotData {..} manager sett m = do
     return $ c < 15
   if cv
     then do
-      (uuid, name) <- if T.length (messageText m) <= 4
+      let wrd = T.words (messageText m)
+      (uuid, name) <- if length wrd == 1
       then do
         pns <- liftIO $ atomically $ readTVar peopleNicks
         liftIO $ print $ lookup (userId $ messageAuthor m) pns
-        return (lookup (userId $ messageAuthor m) pns, undefined)
+        return (lookup (userId $ messageAuthor m) pns, "")
       else do
         let name = unpack . strip . T.dropWhile isSpace . T.dropWhile (not . isSpace) $ messageText m
         fmap (, name) $ liftIO $ nameToUUID' manager nickCache name
-      unless (isNothing uuid) $ do
+      if isJust uuid then do
         stats <- liftIO $ searchForStats dt manager (fromMaybe "" uuid, name)
         _ <- case stats of
           NoResponse -> restCall $ R.CreateMessage (messageChannel m) "*The player doesn't exist!*"
           (JustResponse s) -> restCall . R.CreateMessage (messageChannel m) . pack . showStats sett $ s
           (DidYouMeanResponse s) -> restCall . R.CreateMessage (messageChannel m) . ("*Did you mean* "<>) . pack . showStats sett $ s
+        pure ()
+      else do
+        _ <- restCall $ R.CreateMessage (messageChannel m) $ if null name then "*You aren't on the list! Please provide your ign to get added in the future.*" else "*The player doesn't exist!*"
         pure ()
     else do
       f <- liftIO $ read @Int <$> getTime "%S"

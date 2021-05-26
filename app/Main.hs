@@ -185,6 +185,9 @@ eventHandler dt@BowBotData {..} sm event = case event of
             Just uuid <- liftIO $ nameToUUID' manager nickCache name
             liftIO $ addNick manager peopleNicks (read (filter isDigit did)) uuid
           _ -> pure ()
+      "?refresh" -> commandTimeout 2 $ when (isAdmin (messageAuthor m)) $ do
+        liftIO . putStrLn $ "recieved " ++ unpack (messageText m)
+        liftIO $ updateData dt
       _ -> pure ()
   _ -> pure ()
 
