@@ -146,7 +146,7 @@ eventHandler dt@BowBotData {..} sm event = case event of
                 _ <- restCall . R.CreateMessage (messageChannel m) $ "**Players in wachList currently in bow duels:**"
                 pure onl
             liftIO . atomically $ writeTVar onlineBusy False
-            names <- liftIO $ traverse (fmap last . uuidToNames' manager nickCache) o
+            names <- liftIO $ traverse (fmap head . uuidToNames' manager nickCache) o
             let msg = if null names then "None of the watchListed players are currently in bow duels." else pack . unlines . map (" - " ++) $ names
             _ <- restCall . R.CreateMessage (messageChannel m) $ "```" <> msg <> "```"
             pure ()
