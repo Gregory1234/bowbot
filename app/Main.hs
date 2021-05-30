@@ -155,12 +155,30 @@ eventHandler dt@BowBotData {..} sm event = case event of
             pure ()
       "?list" -> commandTimeout 2 $ do
         liftIO . putStrLn $ "recieved " ++ unpack (messageText m)
-        manager <- liftIO $ newManager managerSettings
-        st <- liftIO $ getWatchlist manager
-        people <- traverse (liftIO . uuidToNames' manager nickCache) st
-        let str = T.unwords . map pack . mapMaybe listToMaybe $ people
-        _ <- restCall . R.CreateMessage (messageChannel m) $ "**Players in wachList:**" <> "```\n" <> str <> "```"
-        pure ()
+        let wrds = tail $ words $ unpack $ messageText m
+        ln <- case wrds of
+          [] -> do
+            manager <- liftIO $ newManager managerSettings
+            st <- liftIO $ getWatchlist manager
+            people <- traverse (liftIO . uuidToNames' manager nickCache) st
+            return $ Just (map pack . mapMaybe listToMaybe $ people, "Players in watchList")
+          ["w"] -> do
+            manager <- liftIO $ newManager managerSettings
+            st <- liftIO $ getWatchlist manager
+            people <- traverse (liftIO . uuidToNames' manager nickCache) st
+            return $ Just (map pack . mapMaybe listToMaybe $ people, "Players in watchList")
+          ["ac"] -> do
+            st <- liftIO $ atomically $ readTVar nickCache
+            return $ Just (map pack $ mapMaybe (listToMaybe . snd) st, "Players on autocomplete list")
+          ["d"] -> do
+            manager <- liftIO $ newManager managerSettings
+            st <- liftIO $ atomically $ readTVar peopleNicks
+            people <- traverse (liftIO . uuidToNames' manager nickCache . snd) st
+            return $ Just (map pack . mapMaybe listToMaybe $ people, "Players on discord list")
+          _ -> return Nothing
+        void $ restCall $ R.CreateMessage (messageChannel m) $ case ln of
+          Nothing ->  "*Wrong command syntax*"
+          Just (list, name) -> "**"<> name <> ":**" <> "```\n" <> T.unwords list <> "```"
       "?help" -> commandTimeout 2 $ do
         liftIO . putStrLn $ "recieved " ++ unpack (messageText m)
         _ <-
@@ -193,15 +211,15 @@ eventHandler dt@BowBotData {..} sm event = case event of
         liftIO . putStrLn $ "recieved " ++ unpack (messageText m)
         _ <-
           restCall . R.CreateMessage (messageChannel m) $
-            "**Bow bot stat settings help:**\n\n"
-              <> "**Stat names:** wins, losses, wlr, winsuntil, beststreak, currentstreak, bestdailystreak, bowhits, bowshots, accuracy\n"
+            "**You can now customize the output of ?s command!**"
               <> "**Commands:**\n"
               <> " - **?settings** - *display this message*\n"
               <> " - **?show [stat]** - *makes the stat visible*\n"
               <> " - **?hide [stat]** - *makes the stat hidden*\n"
               <> " - **?show [stat] [yes|always|show|no|never|hide|maybe|defined]** - *sets the visibility of the stat*\n"
               <> "*Visibility 'maybe' and 'defined' hide the stat when the value is undefined.*\n"
-              <> "\nMade by **GregC**#9698"
+              <> "**Stat names:** wins, losses, wlr, winsuntil, beststreak, currentstreak, bestdailystreak, bowhits, bowshots, accuracy\n"
+              <> "**Example:** *?show accuracy* makes accuracy visible in the ?s command\n"
         pure ()
       "?show" -> commandTimeout 2 $ do
         let wrds = tail $ words $ unpack $ messageText m
