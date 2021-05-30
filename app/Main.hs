@@ -29,6 +29,7 @@ import API
 import Commands
 import Data.List.Split (chunksOf)
 import Data.Traversable (for)
+import Data.Text.Encoding (encodeUtf8)
 
 
 
@@ -176,9 +177,14 @@ eventHandler dt@BowBotData {..} sm event = case event of
             people <- traverse (liftIO . uuidToNames' manager nickCache . snd) st
             return $ Just (map pack . mapMaybe listToMaybe $ people, "Players on discord list")
           _ -> return Nothing
-        void $ restCall $ R.CreateMessage (messageChannel m) $ case ln of
-          Nothing ->  "*Wrong command syntax*"
-          Just (list, name) -> "**"<> name <> ":**" <> "```\n" <> T.unwords list <> "```"
+        void $ case ln of
+          Nothing -> restCall $ R.CreateMessage (messageChannel m) "*Wrong command syntax*"
+          Just (list, name) ->
+            if sum (map T.length list) < 1800
+              then restCall $ R.CreateMessage (messageChannel m) $ "**" <> name <> ":**\n" <> "```\n" <> T.unwords list <> "```"
+              else do
+                _ <- restCall $ R.CreateMessage (messageChannel m) $ "**" <> name <> ":**"
+                restCall $ R.CreateMessageUploadFile (messageChannel m) "list.txt" $ encodeUtf8 (T.unlines list)
       "?help" -> commandTimeout 2 $ do
         liftIO . putStrLn $ "recieved " ++ unpack (messageText m)
         _ <-
@@ -211,7 +217,7 @@ eventHandler dt@BowBotData {..} sm event = case event of
         liftIO . putStrLn $ "recieved " ++ unpack (messageText m)
         _ <-
           restCall . R.CreateMessage (messageChannel m) $
-            "**You can now customize the output of ?s command!**"
+            "**You can now customize the output of ?s command!**\n"
               <> "**Commands:**\n"
               <> " - **?settings** - *display this message*\n"
               <> " - **?show [stat]** - *makes the stat visible*\n"
