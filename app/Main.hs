@@ -54,9 +54,19 @@ main = do
         runDiscord $
           def
             { discordToken = pack apiKey,
+              discordOnStart = onStartup,
               discordOnEvent = eventHandler bbdata manager
             }
       TIO.putStrLn userFacingError
+
+onStartup :: DiscordHandler ()
+onStartup = do
+  sendCommand (UpdateStatus $ UpdateStatusOpts {
+    updateStatusOptsSince = Nothing, 
+    updateStatusOptsGame = Just (Activity {activityName = "try out ?settings command", activityType = ActivityTypeGame, activityUrl = Nothing}),
+    updateStatusOptsNewStatus = UpdateStatusOnline,
+    updateStatusOptsAFK = False
+  })
 
 updateData :: BowBotData -> IO ()
 updateData BowBotData {..} = do
