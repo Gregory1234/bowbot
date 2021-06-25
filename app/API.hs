@@ -16,6 +16,7 @@ import System.Environment.Blank (getEnv)
 import qualified Data.Vector as V
 import Discord.Types
 import Stats
+import Data.List (intercalate)
 
 managerSettings :: ManagerSettings
 managerSettings = tlsManagerSettings { managerResponseTimeout = responseTimeoutMicro 15000000 }
@@ -58,6 +59,15 @@ uuidToNames manager uuid = do
     helper x = case x HM.! "name" of
        (String text) -> Just $ unpack text
        _ -> Nothing
+
+updateNamesDB :: Manager -> String -> [String] -> IO ()
+updateNamesDB manager uuid names = do
+  website <- fromMaybe "" <$> getEnv "DB_SITE"
+  apiKey <- fromMaybe "" <$> getEnv "DB_KEY"
+  let url = "http://" ++ website ++ "/updateMinecraftNames.php?key=" ++ apiKey ++ "&uuid=" ++ uuid ++ "&names=" ++ intercalate "," (reverse names)
+  _ <- sendRequestTo manager url
+  putStrLn $ "Received response from: " ++ url
+  pure ()
 
 isInBowDuels :: Manager -> String -> IO (Maybe Bool)
 isInBowDuels manager uuid = do
@@ -119,7 +129,7 @@ getWatchlist manager = do
     str (String (unpack -> d)) = Just d
     str _ = Nothing
 
-getFullNickUUIDList :: Manager -> IO [String]
+getFullNickUUIDList :: Manager -> IO [(String, [String])]
 getFullNickUUIDList manager = do
   website <- fromMaybe "" <$> getEnv "DB_SITE"
   apiKey <- fromMaybe "" <$> getEnv "DB_KEY"
@@ -130,9 +140,14 @@ getFullNickUUIDList manager = do
    (Just js) -> do
      putStrLn $ "Received response from: " ++ url
      case js HM.!? "data" of
-       (Just (Array (V.toList -> list))) -> return $ mapMaybe str list
+       (Just (Array (V.toList -> list))) -> return $ mapMaybe person list
        _ -> return []
   where
+   person :: Value -> Maybe (String, [String])
+   person (Object x) = case (x HM.!? "uuid", x HM.!? "names") of
+     (Just (str -> Just uuid), Just (Array (V.toList -> list))) -> Just (uuid, reverse $ mapMaybe str list)
+     _ -> Nothing
+   person _ = Nothing
    str (String (unpack -> d)) = Just d
    str _ = Nothing
 
@@ -174,7 +189,7 @@ getAllSettings manager = do
     str (Just (String (unpack -> d))) = Just d
     str _ = Nothing
 
-getDiscordNicks :: Manager -> IO [(UserId, String)]
+getDiscordNicks :: Manager -> IO [(Integer, UserId, String)]
 getDiscordNicks manager = do
   website <- fromMaybe "" <$> getEnv "DB_SITE"
   apiKey <- fromMaybe "" <$> getEnv "DB_KEY"
@@ -189,9 +204,10 @@ getDiscordNicks manager = do
        _ -> return []
   where
    parsePerson (Object js) = let
+         gid = maybe 0 read $ str (js HM.!? "id")
          discord = maybe 0 read $ str (js HM.!? "discord")
          uuid = fromMaybe "" $ str (js HM.!? "minecraft")
-         in Just (discord, uuid)
+         in Just (gid, discord, uuid)
    parsePerson _ = Nothing
    str (Just (String (unpack -> d))) = Just d
    str _ = Nothing

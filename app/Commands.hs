@@ -35,7 +35,7 @@ data BowBotData = BowBotData
     onlineBorder :: TVar (Maybe [String]),
     onlineBusy :: TVar Bool,
     peopleSettings :: TVar [(UserId, StatsSettings)],
-    peopleNicks :: TVar [(UserId, String)]
+    peopleNicks :: TVar [(Integer, UserId, String)]
   }
 
 nameToUUID' :: Manager -> TVar [(String, [String])] -> String -> IO (Maybe String)
@@ -51,17 +51,6 @@ uuidToNames' manager nameCache uuid = do
   case filter ((== uuid) . fst) cache of
     [] -> uuidToNames manager uuid
     ((_, names) : _) -> return names
-
-addNick :: Manager -> TVar [(UserId, String)] -> UserId -> String -> IO ()
-addNick manager peopleNicks did uuid = do
-  atomically $ do
-    n <- readTVar peopleNicks
-    writeTVar peopleNicks $ (did, uuid):filter ((/=did).fst) n
-  website <- fromMaybe "" <$> getEnv "DB_SITE"
-  apiKey <- fromMaybe "" <$> getEnv "DB_KEY"
-  let url = "http://" ++ website ++ "/addPerson.php?key=" ++ apiKey ++ "&discord=" ++ show did ++ "&minecraft=" ++ uuid
-  _ <- sendRequestTo manager url
-  pure ()
 
 flatNickList :: BowBotData -> IO [(String, String)]
 flatNickList BowBotData {..} = do
@@ -104,7 +93,7 @@ statsCommand dt@BowBotData {..} manager sett m = do
       let wrd = T.words (messageText m)
       (uuid, name) <- if length wrd == 1
       then do
-        pns <- liftIO $ atomically $ readTVar peopleNicks
+        pns <- fmap (map (\(_, b, c) -> (b, c))) $ liftIO $ atomically $ readTVar peopleNicks
         liftIO $ print $ lookup (userId $ messageAuthor m) pns
         return (lookup (userId $ messageAuthor m) pns, "")
       else do

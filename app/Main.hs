@@ -46,7 +46,7 @@ main = do
     peopleSettings <- atomically $ newTVar []
     peopleNicks <- atomically $ newTVar []
     let bbdata = BowBotData {..}
-    updateData bbdata
+    downloadData bbdata
     mkBackground bbdata
     manager <- newManager managerSettings
     forever $ do
@@ -68,6 +68,13 @@ onStartup = do
     updateStatusOptsAFK = False
   })
 
+downloadData :: BowBotData -> IO ()
+downloadData BowBotData {..} = do
+  manager <- newManager managerSettings
+  _ <- forkIO $ downloadNicks manager nickCache
+  _ <- forkIO $ updateSettings manager peopleSettings peopleNicks
+  pure ()
+
 updateData :: BowBotData -> IO ()
 updateData BowBotData {..} = do
   manager <- newManager managerSettings
@@ -75,14 +82,25 @@ updateData BowBotData {..} = do
   _ <- forkIO $ updateSettings manager peopleSettings peopleNicks
   pure ()
 
+downloadNicks :: Manager -> TVar [(String, [String])] -> IO ()
+downloadNicks manager nickCache = do
+  nickList <- getFullNickUUIDList manager
+  atomically $ writeTVar nickCache nickList
+
 updateNicks :: Manager -> TVar [(String, [String])] -> IO ()
 updateNicks manager nickCache = do
   nickList <- getFullNickUUIDList manager
   let chunked = chunksOf 10 nickList
-  updatedNicks <- fmap concat $ for chunked $ mapConcurrently (\u -> (u,) <$> uuidToNames manager u)
+  updatedNicks <- fmap concat $ for chunked $ mapConcurrently helper
   atomically $ writeTVar nickCache updatedNicks
+  where
+    helper (u, names) = do
+      newNames <- uuidToNames manager u
+      unless (names == newNames) $ do
+        updateNamesDB manager u names
+      return (u,newNames)
 
-updateSettings :: Manager -> TVar [(UserId, StatsSettings)] -> TVar [(UserId, String)] -> IO ()
+updateSettings :: Manager -> TVar [(UserId, StatsSettings)] -> TVar [(Integer, UserId, String)] -> IO ()
 updateSettings manager peopleSettings peopleNicks = do
   settings <- getAllSettings manager
   nicks <- getDiscordNicks manager
@@ -184,7 +202,7 @@ eventHandler dt@BowBotData {..} sm event = case event of
           ["d"] -> do
             manager <- liftIO $ newManager managerSettings
             st <- liftIO $ atomically $ readTVar peopleNicks
-            people <- traverse (liftIO . uuidToNames' manager nickCache . snd) st
+            people <- traverse (liftIO . uuidToNames' manager nickCache . (\(_,_,x) -> x)) st
             return $ Just (map pack . mapMaybe listToMaybe $ people, "Players on discord list")
           _ -> return Nothing
         void $ case ln of
@@ -210,17 +228,10 @@ eventHandler dt@BowBotData {..} sm event = case event of
               <> " - **?settings** - *display help for settings*\n"
               <> "\nMade by **GregC**#9698"
         pure ()
-      "?add" -> commandTimeout 2 $ when (isAdmin (messageAuthor m)) $ do
-        liftIO . putStrLn $ "recieved " ++ unpack (messageText m)
-        manager <- liftIO $ newManager managerSettings
-        let wrds = tail $ words $ unpack $ messageText m
-        case wrds of
-          [did, "u", uuid] -> liftIO $ addNick manager peopleNicks (read (filter isDigit did)) uuid
-          [did, "n", name] -> do
-            Just uuid <- liftIO $ nameToUUID' manager nickCache name
-            liftIO $ addNick manager peopleNicks (read (filter isDigit did)) uuid
-          _ -> pure ()
       "?refresh" -> commandTimeout 2 $ when (isAdmin (messageAuthor m)) $ do
+        liftIO . putStrLn $ "recieved " ++ unpack (messageText m)
+        liftIO $ downloadData dt
+      "?fullrefresh" -> commandTimeout 2 $ when (isAdmin (messageAuthor m)) $ do
         liftIO . putStrLn $ "recieved " ++ unpack (messageText m)
         liftIO $ updateData dt
       "?settings" -> commandTimeout 2 $ do
