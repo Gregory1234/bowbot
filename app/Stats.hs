@@ -20,7 +20,7 @@ data Stats = Stats
     bowShots :: Integer
   }
   deriving (Show)
-  
+
 data StatsSettings = StatsSettings
   { sWins :: Bool
   , sLosses :: Bool

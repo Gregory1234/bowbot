@@ -99,7 +99,7 @@ updateNicks manager nickCache = do
         updateMinecraftNames manager u newNames
       return (u,newNames)
 
-updateSettings :: Manager -> TVar [(UserId, StatsSettings)] -> TVar [(Integer, UserId, String)] -> IO ()
+updateSettings :: Manager -> TVar [(UserId, StatsSettings)] -> TVar [(Integer, [UserId], String, [String])] -> IO ()
 updateSettings manager peopleSettings peopleNicks = do
   settings <- getPeopleSettings manager
   nicks <- getPeopleSelectedAccounts manager
@@ -201,7 +201,7 @@ eventHandler dt@BowBotData {..} sm event = case event of
           ["d"] -> do
             manager <- liftIO $ newManager managerSettings
             st <- liftIO $ atomically $ readTVar peopleSelectedAccounts
-            people <- traverse (liftIO . minecraftUuidToNames' manager minecraftNicks . (\(_,_,x) -> x)) st
+            people <- traverse (liftIO . minecraftUuidToNames' manager minecraftNicks . (\(_,_,x, _) -> x)) st
             return $ Just (map pack . mapMaybe listToMaybe $ people, "Players on discord list")
           _ -> return Nothing
         void $ case ln of

@@ -189,7 +189,7 @@ getPeopleSettings manager = do
     str (Just (String (unpack -> d))) = Just d
     str _ = Nothing
 
-getPeopleSelectedAccounts :: Manager -> IO [(Integer, UserId, String)]
+getPeopleSelectedAccounts :: Manager -> IO [(Integer, [UserId], String, [String])]
 getPeopleSelectedAccounts manager = do
   website <- fromMaybe "" <$> getEnv "DB_SITE"
   apiKey <- fromMaybe "" <$> getEnv "DB_KEY"
@@ -200,14 +200,18 @@ getPeopleSelectedAccounts manager = do
    (Just js) -> do
      putStrLn $ "Received response from: " ++ url
      case js HM.!? "data" of
-       (Just (Array (V.toList -> list))) -> return $ mapMaybe parsePerson list
+       (Just (Object (HM.toList -> list))) -> return $ mapMaybe parsePerson list
        _ -> return []
   where
-   parsePerson (Object js) = let
-         gid = maybe 0 read $ str (js HM.!? "id")
-         discord = maybe 0 read $ str (js HM.!? "discord")
-         uuid = fromMaybe "" $ str (js HM.!? "minecraft")
-         in Just (gid, discord, uuid)
+   parsePerson (read . unpack -> gid, Object js) = let
+         discord = map read $ strlist (js HM.!? "discord")
+         selected = fromMaybe "" $ str (js HM.!? "selected")
+         uuid = strlist (js HM.!? "minecraft")
+         in Just (gid, discord, selected, uuid)
    parsePerson _ = Nothing
+   str :: Maybe Value -> Maybe String
    str (Just (String (unpack -> d))) = Just d
    str _ = Nothing
+   strlist :: Maybe Value -> [String]
+   strlist (Just (Array (V.toList -> d))) = mapMaybe (str . Just) d
+   strlist _ = []

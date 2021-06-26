@@ -34,7 +34,7 @@ data BowBotData = BowBotData
     hypixelOnlineBorderList :: TVar (Maybe [String]),
     hypixelOnlineBusyList :: TVar Bool,
     discordPeopleSettings :: TVar [(UserId, StatsSettings)],
-    peopleSelectedAccounts :: TVar [(Integer, UserId, String)]
+    peopleSelectedAccounts :: TVar [(Integer, [UserId], String, [String])]
   }
 
 minecraftNameToUUID' :: Manager -> TVar [(String, [String])] -> String -> IO (Maybe String)
@@ -93,9 +93,10 @@ statsCommand dt@BowBotData {..} manager sett m = do
       let wrd = T.words (messageText m)
       (uuid, name) <- if length wrd == 1
       then do
-        pns <- fmap (map (\(_, b, c) -> (b, c))) $ liftIO $ atomically $ readTVar peopleSelectedAccounts
+        pns <- fmap (>>=(\(_, b, c, _) -> (,c) <$> b)) $ liftIO $ atomically $ readTVar peopleSelectedAccounts
         liftIO $ print $ lookup (userId $ messageAuthor m) pns
-        return (lookup (userId $ messageAuthor m) pns, "")
+        let sel = lookup (userId $ messageAuthor m) pns
+        return (sel, "")
       else do
         let name = unpack . strip . T.dropWhile isSpace . T.dropWhile (not . isSpace) $ messageText m
         fmap (, name) $ liftIO $ minecraftNameToUUID' manager minecraftNicks name
