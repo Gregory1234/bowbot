@@ -64,7 +64,7 @@ updateMinecraftNames :: Manager -> String -> [String] -> IO ()
 updateMinecraftNames manager uuid names = do
   website <- fromMaybe "" <$> getEnv "DB_SITE"
   apiKey <- fromMaybe "" <$> getEnv "DB_KEY"
-  let url = "http://" ++ website ++ "/updateMinecraftNames.php?key=" ++ apiKey ++ "&uuid=" ++ uuid ++ "&names=" ++ intercalate "," (reverse names)
+  let url = "http://" ++ website ++ "/updateMinecraftNames.php?key=" ++ apiKey ++ "&uuid=" ++ uuid ++ "&names=" ++ intercalate "," names
   _ <- sendRequestTo manager url
   putStrLn $ "Received response from: " ++ url
   pure ()
@@ -145,7 +145,7 @@ getMinecraftNickList manager = do
   where
    person :: Value -> Maybe (String, [String])
    person (Object x) = case (x HM.!? "uuid", x HM.!? "names") of
-     (Just (str -> Just uuid), Just (Array (V.toList -> list))) -> Just (uuid, reverse $ mapMaybe str list)
+     (Just (str -> Just uuid), Just (Array (V.toList -> list))) -> Just (uuid, mapMaybe str list)
      _ -> Nothing
    person _ = Nothing
    str (String (unpack -> d)) = Just d

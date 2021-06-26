@@ -142,6 +142,7 @@ eventHandler dt@BowBotData {..} sm event = case event of
     unless (fromBot m) $ case unpack $ T.toLower . T.takeWhile (/= ' ') $ messageText m of
       "?s" -> commandTimeout 12 $ do
         liftIO . putStrLn $ "recieved " ++ unpack (messageText m)
+        liftIO . print =<< liftIO (atomically (readTVar minecraftNicks))
         settings <- liftIO $ atomically $ readTVar discordPeopleSettings
         statsCommand dt sm (fromMaybe defSettings $ lookup (userId $ messageAuthor m) settings) m
       "?sd" -> commandTimeout 12 $ do
