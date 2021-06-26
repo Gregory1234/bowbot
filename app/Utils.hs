@@ -54,6 +54,7 @@ data StatsResponse a
 maybeToJustStats :: Maybe a -> StatsResponse a
 maybeToJustStats Nothing = NoResponse
 maybeToJustStats (Just x) = JustResponse x
-maybeToDidYouMeanStats :: Maybe a -> StatsResponse a
-maybeToDidYouMeanStats Nothing = NoResponse
-maybeToDidYouMeanStats (Just x) = DidYouMeanResponse x
+maybeToDidYouMeanStats :: Bool -> Maybe a -> StatsResponse a
+maybeToDidYouMeanStats _ Nothing = NoResponse
+maybeToDidYouMeanStats False (Just x) = DidYouMeanResponse x
+maybeToDidYouMeanStats True (Just x) = JustResponse x

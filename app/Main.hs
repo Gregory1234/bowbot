@@ -22,7 +22,6 @@ import qualified Discord.Requests as R
 import Discord.Types
 import Network.HTTP.Conduit
 import System.Environment.Blank (getEnv)
-import Data.Char (isDigit)
 import Stats
 import Utils
 import API
@@ -37,14 +36,14 @@ main :: IO ()
 main = do
   apiKey <- fromMaybe "" <$> getEnv "API_KEY"
   unless (apiKey == "") $ do
-    count <- atomically $ newTVar 0
-    countBorder <- atomically $ newTVar 0
-    nickCache <- atomically $ newTVar []
-    online <- atomically $ newTVar Nothing
-    onlineBorder <- atomically $ newTVar Nothing
-    onlineBusy <- atomically $ newTVar False
-    peopleSettings <- atomically $ newTVar []
-    peopleNicks <- atomically $ newTVar []
+    hypixelRequestCount <- atomically $ newTVar 0
+    hypixelRequestBorderCount <- atomically $ newTVar 0
+    minecraftNicks <- atomically $ newTVar []
+    hypixelOnlineList <- atomically $ newTVar Nothing
+    hypixelOnlineBorderList <- atomically $ newTVar Nothing
+    hypixelOnlineBusyList <- atomically $ newTVar False
+    discordPeopleSettings <- atomically $ newTVar []
+    peopleSelectedAccounts <- atomically $ newTVar []
     let bbdata = BowBotData {..}
     downloadData bbdata
     mkBackground bbdata
@@ -71,39 +70,39 @@ onStartup = do
 downloadData :: BowBotData -> IO ()
 downloadData BowBotData {..} = do
   manager <- newManager managerSettings
-  _ <- forkIO $ downloadNicks manager nickCache
-  _ <- forkIO $ updateSettings manager peopleSettings peopleNicks
+  _ <- forkIO $ downloadNicks manager minecraftNicks
+  _ <- forkIO $ updateSettings manager discordPeopleSettings peopleSelectedAccounts
   pure ()
 
 updateData :: BowBotData -> IO ()
 updateData BowBotData {..} = do
   manager <- newManager managerSettings
-  _ <- forkIO $ updateNicks manager nickCache
-  _ <- forkIO $ updateSettings manager peopleSettings peopleNicks
+  _ <- forkIO $ updateNicks manager minecraftNicks
+  _ <- forkIO $ updateSettings manager discordPeopleSettings peopleSelectedAccounts
   pure ()
 
 downloadNicks :: Manager -> TVar [(String, [String])] -> IO ()
 downloadNicks manager nickCache = do
-  nickList <- getFullNickUUIDList manager
+  nickList <- getMinecraftNickList manager
   atomically $ writeTVar nickCache nickList
 
 updateNicks :: Manager -> TVar [(String, [String])] -> IO ()
 updateNicks manager nickCache = do
-  nickList <- getFullNickUUIDList manager
+  nickList <- getMinecraftNickList manager
   let chunked = chunksOf 10 nickList
   updatedNicks <- fmap concat $ for chunked $ mapConcurrently helper
   atomically $ writeTVar nickCache updatedNicks
   where
     helper (u, names) = do
-      newNames <- uuidToNames manager u
+      newNames <- minecraftUuidToNames manager u
       unless (names == newNames) $ do
-        updateNamesDB manager u names
+        updateMinecraftNames manager u newNames
       return (u,newNames)
 
 updateSettings :: Manager -> TVar [(UserId, StatsSettings)] -> TVar [(Integer, UserId, String)] -> IO ()
 updateSettings manager peopleSettings peopleNicks = do
-  settings <- getAllSettings manager
-  nicks <- getDiscordNicks manager
+  settings <- getPeopleSettings manager
+  nicks <- getPeopleSelectedAccounts manager
   atomically $ writeTVar peopleSettings settings
   atomically $ writeTVar peopleNicks nicks
 
@@ -124,13 +123,13 @@ background bbdata@BowBotData {..} = do
         mint <- getTime "%M"
         putStrLn "New minute!"
         atomically $ do
-          bc <- readTVar countBorder
-          writeTVar count bc
-          writeTVar countBorder 0
+          bc <- readTVar hypixelRequestBorderCount
+          writeTVar hypixelRequestCount bc
+          writeTVar hypixelRequestBorderCount 0
         atomically $ do
-          onl <- readTVar onlineBorder
-          writeTVar online onl
-          writeTVar onlineBorder Nothing
+          onl <- readTVar hypixelOnlineBorderList
+          writeTVar hypixelOnlineList onl
+          writeTVar hypixelOnlineBorderList Nothing
         when (mint == "00") $ updateData bbdata
         putStrLn "New minute finished!"
       threadDelay 60000000
@@ -143,7 +142,7 @@ eventHandler dt@BowBotData {..} sm event = case event of
     unless (fromBot m) $ case unpack $ T.toLower . T.takeWhile (/= ' ') $ messageText m of
       "?s" -> commandTimeout 12 $ do
         liftIO . putStrLn $ "recieved " ++ unpack (messageText m)
-        settings <- liftIO $ atomically $ readTVar peopleSettings
+        settings <- liftIO $ atomically $ readTVar discordPeopleSettings
         statsCommand dt sm (fromMaybe defSettings $ lookup (userId $ messageAuthor m) settings) m
       "?sd" -> commandTimeout 12 $ do
         liftIO . putStrLn $ "recieved " ++ unpack (messageText m)
@@ -155,13 +154,13 @@ eventHandler dt@BowBotData {..} sm event = case event of
         liftIO . putStrLn $ "recieved " ++ unpack (messageText m)
         t <- liftIO $ read @Int <$> getTime "%S"
         cv <- liftIO . atomically $ do
-          c <- readTVar onlineBusy
-          unless c $ writeTVar onlineBusy True
+          c <- readTVar hypixelOnlineBusyList
+          unless c $ writeTVar hypixelOnlineBusyList True
           return (not c)
         if cv
           then do
-            onlo <- liftIO . atomically $ readTVar online
-            onlb <- liftIO . atomically $ readTVar online
+            onlo <- liftIO . atomically $ readTVar hypixelOnlineList
+            onlb <- liftIO . atomically $ readTVar hypixelOnlineList
             manager <- liftIO $ newManager managerSettings
             o <- case onlo <|> onlb of
               (Just onl) -> do
@@ -171,11 +170,11 @@ eventHandler dt@BowBotData {..} sm event = case event of
                 people <- liftIO $ getWatchlist manager
                 status <- liftIO $ mapConcurrently (\u -> (u,) . fromMaybe False <$> isInBowDuels manager u) people
                 let onl = map fst $ filter snd status
-                liftIO . atomically $ writeTVar (if t <= 5 || t >= 55 then onlineBorder else online) $ Just onl
+                liftIO . atomically $ writeTVar (if t <= 5 || t >= 55 then hypixelOnlineBorderList else hypixelOnlineList) $ Just onl
                 _ <- restCall . R.CreateMessage (messageChannel m) $ "**Players in wachList currently in bow duels:**"
                 pure onl
-            liftIO . atomically $ writeTVar onlineBusy False
-            names <- liftIO $ traverse (fmap head . uuidToNames' manager nickCache) o
+            liftIO . atomically $ writeTVar hypixelOnlineBusyList False
+            names <- liftIO $ traverse (fmap head . minecraftUuidToNames' manager minecraftNicks) o
             let msg = if null names then "None of the watchListed players are currently in bow duels." else pack . unlines . map (" - " ++) $ names
             _ <- restCall . R.CreateMessage (messageChannel m) $ "```" <> msg <> "```"
             pure ()
@@ -189,20 +188,20 @@ eventHandler dt@BowBotData {..} sm event = case event of
           [] -> do
             manager <- liftIO $ newManager managerSettings
             st <- liftIO $ getWatchlist manager
-            people <- traverse (liftIO . uuidToNames' manager nickCache) st
+            people <- traverse (liftIO . minecraftUuidToNames' manager minecraftNicks) st
             return $ Just (map pack . mapMaybe listToMaybe $ people, "Players in watchList")
           ["w"] -> do
             manager <- liftIO $ newManager managerSettings
             st <- liftIO $ getWatchlist manager
-            people <- traverse (liftIO . uuidToNames' manager nickCache) st
+            people <- traverse (liftIO . minecraftUuidToNames' manager minecraftNicks) st
             return $ Just (map pack . mapMaybe listToMaybe $ people, "Players in watchList")
           ["ac"] -> do
-            st <- liftIO $ atomically $ readTVar nickCache
+            st <- liftIO $ atomically $ readTVar minecraftNicks
             return $ Just (map pack $ mapMaybe (listToMaybe . snd) st, "Players on autocomplete list")
           ["d"] -> do
             manager <- liftIO $ newManager managerSettings
-            st <- liftIO $ atomically $ readTVar peopleNicks
-            people <- traverse (liftIO . uuidToNames' manager nickCache . (\(_,_,x) -> x)) st
+            st <- liftIO $ atomically $ readTVar peopleSelectedAccounts
+            people <- traverse (liftIO . minecraftUuidToNames' manager minecraftNicks . (\(_,_,x) -> x)) st
             return $ Just (map pack . mapMaybe listToMaybe $ people, "Players on discord list")
           _ -> return Nothing
         void $ case ln of

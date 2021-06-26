@@ -33,8 +33,8 @@ sendRequestTo manager url = do
     (Right v) -> return $ responseBody v
 
 
-nameToUUID :: Manager -> String -> IO (Maybe String)
-nameToUUID manager name = do
+minecraftNameToUUID :: Manager -> String -> IO (Maybe String)
+minecraftNameToUUID manager name = do
   let url = "https://api.mojang.com/users/profiles/minecraft/" ++ name
   res <- sendRequestTo manager url
   case decode res :: Maybe Object of
@@ -46,8 +46,8 @@ nameToUUID manager name = do
           return . Just $ unpack text
         _ -> return Nothing
 
-uuidToNames :: Manager -> String -> IO [String]
-uuidToNames manager uuid = do
+minecraftUuidToNames :: Manager -> String -> IO [String]
+minecraftUuidToNames manager uuid = do
   let url = "https://api.mojang.com/user/profiles/" ++ uuid ++ "/names"
   res <- sendRequestTo manager url
   case decode res :: Maybe [Object] of
@@ -60,8 +60,8 @@ uuidToNames manager uuid = do
        (String text) -> Just $ unpack text
        _ -> Nothing
 
-updateNamesDB :: Manager -> String -> [String] -> IO ()
-updateNamesDB manager uuid names = do
+updateMinecraftNames :: Manager -> String -> [String] -> IO ()
+updateMinecraftNames manager uuid names = do
   website <- fromMaybe "" <$> getEnv "DB_SITE"
   apiKey <- fromMaybe "" <$> getEnv "DB_KEY"
   let url = "http://" ++ website ++ "/updateMinecraftNames.php?key=" ++ apiKey ++ "&uuid=" ++ uuid ++ "&names=" ++ intercalate "," (reverse names)
@@ -84,8 +84,8 @@ isInBowDuels manager uuid = do
           _ -> return $ Just False
         _ -> return $ Just False
 
-getStats :: Manager -> String -> IO (Maybe Stats)
-getStats manager uuid = do
+getHypixelStats :: Manager -> String -> IO (Maybe Stats)
+getHypixelStats manager uuid = do
   apiKey <- fromMaybe "" <$> getEnv "HYPIXEL_API"
   let url = "https://api.hypixel.net/player?key=" ++ apiKey ++ "&uuid=" ++ uuid
   res <- sendRequestTo manager url
@@ -129,8 +129,8 @@ getWatchlist manager = do
     str (String (unpack -> d)) = Just d
     str _ = Nothing
 
-getFullNickUUIDList :: Manager -> IO [(String, [String])]
-getFullNickUUIDList manager = do
+getMinecraftNickList :: Manager -> IO [(String, [String])]
+getMinecraftNickList manager = do
   website <- fromMaybe "" <$> getEnv "DB_SITE"
   apiKey <- fromMaybe "" <$> getEnv "DB_KEY"
   let url = "http://" ++ website ++ "/autocorrect.php?key=" ++ apiKey
@@ -151,8 +151,8 @@ getFullNickUUIDList manager = do
    str (String (unpack -> d)) = Just d
    str _ = Nothing
 
-getAllSettings :: Manager -> IO [(UserId, StatsSettings)]
-getAllSettings manager = do
+getPeopleSettings :: Manager -> IO [(UserId, StatsSettings)]
+getPeopleSettings manager = do
   website <- fromMaybe "" <$> getEnv "DB_SITE"
   apiKey <- fromMaybe "" <$> getEnv "DB_KEY"
   let url = "http://" ++ website ++ "/settings.php?key=" ++ apiKey
@@ -189,8 +189,8 @@ getAllSettings manager = do
     str (Just (String (unpack -> d))) = Just d
     str _ = Nothing
 
-getDiscordNicks :: Manager -> IO [(Integer, UserId, String)]
-getDiscordNicks manager = do
+getPeopleSelectedAccounts :: Manager -> IO [(Integer, UserId, String)]
+getPeopleSelectedAccounts manager = do
   website <- fromMaybe "" <$> getEnv "DB_SITE"
   apiKey <- fromMaybe "" <$> getEnv "DB_KEY"
   let url = "http://" ++ website ++ "/people.php?key=" ++ apiKey

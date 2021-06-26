@@ -2,7 +2,6 @@
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE ViewPatterns #-}
 
 module Commands where
 
@@ -14,9 +13,9 @@ import qualified Discord.Requests as R
 import Discord.Types
 import Network.HTTP.Conduit
 import System.Environment.Blank (getEnv)
-import Data.Maybe (fromMaybe, maybeToList, listToMaybe, isNothing, isJust)
+import Data.Maybe (fromMaybe, maybeToList, listToMaybe, isJust)
 import Data.Char (toLower, isSpace)
-import Control.Monad (when, unless, void)
+import Control.Monad (when, void)
 import Data.Text (unpack, strip, pack)
 import Control.Concurrent (forkIO)
 import System.Timeout (timeout)
@@ -28,86 +27,87 @@ import Utils
 import API
 
 data BowBotData = BowBotData
-  { count :: TVar Int,
-    countBorder :: TVar Int,
-    nickCache :: TVar [(String, [String])],
-    online :: TVar (Maybe [String]),
-    onlineBorder :: TVar (Maybe [String]),
-    onlineBusy :: TVar Bool,
-    peopleSettings :: TVar [(UserId, StatsSettings)],
-    peopleNicks :: TVar [(Integer, UserId, String)]
+  { hypixelRequestCount :: TVar Int,
+    hypixelRequestBorderCount :: TVar Int,
+    minecraftNicks :: TVar [(String, [String])],
+    hypixelOnlineList :: TVar (Maybe [String]),
+    hypixelOnlineBorderList :: TVar (Maybe [String]),
+    hypixelOnlineBusyList :: TVar Bool,
+    discordPeopleSettings :: TVar [(UserId, StatsSettings)],
+    peopleSelectedAccounts :: TVar [(Integer, UserId, String)]
   }
 
-nameToUUID' :: Manager -> TVar [(String, [String])] -> String -> IO (Maybe String)
-nameToUUID' manager nameCache name = do
+minecraftNameToUUID' :: Manager -> TVar [(String, [String])] -> String -> IO (Maybe String)
+minecraftNameToUUID' manager nameCache name = do
   cache <- atomically $ readTVar nameCache
   case filter ((name==) . head . snd) cache of
-    [] -> nameToUUID manager name
+    [] -> minecraftNameToUUID manager name
     ((uuid, _) : _) -> return $ Just uuid
 
-uuidToNames' :: Manager -> TVar [(String, [String])] -> String -> IO [String]
-uuidToNames' manager nameCache uuid = do
+minecraftUuidToNames' :: Manager -> TVar [(String, [String])] -> String -> IO [String]
+minecraftUuidToNames' manager nameCache uuid = do
   cache <- atomically $ readTVar nameCache
   case filter ((== uuid) . fst) cache of
-    [] -> uuidToNames manager uuid
+    [] -> minecraftUuidToNames manager uuid
     ((_, names) : _) -> return names
 
-flatNickList :: BowBotData -> IO [(String, String)]
-flatNickList BowBotData {..} = do
-  people <- atomically $ readTVar nickCache
-  let currentNicks = [(n,u) | (n,us) <- people, u <- maybeToList (listToMaybe us)]
+flattenedMinecraftNicks :: BowBotData -> STM [(String, String)]
+flattenedMinecraftNicks BowBotData {..} = do
+  people <- readTVar minecraftNicks
+  let currentNicks = [(n,u) | (n,us) <- people, u <- take 1 us]
   let restOfNicks = [(n,u) | (n,us) <- people, u <- drop 1 us]
   return $ currentNicks ++ restOfNicks
 
 
-searchForStats :: BowBotData -> Manager -> (String, String) -> IO (StatsResponse Stats)
-searchForStats bbd manager (uuid, name) = do
-  stats <- if null uuid then return Nothing else liftIO $ getStats manager uuid
-  people <- flatNickList bbd
+getHypixelStats' :: BowBotData -> Manager -> (String, String) -> IO (StatsResponse Stats)
+getHypixelStats' bbd manager (uuid, name) = do
+  stats <- if null uuid then return Nothing else liftIO $ getHypixelStats manager uuid
+  people <- atomically $ flattenedMinecraftNicks bbd
+  let decorate = \x c@Stats {..} -> c {playerName = if map toLower x == map toLower playerName then playerName else x ++ " (" ++ playerName ++ ")"}
   case stats of
     Nothing -> do
-      let dists = map (\(u,n) -> (u, dist (map toLower n) (map toLower name))) people
+      let dists = map (\(u,n) -> ((u, n), dist (map toLower n) (map toLower name))) people
       let filtered = map fst . filter (\(_,d) -> d <= 2) $ dists
       case filtered of
         [] -> return NoResponse
-        (nu:_) -> liftIO $ maybeToDidYouMeanStats <$> getStats manager nu
+        (nu:_) -> liftIO $ maybeToDidYouMeanStats (map toLower (snd nu) == map toLower name) . fmap (decorate (snd nu)) <$> getHypixelStats manager (fst nu)
     s@(Just Stats {bowWins = 0, bowLosses = 0}) -> do
-      let dists = map (\(u,n) -> (u, dist (map toLower n) (map toLower name))) people
+      let dists = map (\(u,n) -> ((u, n), dist (map toLower n) (map toLower name))) people
       let filtered = map fst . filter (\(_,d) -> d <= 2) $ dists
       case filtered of
         [] -> return $ maybeToJustStats s
-        (nu:_) -> liftIO $ maybeToDidYouMeanStats <$> getStats manager nu
+        (nu:_) -> liftIO $ maybeToDidYouMeanStats (map toLower (snd nu) == map toLower name) . fmap (decorate (snd nu)) <$> getHypixelStats manager (fst nu)
     s -> return $ maybeToJustStats s
 
 statsCommand :: BowBotData -> Manager -> StatsSettings -> Message -> DiscordHandler ()
 statsCommand dt@BowBotData {..} manager sett m = do
   t <- liftIO $ read @Int <$> getTime "%S"
   cv <- liftIO . atomically $ do
-    c1 <- readTVar count
-    c2 <- readTVar countBorder
+    c1 <- readTVar hypixelRequestCount
+    c2 <- readTVar hypixelRequestBorderCount
     let c = c1 + c2
-    when (c < 15) $ modifyTVar (if t <= 5 || t >= 55 then countBorder else count) (+ 1)
+    when (c < 15) $ modifyTVar (if t <= 5 || t >= 55 then hypixelRequestBorderCount else hypixelRequestCount) (+ 1)
     return $ c < 15
   if cv
     then do
       let wrd = T.words (messageText m)
       (uuid, name) <- if length wrd == 1
       then do
-        pns <- fmap (map (\(_, b, c) -> (b, c))) $ liftIO $ atomically $ readTVar peopleNicks
+        pns <- fmap (map (\(_, b, c) -> (b, c))) $ liftIO $ atomically $ readTVar peopleSelectedAccounts
         liftIO $ print $ lookup (userId $ messageAuthor m) pns
         return (lookup (userId $ messageAuthor m) pns, "")
       else do
         let name = unpack . strip . T.dropWhile isSpace . T.dropWhile (not . isSpace) $ messageText m
-        fmap (, name) $ liftIO $ nameToUUID' manager nickCache name
-      if isJust uuid then do
-        stats <- liftIO $ searchForStats dt manager (fromMaybe "" uuid, name)
+        fmap (, name) $ liftIO $ minecraftNameToUUID' manager minecraftNicks name
+      if isJust uuid || not (null name) then do
+        stats <- liftIO $ getHypixelStats' dt manager (fromMaybe "" uuid, name)
         _ <- case stats of
           NoResponse -> restCall $ R.CreateMessage (messageChannel m) "*The player doesn't exist!*"
           (JustResponse s) -> restCall . R.CreateMessage (messageChannel m) . pack . showStats sett $ s
           (DidYouMeanResponse s) -> restCall . R.CreateMessage (messageChannel m) . ("*Did you mean* "<>) . pack . showStats sett $ s
         pure ()
       else do
-        _ <- restCall $ R.CreateMessage (messageChannel m) $ if null name then "*You aren't on the list! Please provide your ign to get added in the future.*" else "*The player doesn't exist!*"
+        _ <- restCall $ R.CreateMessage (messageChannel m) "*You aren't on the list! Please provide your ign to get added in the future.*"
         pure ()
     else do
       f <- liftIO $ read @Int <$> getTime "%S"
@@ -180,8 +180,8 @@ setSetting BowBotData {..} manager m setting maybeValue = case map toLower setti
       (Just b) -> do
         let did = userId $ messageAuthor m
         liftIO $ atomically $ do
-          settings <- readTVar peopleSettings
-          writeTVar peopleSettings $ map (\(i, s) -> (i, if i == did then upd s b else s)) (settings ++ if did `notElem` map fst settings then [(did, upd defSettings b)] else [])
+          settings <- readTVar discordPeopleSettings
+          writeTVar discordPeopleSettings $ map (\(i, s) -> (i, if i == did then upd s b else s)) (settings ++ [(did, upd defSettings b) | did `notElem` map fst settings])
         sendReq did st (fromBool b)
     setVal :: String -> (StatsSettings -> BoolSense -> StatsSettings) -> DiscordHandler ()
     setVal st upd = case val of
@@ -189,6 +189,6 @@ setSetting BowBotData {..} manager m setting maybeValue = case map toLower setti
       (Just b) -> do
         let did = userId $ messageAuthor m
         liftIO $ atomically $ do
-          settings <- readTVar peopleSettings
-          writeTVar peopleSettings $ map (\(i, s) -> (i, if i == did then upd s b else s)) (settings ++ if did `notElem` map fst settings then [(did, upd defSettings b)] else [])
+          settings <- readTVar discordPeopleSettings
+          writeTVar discordPeopleSettings $ map (\(i, s) -> (i, if i == did then upd s b else s)) (settings ++ [(did, upd defSettings b) | did `notElem` map fst settings])
         sendReq did st (fromVal b)
