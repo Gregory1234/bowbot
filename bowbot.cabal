@@ -37,6 +37,7 @@ library
     , discord-haskell
     , http-client-tls
     , http-conduit
+    , mtl
     , split
     , stm
     , text
@@ -67,6 +68,7 @@ executable bowbot-exe
     , discord-haskell
     , http-client-tls
     , http-conduit
+    , mtl
     , split
     , stm
     , text
@@ -94,6 +96,7 @@ test-suite bowbot-test
     , discord-haskell
     , http-client-tls
     , http-conduit
+    , mtl
     , split
     , stm
     , text

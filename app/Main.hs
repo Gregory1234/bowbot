@@ -29,6 +29,8 @@ import Commands
 import Data.List.Split (chunksOf)
 import Data.Traversable (for)
 import Data.Text.Encoding (encodeUtf8)
+import Control.Monad.Reader (ReaderT(..))
+import Data.Either (rights, fromRight)
 
 
 
@@ -66,6 +68,7 @@ onStartup = do
     updateStatusOptsNewStatus = UpdateStatusOnline,
     updateStatusOptsAFK = False
   })
+  mkBackgroundDiscord
 
 downloadData :: BowBotData -> IO ()
 downloadData BowBotData {..} = do
@@ -134,7 +137,40 @@ background bbdata@BowBotData {..} = do
         putStrLn "New minute finished!"
       threadDelay 60000000
 
+mkBackgroundDiscord :: DiscordHandler ()
+mkBackgroundDiscord = ReaderT $ \x -> void $
+  forkFinally (runReaderT backgroundDiscord x) $ \e -> do
+    print e
+    runReaderT mkBackgroundDiscord x
 
+backgroundDiscord :: DiscordHandler ()
+backgroundDiscord = do
+  sec <- liftIO $ read @Int <$> getTime "%S"
+  liftIO $ threadDelay ((60 - sec `mod` 60) * 1000000)
+  forever go
+  where
+    go = do
+      _ <- ReaderT $ \x -> forkIO $ flip runReaderT x $ do
+        mint <- liftIO $ getTime "%M"
+        when (mint == "00") updateDiscords'
+      liftIO $ threadDelay 60000000
+
+updateDiscords' :: DiscordHandler ()
+updateDiscords' = do
+  manager <- liftIO $ newManager managerSettings
+  uids <- liftIO $ getDiscordIds manager
+  v <- restCall (R.ListGuildMembers 742731987902791751 R.GuildMembersTiming {R.guildMembersTimingLimit = Just 500, R.guildMembersTimingAfter = Nothing})
+  case v of
+    Right x -> do
+      let uids' = filter (\u -> all (\m -> userId (memberUser m) /= u) x) uids
+      y <- traverse helper uids'
+      liftIO $ updateDiscords manager x y
+    Left x -> liftIO $ print x
+  where
+    helper :: UserId -> DiscordHandler User
+    helper u = do
+      y <- restCall (R.GetUser u)
+      return $ fromRight undefined y
 
 eventHandler :: BowBotData -> Manager -> Event -> DiscordHandler ()
 eventHandler dt@BowBotData {..} sm event = case event of
@@ -231,9 +267,13 @@ eventHandler dt@BowBotData {..} sm event = case event of
       "?refresh" -> commandTimeout 2 $ when (isAdmin (messageAuthor m)) $ do
         liftIO . putStrLn $ "recieved " ++ unpack (messageText m)
         liftIO $ downloadData dt
-      "?fullrefresh" -> commandTimeout 2 $ when (isAdmin (messageAuthor m)) $ do
+      "?fullrefresh" -> commandTimeout 200 $ when (isAdmin (messageAuthor m)) $ do
         liftIO . putStrLn $ "recieved " ++ unpack (messageText m)
         liftIO $ updateData dt
+        updateDiscords'
+      "?discordrefresh" -> commandTimeout 200 $ when (isAdmin (messageAuthor m)) $ do
+        liftIO . putStrLn $ "recieved " ++ unpack (messageText m)
+        updateDiscords'
       "?settings" -> commandTimeout 2 $ do
         liftIO . putStrLn $ "recieved " ++ unpack (messageText m)
         _ <-

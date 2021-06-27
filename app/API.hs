@@ -2,14 +2,15 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE TypeApplications #-}
 
 module API where
 
 import Network.HTTP.Conduit
 import Control.Exception.Base (try, SomeException)
 import Data.ByteString.Lazy (ByteString)
-import Data.Text (unpack)
-import Data.Maybe (mapMaybe, fromMaybe)
+import Data.Text (unpack, pack)
+import Data.Maybe (mapMaybe, fromMaybe, isNothing)
 import qualified Data.HashMap.Strict as HM
 import Data.Aeson
 import System.Environment.Blank (getEnv)
@@ -17,6 +18,7 @@ import qualified Data.Vector as V
 import Discord.Types
 import Stats
 import Data.List (intercalate)
+import Text.Read (readMaybe)
 
 managerSettings :: ManagerSettings
 managerSettings = tlsManagerSettings { managerResponseTimeout = responseTimeoutMicro 15000000 }
@@ -215,3 +217,39 @@ getPeopleSelectedAccounts manager = do
    strlist :: Maybe Value -> [String]
    strlist (Just (Array (V.toList -> d))) = mapMaybe (str . Just) d
    strlist _ = []
+
+
+getDiscordIds :: Manager -> IO [UserId]
+getDiscordIds manager = do
+  website <- fromMaybe "" <$> getEnv "DB_SITE"
+  apiKey <- fromMaybe "" <$> getEnv "DB_KEY"
+  let url = "http://" ++ website ++ "/discordIds.php?key=" ++ apiKey
+  res <- sendRequestTo manager url
+  case decode res :: Maybe Object of
+     Nothing -> return []
+     (Just js) -> do
+       putStrLn $ "Received response from: " ++ url
+       case js HM.!? "data" of
+         (Just (Array (V.toList -> list))) -> return $ mapMaybe readMaybe $ mapMaybe str list
+         _ -> return []
+  where
+   str :: Value -> Maybe String
+   str (String (unpack -> d)) = Just d
+   str _ = Nothing
+
+updateDiscords :: Manager -> [GuildMember] -> [User] -> IO ()
+updateDiscords manager mem usr = do
+  website <- fromMaybe "" <$> getEnv "DB_SITE"
+  apiKey <- fromMaybe "" <$> getEnv "DB_KEY"
+  let url = "http://" ++ website ++ "/updateDiscord.php?key=" ++ apiKey
+  putStrLn url
+  initRequest <- parseRequest url
+  let dat = encode (object $ map memToObject mem ++ map usrToObject usr)
+  let request = initRequest { method = "POST", requestBody = RequestBodyLBS dat }
+  _ <- try @SomeException $ httpLbs request manager
+  pure ()
+  where
+    memToObject GuildMember {memberUser = memberUser@User {..}, ..} = case memberNick of
+      Nothing -> usrToObject memberUser
+      Just nick -> pack (show userId) .= object ["name" .= userName, "discriminator" .= userDiscrim, "nickname" .= nick]
+    usrToObject User {..} = pack (show userId) .= object ["name" .= userName, "discriminator" .= userDiscrim]
