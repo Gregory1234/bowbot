@@ -160,7 +160,7 @@ updateDiscords' :: DiscordHandler ()
 updateDiscords' = do
   manager <- liftIO $ newManager managerSettings
   uids <- liftIO $ getDiscordIds manager
-  v <- restCall (R.ListGuildMembers 742731987902791751 R.GuildMembersTiming {R.guildMembersTimingLimit = Just 500, R.guildMembersTimingAfter = Nothing})
+  v <- fmap (filter (not . userIsBot . memberUser)) <$> restCall (R.ListGuildMembers 742731987902791751 R.GuildMembersTiming {R.guildMembersTimingLimit = Just 500, R.guildMembersTimingAfter = Nothing})
   case v of
     Right x -> do
       let uids' = filter (\u -> all (\m -> userId (memberUser m) /= u) x) uids
