@@ -274,6 +274,23 @@ eventHandler dt@BowBotData {..} sm event = case event of
       "?discordrefresh" -> commandTimeout 200 $ when (isAdmin (messageAuthor m)) $ do
         liftIO . putStrLn $ "recieved " ++ unpack (messageText m)
         updateDiscords'
+      "?mc" -> commandTimeout 2 $ do
+        liftIO . putStrLn $ "recieved " ++ unpack (messageText m)
+        let wrds = tail $ words $ unpack $ messageText m
+        st <- liftIO $ atomically $ readTVar peopleSelectedAccounts
+        let accountMaybe = listToMaybe $ filter (\(_,b,_,_) -> (userId $ messageAuthor m) `elem` b) st
+        _ <- restCall . R.CreateMessage (messageChannel m) =<< case wrds of
+          [] -> case accountMaybe of
+            Nothing -> return "*You aren't on the list! Please provide your ign to get added in the future.*"
+            Just (_, _, sel, mc) -> do
+              let helper = \x -> do {
+                  name <- liftIO $ head <$> minecraftUuidToNames' sm minecraftNicks x;
+                  return $ (if sel == x then "*" else "") ++ name
+                }
+              mc' <- traverse helper mc
+              return $ "**List of your minecraft accounts listed:**\n```\n" <> pack (unwords mc') <> "```"
+          _ -> return "*Wrong command syntax*"
+        pure ()
       "?settings" -> commandTimeout 2 $ do
         liftIO . putStrLn $ "recieved " ++ unpack (messageText m)
         _ <-
