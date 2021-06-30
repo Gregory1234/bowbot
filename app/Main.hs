@@ -31,6 +31,7 @@ import Data.Traversable (for)
 import Data.Text.Encoding (encodeUtf8)
 import Control.Monad.Reader (ReaderT(..))
 import Data.Either (rights, fromRight)
+import Data.List (find)
 
 
 
@@ -278,7 +279,7 @@ eventHandler dt@BowBotData {..} sm event = case event of
         liftIO . putStrLn $ "recieved " ++ unpack (messageText m)
         let wrds = tail $ words $ unpack $ messageText m
         st <- liftIO $ atomically $ readTVar peopleSelectedAccounts
-        let accountMaybe = listToMaybe $ filter (\(_,b,_,_) -> (userId $ messageAuthor m) `elem` b) st
+        let accountMaybe = find (\(_,b,_,_) -> userId (messageAuthor m) `elem` b) st
         _ <- restCall . R.CreateMessage (messageChannel m) =<< case wrds of
           [] -> case accountMaybe of
             Nothing -> return "*You aren't on the list! Please provide your ign to get added in the future.*"
@@ -288,7 +289,22 @@ eventHandler dt@BowBotData {..} sm event = case event of
                   return $ (if sel == x then "*" else "") ++ name
                 }
               mc' <- traverse helper mc
-              return $ "**List of your minecraft accounts listed:**\n```\n" <> pack (unwords mc') <> "```"
+              return $ "**List of your minecraft accounts listed:**\n```\n" <> pack (unlines mc') <> "```"
+          [newsel] -> case accountMaybe of
+            Nothing -> return "*You aren't on the list! Please provide your ign to get added in the future.*"
+            Just (gid, dids, _, mc) -> do
+              newselid <- liftIO $ minecraftNameToUUID' sm minecraftNicks newsel
+              case newselid of
+                Nothing -> return "*Minecraft account doesn't exist!*"
+                Just nid -> if nid `elem` mc
+                  then do
+                    website <- liftIO $ fromMaybe "" <$> getEnv "DB_SITE"
+                    apiKey <- liftIO $ fromMaybe "" <$> getEnv "DB_KEY"
+                    let url = "http://" ++ website ++ "/selectMinecraft.php?key=" ++ apiKey ++ "&id=" ++ show gid ++ "&minecraft=" ++ nid
+                    _ <- liftIO $ sendRequestTo sm url
+                    liftIO $ atomically $ writeTVar peopleSelectedAccounts $ map (\u@(i, _, _, _) -> if i == gid then (gid, dids, nid, mc) else u) st
+                    return "*Success!*"
+                  else return "*You do not have that minecraft account added!*"
           _ -> return "*Wrong command syntax*"
         pure ()
       "?settings" -> commandTimeout 2 $ do
