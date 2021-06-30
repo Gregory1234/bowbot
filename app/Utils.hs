@@ -58,3 +58,9 @@ maybeToDidYouMeanStats :: Bool -> Maybe a -> StatsResponse a
 maybeToDidYouMeanStats _ Nothing = NoResponse
 maybeToDidYouMeanStats False (Just x) = DidYouMeanResponse x
 maybeToDidYouMeanStats True (Just x) = JustResponse x
+
+discordEscape :: String -> String
+discordEscape [] = ""
+discordEscape (x:xs)
+  | x `elem` "_*~`>" = '\\':x:discordEscape xs
+  | otherwise = x:discordEscape xs
