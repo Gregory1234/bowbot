@@ -262,6 +262,8 @@ eventHandler dt@BowBotData {..} sm event = case event of
               <> " - **?s [name]** - *show player's Bow Duels stats*\n"
               <> " - **?sa [name]** - *show all Bow Duels stats*\n"
               <> " - **?sd [name]** - *show a default set of Bow Duels stats*\n"
+              <> " - **?mc** - *list your linked minecraft nicks*\n"
+              <> " - **?mc [name]** - *select a minecraft account as your default*\n"
               <> " - **?settings** - *display help for settings*\n"
               <> "\nMade by **GregC**#9698"
         pure ()
@@ -289,13 +291,13 @@ eventHandler dt@BowBotData {..} sm event = case event of
                   return $ (if sel == x then "*" else "") ++ name
                 }
               mc' <- traverse helper mc
-              return $ "**List of your minecraft accounts listed:**\n```\n" <> pack (unlines mc') <> "```"
+              return $ "**List of your minecraft nicks linked:**\n```\n" <> pack (unlines mc') <> "```"
           [newsel] -> case accountMaybe of
             Nothing -> return "*You aren't on the list! Please provide your ign to get added in the future.*"
             Just (gid, dids, _, mc) -> do
               newselid <- liftIO $ minecraftNameToUUID' sm minecraftNicks newsel
               case newselid of
-                Nothing -> return "*Minecraft account doesn't exist!*"
+                Nothing -> return "*Player doesn't exist!*"
                 Just nid -> if nid `elem` mc
                   then do
                     website <- liftIO $ fromMaybe "" <$> getEnv "DB_SITE"
@@ -304,7 +306,7 @@ eventHandler dt@BowBotData {..} sm event = case event of
                     _ <- liftIO $ sendRequestTo sm url
                     liftIO $ atomically $ writeTVar peopleSelectedAccounts $ map (\u@(i, _, _, _) -> if i == gid then (gid, dids, nid, mc) else u) st
                     return "*Success!*"
-                  else return "*You do not have that minecraft account added!*"
+                  else return "*You do not have that minecraft nick linked!*"
           _ -> return "*Wrong command syntax*"
         pure ()
       "?settings" -> commandTimeout 2 $ do
