@@ -2,6 +2,7 @@ module Utils where
 
 import Data.Time.Clock
 import Data.Time.Format (defaultTimeLocale, formatTime)
+import Data.List ((\\))
 
 setAt :: Int -> a -> [a] -> [a]
 setAt i a ls
@@ -64,3 +65,6 @@ discordEscape [] = ""
 discordEscape (x:xs)
   | x `elem` "_*~`>" = '\\':x:discordEscape xs
   | otherwise = x:discordEscape xs
+
+ignoreChars :: [Char] -> String -> String
+ignoreChars a = filter (`notElem` a)

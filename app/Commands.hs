@@ -98,7 +98,7 @@ statsCommand dt@BowBotData {..} manager sett m = do
         let sel = lookup (userId $ messageAuthor m) pns
         return (sel, "")
       else do
-        let name = unpack . strip . T.dropWhile isSpace . T.dropWhile (not . isSpace) $ messageText m
+        let name = ignoreChars "\\ " . unpack . strip . T.dropWhile isSpace . T.dropWhile (not . isSpace) $ messageText m
         fmap (, name) $ liftIO $ minecraftNameToUUID' manager minecraftNicks name
       if isJust uuid || not (null name) then do
         stats <- liftIO $ getHypixelStats' dt manager (fromMaybe "" uuid, name)
