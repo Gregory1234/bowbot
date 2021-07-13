@@ -5,6 +5,7 @@ module Stats where
 import Data.Maybe (catMaybes)
 import Text.Printf (printf)
 import Data.Ratio ((%))
+import Utils (discordEscape)
 
 
 data BoolSense = Never | WhenSensible | Always deriving (Show, Eq, Ord, Enum)
@@ -68,7 +69,7 @@ addOldName n st@Stats {..} = st {playerName = n ++ " (" ++ playerName ++ ")" }
 showStats :: StatsSettings -> Stats -> String
 showStats StatsSettings {..} Stats {..} = unlines $ catMaybes
   [ onlyIf True
-  $ "**" ++ playerName ++ ":**"
+  $ "**" ++ discordEscape playerName ++ ":**"
   , onlyIf sWins
   $ " - *Bow Duels Wins:* **"
   ++ show bowWins

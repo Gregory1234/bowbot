@@ -32,6 +32,7 @@ import Data.Text.Encoding (encodeUtf8)
 import Control.Monad.Reader (ReaderT(..))
 import Data.Either (rights, fromRight)
 import Data.Char (toLower)
+import Data.List (find)
 
 
 
@@ -160,7 +161,7 @@ updateDiscords' :: DiscordHandler ()
 updateDiscords' = do
   manager <- liftIO $ newManager managerSettings
   uids <- liftIO $ getDiscordIds manager
-  v <- restCall (R.ListGuildMembers 742731987902791751 R.GuildMembersTiming {R.guildMembersTimingLimit = Just 500, R.guildMembersTimingAfter = Nothing})
+  v <- fmap (filter (not . userIsBot . memberUser)) <$> restCall (R.ListGuildMembers 742731987902791751 R.GuildMembersTiming {R.guildMembersTimingLimit = Just 500, R.guildMembersTimingAfter = Nothing})
   case v of
     Right x -> do
       let uids' = filter (\u -> all (\m -> userId (memberUser m) /= u) x) uids
@@ -289,6 +290,10 @@ eventHandler dt@BowBotData {..} sm event = case event of
               <> " - **?s [name]** - *show player's Bow Duels stats*\n"
               <> " - **?sa [name]** - *show all Bow Duels stats*\n"
               <> " - **?sd [name]** - *show a default set of Bow Duels stats*\n"
+              <> " - **?n [name]** - *show player's past nicks (prioritizing people on autocorrect)*\n"
+              <> " - **?na [name]** - *show player's past nicks*\n"
+              <> " - **?mc** - *list your linked minecraft nicks*\n"
+              <> " - **?mc [name]** - *select a minecraft account as your default*\n"
               <> " - **?settings** - *display help for settings*\n"
               <> "\nMade by **GregC**#9698"
         pure ()
@@ -302,6 +307,38 @@ eventHandler dt@BowBotData {..} sm event = case event of
       "?discordrefresh" -> commandTimeout 200 $ when (isAdmin (messageAuthor m)) $ do
         liftIO . putStrLn $ "recieved " ++ unpack (messageText m)
         updateDiscords'
+      "?mc" -> commandTimeout 2 $ do
+        liftIO . putStrLn $ "recieved " ++ unpack (messageText m)
+        let wrds = tail $ words $ unpack $ messageText m
+        st <- liftIO $ atomically $ readTVar peopleSelectedAccounts
+        let accountMaybe = find (\(_,b,_,_) -> userId (messageAuthor m) `elem` b) st
+        _ <- restCall . R.CreateMessage (messageChannel m) =<< case wrds of
+          [] -> case accountMaybe of
+            Nothing -> return "*You aren't on the list! Please provide your ign to get added in the future.*"
+            Just (_, _, sel, mc) -> do
+              let helper = \x -> do {
+                  name <- liftIO $ head <$> minecraftUuidToNames' sm minecraftNicks x;
+                  return $ (if sel == x then "*" else "") ++ name
+                }
+              mc' <- traverse helper mc
+              return $ "**List of your minecraft nicks linked:**\n```\n" <> pack (unlines mc') <> "```"
+          [newsel] -> case accountMaybe of
+            Nothing -> return "*You aren't on the list! Please provide your ign to get added in the future.*"
+            Just (gid, dids, _, mc) -> do
+              newselid <- liftIO $ minecraftNameToUUID' sm minecraftNicks newsel
+              case newselid of
+                Nothing -> return "*Player doesn't exist!*"
+                Just nid -> if nid `elem` mc
+                  then do
+                    website <- liftIO $ fromMaybe "" <$> getEnv "DB_SITE"
+                    apiKey <- liftIO $ fromMaybe "" <$> getEnv "DB_KEY"
+                    let url = "http://" ++ website ++ "/selectMinecraft.php?key=" ++ apiKey ++ "&id=" ++ show gid ++ "&minecraft=" ++ nid
+                    _ <- liftIO $ sendRequestTo sm url
+                    liftIO $ atomically $ writeTVar peopleSelectedAccounts $ map (\u@(i, _, _, _) -> if i == gid then (gid, dids, nid, mc) else u) st
+                    return "*Success!*"
+                  else return "*You do not have that minecraft nick linked!*"
+          _ -> return "*Wrong command syntax*"
+        pure ()
       "?settings" -> commandTimeout 2 $ do
         liftIO . putStrLn $ "recieved " ++ unpack (messageText m)
         _ <-

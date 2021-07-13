@@ -25,6 +25,7 @@ import Data.Aeson
 import Stats
 import Utils
 import API
+import Data.List (intercalate)
 
 data BowBotData = BowBotData
   { hypixelRequestCount :: TVar Int,
@@ -122,8 +123,19 @@ statsCommand dt@BowBotData {..} manager sett m = do
       stats <- liftIO $ withMinecraftFromName False dt manager name (userId $ messageAuthor m) $ \u -> do
         s <- getHypixelStats manager u
         case s of
+          Nothing -> pure s
           (Just Stats {bowWins = 0, bowLosses = 0}) -> pure Nothing
-          _ -> pure s
+          Just st -> do
+            when (bowWins st >= 500) $ do
+              nicks <- liftIO $ atomically $ readTVar minecraftNicks
+              when (u `notElem` map fst nicks) $ do
+                names <- liftIO $ minecraftUuidToNames manager u
+                website <- liftIO $ fromMaybe "" <$> getEnv "DB_SITE"
+                apiKey <- liftIO $ fromMaybe "" <$> getEnv "DB_KEY"
+                let url = "http://" ++ website ++ "/addMinecraftName.php?key=" ++ apiKey ++ "&uuid=" ++ u ++ "&names=" ++ intercalate "," names
+                _ <- liftIO $ sendRequestTo manager url
+                liftIO $ atomically $ writeTVar minecraftNicks $ (u, names):nicks
+            pure s
       _ <- case stats of
         NoResponse -> restCall $ R.CreateMessage (messageChannel m) "*The player doesn't exist!*"
         (JustResponse _ s) -> restCall . R.CreateMessage (messageChannel m) . pack . showStats sett $ s

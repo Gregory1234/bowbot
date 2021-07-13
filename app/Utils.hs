@@ -53,3 +53,12 @@ data StatsResponse a
   | NotOnList
   | DidYouMeanResponse String a
   | DidYouMeanOldResponse String String a
+
+discordEscape :: String -> String
+discordEscape [] = ""
+discordEscape (x:xs)
+  | x `elem` "_*~`>" = '\\':x:discordEscape xs
+  | otherwise = x:discordEscape xs
+
+ignoreChars :: [Char] -> String -> String
+ignoreChars a = filter (`notElem` a)
