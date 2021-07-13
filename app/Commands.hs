@@ -101,8 +101,10 @@ withMinecraftFromName b bbd@BowBotData {..} manager (Just name) _ f = do
             Nothing -> pure NoResponse
             Just r -> do
               names <- liftIO $ minecraftUuidToNames' manager minecraftNicks uuid
-              if dist (head names) rn <= 2
-                then pure (DidYouMeanResponse rn r)
+              if dist (map toLower $ head names) (map toLower rn) <= 2
+                then if head names == rn
+                  then pure (JustResponse rn r)
+                  else pure (DidYouMeanResponse rn r)
                 else if map toLower name == map toLower rn
                   then pure (OldResponse rn (head names) r)
                   else pure (DidYouMeanOldResponse rn (head names) r)
