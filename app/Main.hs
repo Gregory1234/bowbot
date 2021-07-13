@@ -200,7 +200,7 @@ eventHandler dt@BowBotData {..} sm event = case event of
           (OldResponse _ _ s) -> restCall . R.CreateMessage (messageChannel m) $ "```\n" <> T.unlines (reverse $ map pack s) <> "```"
           (DidYouMeanResponse n s) -> restCall . R.CreateMessage (messageChannel m) $ "*Did you mean* **" <> pack n <> "**:```\n" <> T.unlines (reverse $ map pack s) <> "```"
           (DidYouMeanOldResponse n o s) -> restCall . R.CreateMessage (messageChannel m) $ "*Did you mean* **" <> pack o <> " (" <> pack n <> ")**:```\n" <> T.unlines (reverse $ map pack s) <> "```"
-          NotOnList -> restCall $ R.CreateMessage (messageChannel m) "*You aren't on the list! Please provide your ign to get added in the future.*"
+          NotOnList -> restCall $ R.CreateMessage (messageChannel m) "*You aren't on the list! Please provide your ign to get added in the future (there is no command, just say your ign).*"
         pure ()
       "?n" -> commandTimeout 12 $ do
         liftIO . putStrLn $ "recieved " ++ unpack (messageText m)
@@ -214,7 +214,7 @@ eventHandler dt@BowBotData {..} sm event = case event of
           (OldResponse _ _ s) -> restCall . R.CreateMessage (messageChannel m) $ "```\n" <> T.unlines (reverse $ map pack s) <> "```"
           (DidYouMeanResponse n s) -> restCall . R.CreateMessage (messageChannel m) $ "*Did you mean* **" <> pack n <> "**:```\n" <> T.unlines (reverse $ map pack s) <> "```"
           (DidYouMeanOldResponse n o s) -> restCall . R.CreateMessage (messageChannel m) $ "*Did you mean* **" <> pack o <> " (" <> pack n <> ")**:```\n" <> T.unlines (reverse $ map pack s) <> "```"
-          NotOnList -> restCall $ R.CreateMessage (messageChannel m) "*You aren't on the list! Please provide your ign to get added in the future.*"
+          NotOnList -> restCall $ R.CreateMessage (messageChannel m) "*You aren't on the list! Please provide your ign to get added in the future (there is no command, just say your ign).*"
         pure ()
       "?online" -> commandTimeout 20 $ do
         liftIO . putStrLn $ "recieved " ++ unpack (messageText m)
@@ -290,7 +290,7 @@ eventHandler dt@BowBotData {..} sm event = case event of
               <> " - **?s [name]** - *show player's Bow Duels stats*\n"
               <> " - **?sa [name]** - *show all Bow Duels stats*\n"
               <> " - **?sd [name]** - *show a default set of Bow Duels stats*\n"
-              <> " - **?n [name]** - *show player's past nicks (prioritizing people on autocorrect)*\n"
+              <> " - **?n [name]** - *show player's past nicks (prioritizing people with autocorrect)*\n"
               <> " - **?na [name]** - *show player's past nicks*\n"
               <> " - **?mc** - *list your linked minecraft nicks*\n"
               <> " - **?mc [name]** - *select a minecraft account as your default*\n"
@@ -314,7 +314,7 @@ eventHandler dt@BowBotData {..} sm event = case event of
         let accountMaybe = find (\(_,b,_,_) -> userId (messageAuthor m) `elem` b) st
         _ <- restCall . R.CreateMessage (messageChannel m) =<< case wrds of
           [] -> case accountMaybe of
-            Nothing -> return "*You aren't on the list! Please provide your ign to get added in the future.*"
+            Nothing -> return "*You aren't on the list! Please provide your ign to get added in the future (there is no command, just say your ign).*"
             Just (_, _, sel, mc) -> do
               let helper = \x -> do {
                   name <- liftIO $ head <$> minecraftUuidToNames' sm minecraftNicks x;
@@ -323,7 +323,7 @@ eventHandler dt@BowBotData {..} sm event = case event of
               mc' <- traverse helper mc
               return $ "**List of your minecraft nicks linked:**\n```\n" <> pack (unlines mc') <> "```"
           [newsel] -> case accountMaybe of
-            Nothing -> return "*You aren't on the list! Please provide your ign to get added in the future.*"
+            Nothing -> return "*You aren't on the list! Please provide your ign to get added in the future (there is no command, just say your ign).*"
             Just (gid, dids, _, mc) -> do
               newselid <- liftIO $ minecraftNameToUUID' sm minecraftNicks newsel
               case newselid of

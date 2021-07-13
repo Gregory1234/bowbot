@@ -142,7 +142,7 @@ statsCommand dt@BowBotData {..} manager sett m = do
         (OldResponse o _ s) -> restCall . R.CreateMessage (messageChannel m) . pack . showStats sett . addOldName o $ s
         (DidYouMeanResponse _ s) -> restCall . R.CreateMessage (messageChannel m) . ("*Did you mean* " <>) . pack . showStats sett $ s
         (DidYouMeanOldResponse o _ s) -> restCall . R.CreateMessage (messageChannel m) . ("*Did you mean* " <>) . pack . showStats sett . addOldName o $ s
-        NotOnList -> restCall $ R.CreateMessage (messageChannel m) "*You aren't on the list! Please provide your ign to get added in the future.*"
+        NotOnList -> restCall $ R.CreateMessage (messageChannel m) "*You aren't on the list! Please provide your ign to get added in the future (there is no command, just say your ign).*"
       pure ()
     else do
       f <- liftIO $ read @Int <$> getTime "%S"
