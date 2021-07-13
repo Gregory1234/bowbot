@@ -47,14 +47,9 @@ dist a b =
     min3 x y z = if x < y then x else min y z
 
 data StatsResponse a
-  = JustResponse a
+  = JustResponse String a
+  | OldResponse String String a
   | NoResponse
-  | DidYouMeanResponse a
-
-maybeToJustStats :: Maybe a -> StatsResponse a
-maybeToJustStats Nothing = NoResponse
-maybeToJustStats (Just x) = JustResponse x
-maybeToDidYouMeanStats :: Bool -> Maybe a -> StatsResponse a
-maybeToDidYouMeanStats _ Nothing = NoResponse
-maybeToDidYouMeanStats False (Just x) = DidYouMeanResponse x
-maybeToDidYouMeanStats True (Just x) = JustResponse x
+  | NotOnList
+  | DidYouMeanResponse String a
+  | DidYouMeanOldResponse String String a

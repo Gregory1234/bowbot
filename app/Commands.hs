@@ -6,7 +6,7 @@
 module Commands where
 
 import Control.Concurrent.STM
-import Control.Monad.IO.Class (liftIO)
+import Control.Monad.IO.Class (liftIO, MonadIO)
 import qualified Data.Text as T
 import Discord
 import qualified Discord.Requests as R
@@ -58,26 +58,53 @@ flattenedMinecraftNicks BowBotData {..} = do
   let restOfNicks = [(n,u) | (n,us) <- people, u <- drop 1 us]
   return $ currentNicks ++ restOfNicks
 
-
-getHypixelStats' :: BowBotData -> Manager -> (String, String) -> IO (StatsResponse Stats)
-getHypixelStats' bbd manager (uuid, name) = do
-  stats <- if null uuid then return Nothing else liftIO $ getHypixelStats manager uuid
-  people <- atomically $ flattenedMinecraftNicks bbd
-  let decorate = \x c@Stats {..} -> c {playerName = if map toLower x == map toLower playerName then playerName else x ++ " (" ++ playerName ++ ")"}
-  case stats of
-    Nothing -> do
+withMinecraftFromName :: MonadIO m => Bool -> BowBotData -> Manager -> Maybe String -> UserId -> (String -> m (Maybe a)) -> m (StatsResponse a)
+withMinecraftFromName _ bbd@BowBotData {..} manager Nothing author f = do
+  pns <- fmap (>>=(\(_, b, c, _) -> (,c) <$> b)) $ liftIO $ atomically $ readTVar peopleSelectedAccounts
+  liftIO $ print $ lookup author pns
+  let uuid = lookup author pns
+  case uuid of
+    Nothing -> pure NotOnList
+    Just uuid' -> do
+      res <- f uuid'
+      case res of
+        Nothing -> pure NoResponse
+        Just r -> do
+          names <- liftIO $ minecraftUuidToNames' manager minecraftNicks uuid'
+          pure (JustResponse (head names) r)
+withMinecraftFromName b bbd@BowBotData {..} manager (Just name) _ f = do
+  if b
+    then tryAutoCorrect
+    else tryNormal
+  where
+    tryNormal = do
+      uuid <- liftIO $ minecraftNameToUUID' manager minecraftNicks name
+      case uuid of
+        Nothing -> if b then pure NoResponse else tryAutoCorrect
+        Just uuid' -> do
+          res <- f uuid'
+          case res of
+            Nothing -> if b then pure NoResponse else tryAutoCorrect
+            Just r -> do
+              names <- liftIO $ minecraftUuidToNames' manager minecraftNicks uuid'
+              pure (JustResponse (head names) r)
+    tryAutoCorrect = do
+      people <- liftIO $ atomically $ flattenedMinecraftNicks bbd
       let dists = map (\(u,n) -> ((u, n), dist (map toLower n) (map toLower name))) people
       let filtered = map fst . filter (\(_,d) -> d <= 2) $ dists
       case filtered of
-        [] -> return NoResponse
-        (nu:_) -> liftIO $ maybeToDidYouMeanStats (map toLower (snd nu) == map toLower name) . fmap (decorate (snd nu)) <$> getHypixelStats manager (fst nu)
-    s@(Just Stats {bowWins = 0, bowLosses = 0}) -> do
-      let dists = map (\(u,n) -> ((u, n), dist (map toLower n) (map toLower name))) people
-      let filtered = map fst . filter (\(_,d) -> d <= 2) $ dists
-      case filtered of
-        [] -> return $ maybeToJustStats s
-        (nu:_) -> liftIO $ maybeToDidYouMeanStats (map toLower (snd nu) == map toLower name) . fmap (decorate (snd nu)) <$> getHypixelStats manager (fst nu)
-    s -> return $ maybeToJustStats s
+        [] -> if b then tryNormal else pure NoResponse
+        ((uuid, rn):_) -> do
+          res <- f uuid
+          case res of
+            Nothing -> pure NoResponse
+            Just r -> do
+              names <- liftIO $ minecraftUuidToNames' manager minecraftNicks uuid
+              if dist (head names) rn <= 2
+                then pure (DidYouMeanResponse rn r)
+                else if map toLower name == map toLower rn
+                  then pure (OldResponse rn (head names) r)
+                  else pure (DidYouMeanOldResponse rn (head names) r)
 
 statsCommand :: BowBotData -> Manager -> StatsSettings -> Message -> DiscordHandler ()
 statsCommand dt@BowBotData {..} manager sett m = do
@@ -91,25 +118,20 @@ statsCommand dt@BowBotData {..} manager sett m = do
   if cv
     then do
       let wrd = T.words (messageText m)
-      (uuid, name) <- if length wrd == 1
-      then do
-        pns <- fmap (>>=(\(_, b, c, _) -> (,c) <$> b)) $ liftIO $ atomically $ readTVar peopleSelectedAccounts
-        liftIO $ print $ lookup (userId $ messageAuthor m) pns
-        let sel = lookup (userId $ messageAuthor m) pns
-        return (sel, "")
-      else do
-        let name = unpack . strip . T.dropWhile isSpace . T.dropWhile (not . isSpace) $ messageText m
-        fmap (, name) $ liftIO $ minecraftNameToUUID' manager minecraftNicks name
-      if isJust uuid || not (null name) then do
-        stats <- liftIO $ getHypixelStats' dt manager (fromMaybe "" uuid, name)
-        _ <- case stats of
-          NoResponse -> restCall $ R.CreateMessage (messageChannel m) "*The player doesn't exist!*"
-          (JustResponse s) -> restCall . R.CreateMessage (messageChannel m) . pack . showStats sett $ s
-          (DidYouMeanResponse s) -> restCall . R.CreateMessage (messageChannel m) . ("*Did you mean* "<>) . pack . showStats sett $ s
-        pure ()
-      else do
-        _ <- restCall $ R.CreateMessage (messageChannel m) "*You aren't on the list! Please provide your ign to get added in the future.*"
-        pure ()
+      let name = if length wrd == 1 then Nothing else Just $ unpack $ wrd !! 1
+      stats <- liftIO $ withMinecraftFromName False dt manager name (userId $ messageAuthor m) $ \u -> do
+        s <- getHypixelStats manager u
+        case s of
+          (Just Stats {bowWins = 0, bowLosses = 0}) -> pure Nothing
+          _ -> pure s
+      _ <- case stats of
+        NoResponse -> restCall $ R.CreateMessage (messageChannel m) "*The player doesn't exist!*"
+        (JustResponse _ s) -> restCall . R.CreateMessage (messageChannel m) . pack . showStats sett $ s
+        (OldResponse o _ s) -> restCall . R.CreateMessage (messageChannel m) . pack . showStats sett . addOldName o $ s
+        (DidYouMeanResponse _ s) -> restCall . R.CreateMessage (messageChannel m) . ("*Did you mean* " <>) . pack . showStats sett $ s
+        (DidYouMeanOldResponse o _ s) -> restCall . R.CreateMessage (messageChannel m) . ("*Did you mean* " <>) . pack . showStats sett . addOldName o $ s
+        NotOnList -> restCall $ R.CreateMessage (messageChannel m) "*You aren't on the list! Please provide your ign to get added in the future.*"
+      pure ()
     else do
       f <- liftIO $ read @Int <$> getTime "%S"
       _ <- restCall . R.CreateMessage (messageChannel m) . pack $ "**Too many requests! Wait another " ++ show ((65 - f) `mod` 60) ++ " seconds!**"

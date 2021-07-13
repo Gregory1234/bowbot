@@ -31,6 +31,7 @@ import Data.Traversable (for)
 import Data.Text.Encoding (encodeUtf8)
 import Control.Monad.Reader (ReaderT(..))
 import Data.Either (rights, fromRight)
+import Data.Char (toLower)
 
 
 
@@ -178,7 +179,6 @@ eventHandler dt@BowBotData {..} sm event = case event of
     unless (fromBot m) $ case unpack $ T.toLower . T.takeWhile (/= ' ') $ messageText m of
       "?s" -> commandTimeout 12 $ do
         liftIO . putStrLn $ "recieved " ++ unpack (messageText m)
-        liftIO . print =<< liftIO (atomically (readTVar minecraftNicks))
         settings <- liftIO $ atomically $ readTVar discordPeopleSettings
         statsCommand dt sm (fromMaybe defSettings $ lookup (userId $ messageAuthor m) settings) m
       "?sd" -> commandTimeout 12 $ do
@@ -187,6 +187,34 @@ eventHandler dt@BowBotData {..} sm event = case event of
       "?sa" -> commandTimeout 12 $ do
         liftIO . putStrLn $ "recieved " ++ unpack (messageText m)
         statsCommand dt sm allSettings m
+      "?na" -> commandTimeout 12 $ do
+        liftIO . putStrLn $ "recieved " ++ unpack (messageText m)
+        let wrd = T.words (messageText m)
+        names <- liftIO $ withMinecraftFromName False dt sm (unpack <$> listToMaybe (tail wrd)) (userId $ messageAuthor m) $ \u -> do
+          names <- minecraftUuidToNames' sm minecraftNicks u
+          return if null names then Nothing else Just names
+        _ <- case names of
+          NoResponse -> restCall $ R.CreateMessage (messageChannel m) "*The player doesn't exist!*"
+          (JustResponse _ s) -> restCall . R.CreateMessage (messageChannel m) $ "```\n" <> T.unlines (reverse $ map pack s) <> "```"
+          (OldResponse _ _ s) -> restCall . R.CreateMessage (messageChannel m) $ "```\n" <> T.unlines (reverse $ map pack s) <> "```"
+          (DidYouMeanResponse n s) -> restCall . R.CreateMessage (messageChannel m) $ "*Did you mean* **" <> pack n <> "**:```\n" <> T.unlines (reverse $ map pack s) <> "```"
+          (DidYouMeanOldResponse n o s) -> restCall . R.CreateMessage (messageChannel m) $ "*Did you mean* **" <> pack o <> " (" <> pack n <> ")**:```\n" <> T.unlines (reverse $ map pack s) <> "```"
+          NotOnList -> restCall $ R.CreateMessage (messageChannel m) "*You aren't on the list! Please provide your ign to get added in the future.*"
+        pure ()
+      "?n" -> commandTimeout 12 $ do
+        liftIO . putStrLn $ "recieved " ++ unpack (messageText m)
+        let wrd = T.words (messageText m)
+        names <- liftIO $ withMinecraftFromName True dt sm (unpack <$> listToMaybe (tail wrd)) (userId $ messageAuthor m) $ \u -> do
+          names <- minecraftUuidToNames' sm minecraftNicks u
+          return if null names then Nothing else Just names
+        _ <- case names of
+          NoResponse -> restCall $ R.CreateMessage (messageChannel m) "*The player doesn't exist!*"
+          (JustResponse _ s) -> restCall . R.CreateMessage (messageChannel m) $ "```\n" <> T.unlines (reverse $ map pack s) <> "```"
+          (OldResponse _ _ s) -> restCall . R.CreateMessage (messageChannel m) $ "```\n" <> T.unlines (reverse $ map pack s) <> "```"
+          (DidYouMeanResponse n s) -> restCall . R.CreateMessage (messageChannel m) $ "*Did you mean* **" <> pack n <> "**:```\n" <> T.unlines (reverse $ map pack s) <> "```"
+          (DidYouMeanOldResponse n o s) -> restCall . R.CreateMessage (messageChannel m) $ "*Did you mean* **" <> pack o <> " (" <> pack n <> ")**:```\n" <> T.unlines (reverse $ map pack s) <> "```"
+          NotOnList -> restCall $ R.CreateMessage (messageChannel m) "*You aren't on the list! Please provide your ign to get added in the future.*"
+        pure ()
       "?online" -> commandTimeout 20 $ do
         liftIO . putStrLn $ "recieved " ++ unpack (messageText m)
         t <- liftIO $ read @Int <$> getTime "%S"

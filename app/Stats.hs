@@ -62,6 +62,9 @@ allSettings = StatsSettings
   , sAccuracy = Always
   }
 
+addOldName :: String -> Stats -> Stats
+addOldName n st@Stats {..} = st {playerName = n ++ " (" ++ playerName ++ ")" } 
+
 showStats :: StatsSettings -> Stats -> String
 showStats StatsSettings {..} Stats {..} = unlines $ catMaybes
   [ onlyIf True
