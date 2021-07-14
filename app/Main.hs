@@ -218,16 +218,16 @@ eventHandler dt@BowBotData {..} sm event = case event of
         pure ()
       "?head" -> commandTimeout 12 $ do
         liftIO . putStrLn $ "recieved " ++ unpack (messageText m)
-        urlCommand True dt sm ("https://www.mc-heads.net/avatar/" ++) m
+        urlCommand True dt sm (\s -> "https://crafatar.com/avatars/" ++ s ++ "?overlay") m
       "?skin" -> commandTimeout 12 $ do
         liftIO . putStrLn $ "recieved " ++ unpack (messageText m)
-        urlCommand True dt sm ("https://www.mc-heads.net/body/" ++) m
+        urlCommand True dt sm (\s -> "https://crafatar.com/renders/body/" ++ s ++ "?overlay") m
       "?heada" -> commandTimeout 12 $ do
         liftIO . putStrLn $ "recieved " ++ unpack (messageText m)
-        urlCommand False dt sm ("https://www.mc-heads.net/avatar/" ++) m
+        urlCommand False dt sm (\s -> "https://crafatar.com/avatars/" ++ s ++ "?overlay") m
       "?skina" -> commandTimeout 12 $ do
         liftIO . putStrLn $ "recieved " ++ unpack (messageText m)
-        urlCommand False dt sm ("https://www.mc-heads.net/body/" ++) m
+        urlCommand False dt sm (\s -> "https://crafatar.com/renders/body/" ++ s ++ "?overlay") m
       "?online" -> commandTimeout 20 $ do
         liftIO . putStrLn $ "recieved " ++ unpack (messageText m)
         t <- liftIO $ read @Int <$> getTime "%S"
