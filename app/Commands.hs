@@ -2,6 +2,7 @@
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE ViewPatterns #-}
 
 module Commands where
 
@@ -13,10 +14,10 @@ import qualified Discord.Requests as R
 import Discord.Types
 import Network.HTTP.Conduit
 import System.Environment.Blank (getEnv)
-import Data.Maybe (fromMaybe, maybeToList, listToMaybe, isJust)
-import Data.Char (toLower, isSpace)
+import Data.Maybe (fromMaybe, listToMaybe)
+import Data.Char (toLower)
 import Control.Monad (when, void)
-import Data.Text (unpack, strip, pack)
+import Data.Text (unpack, pack)
 import Control.Concurrent (forkIO)
 import System.Timeout (timeout)
 import Control.Monad.Trans.Reader
@@ -60,7 +61,7 @@ flattenedMinecraftNicks BowBotData {..} = do
   return $ currentNicks ++ restOfNicks
 
 withMinecraftFromName :: MonadIO m => Bool -> BowBotData -> Manager -> Maybe String -> UserId -> (String -> m (Maybe a)) -> m (StatsResponse a)
-withMinecraftFromName _ bbd@BowBotData {..} manager Nothing author f = do
+withMinecraftFromName _ BowBotData {..} manager Nothing author f = do
   pns <- fmap (>>=(\(_, b, c, _) -> (,c) <$> b)) $ liftIO $ atomically $ readTVar peopleSelectedAccounts
   liftIO $ print $ lookup author pns
   let uuid = lookup author pns
@@ -73,7 +74,7 @@ withMinecraftFromName _ bbd@BowBotData {..} manager Nothing author f = do
         Just r -> do
           names <- liftIO $ minecraftUuidToNames' manager minecraftNicks uuid'
           pure (JustResponse (head names) r)
-withMinecraftFromName b bbd@BowBotData {..} manager (Just name) _ f = do
+withMinecraftFromName b bbd@BowBotData {..} manager (Just (ignoreChars "\\ " -> name)) _ f = do
   if b
     then tryAutoCorrect
     else tryNormal
@@ -150,6 +151,24 @@ statsCommand dt@BowBotData {..} manager sett m = do
       f <- liftIO $ read @Int <$> getTime "%S"
       _ <- restCall . R.CreateMessage (messageChannel m) . pack $ "**Too many requests! Wait another " ++ show ((65 - f) `mod` 60) ++ " seconds!**"
       pure ()
+
+urlCommand :: Bool -> BowBotData -> Manager -> (String -> String) -> Message -> DiscordHandler ()
+urlCommand ac bbd man mkurl m = do
+  let wrd = T.words (messageText m)
+  url <- liftIO $ withMinecraftFromName ac bbd man (unpack <$> listToMaybe (tail wrd)) (userId $ messageAuthor m) $ \u -> do
+    return (Just $ mkurl u)
+  _ <- case url of
+    NoResponse -> restCall $ R.CreateMessage (messageChannel m) "*The player doesn't exist!*"
+    (JustResponse _ url') -> restCall . R.CreateMessage (messageChannel m) . pack $ url'
+    (OldResponse _ _ url') -> restCall . R.CreateMessage (messageChannel m) . pack $ url'
+    (DidYouMeanResponse n url') -> do
+      _ <- restCall . R.CreateMessage (messageChannel m) . pack $ "*Did you mean* **" ++ n ++ "**:"
+      restCall . R.CreateMessage (messageChannel m) . pack $ url'
+    (DidYouMeanOldResponse n o url') -> do
+      _ <- restCall . R.CreateMessage (messageChannel m) . pack $ "*Did you mean* **" ++ o <> " (" ++ n ++ ")**:"
+      restCall . R.CreateMessage (messageChannel m) . pack $ url'
+    NotOnList -> restCall $ R.CreateMessage (messageChannel m) "*You aren't on the list! Please provide your ign to get added in the future (there is no command, just say your ign).*"
+  pure ()
 
 commandTimeout :: Int -> DiscordHandler () -> DiscordHandler ()
 commandTimeout n x = ReaderT (void . forkIO . void . timeout (n * 1000000) . runReaderT x)

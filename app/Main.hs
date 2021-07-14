@@ -216,6 +216,18 @@ eventHandler dt@BowBotData {..} sm event = case event of
           (DidYouMeanOldResponse n o s) -> restCall . R.CreateMessage (messageChannel m) $ "*Did you mean* **" <> pack o <> " (" <> pack n <> ")**:```\n" <> T.unlines (reverse $ map pack s) <> "```"
           NotOnList -> restCall $ R.CreateMessage (messageChannel m) "*You aren't on the list! Please provide your ign to get added in the future (there is no command, just say your ign).*"
         pure ()
+      "?head" -> commandTimeout 12 $ do
+        liftIO . putStrLn $ "recieved " ++ unpack (messageText m)
+        urlCommand True dt sm ("https://www.mc-heads.net/avatar/" ++) m
+      "?skin" -> commandTimeout 12 $ do
+        liftIO . putStrLn $ "recieved " ++ unpack (messageText m)
+        urlCommand True dt sm ("https://www.mc-heads.net/body/" ++) m
+      "?heada" -> commandTimeout 12 $ do
+        liftIO . putStrLn $ "recieved " ++ unpack (messageText m)
+        urlCommand False dt sm ("https://www.mc-heads.net/avatar/" ++) m
+      "?skina" -> commandTimeout 12 $ do
+        liftIO . putStrLn $ "recieved " ++ unpack (messageText m)
+        urlCommand False dt sm ("https://www.mc-heads.net/body/" ++) m
       "?online" -> commandTimeout 20 $ do
         liftIO . putStrLn $ "recieved " ++ unpack (messageText m)
         t <- liftIO $ read @Int <$> getTime "%S"
@@ -290,8 +302,9 @@ eventHandler dt@BowBotData {..} sm event = case event of
               <> " - **?s [name]** - *show player's Bow Duels stats*\n"
               <> " - **?sa [name]** - *show all Bow Duels stats*\n"
               <> " - **?sd [name]** - *show a default set of Bow Duels stats*\n"
-              <> " - **?n [name]** - *show player's past nicks (prioritizing people with autocorrect)*\n"
-              <> " - **?na [name]** - *show player's past nicks*\n"
+              <> " - **?n(a) [name]** - *show player's past nicks*\n"
+              <> " - **?head(a) [name]** - *show player's head*\n"
+              <> " - **?skin(a) [name]** - *show player's full skin*\n"
               <> " - **?mc** - *list your linked minecraft nicks*\n"
               <> " - **?mc [name]** - *select a minecraft account as your default*\n"
               <> " - **?settings** - *display help for settings*\n"
