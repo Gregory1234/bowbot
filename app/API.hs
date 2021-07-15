@@ -71,6 +71,29 @@ updateMinecraftNames manager uuid names = do
   putStrLn $ "Received response from: " ++ url
   pure ()
 
+addMinecraftAccount :: Manager -> String -> [String] -> Bool -> IO ()
+addMinecraftAccount manager uuid names hypixel = do
+  website <- fromMaybe "" <$> getEnv "DB_SITE"
+  apiKey <- fromMaybe "" <$> getEnv "DB_KEY"
+  let url = "http://" ++ website ++ "/addMinecraftName.php?key=" ++ apiKey ++ "&uuid=" ++ uuid ++ "&names=" ++ intercalate "," names ++ "&hypixel=" ++ (if hypixel then "1" else "0")
+  _ <- sendRequestTo manager url
+  putStrLn $ "Received response from: " ++ url
+  pure ()
+
+addAccount :: Manager -> String -> UserId -> String -> IO (Maybe Integer)
+addAccount manager name did uuid = do
+  website <- fromMaybe "" <$> getEnv "DB_SITE"
+  apiKey <- fromMaybe "" <$> getEnv "DB_KEY"
+  let url = "http://" ++ website ++ "/addPerson.php?name=" ++ name ++ "&key=" ++ apiKey ++ "&discord=" ++ show did ++ "&verified=0&minecraft=" ++ uuid
+  res <- sendRequestTo manager url
+  case decode res :: Maybe Object of
+    Nothing -> return Nothing
+    (Just js) -> do
+      putStrLn $ "Received response from: " ++ url
+      case js HM.!? "id" of
+          (Just (String (readMaybe . unpack -> Just n))) -> return $ Just n
+          _ -> return Nothing
+
 isInBowDuels :: Manager -> String -> IO (Maybe Bool)
 isInBowDuels manager uuid = do
   apiKey <- fromMaybe "" <$> getEnv "HYPIXEL_API"

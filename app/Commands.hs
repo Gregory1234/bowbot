@@ -16,7 +16,7 @@ import Network.HTTP.Conduit
 import System.Environment.Blank (getEnv)
 import Data.Maybe (fromMaybe, listToMaybe)
 import Data.Char (toLower)
-import Control.Monad (when, void)
+import Control.Monad (when, void, unless)
 import Data.Text (unpack, pack)
 import Control.Concurrent (forkIO)
 import System.Timeout (timeout)
@@ -36,13 +36,14 @@ data BowBotData = BowBotData
     hypixelOnlineBorderList :: TVar (Maybe [String]),
     hypixelOnlineBusyList :: TVar Bool,
     discordPeopleSettings :: TVar [(UserId, StatsSettings)],
-    peopleSelectedAccounts :: TVar [(Integer, [UserId], String, [String])]
+    peopleSelectedAccounts :: TVar [(Integer, [UserId], String, [String])],
+    registeredNow :: TVar Int
   }
 
 minecraftNameToUUID' :: Manager -> TVar [(String, [String])] -> String -> IO (Maybe String)
 minecraftNameToUUID' manager nameCache name = do
   cache <- atomically $ readTVar nameCache
-  case filter ((name==) . head . snd) cache of
+  case filter ((map toLower name==) . map toLower . head . snd) cache of
     [] -> minecraftNameToUUID manager name
     ((uuid, _) : _) -> return $ Just uuid
 
@@ -59,6 +60,33 @@ flattenedMinecraftNicks BowBotData {..} = do
   let currentNicks = [(n,u) | (n,us) <- people, u <- take 1 us]
   let restOfNicks = [(n,u) | (n,us) <- people, u <- drop 1 us]
   return $ currentNicks ++ restOfNicks
+
+registerCommand :: BowBotData -> Manager -> String -> Message -> DiscordHandler ()
+registerCommand BowBotData {..} man name m = do
+  uuid <- liftIO $ minecraftNameToUUID' man minecraftNicks name
+  _ <- case uuid of
+    Nothing -> restCall $ R.CreateMessage (messageChannel m) "*The player doesn't exist!*"
+    Just uuid' -> do
+      nicks <- liftIO $ atomically $ readTVar minecraftNicks
+      taken <- fmap (>>=(\(_, _, _, b) -> b)) $ liftIO $ atomically $ readTVar peopleSelectedAccounts
+      if uuid' `elem` taken
+      then restCall $ R.CreateMessage (messageChannel m) "*That account already belongs to someone else!*"
+      else do
+        names <- liftIO $ minecraftUuidToNames' man minecraftNicks uuid'
+        unless (uuid' `elem` map fst nicks) $ do
+          stats <- liftIO $ getHypixelStats man uuid'
+          liftIO $ addMinecraftAccount man uuid' names $ case stats of
+            Nothing -> False
+            Just s -> bowWins s >= 500
+          liftIO $ atomically $ writeTVar minecraftNicks ((uuid', names):nicks)
+        gid <- liftIO $ addAccount man (head names) (userId (messageAuthor m)) uuid'
+        case gid of
+          Nothing -> restCall $ R.CreateMessage (messageChannel m) "*Somehing went wrong*"
+          Just gid' -> do
+            psa <- liftIO $ atomically $ readTVar peopleSelectedAccounts
+            liftIO $ atomically $ writeTVar peopleSelectedAccounts ((gid', [userId (messageAuthor m)], uuid', [uuid']):psa)
+            restCall $ R.CreateMessage (messageChannel m) "*Registered successfully*"
+  pure ()
 
 withMinecraftFromName :: MonadIO m => Bool -> BowBotData -> Manager -> Maybe String -> UserId -> (String -> m (Maybe a)) -> m (StatsResponse a)
 withMinecraftFromName _ BowBotData {..} manager Nothing author f = do
@@ -135,7 +163,7 @@ statsCommand dt@BowBotData {..} manager sett m = do
                 names <- liftIO $ minecraftUuidToNames manager u
                 website <- liftIO $ fromMaybe "" <$> getEnv "DB_SITE"
                 apiKey <- liftIO $ fromMaybe "" <$> getEnv "DB_KEY"
-                let url = "http://" ++ website ++ "/addMinecraftName.php?key=" ++ apiKey ++ "&uuid=" ++ u ++ "&names=" ++ intercalate "," names
+                let url = "http://" ++ website ++ "/addMinecraftName.php?key=" ++ apiKey ++ "&uuid=" ++ u ++ "&hypixel=1&names=" ++ intercalate "," names
                 _ <- liftIO $ sendRequestTo manager url
                 liftIO $ atomically $ writeTVar minecraftNicks $ (u, names):nicks
             pure s
@@ -145,7 +173,7 @@ statsCommand dt@BowBotData {..} manager sett m = do
         (OldResponse o _ s) -> restCall . R.CreateMessage (messageChannel m) . pack . showStats sett . addOldName o $ s
         (DidYouMeanResponse _ s) -> restCall . R.CreateMessage (messageChannel m) . ("*Did you mean* " <>) . pack . showStats sett $ s
         (DidYouMeanOldResponse o _ s) -> restCall . R.CreateMessage (messageChannel m) . ("*Did you mean* " <>) . pack . showStats sett . addOldName o $ s
-        NotOnList -> restCall $ R.CreateMessage (messageChannel m) "*You aren't on the list! Please provide your ign to get added in the future (there is no command, just say your ign).*"
+        NotOnList -> restCall $ R.CreateMessage (messageChannel m) "*You aren't on the list! To register, type ```?register yourign```.*"
       pure ()
     else do
       f <- liftIO $ read @Int <$> getTime "%S"
@@ -167,7 +195,7 @@ urlCommand ac bbd man mkurl m = do
     (DidYouMeanOldResponse n o url') -> do
       _ <- restCall . R.CreateMessage (messageChannel m) . pack $ "*Did you mean* **" ++ o <> " (" ++ n ++ ")**:"
       restCall . R.CreateMessage (messageChannel m) . pack $ url'
-    NotOnList -> restCall $ R.CreateMessage (messageChannel m) "*You aren't on the list! Please provide your ign to get added in the future (there is no command, just say your ign).*"
+    NotOnList -> restCall $ R.CreateMessage (messageChannel m) "*You aren't on the list! To register, type ```?register yourign```.*"
   pure ()
 
 commandTimeout :: Int -> DiscordHandler () -> DiscordHandler ()

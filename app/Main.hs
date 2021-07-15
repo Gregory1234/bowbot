@@ -48,6 +48,7 @@ main = do
     hypixelOnlineBusyList <- atomically $ newTVar False
     discordPeopleSettings <- atomically $ newTVar []
     peopleSelectedAccounts <- atomically $ newTVar []
+    registeredNow <- atomically $ newTVar 0
     let bbdata = BowBotData {..}
     downloadData bbdata
     mkBackground bbdata
@@ -131,6 +132,7 @@ background bbdata@BowBotData {..} = do
           bc <- readTVar hypixelRequestBorderCount
           writeTVar hypixelRequestCount bc
           writeTVar hypixelRequestBorderCount 0
+          writeTVar registeredNow 0
         atomically $ do
           onl <- readTVar hypixelOnlineBorderList
           writeTVar hypixelOnlineList onl
@@ -188,6 +190,20 @@ eventHandler dt@BowBotData {..} sm event = case event of
       "?sa" -> commandTimeout 12 $ do
         liftIO . putStrLn $ "recieved " ++ unpack (messageText m)
         statsCommand dt sm allSettings m
+      "?register" -> commandTimeout 12 $ do
+        liftIO . putStrLn $ "recieved " ++ unpack (messageText m)
+        rn <- liftIO $ atomically $ readTVar registeredNow
+        if rn > 2
+        then void $ restCall $ R.CreateMessage (messageChannel m) "*Too many requests! Please wait!*"
+        else do
+          liftIO $ atomically $ writeTVar registeredNow (rn + 1)
+          let wrd = T.words (messageText m)
+          pns <- fmap (>>=(\(_, b, _, _) -> b)) $ liftIO $ atomically $ readTVar peopleSelectedAccounts
+          if userId (messageAuthor m) `elem` pns
+          then void $ restCall $ R.CreateMessage (messageChannel m) "*You are already registered. If you made a mistake, contact me (**GregC**#9698)*"
+          else if length wrd /= 2
+            then void $ restCall $ R.CreateMessage (messageChannel m) "*Wrong command syntax*"
+            else registerCommand dt sm (unpack $ wrd !! 1) m
       "?na" -> commandTimeout 12 $ do
         liftIO . putStrLn $ "recieved " ++ unpack (messageText m)
         let wrd = T.words (messageText m)
@@ -200,7 +216,7 @@ eventHandler dt@BowBotData {..} sm event = case event of
           (OldResponse _ _ s) -> restCall . R.CreateMessage (messageChannel m) $ "```\n" <> T.unlines (reverse $ map pack s) <> "```"
           (DidYouMeanResponse n s) -> restCall . R.CreateMessage (messageChannel m) $ "*Did you mean* **" <> pack n <> "**:```\n" <> T.unlines (reverse $ map pack s) <> "```"
           (DidYouMeanOldResponse n o s) -> restCall . R.CreateMessage (messageChannel m) $ "*Did you mean* **" <> pack o <> " (" <> pack n <> ")**:```\n" <> T.unlines (reverse $ map pack s) <> "```"
-          NotOnList -> restCall $ R.CreateMessage (messageChannel m) "*You aren't on the list! Please provide your ign to get added in the future (there is no command, just say your ign).*"
+          NotOnList -> restCall $ R.CreateMessage (messageChannel m) "*You aren't on the list! To register, type ```?register yourign```.*"
         pure ()
       "?n" -> commandTimeout 12 $ do
         liftIO . putStrLn $ "recieved " ++ unpack (messageText m)
@@ -214,7 +230,7 @@ eventHandler dt@BowBotData {..} sm event = case event of
           (OldResponse _ _ s) -> restCall . R.CreateMessage (messageChannel m) $ "```\n" <> T.unlines (reverse $ map pack s) <> "```"
           (DidYouMeanResponse n s) -> restCall . R.CreateMessage (messageChannel m) $ "*Did you mean* **" <> pack n <> "**:```\n" <> T.unlines (reverse $ map pack s) <> "```"
           (DidYouMeanOldResponse n o s) -> restCall . R.CreateMessage (messageChannel m) $ "*Did you mean* **" <> pack o <> " (" <> pack n <> ")**:```\n" <> T.unlines (reverse $ map pack s) <> "```"
-          NotOnList -> restCall $ R.CreateMessage (messageChannel m) "*You aren't on the list! Please provide your ign to get added in the future (there is no command, just say your ign).*"
+          NotOnList -> restCall $ R.CreateMessage (messageChannel m) "*You aren't on the list! To register, type ```?register yourign```.*"
         pure ()
       "?head" -> commandTimeout 12 $ do
         liftIO . putStrLn $ "recieved " ++ unpack (messageText m)
@@ -327,7 +343,7 @@ eventHandler dt@BowBotData {..} sm event = case event of
         let accountMaybe = find (\(_,b,_,_) -> userId (messageAuthor m) `elem` b) st
         _ <- restCall . R.CreateMessage (messageChannel m) =<< case wrds of
           [] -> case accountMaybe of
-            Nothing -> return "*You aren't on the list! Please provide your ign to get added in the future (there is no command, just say your ign).*"
+            Nothing -> return "*You aren't on the list! To register, type ```?register yourign```.*"
             Just (_, _, sel, mc) -> do
               let helper = \x -> do {
                   name <- liftIO $ head <$> minecraftUuidToNames' sm minecraftNicks x;
@@ -336,7 +352,7 @@ eventHandler dt@BowBotData {..} sm event = case event of
               mc' <- traverse helper mc
               return $ "**List of your minecraft nicks linked:**\n```\n" <> pack (unlines mc') <> "```"
           [newsel] -> case accountMaybe of
-            Nothing -> return "*You aren't on the list! Please provide your ign to get added in the future (there is no command, just say your ign).*"
+            Nothing -> return "*You aren't on the list! To register, type ```?register yourign```.*"
             Just (gid, dids, _, mc) -> do
               newselid <- liftIO $ minecraftNameToUUID' sm minecraftNicks newsel
               case newselid of
