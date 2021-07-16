@@ -14,7 +14,7 @@ import Control.Concurrent.Async (mapConcurrently)
 import Control.Concurrent.STM
 import Control.Monad (forever, unless, void, when)
 import Control.Monad.IO.Class (liftIO)
-import Data.Maybe (fromMaybe, mapMaybe, listToMaybe, catMaybes)
+import Data.Maybe (fromMaybe, mapMaybe, listToMaybe, catMaybes, isJust)
 import Data.Text (pack, unpack)
 import qualified Data.Text as T
 import qualified Data.Text.IO as TIO
@@ -91,7 +91,12 @@ updateData BowBotData {..} = do
 
 updateLeaderboard :: BowBotData -> IO ()
 updateLeaderboard BowBotData {..} = void . forkIO $ do
-  lb <- atomically $ readTVar leaderboardBusy
+  lb <- atomically $ do
+    a <- readTVar leaderboardBusy
+    b <- readTVar hypixelOnlineBusyList
+    c <- readTVar hypixelOnlineList
+    d <- readTVar hypixelOnlineBorderList
+    return (a || b || isJust c || isJust d)
   unless lb $ do
     manager <- newManager managerSettings
     nickList <- atomically $ readTVar minecraftNicks
