@@ -13,7 +13,7 @@ import Control.Concurrent.Async (mapConcurrently)
 import Control.Concurrent.STM
 import Control.Monad (forever, unless, void, when)
 import Control.Monad.IO.Class (liftIO)
-import Data.Maybe (fromMaybe, mapMaybe, listToMaybe)
+import Data.Maybe (fromMaybe, mapMaybe, listToMaybe, catMaybes)
 import Data.Text (pack, unpack)
 import qualified Data.Text as T
 import qualified Data.Text.IO as TIO
@@ -48,6 +48,7 @@ main = do
     discordPeopleSettings <- atomically $ newTVar []
     peopleSelectedAccounts <- atomically $ newTVar []
     registeredNow <- atomically $ newTVar 0
+    leaderboardBusy <- atomically $ newTVar False
     let bbdata = BowBotData {..}
     downloadData bbdata
     mkBackground bbdata
@@ -85,6 +86,27 @@ updateData BowBotData {..} = do
   _ <- forkIO $ updateNicks manager minecraftNicks
   _ <- forkIO $ updateSettings manager discordPeopleSettings peopleSelectedAccounts
   pure ()
+
+updateLeaderboard :: BowBotData -> IO ()
+updateLeaderboard BowBotData {..} = void . forkIO $ do
+  lb <- atomically $ readTVar leaderboardBusy
+  unless lb $ do
+    manager <- newManager managerSettings
+    nickList <- atomically $ readTVar minecraftNicks
+    let chunked = chunksOf 50 (filter mcHypixel nickList)
+    putStrLn "Started updating leaderboards"
+    atomically $ writeTVar leaderboardBusy True
+    void $ for chunked (helper manager)
+    atomically $ writeTVar leaderboardBusy False
+    putStrLn "Stopped updating leaderboards"
+  where
+    helper :: Manager -> [MinecraftAccount] -> IO ()
+    helper manager lst = do
+      let chunked = chunksOf 10 lst
+      dt <- fmap (zip lst . concat) $ for chunked $ mapConcurrently (getHypixelStats manager . mcUUID)
+      updateStats manager dt
+      threadDelay 65000000
+
 
 downloadNicks :: Manager -> TVar [MinecraftAccount] -> IO ()
 downloadNicks manager nickCache = do
@@ -137,6 +159,7 @@ background bbdata@BowBotData {..} = do
           writeTVar hypixelOnlineList onl
           writeTVar hypixelOnlineBorderList Nothing
         when (mint == "00") $ updateData bbdata
+        when (mint == "30") $ updateLeaderboard bbdata
         putStrLn "New minute finished!"
       threadDelay 60000000
 
@@ -248,8 +271,9 @@ eventHandler dt@BowBotData {..} sm event = case event of
         t <- liftIO $ read @Int <$> getTime "%S"
         cv <- liftIO . atomically $ do
           c <- readTVar hypixelOnlineBusyList
-          unless c $ writeTVar hypixelOnlineBusyList True
-          return (not c)
+          lb <- readTVar leaderboardBusy
+          unless (c || lb) $ writeTVar hypixelOnlineBusyList True
+          return (not c && not lb)
         if cv
           then do
             onlo <- liftIO . atomically $ readTVar hypixelOnlineList
@@ -335,6 +359,9 @@ eventHandler dt@BowBotData {..} sm event = case event of
       "?discordrefresh" -> commandTimeout 200 $ when (isAdmin (messageAuthor m)) $ do
         liftIO . putStrLn $ "recieved " ++ unpack (messageText m)
         updateDiscords'
+      "?lbrefresh" -> commandTimeout 200 $ when (isAdmin (messageAuthor m)) $ do
+        liftIO . putStrLn $ "recieved " ++ unpack (messageText m)
+        liftIO $ updateLeaderboard dt
       "?mc" -> commandTimeout 2 $ do
         liftIO . putStrLn $ "recieved " ++ unpack (messageText m)
         let wrds = tail $ words $ unpack $ messageText m

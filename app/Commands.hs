@@ -37,7 +37,8 @@ data BowBotData = BowBotData
     hypixelOnlineBusyList :: TVar Bool,
     discordPeopleSettings :: TVar [(UserId, StatsSettings)],
     peopleSelectedAccounts :: TVar [(Integer, [UserId], String, [String])],
-    registeredNow :: TVar Int
+    registeredNow :: TVar Int,
+    leaderboardBusy :: TVar Bool
   }
 
 minecraftNameToUUID' :: Manager -> TVar [MinecraftAccount] -> String -> IO (Maybe String)

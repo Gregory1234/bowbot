@@ -19,12 +19,13 @@ import Discord.Types
 import Stats
 import Data.List (intercalate)
 import Text.Read (readMaybe)
+import Text.Read (readMaybe)
 
 data MinecraftAccount = MinecraftAccount
   { mcUUID :: String
   , mcNames :: [String]
   , mcHypixel :: Bool
-  }
+  } deriving (Show)
 
 managerSettings :: ManagerSettings
 managerSettings = tlsManagerSettings { managerResponseTimeout = responseTimeoutMicro 15000000 }
@@ -176,7 +177,7 @@ getMinecraftNickList manager = do
   where
    person :: Value -> Maybe MinecraftAccount
    person (Object x) = case (x HM.!? "uuid", x HM.!? "names", x HM.!? "hypixel") of
-     (Just (str -> Just uuid), Just (Array (V.toList -> list)), Just (Bool b)) -> Just MinecraftAccount {mcUUID = uuid, mcNames = mapMaybe str list, mcHypixel = b}
+     (Just (str -> Just uuid), Just (Array (V.toList -> list)), Just (str -> Just b)) -> Just MinecraftAccount {mcUUID = uuid, mcNames = mapMaybe str list, mcHypixel = b == "1"}
      _ -> Nothing
    person _ = Nothing
    str (String (unpack -> d)) = Just d
@@ -282,3 +283,19 @@ updateDiscords manager mem usr = do
       Nothing -> usrToObject memberUser
       Just nick -> pack (show userId) .= object ["name" .= userName, "discriminator" .= userDiscrim, "nickname" .= nick]
     usrToObject User {..} = pack (show userId) .= object ["name" .= userName, "discriminator" .= userDiscrim]
+
+
+updateStats :: Manager -> [(MinecraftAccount, Maybe Stats)] -> IO ()
+updateStats manager stats = do
+  website <- fromMaybe "" <$> getEnv "DB_SITE"
+  apiKey <- fromMaybe "" <$> getEnv "DB_KEY"
+  let url = "http://" ++ website ++ "/updateStats.php?key=" ++ apiKey
+  putStrLn url
+  initRequest <- parseRequest url
+  let dat = encode (object $ mapMaybe statsToObject stats)
+  let request = initRequest { method = "POST", requestBody = RequestBodyLBS dat }
+  _ <- try @SomeException $ httpLbs request manager
+  pure ()
+  where
+    statsToObject (MinecraftAccount {..}, Just Stats {..}) = Just $ pack mcUUID .= object ["bowWins" .= bowWins, "bowLosses" .= bowLosses, "bowWinstreak" .= bestWinstreak]
+    statsToObject (_, Nothing) = Nothing
