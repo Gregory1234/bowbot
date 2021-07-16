@@ -183,6 +183,28 @@ getMinecraftNickList manager = do
    str (String (unpack -> d)) = Just d
    str _ = Nothing
 
+getMinecraftStatList :: Manager -> IO [(String, Int, Int, Int)]
+getMinecraftStatList manager = do
+  website <- fromMaybe "" <$> getEnv "DB_SITE"
+  apiKey <- fromMaybe "" <$> getEnv "DB_KEY"
+  let url = "http://" ++ website ++ "/leaderboard.php?key=" ++ apiKey
+  res <- sendRequestTo manager url
+  case decode res :: Maybe Object of
+    Nothing -> return []
+    (Just js) -> do
+      putStrLn $ "Received response from: " ++ url
+      case js HM.!? "data" of
+        (Just (Array (V.toList -> list))) -> return $ mapMaybe person list
+        _ -> return []
+  where
+   person :: Value -> Maybe (String, Int, Int, Int)
+   person (Object x) = case (x HM.!? "uuid", x HM.!? "bowWins", x HM.!? "bowLosses", x HM.!? "bowWinstreak") of
+     (Just (str -> Just uuid), Just (fmap read . str -> Just wins), Just (fmap read . str -> Just losses), Just (fmap read . str -> Just winstreak)) -> Just (uuid, wins, losses, winstreak)
+     _ -> Nothing
+   person _ = Nothing
+   str (String (unpack -> d)) = Just d
+   str _ = Nothing
+
 getPeopleSettings :: Manager -> IO [(UserId, StatsSettings)]
 getPeopleSettings manager = do
   website <- fromMaybe "" <$> getEnv "DB_SITE"

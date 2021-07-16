@@ -4,6 +4,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE ViewPatterns #-}
 
 module Main where
 
@@ -31,7 +32,8 @@ import Data.Traversable (for)
 import Data.Text.Encoding (encodeUtf8)
 import Control.Monad.Reader (ReaderT(..))
 import Data.Either (fromRight)
-import Data.List (find)
+import Data.List (find, sortOn)
+import Text.Read (readMaybe)
 
 
 
@@ -298,6 +300,23 @@ eventHandler dt@BowBotData {..} sm event = case event of
           else do
             _ <- restCall . R.CreateMessage (messageChannel m) . pack $ "**Processing list of online players. Please send command again later.**"
             pure ()
+      "?lb" -> commandTimeout 10 $ do
+        liftIO . putStrLn $ "recieved " ++ unpack (messageText m)
+        dat <- liftIO $ getMinecraftStatList sm
+        lb <- traverse (\(u,a,_,_) -> do
+          n <- liftIO $ minecraftUuidToNames' sm minecraftNicks u
+          pure (head n, a)) dat
+        let leaderboard = zip [1..] $ sortOn (negate . snd) lb
+        let leaderboardString = map (\(i,(n, v)) -> pad 5 (show i ++ ".") ++ pad 20 n ++ " ( " ++ show v ++ " Wins )") leaderboard
+        let pages = map unlines $ chunksOf 20 leaderboardString
+        let wrds = tail $ words $ unpack $ messageText m
+        case wrds of
+          ["all"] -> void $ restCall $ R.CreateMessageUploadFile (messageChannel m) "list.txt" . encodeUtf8 . pack $ unlines leaderboardString
+          [(readMaybe @Int -> Just n)] -> if n > 0 && n <= length pages
+            then void . restCall . R.CreateMessage (messageChannel m) . pack $ "Hypixel Bow Duels Leaderboard (page " ++ show n ++ "):```\n"  ++ pages !! (n-1) ++ "```"
+            else void . restCall $ R.CreateMessage (messageChannel m) "*Wrong page number*"
+          [] -> void . restCall . R.CreateMessage (messageChannel m) . pack $ "Hypixel Bow Duels Leaderboard (page 1):```\n"  ++ head pages ++ "```"
+          _ -> void . restCall $ R.CreateMessage (messageChannel m) "*Wrong command syntax*"
       "?list" -> commandTimeout 2 $ do
         liftIO . putStrLn $ "recieved " ++ unpack (messageText m)
         let wrds = tail $ words $ unpack $ messageText m
@@ -344,6 +363,8 @@ eventHandler dt@BowBotData {..} sm event = case event of
               <> " - **?n(a) [name]** - *show player's past nicks*\n"
               <> " - **?head(a) [name]** - *show player's head*\n"
               <> " - **?skin(a) [name]** - *show player's full skin*\n"
+              <> " - **?lb [page]** - *show a Bow Duels Wins leaderboard*\n"
+              <> " - **?lb all** - *upload a file with the whole Bow Duels Wins leaderboard*\n"
               <> " - **?mc** - *list your linked minecraft nicks*\n"
               <> " - **?mc [name]** - *select a minecraft account as your default*\n"
               <> " - **?settings** - *display help for settings*\n"

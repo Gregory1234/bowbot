@@ -62,3 +62,6 @@ discordEscape (x:xs)
 
 ignoreChars :: [Char] -> String -> String
 ignoreChars a = filter (`notElem` a)
+
+pad :: Int -> String -> String
+pad l x = x ++ replicate (l - length x) ' '
