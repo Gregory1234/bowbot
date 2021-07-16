@@ -30,8 +30,7 @@ import Data.List.Split (chunksOf)
 import Data.Traversable (for)
 import Data.Text.Encoding (encodeUtf8)
 import Control.Monad.Reader (ReaderT(..))
-import Data.Either (rights, fromRight)
-import Data.Char (toLower)
+import Data.Either (fromRight)
 import Data.List (find)
 
 
@@ -87,23 +86,23 @@ updateData BowBotData {..} = do
   _ <- forkIO $ updateSettings manager discordPeopleSettings peopleSelectedAccounts
   pure ()
 
-downloadNicks :: Manager -> TVar [(String, [String])] -> IO ()
+downloadNicks :: Manager -> TVar [MinecraftAccount] -> IO ()
 downloadNicks manager nickCache = do
   nickList <- getMinecraftNickList manager
   atomically $ writeTVar nickCache nickList
 
-updateNicks :: Manager -> TVar [(String, [String])] -> IO ()
+updateNicks :: Manager -> TVar [MinecraftAccount] -> IO ()
 updateNicks manager nickCache = do
   nickList <- getMinecraftNickList manager
   let chunked = chunksOf 10 nickList
   updatedNicks <- fmap concat $ for chunked $ mapConcurrently helper
   atomically $ writeTVar nickCache updatedNicks
   where
-    helper (u, names) = do
-      newNames <- minecraftUuidToNames manager u
-      unless (names == newNames) $ do
-        updateMinecraftNames manager u newNames
-      return (u,newNames)
+    helper MinecraftAccount {..} = do
+      newNames <- minecraftUuidToNames manager mcUUID
+      unless (mcNames == newNames) $ do
+        updateMinecraftNames manager mcUUID newNames
+      return MinecraftAccount {mcNames = newNames, ..}
 
 updateSettings :: Manager -> TVar [(UserId, StatsSettings)] -> TVar [(Integer, [UserId], String, [String])] -> IO ()
 updateSettings manager peopleSettings peopleNicks = do
@@ -291,7 +290,7 @@ eventHandler dt@BowBotData {..} sm event = case event of
             return $ Just (map pack . mapMaybe listToMaybe $ people, "Players in watchList")
           ["ac"] -> do
             st <- liftIO $ atomically $ readTVar minecraftNicks
-            return $ Just (map pack $ mapMaybe (listToMaybe . snd) st, "Players on autocomplete list")
+            return $ Just (map pack $ mapMaybe (listToMaybe . mcNames) st, "Players on autocomplete list")
           ["d"] -> do
             manager <- liftIO $ newManager managerSettings
             st <- liftIO $ atomically $ readTVar peopleSelectedAccounts

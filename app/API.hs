@@ -20,6 +20,12 @@ import Stats
 import Data.List (intercalate)
 import Text.Read (readMaybe)
 
+data MinecraftAccount = MinecraftAccount
+  { mcUUID :: String
+  , mcNames :: [String]
+  , mcHypixel :: Bool
+  }
+
 managerSettings :: ManagerSettings
 managerSettings = tlsManagerSettings { managerResponseTimeout = responseTimeoutMicro 15000000 }
 
@@ -154,7 +160,7 @@ getWatchlist manager = do
     str (String (unpack -> d)) = Just d
     str _ = Nothing
 
-getMinecraftNickList :: Manager -> IO [(String, [String])]
+getMinecraftNickList :: Manager -> IO [MinecraftAccount]
 getMinecraftNickList manager = do
   website <- fromMaybe "" <$> getEnv "DB_SITE"
   apiKey <- fromMaybe "" <$> getEnv "DB_KEY"
@@ -168,9 +174,9 @@ getMinecraftNickList manager = do
        (Just (Array (V.toList -> list))) -> return $ mapMaybe person list
        _ -> return []
   where
-   person :: Value -> Maybe (String, [String])
-   person (Object x) = case (x HM.!? "uuid", x HM.!? "names") of
-     (Just (str -> Just uuid), Just (Array (V.toList -> list))) -> Just (uuid, mapMaybe str list)
+   person :: Value -> Maybe MinecraftAccount
+   person (Object x) = case (x HM.!? "uuid", x HM.!? "names", x HM.!? "hypixel") of
+     (Just (str -> Just uuid), Just (Array (V.toList -> list)), Just (Bool b)) -> Just MinecraftAccount {mcUUID = uuid, mcNames = mapMaybe str list, mcHypixel = b}
      _ -> Nothing
    person _ = Nothing
    str (String (unpack -> d)) = Just d

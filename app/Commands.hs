@@ -31,7 +31,7 @@ import Data.List (intercalate)
 data BowBotData = BowBotData
   { hypixelRequestCount :: TVar Int,
     hypixelRequestBorderCount :: TVar Int,
-    minecraftNicks :: TVar [(String, [String])],
+    minecraftNicks :: TVar [MinecraftAccount],
     hypixelOnlineList :: TVar (Maybe [String]),
     hypixelOnlineBorderList :: TVar (Maybe [String]),
     hypixelOnlineBusyList :: TVar Bool,
@@ -40,25 +40,25 @@ data BowBotData = BowBotData
     registeredNow :: TVar Int
   }
 
-minecraftNameToUUID' :: Manager -> TVar [(String, [String])] -> String -> IO (Maybe String)
+minecraftNameToUUID' :: Manager -> TVar [MinecraftAccount] -> String -> IO (Maybe String)
 minecraftNameToUUID' manager nameCache name = do
   cache <- atomically $ readTVar nameCache
-  case filter ((map toLower name==) . map toLower . head . snd) cache of
+  case filter ((map toLower name==) . map toLower . head . mcNames) cache of
     [] -> minecraftNameToUUID manager name
-    ((uuid, _) : _) -> return $ Just uuid
+    (MinecraftAccount {..} : _) -> return $ Just mcUUID
 
-minecraftUuidToNames' :: Manager -> TVar [(String, [String])] -> String -> IO [String]
+minecraftUuidToNames' :: Manager -> TVar [MinecraftAccount] -> String -> IO [String]
 minecraftUuidToNames' manager nameCache uuid = do
   cache <- atomically $ readTVar nameCache
-  case filter ((== uuid) . fst) cache of
+  case filter ((== uuid) . mcUUID) cache of
     [] -> minecraftUuidToNames manager uuid
-    ((_, names) : _) -> return names
+    (MinecraftAccount {..} : _) -> return mcNames
 
 flattenedMinecraftNicks :: BowBotData -> STM [(String, String)]
 flattenedMinecraftNicks BowBotData {..} = do
   people <- readTVar minecraftNicks
-  let currentNicks = [(n,u) | (n,us) <- people, u <- take 1 us]
-  let restOfNicks = [(n,u) | (n,us) <- people, u <- drop 1 us]
+  let currentNicks = [(mcUUID,u) | MinecraftAccount {..} <- people, u <- take 1 mcNames]
+  let restOfNicks = [(mcUUID,u) | MinecraftAccount {..} <- people, u <- drop 1 mcNames]
   return $ currentNicks ++ restOfNicks
 
 registerCommand :: BowBotData -> Manager -> String -> Message -> DiscordHandler ()
@@ -73,12 +73,11 @@ registerCommand BowBotData {..} man name m = do
       then restCall $ R.CreateMessage (messageChannel m) "*That account already belongs to someone else!*"
       else do
         names <- liftIO $ minecraftUuidToNames' man minecraftNicks uuid'
-        unless (uuid' `elem` map fst nicks) $ do
+        unless (uuid' `elem` map mcUUID nicks) $ do
           stats <- liftIO $ getHypixelStats man uuid'
-          liftIO $ addMinecraftAccount man uuid' names $ case stats of
-            Nothing -> False
-            Just s -> bowWins s >= 500
-          liftIO $ atomically $ writeTVar minecraftNicks ((uuid', names):nicks)
+          let hypixel = case stats of Nothing -> False; Just s -> bowWins s >= 500
+          liftIO $ addMinecraftAccount man uuid' names hypixel
+          liftIO $ atomically $ writeTVar minecraftNicks (MinecraftAccount {mcUUID = uuid', mcNames = names, mcHypixel = hypixel}:nicks)
         gid <- liftIO $ addAccount man (head names) (userId (messageAuthor m)) uuid'
         case gid of
           Nothing -> restCall $ R.CreateMessage (messageChannel m) "*Somehing went wrong*"
@@ -159,13 +158,13 @@ statsCommand dt@BowBotData {..} manager sett m = do
           Just st -> do
             when (bowWins st >= 500) $ do
               nicks <- liftIO $ atomically $ readTVar minecraftNicks
-              when (u `notElem` map fst nicks) $ do
+              when (u `notElem` map mcUUID nicks || all (\MinecraftAccount {..} -> mcUUID /= u || not mcHypixel) nicks) $ do
                 names <- liftIO $ minecraftUuidToNames manager u
                 website <- liftIO $ fromMaybe "" <$> getEnv "DB_SITE"
                 apiKey <- liftIO $ fromMaybe "" <$> getEnv "DB_KEY"
                 let url = "http://" ++ website ++ "/addMinecraftName.php?key=" ++ apiKey ++ "&uuid=" ++ u ++ "&hypixel=1&names=" ++ intercalate "," names
                 _ <- liftIO $ sendRequestTo manager url
-                liftIO $ atomically $ writeTVar minecraftNicks $ (u, names):nicks
+                liftIO $ atomically $ writeTVar minecraftNicks $ MinecraftAccount { mcUUID = u, mcNames = names, mcHypixel = True }:nicks
             pure s
       _ <- case stats of
         NoResponse -> restCall $ R.CreateMessage (messageChannel m) "*The player doesn't exist!*"
