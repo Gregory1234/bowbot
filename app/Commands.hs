@@ -157,15 +157,18 @@ statsCommand dt@BowBotData {..} manager sett m = do
           Nothing -> pure s
           (Just Stats {bowWins = 0, bowLosses = 0}) -> pure Nothing
           Just st -> do
-            when (bowWins st >= 500) $ do
-              nicks <- liftIO $ atomically $ readTVar minecraftNicks
+            liftIO $ when (bowWins st >= 500) $ void $ forkIO $ do
+              nicks <- atomically $ readTVar minecraftNicks
               when (u `notElem` map mcUUID nicks || all (\MinecraftAccount {..} -> mcUUID /= u || not mcHypixel) nicks) $ do
-                names <- liftIO $ minecraftUuidToNames manager u
-                website <- liftIO $ fromMaybe "" <$> getEnv "DB_SITE"
-                apiKey <- liftIO $ fromMaybe "" <$> getEnv "DB_KEY"
+                names <- minecraftUuidToNames manager u
+                website <- fromMaybe "" <$> getEnv "DB_SITE"
+                apiKey <- fromMaybe "" <$> getEnv "DB_KEY"
                 let url = "http://" ++ website ++ "/addMinecraftName.php?key=" ++ apiKey ++ "&uuid=" ++ u ++ "&hypixel=1&names=" ++ intercalate "," names
-                _ <- liftIO $ sendRequestTo manager url
-                liftIO $ atomically $ writeTVar minecraftNicks $ MinecraftAccount { mcUUID = u, mcNames = names, mcHypixel = True }:nicks
+                _ <- sendRequestTo manager url
+                atomically $ writeTVar minecraftNicks $ MinecraftAccount { mcUUID = u, mcNames = names, mcHypixel = True }:nicks
+              nicks2 <- atomically $ readTVar minecraftNicks
+              let acc = head $ filter (\MinecraftAccount {..} -> mcUUID == u) nicks2
+              updateStats manager [(acc, Just st)]
             pure s
       _ <- case stats of
         NoResponse -> restCall $ R.CreateMessage (messageChannel m) "*The player doesn't exist!*"
