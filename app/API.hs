@@ -20,6 +20,7 @@ import Stats
 import Data.List (intercalate)
 import Text.Read (readMaybe)
 import Text.Read (readMaybe)
+import Control.Monad.Cont (void)
 
 data MinecraftAccount = MinecraftAccount
   { mcUUID :: String
@@ -70,33 +71,19 @@ minecraftUuidToNames manager uuid = do
        _ -> Nothing
 
 updateMinecraftNames :: Manager -> String -> [String] -> IO ()
-updateMinecraftNames manager uuid names = do
-  website <- fromMaybe "" <$> getEnv "DB_SITE"
-  apiKey <- fromMaybe "" <$> getEnv "DB_KEY"
-  let url = "http://" ++ website ++ "/updateMinecraftNames.php?key=" ++ apiKey ++ "&uuid=" ++ uuid ++ "&names=" ++ intercalate "," names
-  _ <- sendRequestTo manager url
-  putStrLn $ "Received response from: " ++ url
-  pure ()
+updateMinecraftNames manager uuid names = 
+  void $ sendDB manager "updateMinecraftNames.php" ["uuid=" ++ uuid, "names=" ++ intercalate "," names]
 
 addMinecraftAccount :: Manager -> String -> [String] -> Bool -> IO ()
-addMinecraftAccount manager uuid names hypixel = do
-  website <- fromMaybe "" <$> getEnv "DB_SITE"
-  apiKey <- fromMaybe "" <$> getEnv "DB_KEY"
-  let url = "http://" ++ website ++ "/addMinecraftName.php?key=" ++ apiKey ++ "&uuid=" ++ uuid ++ "&names=" ++ intercalate "," names ++ "&hypixel=" ++ (if hypixel then "1" else "0")
-  _ <- sendRequestTo manager url
-  putStrLn $ "Received response from: " ++ url
-  pure ()
+addMinecraftAccount manager uuid names hypixel = 
+  void $ sendDB manager "addMinecraftName.php" ["uuid=" ++ uuid, "names=" ++ intercalate "," names, "hypixel=" ++ (if hypixel then "1" else "0")]
 
 addAccount :: Manager -> String -> UserId -> String -> IO (Maybe Integer)
 addAccount manager name did uuid = do
-  website <- fromMaybe "" <$> getEnv "DB_SITE"
-  apiKey <- fromMaybe "" <$> getEnv "DB_KEY"
-  let url = "http://" ++ website ++ "/addPerson.php?name=" ++ name ++ "&key=" ++ apiKey ++ "&discord=" ++ show did ++ "&verified=0&minecraft=" ++ uuid
-  res <- sendRequestTo manager url
+  res <- sendDB manager "addPerson.php" ["name=" ++ name, "discord=" ++ show did, "verified=0", "minecraft=" ++ uuid]
   case decode res :: Maybe Object of
     Nothing -> return Nothing
     (Just js) -> do
-      putStrLn $ "Received response from: " ++ url
       case js HM.!? "id" of
           (Just (String (readMaybe . unpack -> Just n))) -> return $ Just n
           _ -> return Nothing
@@ -144,36 +131,35 @@ getHypixelStats manager uuid = do
     roundNum _ (Just (Number (round -> x))) = x
     roundNum y _ = y
 
-getWatchlist :: Manager -> IO [String]
-getWatchlist manager = do
+sendDB :: Manager -> String -> [String] -> IO ByteString
+sendDB manager path args = do
   website <- fromMaybe "" <$> getEnv "DB_SITE"
   apiKey <- fromMaybe "" <$> getEnv "DB_KEY"
-  let url = "http://" ++ website ++ "/watchlist.php?key=" ++ apiKey
+  let url = "http://" ++ website ++ "/" ++ path ++ "?key=" ++ apiKey ++ (('&':) =<< args)
   res <- sendRequestTo manager url
+  putStrLn $ "Received response from: " ++ url
+  return res
+
+getWatchlist :: Manager -> IO [String]
+getWatchlist manager = do
+  res <- sendDB manager "watchlist.php" []
   case decode res :: Maybe Object of
     Nothing -> return []
-    (Just js) -> do
-      putStrLn $ "Received response from: " ++ url
-      case js HM.!? "data" of
-        (Just (Array (V.toList -> list))) -> return $ mapMaybe str list
-        _ -> return []
+    (Just js) -> case js HM.!? "data" of
+      (Just (Array (V.toList -> list))) -> return $ mapMaybe str list
+      _ -> return []
   where
     str (String (unpack -> d)) = Just d
     str _ = Nothing
 
 getMinecraftNickList :: Manager -> IO [MinecraftAccount]
 getMinecraftNickList manager = do
-  website <- fromMaybe "" <$> getEnv "DB_SITE"
-  apiKey <- fromMaybe "" <$> getEnv "DB_KEY"
-  let url = "http://" ++ website ++ "/autocorrect.php?key=" ++ apiKey
-  res <- sendRequestTo manager url
+  res <- sendDB manager "autocorrect.php" []
   case decode res :: Maybe Object of
    Nothing -> return []
-   (Just js) -> do
-     putStrLn $ "Received response from: " ++ url
-     case js HM.!? "data" of
-       (Just (Array (V.toList -> list))) -> return $ mapMaybe person list
-       _ -> return []
+   (Just js) -> case js HM.!? "data" of
+     (Just (Array (V.toList -> list))) -> return $ mapMaybe person list
+     _ -> return []
   where
    person :: Value -> Maybe MinecraftAccount
    person (Object x) = case (x HM.!? "uuid", x HM.!? "names", x HM.!? "hypixel") of
@@ -185,17 +171,12 @@ getMinecraftNickList manager = do
 
 getMinecraftStatList :: Manager -> IO [(String, Int, Int, Int)]
 getMinecraftStatList manager = do
-  website <- fromMaybe "" <$> getEnv "DB_SITE"
-  apiKey <- fromMaybe "" <$> getEnv "DB_KEY"
-  let url = "http://" ++ website ++ "/leaderboard.php?key=" ++ apiKey
-  res <- sendRequestTo manager url
+  res <- sendDB manager "leaderboard.php" []
   case decode res :: Maybe Object of
     Nothing -> return []
-    (Just js) -> do
-      putStrLn $ "Received response from: " ++ url
-      case js HM.!? "data" of
-        (Just (Array (V.toList -> list))) -> return $ mapMaybe person list
-        _ -> return []
+    (Just js) -> case js HM.!? "data" of
+      (Just (Array (V.toList -> list))) -> return $ mapMaybe person list
+      _ -> return []
   where
    person :: Value -> Maybe (String, Int, Int, Int)
    person (Object x) = case (x HM.!? "uuid", x HM.!? "bowWins", x HM.!? "bowLosses", x HM.!? "bowWinstreak") of
@@ -207,17 +188,12 @@ getMinecraftStatList manager = do
 
 getPeopleSettings :: Manager -> IO [(UserId, StatsSettings)]
 getPeopleSettings manager = do
-  website <- fromMaybe "" <$> getEnv "DB_SITE"
-  apiKey <- fromMaybe "" <$> getEnv "DB_KEY"
-  let url = "http://" ++ website ++ "/settings.php?key=" ++ apiKey
-  res <- sendRequestTo manager url
+  res <- sendDB manager "settings.php" []
   case decode res :: Maybe Object of
     Nothing -> return []
-    (Just js) -> do
-      putStrLn $ "Received response from: " ++ url
-      case js HM.!? "data" of
-        (Just (Array (V.toList -> list))) -> return $ mapMaybe parseSettings list
-        _ -> return []
+    (Just js) -> case js HM.!? "data" of
+      (Just (Array (V.toList -> list))) -> return $ mapMaybe parseSettings list
+      _ -> return []
   where
     parseSettings (Object js) = let
       discord = maybe 0 read $ str (js HM.!? "discord")
@@ -245,17 +221,12 @@ getPeopleSettings manager = do
 
 getPeopleSelectedAccounts :: Manager -> IO [(Integer, [UserId], String, [String])]
 getPeopleSelectedAccounts manager = do
-  website <- fromMaybe "" <$> getEnv "DB_SITE"
-  apiKey <- fromMaybe "" <$> getEnv "DB_KEY"
-  let url = "http://" ++ website ++ "/people.php?key=" ++ apiKey
-  res <- sendRequestTo manager url
+  res <- sendDB manager "people.php" []
   case decode res :: Maybe Object of
    Nothing -> return []
-   (Just js) -> do
-     putStrLn $ "Received response from: " ++ url
-     case js HM.!? "data" of
-       (Just (Object (HM.toList -> list))) -> return $ mapMaybe parsePerson list
-       _ -> return []
+   (Just js) -> case js HM.!? "data" of
+     (Just (Object (HM.toList -> list))) -> return $ mapMaybe parsePerson list
+     _ -> return []
   where
    parsePerson (read . unpack -> gid, Object js) = let
          discord = map read $ strlist (js HM.!? "discord")
@@ -273,33 +244,29 @@ getPeopleSelectedAccounts manager = do
 
 getDiscordIds :: Manager -> IO [UserId]
 getDiscordIds manager = do
-  website <- fromMaybe "" <$> getEnv "DB_SITE"
-  apiKey <- fromMaybe "" <$> getEnv "DB_KEY"
-  let url = "http://" ++ website ++ "/discordIds.php?key=" ++ apiKey
-  res <- sendRequestTo manager url
+  res <- sendDB manager "discordIds.php" []
   case decode res :: Maybe Object of
      Nothing -> return []
-     (Just js) -> do
-       putStrLn $ "Received response from: " ++ url
-       case js HM.!? "data" of
-         (Just (Array (V.toList -> list))) -> return $ mapMaybe readMaybe $ mapMaybe str list
-         _ -> return []
+     (Just js) -> case js HM.!? "data" of
+       (Just (Array (V.toList -> list))) -> return $ mapMaybe readMaybe $ mapMaybe str list
+       _ -> return []
   where
    str :: Value -> Maybe String
    str (String (unpack -> d)) = Just d
    str _ = Nothing
 
-updateDiscords :: Manager -> [GuildMember] -> [User] -> IO ()
-updateDiscords manager mem usr = do
+sendPostDB :: Manager -> String -> Value -> IO ()
+sendPostDB manager path dat = do
   website <- fromMaybe "" <$> getEnv "DB_SITE"
   apiKey <- fromMaybe "" <$> getEnv "DB_KEY"
-  let url = "http://" ++ website ++ "/updateDiscord.php?key=" ++ apiKey
+  let url = "http://" ++ website ++ "/" ++ path ++ "?key=" ++ apiKey
   putStrLn url
   initRequest <- parseRequest url
-  let dat = encode (object $ map memToObject mem ++ map usrToObject usr)
-  let request = initRequest { method = "POST", requestBody = RequestBodyLBS dat }
-  _ <- try @SomeException $ httpLbs request manager
-  pure ()
+  let request = initRequest { method = "POST", requestBody = RequestBodyLBS (encode dat) }
+  void $ try @SomeException $ httpLbs request manager
+
+updateDiscords :: Manager -> [GuildMember] -> [User] -> IO ()
+updateDiscords manager mem usr = sendPostDB manager "updateDiscord.php" (object $ map memToObject mem ++ map usrToObject usr)
   where
     memToObject GuildMember {memberUser = memberUser@User {..}, ..} = case memberNick of
       Nothing -> usrToObject memberUser
@@ -308,16 +275,7 @@ updateDiscords manager mem usr = do
 
 
 updateStats :: Manager -> [(MinecraftAccount, Maybe Stats)] -> IO ()
-updateStats manager stats = do
-  website <- fromMaybe "" <$> getEnv "DB_SITE"
-  apiKey <- fromMaybe "" <$> getEnv "DB_KEY"
-  let url = "http://" ++ website ++ "/updateStats.php?key=" ++ apiKey
-  putStrLn url
-  initRequest <- parseRequest url
-  let dat = encode (object $ mapMaybe statsToObject stats)
-  let request = initRequest { method = "POST", requestBody = RequestBodyLBS dat }
-  _ <- try @SomeException $ httpLbs request manager
-  pure ()
+updateStats manager stats = sendPostDB manager "updateStats.php" (object $ mapMaybe statsToObject stats)
   where
     statsToObject (MinecraftAccount {..}, Just Stats {..}) = Just $ pack mcUUID .= object ["bowWins" .= bowWins, "bowLosses" .= bowLosses, "bowWinstreak" .= bestWinstreak]
     statsToObject (_, Nothing) = Nothing
