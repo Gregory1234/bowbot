@@ -33,7 +33,8 @@ data DivisionTitle =
 
 winsToTitle :: Integer -> DivisionTitle
 winsToTitle x
-  | x < 1000  = NoDivisionTitle
+  | x < 500  = NoDivisionTitle
+  | x < 1000  = DiamondTitle
   | x < 2000  = MasterTitle
   | x < 5000  = LegendTitle
   | x < 10000 = GrandmasterTitle
