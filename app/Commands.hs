@@ -27,6 +27,16 @@ import Stats
 import Utils
 import API
 import Data.List (intercalate)
+import Data.Text.Encoding (encodeUtf8)
+
+call = void . restCall
+
+respond m = call . R.CreateMessage (messageChannel m) . pack
+
+respondFile m n = call . R.CreateMessageUploadFile (messageChannel m) n . encodeUtf8 . pack
+
+sendRegisterMessage :: Message -> DiscordHandler ()
+sendRegisterMessage m = respond m "*You aren't on the list! To register, type ```?register yourign```.*"
 
 data BowBotData = BowBotData
   { hypixelRequestCount :: TVar Int,
@@ -66,12 +76,12 @@ registerCommand :: BowBotData -> Manager -> String -> Message -> DiscordHandler 
 registerCommand BowBotData {..} man name m = do
   uuid <- liftIO $ minecraftNameToUUID' man minecraftNicks name
   _ <- case uuid of
-    Nothing -> restCall $ R.CreateMessage (messageChannel m) "*The player doesn't exist!*"
+    Nothing -> respond m "*The player doesn't exist!*"
     Just uuid' -> do
       nicks <- liftIO $ atomically $ readTVar minecraftNicks
       taken <- fmap (>>=(\(_, _, _, b) -> b)) $ liftIO $ atomically $ readTVar peopleSelectedAccounts
       if uuid' `elem` taken
-      then restCall $ R.CreateMessage (messageChannel m) "*That account already belongs to someone else!*"
+      then respond m "*That account already belongs to someone else!*"
       else do
         names <- liftIO $ minecraftUuidToNames' man minecraftNicks uuid'
         unless (uuid' `elem` map mcUUID nicks) $ do
@@ -81,11 +91,11 @@ registerCommand BowBotData {..} man name m = do
           liftIO $ atomically $ writeTVar minecraftNicks (MinecraftAccount {mcUUID = uuid', mcNames = names, mcHypixel = hypixel}:nicks)
         gid <- liftIO $ addAccount man (head names) (userId (messageAuthor m)) uuid'
         case gid of
-          Nothing -> restCall $ R.CreateMessage (messageChannel m) "*Somehing went wrong*"
+          Nothing -> respond m "*Somehing went wrong*"
           Just gid' -> do
             psa <- liftIO $ atomically $ readTVar peopleSelectedAccounts
             liftIO $ atomically $ writeTVar peopleSelectedAccounts ((gid', [userId (messageAuthor m)], uuid', [uuid']):psa)
-            restCall $ R.CreateMessage (messageChannel m) "*Registered successfully*"
+            respond m "*Registered successfully*"
   pure ()
 
 withMinecraftFromName :: MonadIO m => Bool -> BowBotData -> Manager -> Maybe String -> UserId -> (String -> m (Maybe a)) -> m (StatsResponse a)
@@ -171,12 +181,12 @@ statsCommand dt@BowBotData {..} manager sett m = do
               updateStats manager [(acc, Just st)]
             pure s
       _ <- case stats of
-        NoResponse -> restCall $ R.CreateMessage (messageChannel m) "*The player doesn't exist!*"
-        (JustResponse _ s) -> restCall . R.CreateMessage (messageChannel m) . pack . showStats sett $ s
-        (OldResponse o _ s) -> restCall . R.CreateMessage (messageChannel m) . pack . showStats sett . addOldName o $ s
-        (DidYouMeanResponse _ s) -> restCall . R.CreateMessage (messageChannel m) . ("*Did you mean* " <>) . pack . showStats sett $ s
-        (DidYouMeanOldResponse o _ s) -> restCall . R.CreateMessage (messageChannel m) . ("*Did you mean* " <>) . pack . showStats sett . addOldName o $ s
-        NotOnList -> restCall $ R.CreateMessage (messageChannel m) "*You aren't on the list! To register, type ```?register yourign```.*"
+        NoResponse -> respond m "*The player doesn't exist!*"
+        (JustResponse _ s) -> respond m . showStats sett $ s
+        (OldResponse o _ s) -> respond m . showStats sett . addOldName o $ s
+        (DidYouMeanResponse _ s) -> respond m . ("*Did you mean* " ++) . showStats sett $ s
+        (DidYouMeanOldResponse o _ s) -> respond m . ("*Did you mean* " ++) . showStats sett . addOldName o $ s
+        NotOnList -> sendRegisterMessage m
       pure ()
     else do
       f <- liftIO $ read @Int <$> getTime "%S"
@@ -189,16 +199,16 @@ urlCommand ac bbd man mkurl m = do
   url <- liftIO $ withMinecraftFromName ac bbd man (unpack <$> listToMaybe (tail wrd)) (userId $ messageAuthor m) $ \u -> do
     return (Just $ mkurl u)
   _ <- case url of
-    NoResponse -> restCall $ R.CreateMessage (messageChannel m) "*The player doesn't exist!*"
-    (JustResponse _ url') -> restCall . R.CreateMessage (messageChannel m) . pack $ url'
-    (OldResponse _ _ url') -> restCall . R.CreateMessage (messageChannel m) . pack $ url'
+    NoResponse -> respond m "*The player doesn't exist!*"
+    (JustResponse _ url') -> respond m url'
+    (OldResponse _ _ url') -> respond m url'
     (DidYouMeanResponse n url') -> do
-      _ <- restCall . R.CreateMessage (messageChannel m) . pack $ "*Did you mean* **" ++ n ++ "**:"
-      restCall . R.CreateMessage (messageChannel m) . pack $ url'
+      respond m $ "*Did you mean* **" ++ n ++ "**:"
+      respond m url'
     (DidYouMeanOldResponse n o url') -> do
-      _ <- restCall . R.CreateMessage (messageChannel m) . pack $ "*Did you mean* **" ++ o <> " (" ++ n ++ ")**:"
-      restCall . R.CreateMessage (messageChannel m) . pack $ url'
-    NotOnList -> restCall $ R.CreateMessage (messageChannel m) "*You aren't on the list! To register, type ```?register yourign```.*"
+      respond m $ "*Did you mean* **" ++ o ++ " (" ++ n ++ ")**:"
+      respond m url'
+    NotOnList -> sendRegisterMessage m
   pure ()
 
 commandTimeout :: Int -> DiscordHandler () -> DiscordHandler ()
@@ -254,16 +264,16 @@ setSetting BowBotData {..} manager m setting maybeValue = case map toLower setti
       let url = "http://" ++ website ++ "/updateSetting.php?key=" ++ apiKey ++ "&discord=" ++ show did ++ "&setting=" ++ s ++ "&value=" ++ v
       res <- liftIO $ sendRequestTo manager url
       _ <- case decode res :: Maybe Object of
-          Nothing -> restCall $ R.CreateMessage (messageChannel m) "*Something went wrong!*"
+          Nothing -> respond m "*Something went wrong!*"
           (Just js) -> do
             liftIO $ putStrLn $ "Received response from: " ++ url
             case js HM.!? "success" of
-              (Just (Bool True)) -> restCall $ R.CreateMessage (messageChannel m) "*Successfully updated!*"
-              _ -> restCall $ R.CreateMessage (messageChannel m) "*Something went wrong!*"
+              (Just (Bool True)) -> respond m "*Successfully updated!*"
+              _ -> respond m "*Something went wrong!*"
       pure ()
     setBool :: String -> (StatsSettings -> Bool -> StatsSettings) -> DiscordHandler ()
     setBool st upd = case bool of
-      Nothing -> void $ restCall $ R.CreateMessage (messageChannel m) "*Wrong command argument!*"
+      Nothing -> respond m "*Wrong command argument!*"
       (Just b) -> do
         let did = userId $ messageAuthor m
         liftIO $ atomically $ do
@@ -272,7 +282,7 @@ setSetting BowBotData {..} manager m setting maybeValue = case map toLower setti
         sendReq did st (fromBool b)
     setVal :: String -> (StatsSettings -> BoolSense -> StatsSettings) -> DiscordHandler ()
     setVal st upd = case val of
-      Nothing -> void $ restCall $ R.CreateMessage (messageChannel m) "*Wrong command argument!*"
+      Nothing -> respond m "*Wrong command argument!*"
       (Just b) -> do
         let did = userId $ messageAuthor m
         liftIO $ atomically $ do

@@ -223,15 +223,15 @@ eventHandler dt@BowBotData {..} sm event = case event of
         liftIO . putStrLn $ "recieved " ++ unpack (messageText m)
         rn <- liftIO $ atomically $ readTVar registeredNow
         if rn > 2
-        then void $ restCall $ R.CreateMessage (messageChannel m) "*Too many requests! Please wait!*"
+        then respond m "*Too many requests! Please wait!*"
         else do
           liftIO $ atomically $ writeTVar registeredNow (rn + 1)
           let wrd = T.words (messageText m)
           pns <- fmap (>>=(\(_, b, _, _) -> b)) $ liftIO $ atomically $ readTVar peopleSelectedAccounts
           if userId (messageAuthor m) `elem` pns
-          then void $ restCall $ R.CreateMessage (messageChannel m) "*You are already registered. If you made a mistake, contact me (**GregC**#9698)*"
+          then respond m "*You are already registered. If you made a mistake, contact me (**GregC**#9698)*"
           else if length wrd /= 2
-            then void $ restCall $ R.CreateMessage (messageChannel m) "*Wrong command syntax*"
+            then respond m "*Wrong command syntax*"
             else registerCommand dt sm (unpack $ wrd !! 1) m
       "?na" -> commandTimeout 12 $ do
         liftIO . putStrLn $ "recieved " ++ unpack (messageText m)
@@ -239,14 +239,13 @@ eventHandler dt@BowBotData {..} sm event = case event of
         names <- liftIO $ withMinecraftFromName False dt sm (unpack <$> listToMaybe (tail wrd)) (userId $ messageAuthor m) $ \u -> do
           names <- minecraftUuidToNames' sm minecraftNicks u
           return if null names then Nothing else Just names
-        _ <- case names of
-          NoResponse -> restCall $ R.CreateMessage (messageChannel m) "*The player doesn't exist!*"
-          (JustResponse _ s) -> restCall . R.CreateMessage (messageChannel m) $ "```\n" <> T.unlines (reverse $ map pack s) <> "```"
-          (OldResponse _ _ s) -> restCall . R.CreateMessage (messageChannel m) $ "```\n" <> T.unlines (reverse $ map pack s) <> "```"
-          (DidYouMeanResponse n s) -> restCall . R.CreateMessage (messageChannel m) $ "*Did you mean* **" <> pack n <> "**:```\n" <> T.unlines (reverse $ map pack s) <> "```"
-          (DidYouMeanOldResponse n o s) -> restCall . R.CreateMessage (messageChannel m) $ "*Did you mean* **" <> pack o <> " (" <> pack n <> ")**:```\n" <> T.unlines (reverse $ map pack s) <> "```"
-          NotOnList -> restCall $ R.CreateMessage (messageChannel m) "*You aren't on the list! To register, type ```?register yourign```.*"
-        pure ()
+        case names of
+          NoResponse -> respond m "*The player doesn't exist!*"
+          (JustResponse _ s) -> respond m $ "```\n" ++ unlines (reverse s) ++ "```"
+          (OldResponse _ _ s) -> respond m $ "```\n" ++ unlines (reverse s) ++ "```"
+          (DidYouMeanResponse n s) -> respond m $ "*Did you mean* **" ++ n ++ "**:```\n" ++ unlines (reverse s) ++ "```"
+          (DidYouMeanOldResponse n o s) -> respond m $ "*Did you mean* **" ++ o ++ " (" ++ n ++ ")**:```\n" ++ unlines (reverse s) ++ "```"
+          NotOnList -> sendRegisterMessage m
       "?n" -> commandTimeout 12 $ do
         liftIO . putStrLn $ "recieved " ++ unpack (messageText m)
         let wrd = T.words (messageText m)
@@ -254,12 +253,12 @@ eventHandler dt@BowBotData {..} sm event = case event of
           names <- minecraftUuidToNames' sm minecraftNicks u
           return if null names then Nothing else Just names
         _ <- case names of
-          NoResponse -> restCall $ R.CreateMessage (messageChannel m) "*The player doesn't exist!*"
-          (JustResponse _ s) -> restCall . R.CreateMessage (messageChannel m) $ "```\n" <> T.unlines (reverse $ map pack s) <> "```"
-          (OldResponse _ _ s) -> restCall . R.CreateMessage (messageChannel m) $ "```\n" <> T.unlines (reverse $ map pack s) <> "```"
-          (DidYouMeanResponse n s) -> restCall . R.CreateMessage (messageChannel m) $ "*Did you mean* **" <> pack n <> "**:```\n" <> T.unlines (reverse $ map pack s) <> "```"
-          (DidYouMeanOldResponse n o s) -> restCall . R.CreateMessage (messageChannel m) $ "*Did you mean* **" <> pack o <> " (" <> pack n <> ")**:```\n" <> T.unlines (reverse $ map pack s) <> "```"
-          NotOnList -> restCall $ R.CreateMessage (messageChannel m) "*You aren't on the list! To register, type ```?register yourign```.*"
+          NoResponse -> respond m "*The player doesn't exist!*"
+          (JustResponse _ s) -> respond m $ "```\n" ++ unlines (reverse s) ++ "```"
+          (OldResponse _ _ s) -> respond m $ "```\n" ++ unlines (reverse s) ++ "```"
+          (DidYouMeanResponse n s) -> respond m $ "*Did you mean* **" ++ n ++ "**:```\n" ++ unlines (reverse s) ++ "```"
+          (DidYouMeanOldResponse n o s) -> respond m $ "*Did you mean* **" ++ o ++ " (" ++ n ++ ")**:```\n" ++ unlines (reverse s) ++ "```"
+          NotOnList -> sendRegisterMessage m
         pure ()
       "?head" -> commandTimeout 12 $ do
         liftIO . putStrLn $ "recieved " ++ unpack (messageText m)
@@ -288,23 +287,20 @@ eventHandler dt@BowBotData {..} sm event = case event of
             manager <- liftIO $ newManager managerSettings
             o <- case onlo <|> onlb of
               (Just onl) -> do
-                _ <- restCall . R.CreateMessage (messageChannel m) $ "**Players in wachList currently in bow duels:** (cached response)"
+                respond m "**Players in wachList currently in bow duels:** (cached response)"
                 pure onl
               Nothing -> do
                 people <- liftIO $ getWatchlist manager
                 status <- liftIO $ mapConcurrently (\u -> (u,) . fromMaybe False <$> isInBowDuels manager u) people
                 let onl = map fst $ filter snd status
                 liftIO . atomically $ writeTVar (if t <= 5 || t >= 55 then hypixelOnlineBorderList else hypixelOnlineList) $ Just onl
-                _ <- restCall . R.CreateMessage (messageChannel m) $ "**Players in wachList currently in bow duels:**"
+                respond m "**Players in wachList currently in bow duels:**"
                 pure onl
             liftIO . atomically $ writeTVar hypixelOnlineBusyList False
             names <- liftIO $ traverse (fmap head . minecraftUuidToNames' manager minecraftNicks) o
-            let msg = if null names then "None of the watchListed players are currently in bow duels." else pack . unlines . map (" - " ++) $ names
-            _ <- restCall . R.CreateMessage (messageChannel m) $ "```" <> msg <> "```"
-            pure ()
-          else do
-            _ <- restCall . R.CreateMessage (messageChannel m) . pack $ "**Processing list of online players. Please send command again later.**"
-            pure ()
+            let msg = if null names then "None of the watchListed players are currently in bow duels." else unlines . map (" - " ++) $ names
+            respond m $ "```" ++ msg ++ "```"
+          else respond m "**Processing list of online players. Please send command again later.**"
       "?lb" -> commandTimeout 10 $ do
         liftIO . putStrLn $ "recieved " ++ unpack (messageText m)
         dat <- liftIO $ getMinecraftStatList sm
@@ -318,10 +314,10 @@ eventHandler dt@BowBotData {..} sm event = case event of
         case wrds of
           ["all"] -> void $ restCall $ R.CreateMessageUploadFile (messageChannel m) "list.txt" . encodeUtf8 . pack $ unlines leaderboardString
           [(readMaybe @Int -> Just n)] -> if n > 0 && n <= length pages
-            then void . restCall . R.CreateMessage (messageChannel m) . pack $ "Hypixel Bow Duels Leaderboard (page " ++ show n ++ "):```\n"  ++ pages !! (n-1) ++ "```"
-            else void . restCall $ R.CreateMessage (messageChannel m) "*Wrong page number*"
-          [] -> void . restCall . R.CreateMessage (messageChannel m) . pack $ "Hypixel Bow Duels Leaderboard (page 1):```\n"  ++ head pages ++ "```"
-          _ -> void . restCall $ R.CreateMessage (messageChannel m) "*Wrong command syntax*"
+            then respond m $ "Hypixel Bow Duels Leaderboard (page " ++ show n ++ "):```\n"  ++ pages !! (n-1) ++ "```"
+            else respond m "*Wrong page number*"
+          [] -> respond m $ "Hypixel Bow Duels Leaderboard (page 1):```\n"  ++ head pages ++ "```"
+          _ -> respond m "*Wrong command syntax*"
       "?list" -> commandTimeout 2 $ do
         liftIO . putStrLn $ "recieved " ++ unpack (messageText m)
         let wrds = tail $ words $ unpack $ messageText m
@@ -330,51 +326,48 @@ eventHandler dt@BowBotData {..} sm event = case event of
             manager <- liftIO $ newManager managerSettings
             st <- liftIO $ getWatchlist manager
             people <- traverse (liftIO . minecraftUuidToNames' manager minecraftNicks) st
-            return $ Just (map pack . mapMaybe listToMaybe $ people, "Players in watchList")
+            return $ Just (mapMaybe listToMaybe $ people, "Players in watchList")
           ["w"] -> do
             manager <- liftIO $ newManager managerSettings
             st <- liftIO $ getWatchlist manager
             people <- traverse (liftIO . minecraftUuidToNames' manager minecraftNicks) st
-            return $ Just (map pack . mapMaybe listToMaybe $ people, "Players in watchList")
+            return $ Just (mapMaybe listToMaybe $ people, "Players in watchList")
           ["ac"] -> do
             st <- liftIO $ atomically $ readTVar minecraftNicks
-            return $ Just (map pack $ mapMaybe (listToMaybe . mcNames) st, "Players on autocomplete list")
+            return $ Just (mapMaybe (listToMaybe . mcNames) st, "Players on autocomplete list")
           ["d"] -> do
             manager <- liftIO $ newManager managerSettings
             st <- liftIO $ atomically $ readTVar peopleSelectedAccounts
             people <- traverse (liftIO . minecraftUuidToNames' manager minecraftNicks . (\(_,_,x, _) -> x)) st
-            return $ Just (map pack . mapMaybe listToMaybe $ people, "Players on discord list")
+            return $ Just (mapMaybe listToMaybe $ people, "Players on discord list")
           _ -> return Nothing
-        void $ case ln of
-          Nothing -> restCall $ R.CreateMessage (messageChannel m) "*Wrong command syntax*"
+        case ln of
+          Nothing -> respond m "*Wrong command syntax*"
           Just (list, name) ->
-            if sum (map T.length list) < 1800
-              then restCall $ R.CreateMessage (messageChannel m) $ "**" <> name <> ":**\n" <> "```\n" <> T.unwords list <> "```"
+            if sum (map length list) < 1800
+              then respond m $ "**" ++ name ++ ":**\n" ++ "```\n" ++ unwords list ++ "```"
               else do
-                _ <- restCall $ R.CreateMessage (messageChannel m) $ "**" <> name <> ":**"
-                restCall $ R.CreateMessageUploadFile (messageChannel m) "list.txt" $ encodeUtf8 (T.unlines list)
+                _ <- respond m $ "**" ++ name ++ ":**"
+                respondFile m "list.txt" $ unlines list
       "?help" -> commandTimeout 2 $ do
         liftIO . putStrLn $ "recieved " ++ unpack (messageText m)
-        _ <-
-          restCall . R.CreateMessage (messageChannel m) $
-            "**Bow bot help:**\n\n"
-              <> "**Commands:**\n"
-              <> " - **?help** - *display this message*\n"
-              <> " - **?online** - *show all people from watchList currently in Bow Duels*\n"
-              <> " - **?list** - *show all players in watchList*\n"
-              <> " - **?s [name]** - *show player's Bow Duels stats*\n"
-              <> " - **?sa [name]** - *show all Bow Duels stats*\n"
-              <> " - **?sd [name]** - *show a default set of Bow Duels stats*\n"
-              <> " - **?n(a) [name]** - *show player's past nicks*\n"
-              <> " - **?head(a) [name]** - *show player's head*\n"
-              <> " - **?skin(a) [name]** - *show player's full skin*\n"
-              <> " - **?lb [page]** - *show a Bow Duels Wins leaderboard*\n"
-              <> " - **?lb all** - *upload a file with the whole Bow Duels Wins leaderboard*\n"
-              <> " - **?mc** - *list your linked minecraft nicks*\n"
-              <> " - **?mc [name]** - *select a minecraft account as your default*\n"
-              <> " - **?settings** - *display help for settings*\n"
-              <> "\nMade by **GregC**#9698"
-        pure ()
+        respond m $"**Bow bot help:**\n\n"
+          ++ "**Commands:**\n"
+          ++ " - **?help** - *display this message*\n"
+          ++ " - **?online** - *show all people from watchList currently in Bow Duels*\n"
+          ++ " - **?list** - *show all players in watchList*\n"
+          ++ " - **?s [name]** - *show player's Bow Duels stats*\n"
+          ++ " - **?sa [name]** - *show all Bow Duels stats*\n"
+          ++ " - **?sd [name]** - *show a default set of Bow Duels stats*\n"
+          ++ " - **?n(a) [name]** - *show player's past nicks*\n"
+          ++ " - **?head(a) [name]** - *show player's head*\n"
+          ++ " - **?skin(a) [name]** - *show player's full skin*\n"
+          ++ " - **?lb [page]** - *show a Bow Duels Wins leaderboard*\n"
+          ++ " - **?lb all** - *upload a file with the whole Bow Duels Wins leaderboard*\n"
+          ++ " - **?mc** - *list your linked minecraft nicks*\n"
+          ++ " - **?mc [name]** - *select a minecraft account as your default*\n"
+          ++ " - **?settings** - *display help for settings*\n"
+          ++ "\nMade by **GregC**#9698"
       "?refresh" -> commandTimeout 2 $ when (isAdmin (messageAuthor m)) $ do
         liftIO . putStrLn $ "recieved " ++ unpack (messageText m)
         liftIO $ downloadData dt
@@ -393,22 +386,22 @@ eventHandler dt@BowBotData {..} sm event = case event of
         let wrds = tail $ words $ unpack $ messageText m
         st <- liftIO $ atomically $ readTVar peopleSelectedAccounts
         let accountMaybe = find (\(_,b,_,_) -> userId (messageAuthor m) `elem` b) st
-        _ <- restCall . R.CreateMessage (messageChannel m) =<< case wrds of
+        case wrds of
           [] -> case accountMaybe of
-            Nothing -> return "*You aren't on the list! To register, type ```?register yourign```.*"
+            Nothing -> sendRegisterMessage m
             Just (_, _, sel, mc) -> do
               let helper = \x -> do {
                   name <- liftIO $ head <$> minecraftUuidToNames' sm minecraftNicks x;
                   return $ (if sel == x then "*" else "") ++ name
                 }
               mc' <- traverse helper mc
-              return $ "**List of your minecraft nicks linked:**\n```\n" <> pack (unlines mc') <> "```"
+              respond m $ "**List of your minecraft nicks linked:**\n```\n" ++ unlines mc' ++ "```"
           [newsel] -> case accountMaybe of
-            Nothing -> return "*You aren't on the list! To register, type ```?register yourign```.*"
+            Nothing -> sendRegisterMessage m
             Just (gid, dids, _, mc) -> do
               newselid <- liftIO $ minecraftNameToUUID' sm minecraftNicks newsel
               case newselid of
-                Nothing -> return "*Player doesn't exist!*"
+                Nothing -> respond m "*Player doesn't exist!*"
                 Just nid -> if nid `elem` mc
                   then do
                     website <- liftIO $ fromMaybe "" <$> getEnv "DB_SITE"
@@ -416,35 +409,33 @@ eventHandler dt@BowBotData {..} sm event = case event of
                     let url = "http://" ++ website ++ "/selectMinecraft.php?key=" ++ apiKey ++ "&id=" ++ show gid ++ "&minecraft=" ++ nid
                     _ <- liftIO $ sendRequestTo sm url
                     liftIO $ atomically $ writeTVar peopleSelectedAccounts $ map (\u@(i, _, _, _) -> if i == gid then (gid, dids, nid, mc) else u) st
-                    return "*Success!*"
-                  else return "*You do not have that minecraft nick linked!*"
-          _ -> return "*Wrong command syntax*"
+                    respond m "*Success!*"
+                  else respond m "*You do not have that minecraft nick linked!*"
+          _ -> respond m "*Wrong command syntax*"
         pure ()
       "?settings" -> commandTimeout 2 $ do
         liftIO . putStrLn $ "recieved " ++ unpack (messageText m)
-        _ <-
-          restCall . R.CreateMessage (messageChannel m) $
-            "**You can now customize the output of ?s command!**\n"
-              <> "**Commands:**\n"
-              <> " - **?settings** - *display this message*\n"
-              <> " - **?show [stat]** - *makes the stat visible*\n"
-              <> " - **?hide [stat]** - *makes the stat hidden*\n"
-              <> " - **?show [stat] [yes|always|show|no|never|hide|maybe|defined]** - *sets the visibility of the stat*\n"
-              <> "*Visibility 'maybe' and 'defined' hide the stat when the value is undefined.*\n"
-              <> "**Stat names:** wins, losses, wlr, winsuntil, beststreak, currentstreak, bestdailystreak, bowhits, bowshots, accuracy\n"
-              <> "**Example:** *?show accuracy* makes accuracy visible in the ?s command\n"
+        respond m $ "**You can now customize the output of ?s command!**\n"
+          ++ "**Commands:**\n"
+          ++ " - **?settings** - *display this message*\n"
+          ++ " - **?show [stat]** - *makes the stat visible*\n"
+          ++ " - **?hide [stat]** - *makes the stat hidden*\n"
+          ++ " - **?show [stat] [yes|always|show|no|never|hide|maybe|defined]** - *sets the visibility of the stat*\n"
+          ++ "*Visibility 'maybe' and 'defined' hide the stat when the value is undefined.*\n"
+          ++ "**Stat names:** wins, losses, wlr, winsuntil, beststreak, currentstreak, bestdailystreak, bowhits, bowshots, accuracy\n"
+          ++ "**Example:** *?show accuracy* makes accuracy visible in the ?s command\n"
         pure ()
       "?show" -> commandTimeout 2 $ do
         let wrds = tail $ words $ unpack $ messageText m
         case wrds of
           [setting] -> setSetting dt sm m setting Nothing
           [setting, value] -> setSetting dt sm m setting (Just value)
-          _ -> void $ restCall $ R.CreateMessage (messageChannel m) "*Wrong command syntax*"
+          _ -> respond m "*Wrong command syntax*"
       "?hide" -> commandTimeout 2 $ do
         let wrds = tail $ words $ unpack $ messageText m
         case wrds of
           [setting] -> setSetting dt sm m setting (Just "hide")
-          _ -> void $ restCall $ R.CreateMessage (messageChannel m) "*Wrong command syntax*"
+          _ -> respond m "*Wrong command syntax*"
       _ -> pure ()
   _ -> pure ()
 
