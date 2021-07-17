@@ -24,6 +24,7 @@ data Stats = Stats
 
 data DivisionTitle =
     NoDivisionTitle
+  | DiamondTitle
   | MasterTitle
   | LegendTitle
   | GrandmasterTitle

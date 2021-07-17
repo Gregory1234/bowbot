@@ -194,6 +194,7 @@ airplanesId :: GuildId
 airplanesId = 742731987902791751
 
 roleIdToTitle :: RoleId -> Maybe DivisionTitle
+roleIdToTitle 865997053838753814 = Just DiamondTitle
 roleIdToTitle 742734559514329239 = Just MasterTitle
 roleIdToTitle 742734346200285277 = Just LegendTitle
 roleIdToTitle 742734209084555264 = Just GrandmasterTitle
@@ -203,6 +204,7 @@ roleIdToTitle _ = Nothing
 
 titleRoleId :: DivisionTitle -> Maybe RoleId
 titleRoleId NoDivisionTitle = Nothing
+titleRoleId DiamondTitle = Just 865997053838753814
 titleRoleId MasterTitle = Just 742734559514329239
 titleRoleId LegendTitle = Just 742734346200285277
 titleRoleId GrandmasterTitle = Just 742734209084555264
