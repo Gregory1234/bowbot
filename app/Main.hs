@@ -241,25 +241,26 @@ updateRoles' bbd = do
 
 updateRoles :: BowBotData -> [(String, Int, Int, Int)] -> GuildMember -> DiscordHandler Bool
 updateRoles BowBotData {..} lb memb = do
-  pns <- fmap (>>=(\(_, b, c, _) -> (,c) <$> b)) $ liftIO $ atomically $ readTVar peopleSelectedAccounts
+  pns <- fmap (>>=(\(_, b, _, d) -> (,d) <$> b)) $ liftIO $ atomically $ readTVar peopleSelectedAccounts
   let did = userId . memberUser $ memb
   case lookup did pns of
     Nothing -> pure False
-    Just uuid -> do
-      case lookup uuid (map (\(a, b, _, _) -> (a,b)) lb) of
-        Nothing -> pure False
-        Just wins -> do
-          let title = winsToTitle (fromIntegral wins)
-          let currentRoles = memberRoles memb
-          let currentTitle = getFirst $ mconcat (map (First . roleIdToTitle) currentRoles)
-          case (currentTitle >>= titleRoleId, titleRoleId title) of
-            (Nothing, Nothing) -> pure ()
-            (Nothing, Just rid) -> call $ R.AddGuildMemberRole airplanesId did rid
-            (Just rid, Nothing) -> call $ R.RemoveGuildMemberRole airplanesId did rid
-            (Just rid, Just rid') -> when (rid /= rid') $ do
-              call $ R.RemoveGuildMemberRole airplanesId did rid
-              call $ R.AddGuildMemberRole airplanesId did rid'
-          pure True
+    Just uuids -> do
+      let lb' = map (\(a, b, _, _) -> (a,b)) lb
+      let wins' = mapMaybe (`lookup` lb') uuids
+      unless (null wins') $ do
+        let wins = maximum wins'
+        let title = winsToTitle (fromIntegral wins)
+        let currentRoles = memberRoles memb
+        let currentTitle = getFirst $ mconcat (map (First . roleIdToTitle) currentRoles)
+        case (currentTitle >>= titleRoleId, titleRoleId title) of
+          (Nothing, Nothing) -> pure ()
+          (Nothing, Just rid) -> call $ R.AddGuildMemberRole airplanesId did rid
+          (Just rid, Nothing) -> call $ R.RemoveGuildMemberRole airplanesId did rid
+          (Just rid, Just rid') -> when (rid /= rid') $ do
+            call $ R.RemoveGuildMemberRole airplanesId did rid
+            call $ R.AddGuildMemberRole airplanesId did rid'
+      pure (not $ null wins')
 
 eventHandler :: BowBotData -> Manager -> Event -> DiscordHandler ()
 eventHandler dt@BowBotData {..} sm event = case event of
