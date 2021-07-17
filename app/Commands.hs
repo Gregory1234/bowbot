@@ -11,6 +11,7 @@ import Control.Monad.IO.Class (liftIO, MonadIO)
 import qualified Data.Text as T
 import Discord
 import qualified Discord.Requests as R
+import qualified Discord.Internal.Rest as R
 import Discord.Types
 import Network.HTTP.Conduit
 import System.Environment.Blank (getEnv)
@@ -29,14 +30,17 @@ import API
 import Data.List (intercalate)
 import Data.Text.Encoding (encodeUtf8)
 
+call :: (FromJSON a, R.Request (r a)) => r a -> DiscordHandler ()
 call = void . restCall
 
+respond :: Message -> String -> DiscordHandler ()
 respond m = call . R.CreateMessage (messageChannel m) . pack
 
+respondFile :: Message -> T.Text -> String -> DiscordHandler ()
 respondFile m n = call . R.CreateMessageUploadFile (messageChannel m) n . encodeUtf8 . pack
 
 sendRegisterMessage :: Message -> DiscordHandler ()
-sendRegisterMessage m = respond m "*You aren't on the list! To register, type ```?register yourign```.*"
+sendRegisterMessage m = respond m "*You aren't on the list! To register, type `?register yourign`.*"
 
 data BowBotData = BowBotData
   { hypixelRequestCount :: TVar Int,

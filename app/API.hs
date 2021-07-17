@@ -71,11 +71,11 @@ minecraftUuidToNames manager uuid = do
        _ -> Nothing
 
 updateMinecraftNames :: Manager -> String -> [String] -> IO ()
-updateMinecraftNames manager uuid names = 
+updateMinecraftNames manager uuid names =
   void $ sendDB manager "updateMinecraftNames.php" ["uuid=" ++ uuid, "names=" ++ intercalate "," names]
 
 addMinecraftAccount :: Manager -> String -> [String] -> Bool -> IO ()
-addMinecraftAccount manager uuid names hypixel = 
+addMinecraftAccount manager uuid names hypixel =
   void $ sendDB manager "addMinecraftName.php" ["uuid=" ++ uuid, "names=" ++ intercalate "," names, "hypixel=" ++ (if hypixel then "1" else "0")]
 
 addAccount :: Manager -> String -> UserId -> String -> IO (Maybe Integer)
@@ -245,6 +245,19 @@ getPeopleSelectedAccounts manager = do
 getDiscordIds :: Manager -> IO [UserId]
 getDiscordIds manager = do
   res <- sendDB manager "discordIds.php" []
+  case decode res :: Maybe Object of
+     Nothing -> return []
+     (Just js) -> case js HM.!? "data" of
+       (Just (Array (V.toList -> list))) -> return $ mapMaybe readMaybe $ mapMaybe str list
+       _ -> return []
+  where
+   str :: Value -> Maybe String
+   str (String (unpack -> d)) = Just d
+   str _ = Nothing
+
+getDiscordRoleDisabledIds :: Manager -> IO [UserId]
+getDiscordRoleDisabledIds manager = do
+  res <- sendDB manager "discordRoleDisabledIds.php" []
   case decode res :: Maybe Object of
      Nothing -> return []
      (Just js) -> case js HM.!? "data" of

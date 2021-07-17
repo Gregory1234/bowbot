@@ -22,6 +22,23 @@ data Stats = Stats
   }
   deriving (Show)
 
+data DivisionTitle =
+    NoDivisionTitle
+  | MasterTitle
+  | LegendTitle
+  | GrandmasterTitle
+  | GodlikeTitle
+  | GodlikeXTitle
+
+winsToTitle :: Integer -> DivisionTitle
+winsToTitle x
+  | x < 1000  = NoDivisionTitle
+  | x < 2000  = MasterTitle
+  | x < 5000  = LegendTitle
+  | x < 10000 = GrandmasterTitle
+  | x < 28000 = GodlikeTitle
+  | otherwise = GodlikeXTitle
+
 data StatsSettings = StatsSettings
   { sWins :: Bool
   , sLosses :: Bool

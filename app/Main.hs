@@ -34,6 +34,7 @@ import Control.Monad.Reader (ReaderT(..))
 import Data.Either (fromRight)
 import Data.List (find, sortOn)
 import Text.Read (readMaybe)
+import Data.Monoid (First(..))
 
 
 
@@ -60,20 +61,20 @@ main = do
         runDiscord $
           def
             { discordToken = pack apiKey,
-              discordOnStart = onStartup,
+              discordOnStart = onStartup bbdata,
               discordOnEvent = eventHandler bbdata manager
             }
       TIO.putStrLn userFacingError
 
-onStartup :: DiscordHandler ()
-onStartup = do
+onStartup :: BowBotData -> DiscordHandler ()
+onStartup bbdata = do
   sendCommand (UpdateStatus $ UpdateStatusOpts {
     updateStatusOptsSince = Nothing, 
     updateStatusOptsGame = Just (Activity {activityName = "try out ?settings command", activityType = ActivityTypeGame, activityUrl = Nothing}),
     updateStatusOptsNewStatus = UpdateStatusOnline,
     updateStatusOptsAFK = False
   })
-  mkBackgroundDiscord
+  mkBackgroundDiscord bbdata
 
 downloadData :: BowBotData -> IO ()
 downloadData BowBotData {..} = do
@@ -113,7 +114,6 @@ updateLeaderboard BowBotData {..} = void . forkIO $ do
       dt <- fmap (zip lst . concat) $ for chunked $ mapConcurrently (getHypixelStats manager . mcUUID)
       updateStats manager dt
       threadDelay 65000000
-
 
 downloadNicks :: Manager -> TVar [MinecraftAccount] -> IO ()
 downloadNicks manager nickCache = do
@@ -170,14 +170,14 @@ background bbdata@BowBotData {..} = do
         putStrLn "New minute finished!"
       threadDelay 60000000
 
-mkBackgroundDiscord :: DiscordHandler ()
-mkBackgroundDiscord = ReaderT $ \x -> void $
-  forkFinally (runReaderT backgroundDiscord x) $ \e -> do
+mkBackgroundDiscord :: BowBotData -> DiscordHandler ()
+mkBackgroundDiscord bbdata = ReaderT $ \x -> void $
+  forkFinally (runReaderT (backgroundDiscord bbdata) x) $ \e -> do
     print e
-    runReaderT mkBackgroundDiscord x
+    runReaderT (mkBackgroundDiscord bbdata) x
 
-backgroundDiscord :: DiscordHandler ()
-backgroundDiscord = do
+backgroundDiscord :: BowBotData -> DiscordHandler ()
+backgroundDiscord bbdata = do
   sec <- liftIO $ read @Int <$> getTime "%S"
   liftIO $ threadDelay ((60 - sec `mod` 60) * 1000000)
   forever go
@@ -185,14 +185,35 @@ backgroundDiscord = do
     go = do
       _ <- ReaderT $ \x -> forkIO $ flip runReaderT x $ do
         mint <- liftIO $ getTime "%M"
-        when (mint == "00") updateDiscords'
+        when (mint == "00") do
+          updateDiscords'
+          updateRoles' bbdata
       liftIO $ threadDelay 60000000
+
+airplanesId :: GuildId
+airplanesId = 742731987902791751
+
+roleIdToTitle :: RoleId -> Maybe DivisionTitle
+roleIdToTitle 742734559514329239 = Just MasterTitle
+roleIdToTitle 742734346200285277 = Just LegendTitle
+roleIdToTitle 742734209084555264 = Just GrandmasterTitle
+roleIdToTitle 742734125231898656 = Just GodlikeTitle
+roleIdToTitle 770446876411035669 = Just GodlikeXTitle
+roleIdToTitle _ = Nothing
+
+titleRoleId :: DivisionTitle -> Maybe RoleId
+titleRoleId NoDivisionTitle = Nothing
+titleRoleId MasterTitle = Just 742734559514329239
+titleRoleId LegendTitle = Just 742734346200285277
+titleRoleId GrandmasterTitle = Just 742734209084555264
+titleRoleId GodlikeTitle = Just 742734125231898656
+titleRoleId GodlikeXTitle = Just 770446876411035669
 
 updateDiscords' :: DiscordHandler ()
 updateDiscords' = do
   manager <- liftIO $ newManager managerSettings
   uids <- liftIO $ getDiscordIds manager
-  v <- fmap (filter (not . userIsBot . memberUser)) <$> restCall (R.ListGuildMembers 742731987902791751 R.GuildMembersTiming {R.guildMembersTimingLimit = Just 500, R.guildMembersTimingAfter = Nothing})
+  v <- fmap (filter (not . userIsBot . memberUser)) <$> restCall (R.ListGuildMembers airplanesId R.GuildMembersTiming {R.guildMembersTimingLimit = Just 500, R.guildMembersTimingAfter = Nothing})
   case v of
     Right x -> do
       let uids' = filter (\u -> all (\m -> userId (memberUser m) /= u) x) uids
@@ -204,6 +225,41 @@ updateDiscords' = do
     helper u = do
       y <- restCall (R.GetUser u)
       return $ fromRight undefined y
+
+updateRoles' :: BowBotData -> DiscordHandler ()
+updateRoles' bbd = do
+  manager <- liftIO $ newManager managerSettings
+  uids <- liftIO $ getDiscordRoleDisabledIds manager
+  v <- fmap (filter (not . userIsBot . memberUser)) <$> restCall (R.ListGuildMembers airplanesId R.GuildMembersTiming {R.guildMembersTimingLimit = Just 500, R.guildMembersTimingAfter = Nothing})
+  case v of
+    Right x -> do
+      let members = filter (\m -> userId (memberUser m) `notElem` uids) x
+      lb <- liftIO $ getMinecraftStatList manager
+      _ <- traverse (updateRoles bbd lb) members
+      pure ()
+    Left x -> liftIO $ print x
+
+updateRoles :: BowBotData -> [(String, Int, Int, Int)] -> GuildMember -> DiscordHandler Bool
+updateRoles BowBotData {..} lb memb = do
+  pns <- fmap (>>=(\(_, b, c, _) -> (,c) <$> b)) $ liftIO $ atomically $ readTVar peopleSelectedAccounts
+  let did = userId . memberUser $ memb
+  case lookup did pns of
+    Nothing -> pure False
+    Just uuid -> do
+      case lookup uuid (map (\(a, b, _, _) -> (a,b)) lb) of
+        Nothing -> pure False
+        Just wins -> do
+          let title = winsToTitle (fromIntegral wins)
+          let currentRoles = memberRoles memb
+          let currentTitle = getFirst $ mconcat (map (First . roleIdToTitle) currentRoles)
+          case (currentTitle >>= titleRoleId, titleRoleId title) of
+            (Nothing, Nothing) -> pure ()
+            (Nothing, Just rid) -> call $ R.AddGuildMemberRole airplanesId did rid
+            (Just rid, Nothing) -> call $ R.RemoveGuildMemberRole airplanesId did rid
+            (Just rid, Just rid') -> when (rid /= rid') $ do
+              call $ R.RemoveGuildMemberRole airplanesId did rid
+              call $ R.AddGuildMemberRole airplanesId did rid'
+          pure True
 
 eventHandler :: BowBotData -> Manager -> Event -> DiscordHandler ()
 eventHandler dt@BowBotData {..} sm event = case event of
@@ -366,6 +422,7 @@ eventHandler dt@BowBotData {..} sm event = case event of
           ++ " - **?lb all** - *upload a file with the whole Bow Duels Wins leaderboard*\n"
           ++ " - **?mc** - *list your linked minecraft nicks*\n"
           ++ " - **?mc [name]** - *select a minecraft account as your default*\n"
+          ++ " - **?roles** - *refresh discord roles*\n"
           ++ " - **?settings** - *display help for settings*\n"
           ++ "\nMade by **GregC**#9698"
       "?refresh" -> commandTimeout 2 $ when (isAdmin (messageAuthor m)) $ do
@@ -378,6 +435,9 @@ eventHandler dt@BowBotData {..} sm event = case event of
       "?discordrefresh" -> commandTimeout 200 $ when (isAdmin (messageAuthor m)) $ do
         liftIO . putStrLn $ "recieved " ++ unpack (messageText m)
         updateDiscords'
+      "?rolesrefresh" -> commandTimeout 200 $ when (isAdmin (messageAuthor m)) $ do
+        liftIO . putStrLn $ "recieved " ++ unpack (messageText m)
+        updateRoles' dt
       "?lbrefresh" -> commandTimeout 200 $ when (isAdmin (messageAuthor m)) $ do
         liftIO . putStrLn $ "recieved " ++ unpack (messageText m)
         liftIO $ updateLeaderboard dt
@@ -412,6 +472,19 @@ eventHandler dt@BowBotData {..} sm event = case event of
                     respond m "*Success!*"
                   else respond m "*You do not have that minecraft nick linked!*"
           _ -> respond m "*Wrong command syntax*"
+        pure ()
+      "?roles" -> commandTimeout 12 $ do
+        liftIO . putStrLn $ "recieved " ++ unpack (messageText m)
+        lb <- liftIO $ getMinecraftStatList sm
+        mem <- restCall $ R.GetGuildMember airplanesId (userId $ messageAuthor m)
+        case mem of
+          Left _ -> pure ()
+          Right mem' -> do
+            liftIO $ updateDiscords sm [mem'] []
+            b <- updateRoles dt lb mem'
+            if b
+            then respond m "Roles updated successfully."
+            else respond m "Something went wrong!"
         pure ()
       "?settings" -> commandTimeout 2 $ do
         liftIO . putStrLn $ "recieved " ++ unpack (messageText m)
