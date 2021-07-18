@@ -35,6 +35,7 @@ import Data.Either (fromRight)
 import Data.List (find, sortOn)
 import Text.Read (readMaybe)
 import Data.Monoid (First(..))
+import Data.Foldable (traverse_)
 
 
 
@@ -193,6 +194,15 @@ backgroundDiscord bbdata = do
 airplanesId :: GuildId
 airplanesId = 742731987902791751
 
+airplanesIdHypixel :: String
+airplanesIdHypixel = "5f308a358ea8c97248581e46"
+
+guildMemberRoleId :: RoleId
+guildMemberRoleId = 742890312690827345
+
+guildVisitorRoleId :: RoleId
+guildVisitorRoleId = 742874367200854136
+
 roleIdToTitle :: RoleId -> Maybe DivisionTitle
 roleIdToTitle 865997053838753814 = Just DiamondTitle
 roleIdToTitle 742734559514329239 = Just MasterTitle
@@ -236,13 +246,16 @@ updateRoles' bbd = do
   case v of
     Right x -> do
       let members = filter (\m -> userId (memberUser m) `notElem` uids) x
-      lb <- liftIO $ getMinecraftStatList manager
-      _ <- traverse (updateRoles bbd lb) members
-      pure ()
+      gmem <- liftIO $ getHypixelGuildMembers manager airplanesIdHypixel
+      case gmem of
+        Nothing -> pure ()
+        Just gmem' -> do
+          lb <- liftIO $ getMinecraftStatList manager
+          traverse_ (updateRoles bbd lb gmem') members
     Left x -> liftIO $ print x
 
-updateRoles :: BowBotData -> [(String, Int, Int, Int)] -> GuildMember -> DiscordHandler Bool
-updateRoles BowBotData {..} lb memb = do
+updateRoles :: BowBotData -> [(String, Int, Int, Int)] -> [String] -> GuildMember -> DiscordHandler Bool
+updateRoles BowBotData {..} lb gmem memb = do
   pns <- fmap (>>=(\(_, b, _, d) -> (,d) <$> b)) $ liftIO $ atomically $ readTVar peopleSelectedAccounts
   let did = userId . memberUser $ memb
   case lookup did pns of
@@ -250,10 +263,10 @@ updateRoles BowBotData {..} lb memb = do
     Just uuids -> do
       let lb' = map (\(a, b, _, _) -> (a,b)) lb
       let wins' = mapMaybe (`lookup` lb') uuids
+      let currentRoles = memberRoles memb
       unless (null wins') $ do
         let wins = maximum wins'
         let title = winsToTitle (fromIntegral wins)
-        let currentRoles = memberRoles memb
         let currentTitle = getFirst $ mconcat (map (First . roleIdToTitle) currentRoles)
         case (currentTitle >>= titleRoleId, titleRoleId title) of
           (Nothing, Nothing) -> pure ()
@@ -262,7 +275,14 @@ updateRoles BowBotData {..} lb memb = do
           (Just rid, Just rid') -> when (rid /= rid') $ do
             call $ R.RemoveGuildMemberRole airplanesId did rid
             call $ R.AddGuildMemberRole airplanesId did rid'
-      pure (not $ null wins')
+      let isMember = any (`elem` gmem) uuids
+      let isDiscordMember = guildMemberRoleId `elem` currentRoles
+      let isDiscordVisitor = guildVisitorRoleId `elem` currentRoles
+      when (isMember && not isDiscordMember) $ call $ R.AddGuildMemberRole airplanesId did guildMemberRoleId
+      when (isMember && isDiscordVisitor) $ call $ R.RemoveGuildMemberRole airplanesId did guildVisitorRoleId
+      when (not isMember && isDiscordMember) $ call $ R.RemoveGuildMemberRole airplanesId did guildMemberRoleId
+      when (not isMember && not isDiscordVisitor) $ call $ R.AddGuildMemberRole airplanesId did guildVisitorRoleId
+      pure True
 
 eventHandler :: BowBotData -> Manager -> Event -> DiscordHandler ()
 eventHandler dt@BowBotData {..} sm event = case event of
@@ -484,10 +504,14 @@ eventHandler dt@BowBotData {..} sm event = case event of
           Left _ -> pure ()
           Right mem' -> do
             liftIO $ updateDiscords sm [mem'] []
-            b <- updateRoles dt lb mem'
-            if b
-            then respond m "Roles updated successfully."
-            else respond m "Something went wrong!"
+            gmem <- liftIO $ getHypixelGuildMembers sm airplanesIdHypixel
+            case gmem of
+              Nothing -> respond m "Something went wrong!"
+              Just gmem' -> do
+                b <- updateRoles dt lb gmem' mem'
+                if b
+                then respond m "Roles updated successfully."
+                else respond m "Something went wrong!"
         pure ()
       "?settings" -> commandTimeout 2 $ do
         liftIO . putStrLn $ "recieved " ++ unpack (messageText m)

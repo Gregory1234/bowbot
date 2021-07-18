@@ -131,6 +131,26 @@ getHypixelStats manager uuid = do
     roundNum _ (Just (Number (round -> x))) = x
     roundNum y _ = y
 
+getHypixelGuildMembers :: Manager -> String -> IO (Maybe [String])
+getHypixelGuildMembers manager guildid = do
+  apiKey <- fromMaybe "" <$> getEnv "HYPIXEL_API"
+  let url = "https://api.hypixel.net/guild?key=" ++ apiKey ++ "&id=" ++ guildid
+  res <- sendRequestTo manager url
+  case decode res :: Maybe Object of
+    Nothing -> return Nothing
+    (Just js) -> do
+      putStrLn $ "Received response from: " ++ url
+      case js HM.!? "guild" of
+        (Just (Object gld)) -> case gld HM.!? "members" of
+          (Just (Array (V.toList -> list))) -> return . Just $ mapMaybe personUUID list
+          _ -> return Nothing
+        _ -> return Nothing
+  where
+    personUUID (Object pl) = case pl HM.!? "uuid" of
+      (Just (String (unpack -> uuid))) -> Just uuid
+      _ -> Nothing
+    personUUID _ = Nothing
+
 sendDB :: Manager -> String -> [String] -> IO ByteString
 sendDB manager path args = do
   website <- fromMaybe "" <$> getEnv "DB_SITE"
