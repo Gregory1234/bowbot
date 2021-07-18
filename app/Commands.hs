@@ -27,8 +27,10 @@ import Data.Aeson
 import Stats
 import Utils
 import API
-import Data.List (intercalate)
+import Data.List (intercalate, sortOn)
 import Data.Text.Encoding (encodeUtf8)
+import Data.List.Split (chunksOf)
+import Text.Read (readMaybe)
 
 call :: (FromJSON a, R.Request (r a)) => r a -> DiscordHandler ()
 call = void . restCall
@@ -214,6 +216,48 @@ urlCommand ac bbd man mkurl m = do
       respond m url'
     NotOnList -> sendRegisterMessage m
   pure ()
+
+leaderboardCommand :: BowBotData -> Manager -> Message -> DiscordHandler ()
+leaderboardCommand BowBotData {..} manager m = do
+  dat <- liftIO $ getMinecraftStatList manager
+  lb <- traverse (\(u,a,_,_) -> do
+    n <- liftIO $ minecraftUuidToNames' manager minecraftNicks u
+    pure ((u, head n), a)) dat
+  pns <- fmap (>>=(\(_, b, _, d) -> (,d) <$> b)) $ liftIO $ atomically $ readTVar peopleSelectedAccounts
+  let wrds = tail $ words $ unpack $ messageText m
+  let did = userId . messageAuthor $ m
+  case wrds of
+    ["all"] -> do
+      let uuids = fromMaybe [] $ lookup did pns
+      let (leaderboard, _) = genlb uuids lb
+      void $ restCall $ R.CreateMessageUploadFile (messageChannel m) "list.txt" . encodeUtf8 . pack $ unlines leaderboard
+    [readMaybe @Int -> Just n] ->  do
+      let uuids = fromMaybe [] $ lookup did pns
+      let (leaderboard, _) = genlb uuids lb
+      let pages = map unlines $ chunksOf 20 leaderboard
+      if n > 0 && n <= length pages
+      then respond m $ "Hypixel Bow Duels Leaderboard (page " ++ show n ++ "):```\n"  ++ pages !! (n-1) ++ "```"
+      else respond m "*Wrong page number*"
+    [] -> do
+      let uuids = lookup did pns
+      case uuids of
+        Nothing -> do
+          let (leaderboard, _) = genlb [] lb
+          let pages = map unlines $ chunksOf 20 leaderboard
+          respond m $ "Hypixel Bow Duels Leaderboard (page 1):```\n"  ++ head pages ++ "```"
+        Just uuids' -> do
+          let (leaderboard, firstpos) = genlb uuids' lb
+          let pages = map unlines $ chunksOf 20 leaderboard
+          let page = firstpos `div` 20
+          respond m $ "Hypixel Bow Duels Leaderboard (page " ++ show (page + 1) ++ "):```\n"  ++ pages !! page ++ "```"
+    _ -> respond m "*Wrong command syntax*"
+  where
+    genlb :: [String] -> [((String, String), Int)] -> ([String], Int)
+    genlb uuids lb = (leaderboardString, firstpos)
+      where
+        leaderboard = zip [(1 :: Integer)..] $ sortOn (negate . snd) lb
+        leaderboardString = map (\(i,((u, n), v)) -> pad 5 (show i ++ ".") ++ (if u `elem` uuids then "*" else " ") ++ pad 20 n ++ " ( " ++ show v ++ " Wins )") leaderboard
+        firstpos = length $ takeWhile ((`notElem`uuids) . fst . fst . snd) leaderboard
 
 commandTimeout :: Int -> DiscordHandler () -> DiscordHandler ()
 commandTimeout n x = ReaderT (void . forkIO . void . timeout (n * 1000000) . runReaderT x)

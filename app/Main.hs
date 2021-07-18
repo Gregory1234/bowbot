@@ -382,21 +382,7 @@ eventHandler dt@BowBotData {..} sm event = case event of
           else respond m "**Processing list of online players. Please send command again later.**"
       "?lb" -> commandTimeout 10 $ do
         liftIO . putStrLn $ "recieved " ++ unpack (messageText m)
-        dat <- liftIO $ getMinecraftStatList sm
-        lb <- traverse (\(u,a,_,_) -> do
-          n <- liftIO $ minecraftUuidToNames' sm minecraftNicks u
-          pure (head n, a)) dat
-        let leaderboard = zip [1..] $ sortOn (negate . snd) lb
-        let leaderboardString = map (\(i,(n, v)) -> pad 5 (show i ++ ".") ++ pad 20 n ++ " ( " ++ show v ++ " Wins )") leaderboard
-        let pages = map unlines $ chunksOf 20 leaderboardString
-        let wrds = tail $ words $ unpack $ messageText m
-        case wrds of
-          ["all"] -> void $ restCall $ R.CreateMessageUploadFile (messageChannel m) "list.txt" . encodeUtf8 . pack $ unlines leaderboardString
-          [(readMaybe @Int -> Just n)] -> if n > 0 && n <= length pages
-            then respond m $ "Hypixel Bow Duels Leaderboard (page " ++ show n ++ "):```\n"  ++ pages !! (n-1) ++ "```"
-            else respond m "*Wrong page number*"
-          [] -> respond m $ "Hypixel Bow Duels Leaderboard (page 1):```\n"  ++ head pages ++ "```"
-          _ -> respond m "*Wrong command syntax*"
+        leaderboardCommand dt sm m
       "?list" -> commandTimeout 2 $ do
         liftIO . putStrLn $ "recieved " ++ unpack (messageText m)
         let wrds = tail $ words $ unpack $ messageText m
@@ -498,20 +484,33 @@ eventHandler dt@BowBotData {..} sm event = case event of
         pure ()
       "?roles" -> commandTimeout 12 $ do
         liftIO . putStrLn $ "recieved " ++ unpack (messageText m)
-        lb <- liftIO $ getMinecraftStatList sm
-        mem <- restCall $ R.GetGuildMember airplanesId (userId $ messageAuthor m)
-        case mem of
-          Left _ -> pure ()
-          Right mem' -> do
-            liftIO $ updateDiscords sm [mem'] []
-            gmem <- liftIO $ getHypixelGuildMembers sm airplanesIdHypixel
-            case gmem of
-              Nothing -> respond m "Something went wrong!"
-              Just gmem' -> do
-                b <- updateRoles dt lb gmem' mem'
-                if b
-                then respond m "Roles updated successfully."
-                else respond m "Something went wrong!"
+        t <- liftIO $ read @Int <$> getTime "%S"
+        cv <- liftIO . atomically $ do
+          c1 <- readTVar hypixelRequestCount
+          c2 <- readTVar hypixelRequestBorderCount
+          let c = c1 + c2
+          when (c < 15) $ modifyTVar (if t <= 5 || t >= 55 then hypixelRequestBorderCount else hypixelRequestCount) (+ 1)
+          return $ c < 15
+        if cv
+          then do
+            lb <- liftIO $ getMinecraftStatList sm
+            mem <- restCall $ R.GetGuildMember airplanesId (userId $ messageAuthor m)
+            case mem of
+              Left _ -> pure ()
+              Right mem' -> do
+                liftIO $ updateDiscords sm [mem'] []
+                gmem <- liftIO $ getHypixelGuildMembers sm airplanesIdHypixel
+                case gmem of
+                  Nothing -> respond m "Something went wrong!"
+                  Just gmem' -> do
+                    b <- updateRoles dt lb gmem' mem'
+                    if b
+                    then respond m "Roles updated successfully."
+                    else respond m "Something went wrong!"
+          else do
+            f <- liftIO $ read @Int <$> getTime "%S"
+            _ <- restCall . R.CreateMessage (messageChannel m) . pack $ "**Too many requests! Wait another " ++ show ((65 - f) `mod` 60) ++ " seconds!**"
+            pure ()
         pure ()
       "?settings" -> commandTimeout 2 $ do
         liftIO . putStrLn $ "recieved " ++ unpack (messageText m)
