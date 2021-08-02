@@ -10,7 +10,7 @@ import Network.HTTP.Conduit
 import Control.Exception.Base (try, SomeException)
 import Data.ByteString.Lazy (ByteString)
 import Data.Text (unpack, pack)
-import Data.Maybe (mapMaybe, fromMaybe, isNothing)
+import Data.Maybe (mapMaybe, fromMaybe)
 import qualified Data.HashMap.Strict as HM
 import Data.Aeson
 import System.Environment.Blank (getEnv)
@@ -19,7 +19,6 @@ import Discord.Types
 import Stats
 import Data.List (intercalate)
 import Text.Read (readMaybe)
-import Text.Read (readMaybe)
 import Control.Monad.Cont (void)
 
 data MinecraftAccount = MinecraftAccount
@@ -27,6 +26,13 @@ data MinecraftAccount = MinecraftAccount
   , mcNames :: [String]
   , mcHypixel :: Bool
   } deriving (Show)
+
+data PermissionLevel =
+    BanLevel
+  | DefaultLevel
+  | ModLevel
+  | AdminLevel
+    deriving (Eq, Ord, Enum, Bounded, Show)
 
 managerSettings :: ManagerSettings
 managerSettings = tlsManagerSettings { managerResponseTimeout = responseTimeoutMicro 15000000 }
@@ -205,6 +211,27 @@ getMinecraftStatList manager = do
    person _ = Nothing
    str (String (unpack -> d)) = Just d
    str _ = Nothing
+
+getPeoplePerms :: Manager -> IO [(UserId, PermissionLevel)]
+getPeoplePerms manager = do
+  res <- sendDB manager "perms.php" []
+  case decode res :: Maybe Object of
+      Nothing -> return []
+      (Just js) -> case js HM.!? "data" of
+        (Just (Array (V.toList -> list))) -> return $ mapMaybe parsePerms list
+        _ -> return []
+    where
+      parsePerms (Object js) = let
+        discord = maybe 0 read $ str (js HM.!? "id")
+        level = parseLevel (js HM.!? "level")
+        in Just (discord, level)
+      parsePerms _ = Nothing
+      parseLevel (Just "ban") = BanLevel
+      parseLevel (Just "mod") = ModLevel
+      parseLevel (Just "admin") = AdminLevel
+      parseLevel _ = DefaultLevel
+      str (Just (String (unpack -> d))) = Just d
+      str _ = Nothing
 
 getPeopleSettings :: Manager -> IO [(UserId, StatsSettings)]
 getPeopleSettings manager = do

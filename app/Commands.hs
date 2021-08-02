@@ -54,8 +54,10 @@ data BowBotData = BowBotData
     discordPeopleSettings :: TVar [(UserId, StatsSettings)],
     peopleSelectedAccounts :: TVar [(Integer, [UserId], String, [String])],
     registeredNow :: TVar Int,
-    leaderboardBusy :: TVar Bool
+    leaderboardBusy :: TVar Bool,
+    permissions :: TVar [(UserId, PermissionLevel)]
   }
+
 
 minecraftNameToUUID' :: Manager -> TVar [MinecraftAccount] -> String -> IO (Maybe String)
 minecraftNameToUUID' manager nameCache name = do
@@ -78,8 +80,8 @@ flattenedMinecraftNicks BowBotData {..} = do
   let restOfNicks = [(mcUUID,u) | MinecraftAccount {..} <- people, u <- drop 1 mcNames]
   return $ currentNicks ++ restOfNicks
 
-registerCommand :: BowBotData -> Manager -> String -> Message -> DiscordHandler ()
-registerCommand BowBotData {..} man name m = do
+registerCommand :: BowBotData -> Manager -> String -> UserId -> Message -> DiscordHandler ()
+registerCommand BowBotData {..} man name did m = do
   uuid <- liftIO $ minecraftNameToUUID' man minecraftNicks name
   _ <- case uuid of
     Nothing -> respond m "*The player doesn't exist!*"
@@ -95,12 +97,12 @@ registerCommand BowBotData {..} man name m = do
           let hypixel = case stats of Nothing -> False; Just s -> bowWins s >= 500
           liftIO $ addMinecraftAccount man uuid' names hypixel
           liftIO $ atomically $ writeTVar minecraftNicks (MinecraftAccount {mcUUID = uuid', mcNames = names, mcHypixel = hypixel}:nicks)
-        gid <- liftIO $ addAccount man (head names) (userId (messageAuthor m)) uuid'
+        gid <- liftIO $ addAccount man (head names) did uuid'
         case gid of
           Nothing -> respond m "*Somehing went wrong*"
           Just gid' -> do
             psa <- liftIO $ atomically $ readTVar peopleSelectedAccounts
-            liftIO $ atomically $ writeTVar peopleSelectedAccounts ((gid', [userId (messageAuthor m)], uuid', [uuid']):psa)
+            liftIO $ atomically $ writeTVar peopleSelectedAccounts ((gid', [did], uuid', [uuid']):psa)
             respond m "*Registered successfully*"
   pure ()
 
