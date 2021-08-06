@@ -80,8 +80,8 @@ flattenedMinecraftNicks BowBotData {..} = do
   let restOfNicks = [(mcUUID,u) | MinecraftAccount {..} <- people, u <- drop 1 mcNames]
   return $ currentNicks ++ restOfNicks
 
-registerCommand :: BowBotData -> Manager -> String -> UserId -> Message -> DiscordHandler ()
-registerCommand BowBotData {..} man name did m = do
+registerCommand :: BowBotData -> Bool -> Manager -> String -> UserId -> Message -> DiscordHandler ()
+registerCommand BowBotData {..} isalt man name did m = do
   uuid <- liftIO $ minecraftNameToUUID' man minecraftNicks name
   _ <- case uuid of
     Nothing -> respond m "*The player doesn't exist!*"
@@ -97,13 +97,25 @@ registerCommand BowBotData {..} man name did m = do
           let hypixel = case stats of Nothing -> False; Just s -> bowWins s >= 500
           liftIO $ addMinecraftAccount man uuid' names hypixel
           liftIO $ atomically $ writeTVar minecraftNicks (MinecraftAccount {mcUUID = uuid', mcNames = names, mcHypixel = hypixel}:nicks)
-        gid <- liftIO $ addAccount man (head names) did uuid'
-        case gid of
-          Nothing -> respond m "*Somehing went wrong*"
-          Just gid' -> do
-            psa <- liftIO $ atomically $ readTVar peopleSelectedAccounts
-            liftIO $ atomically $ writeTVar peopleSelectedAccounts ((gid', [did], uuid', [uuid']):psa)
-            respond m "*Registered successfully*"
+        if isalt
+        then do
+          pns <- fmap (>>=(\(a, c, _, _) -> (, a) <$> c)) $ liftIO $ atomically $ readTVar peopleSelectedAccounts
+          case lookup did pns of
+            Nothing -> respond m "*Somehing went wrong*"
+            Just gid -> do
+              liftIO $ addAltAccount man gid uuid'
+              psa <- liftIO $ atomically $ readTVar peopleSelectedAccounts
+              let (_, dids, suuid, uuids) = head $ filter (\(g, _, _, _) -> g == gid) psa
+              liftIO $ atomically $ writeTVar peopleSelectedAccounts ((gid, dids, suuid, uuid':uuids):filter (\(g, _, _, _) -> g /= gid) psa)
+              respond m "*Registered successfully*"
+        else do
+          gid <- liftIO $ addAccount man (head names) did uuid'
+          case gid of
+            Nothing -> respond m "*Somehing went wrong*"
+            Just gid' -> do
+              psa <- liftIO $ atomically $ readTVar peopleSelectedAccounts
+              liftIO $ atomically $ writeTVar peopleSelectedAccounts ((gid', [did], uuid', [uuid']):psa)
+              respond m "*Registered successfully*"
   pure ()
 
 withMinecraftFromName :: MonadIO m => Bool -> BowBotData -> Manager -> Maybe String -> UserId -> (String -> m (Maybe a)) -> m (StatsResponse a)

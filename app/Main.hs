@@ -303,7 +303,6 @@ eventHandler :: BowBotData -> Manager -> Event -> DiscordHandler ()
 eventHandler dt@BowBotData {..} sm event = case event of
   MessageCreate m -> do
     perms <- liftIO $ atomically $ readTVar permissions
-    liftIO $ print perms
     unless (fromBot m) $ case unpack $ T.toLower . T.takeWhile (/= ' ') $ messageText m of
       "?s" -> checkPerms perms m DefaultLevel $ commandTimeout 12 $ do
         liftIO . putStrLn $ "recieved " ++ unpack (messageText m)
@@ -328,13 +327,14 @@ eventHandler dt@BowBotData {..} sm event = case event of
           then respond m "*You are already registered. If you made a mistake, contact me (**GregC**#9698)*"
           else if length wrd /= 2
             then respond m "*Wrong command syntax*"
-            else registerCommand dt sm (unpack $ wrd !! 1) (userId (messageAuthor m)) m
+            else registerCommand dt False sm (unpack $ wrd !! 1) (userId (messageAuthor m)) m
       "?modhelp" -> checkPerms perms m ModLevel $ commandTimeout 2 $ do
         liftIO . putStrLn $ "recieved " ++ unpack (messageText m)
         respond m $"**Bow bot help:**\n\n"
           ++ "**Mod Commands:**\n"
           ++ " - **?modhelp** - *display this message*\n"
           ++ " - **?add [discord/discord id] [name]** - *register a person with a given minecraft name*\n"
+          ++ " - **?addalt [discord/discord id] [name]** - *register a person's alt*\n"
           ++ "\nMade by **GregC**#9698"
       "?add" -> checkPerms perms m ModLevel $ commandTimeout 12 $ do
         liftIO . putStrLn $ "recieved " ++ unpack (messageText m)
@@ -347,14 +347,29 @@ eventHandler dt@BowBotData {..} sm event = case event of
           pns <- fmap (>>=(\(_, b, _, _) -> b)) $ liftIO $ atomically $ readTVar peopleSelectedAccounts
           if length wrd /= 3
           then respond m "*Wrong command syntax*"
-          else do
-            let [_, read . filter isDigit -> did :: UserId, mcn] = map unpack wrd
-            if did `elem` pns
-            then respond m "*That discord already has a minecraft account. To add an alt use `?addalt`.*"
-            else registerCommand dt sm mcn did m
+          else case map unpack wrd of
+            [_, readMaybe . filter isDigit -> Just (did :: UserId), mcn] ->
+              if did `elem` pns
+              then respond m "*That discord already has a minecraft account. To add an alt use `?addalt`.*"
+              else registerCommand dt False sm mcn did m
+            _ -> respond m "*Wrong command syntax*"
       "?addalt" -> checkPerms perms m ModLevel $ commandTimeout 12 $ do
         liftIO . putStrLn $ "recieved " ++ unpack (messageText m)
-        respond m "*Not implemented yet.*"
+        rn <- liftIO $ atomically $ readTVar registeredNow
+        if rn > 2
+        then respond m "*Too many requests! Please wait!*"
+        else do
+          liftIO $ atomically $ writeTVar registeredNow (rn + 1)
+          let wrd = T.words (messageText m)
+          pns <- fmap (>>=(\(_, b, _, _) -> b)) $ liftIO $ atomically $ readTVar peopleSelectedAccounts
+          if length wrd /= 3
+          then respond m "*Wrong command syntax*"
+          else case map unpack wrd of
+            [_, readMaybe . filter isDigit -> Just (did :: UserId), mcn] ->
+              if did `notElem` pns
+              then respond m "*That discord has no minecraft account. To add a main use `?add`.*"
+              else registerCommand dt True sm mcn did m
+            _ -> respond m "*Wrong command syntax*"
       "?na" -> checkPerms perms m DefaultLevel $ commandTimeout 12 $ do
         liftIO . putStrLn $ "recieved " ++ unpack (messageText m)
         let wrd = T.words (messageText m)

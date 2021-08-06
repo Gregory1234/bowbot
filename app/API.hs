@@ -94,6 +94,11 @@ addAccount manager name did uuid = do
           (Just (String (readMaybe . unpack -> Just n))) -> return $ Just n
           _ -> return Nothing
 
+addAltAccount :: Manager -> Integer -> String -> IO ()
+addAltAccount manager gid uuid = do
+  _ <- sendDB manager "addAlt.php" ["id=" ++ show gid, "verified=0", "minecraft=" ++ uuid]
+  return ()
+
 isInBowDuels :: Manager -> String -> IO (Maybe Bool)
 isInBowDuels manager uuid = do
   apiKey <- fromMaybe "" <$> getEnv "HYPIXEL_API"
