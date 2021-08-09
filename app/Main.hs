@@ -303,6 +303,23 @@ updateRoles BowBotData {..} lb gmem memb = do
       when (not isMember && not isDiscordVisitor) $ call $ R.AddGuildMemberRole airplanesId did guildVisitorRoleId
       pure True
 
+updateRolesUser :: BowBotData -> Bool -> Manager -> UserId -> Message -> DiscordHandler ()
+updateRolesUser dt quiet manager did m = do
+  lb <- liftIO $ getMinecraftStatList manager
+  mem <- restCall $ R.GetGuildMember airplanesId did
+  case mem of
+    Left _ -> pure ()
+    Right mem' -> do
+      liftIO $ updateDiscords manager [mem'] []
+      gmem <- liftIO $ getHypixelGuildMembers manager airplanesIdHypixel
+      case gmem of
+        Nothing -> unless quiet $ respond m "Something went wrong!"
+        Just gmem' -> do
+          b <- updateRoles dt lb gmem' mem'
+          unless quiet $ if b
+            then respond m "Roles updated successfully."
+            else respond m "Something went wrong!"
+
 checkPerms :: [(UserId, PermissionLevel)] -> Message -> PermissionLevel -> DiscordHandler () -> DiscordHandler ()
 checkPerms p m l success = if not $ hasPerms p l (messageAuthor m)
  then respond m $ case l of
@@ -338,7 +355,9 @@ eventHandler dt@BowBotData {..} sm event = case event of
           then respond m "*You are already registered. If you made a mistake, contact me (**GregC**#9698)*"
           else if length wrd /= 2
             then respond m "*Wrong command syntax*"
-            else registerCommand dt False sm (unpack $ wrd !! 1) (userId (messageAuthor m)) m
+            else do
+              registerCommand dt False sm (unpack $ wrd !! 1) (userId (messageAuthor m)) m
+              updateRolesUser dt True sm (userId (messageAuthor m)) m
       "?modhelp" -> checkPerms perms m ModLevel $ commandTimeout 2 $ do
         liftIO . putStrLn $ "recieved " ++ unpack (messageText m)
         respond m $"**Bow bot help:**\n\n"
@@ -362,7 +381,9 @@ eventHandler dt@BowBotData {..} sm event = case event of
             [_, readMaybe . filter isDigit -> Just (did :: UserId), mcn] ->
               if did `elem` pns
               then respond m "*That discord already has a minecraft account. To add an alt use `?addalt`.*"
-              else registerCommand dt False sm mcn did m
+              else do
+                registerCommand dt False sm mcn did m
+                updateRolesUser dt False sm did m
             _ -> respond m "*Wrong command syntax*"
       "?addalt" -> checkPerms perms m ModLevel $ commandTimeout 12 $ do
         liftIO . putStrLn $ "recieved " ++ unpack (messageText m)
@@ -379,7 +400,9 @@ eventHandler dt@BowBotData {..} sm event = case event of
             [_, readMaybe . filter isDigit -> Just (did :: UserId), mcn] ->
               if did `notElem` pns
               then respond m "*That discord has no minecraft account. To add a main use `?add`.*"
-              else registerCommand dt True sm mcn did m
+              else do
+                registerCommand dt True sm mcn did m
+                updateRolesUser dt False sm did m
             _ -> respond m "*Wrong command syntax*"
       "?na" -> checkPerms perms m DefaultLevel $ commandTimeout 12 $ do
         liftIO . putStrLn $ "recieved " ++ unpack (messageText m)
@@ -565,21 +588,7 @@ eventHandler dt@BowBotData {..} sm event = case event of
           when (c < 15) $ modifyTVar (if t <= 5 || t >= 55 then hypixelRequestBorderCount else hypixelRequestCount) (+ 1)
           return $ c < 15
         if cv
-          then do
-            lb <- liftIO $ getMinecraftStatList sm
-            mem <- restCall $ R.GetGuildMember airplanesId (userId $ messageAuthor m)
-            case mem of
-              Left _ -> pure ()
-              Right mem' -> do
-                liftIO $ updateDiscords sm [mem'] []
-                gmem <- liftIO $ getHypixelGuildMembers sm airplanesIdHypixel
-                case gmem of
-                  Nothing -> respond m "Something went wrong!"
-                  Just gmem' -> do
-                    b <- updateRoles dt lb gmem' mem'
-                    if b
-                    then respond m "Roles updated successfully."
-                    else respond m "Something went wrong!"
+          then updateRolesUser dt False sm (userId $ messageAuthor m) m
           else do
             f <- liftIO $ read @Int <$> getTime "%S"
             _ <- restCall . R.CreateMessage (messageChannel m) . pack $ "**Too many requests! Wait another " ++ show ((65 - f) `mod` 60) ++ " seconds!**"
