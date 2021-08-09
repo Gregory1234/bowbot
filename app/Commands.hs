@@ -231,12 +231,12 @@ urlCommand ac bbd man mkurl m = do
     NotOnList -> sendRegisterMessage m
   pure ()
 
-leaderboardCommand :: BowBotData -> Manager -> Message -> DiscordHandler ()
-leaderboardCommand BowBotData {..} manager m = do
+leaderboardCommand :: BowBotData -> Manager -> Message -> String -> (Int -> Int -> Int -> (Int, String)) -> DiscordHandler ()
+leaderboardCommand BowBotData {..} manager m statname stat = do
   dat <- liftIO $ getMinecraftStatList manager
-  lb <- traverse (\(u,a,_,_) -> do
+  lb <- traverse (\(u,a,b,c) -> do
     n <- liftIO $ minecraftUuidToNames' manager minecraftNicks u
-    pure ((u, head n), a)) dat
+    pure ((u, head n), stat a b c)) dat
   pns <- fmap (>>=(\(_, b, _, d) -> (,d) <$> b)) $ liftIO $ atomically $ readTVar peopleSelectedAccounts
   let wrds = tail $ words $ unpack $ messageText m
   let did = userId . messageAuthor $ m
@@ -245,32 +245,48 @@ leaderboardCommand BowBotData {..} manager m = do
       let uuids = fromMaybe [] $ lookup did pns
       let (leaderboard, _) = genlb uuids lb
       void $ restCall $ R.CreateMessageUploadFile (messageChannel m) "list.txt" . encodeUtf8 . pack $ unlines leaderboard
-    [readMaybe @Int -> Just n] ->  do
+    [readMaybe @Int -> Just n] -> do
       let uuids = fromMaybe [] $ lookup did pns
       let (leaderboard, _) = genlb uuids lb
-      let pages = map unlines $ chunksOf 20 leaderboard
-      if n > 0 && n <= length pages
-      then respond m $ "Hypixel Bow Duels Leaderboard (page " ++ show n ++ "):```\n"  ++ pages !! (n-1) ++ "```"
-      else respond m "*Wrong page number*"
+      showpospage leaderboard n
+    [name] -> do
+      uuid <- liftIO $ minecraftNameToUUID' manager minecraftNicks name
+      case uuid of
+        Nothing -> respond m "*The player doesn't exist!*"
+        Just uuid' -> do
+          let (leaderboard, firstpos) = genlb [uuid'] lb
+          liftIO $ print firstpos
+          if firstpos == -1
+          then respond m "*The player isn't on the leaderboard!*"
+          else showpospage leaderboard ((firstpos `div` 20) + 1)
     [] -> do
       let uuids = lookup did pns
       case uuids of
         Nothing -> do
           let (leaderboard, _) = genlb [] lb
-          let pages = map unlines $ chunksOf 20 leaderboard
-          respond m $ "Hypixel Bow Duels Leaderboard (page 1):```\n"  ++ head pages ++ "```"
+          showfirstpage leaderboard
         Just uuids' -> do
           let (leaderboard, firstpos) = genlb uuids' lb
-          let pages = map unlines $ chunksOf 20 leaderboard
-          let page = firstpos `div` 20
-          respond m $ "Hypixel Bow Duels Leaderboard (page " ++ show (page + 1) ++ "):```\n"  ++ pages !! page ++ "```"
+          if firstpos == -1
+          then showfirstpage leaderboard
+          else showpospage leaderboard ((firstpos `div` 20) + 1)
     _ -> respond m "*Wrong command syntax*"
   where
-    genlb :: [String] -> [((String, String), Int)] -> ([String], Int)
-    genlb uuids lb = (leaderboardString, firstpos)
+    showfirstpage :: [String] -> DiscordHandler ()
+    showfirstpage leaderboard = do
+      let pages = map unlines $ chunksOf 20 leaderboard
+      respond m $ "Hypixel Bow Duels " ++ statname ++ " Leaderboard (page 1):```\n"  ++ head pages ++ "```"
+    showpospage :: [String] -> Int -> DiscordHandler ()
+    showpospage leaderboard n = do
+      let pages = map unlines $ chunksOf 20 leaderboard
+      if n > 0 && n <= length pages
+      then respond m $ "Hypixel Bow Duels " ++ statname ++ " Leaderboard (page " ++ show n ++ "):```\n"  ++ pages !! (n-1) ++ "```"
+      else respond m $ "*Wrong page number, it has to be between **1** and **" ++ show (length pages) ++ "**.*"
+    genlb :: [String] -> [((String, String), (Int, String))] -> ([String], Int)
+    genlb uuids lb = (leaderboardString, if firstpos == length leaderboard then -1 else firstpos)
       where
-        leaderboard = zip [(1 :: Integer)..] $ sortOn (negate . snd) lb
-        leaderboardString = map (\(i,((u, n), v)) -> pad 5 (show i ++ ".") ++ (if u `elem` uuids then "*" else " ") ++ pad 20 n ++ " ( " ++ show v ++ " Wins )") leaderboard
+        leaderboard = zip [(1 :: Integer)..] $ sortOn (negate . fst . snd) lb
+        leaderboardString = map (\(i,((u, n), (_, v))) -> pad 5 (show i ++ ".") ++ (if u `elem` uuids then "*" else " ") ++ pad 20 n ++ " ( " ++ v ++ " " ++ statname ++ " )") leaderboard
         firstpos = length $ takeWhile ((`notElem`uuids) . fst . fst . snd) leaderboard
 
 commandTimeout :: Int -> DiscordHandler () -> DiscordHandler ()

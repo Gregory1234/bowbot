@@ -262,12 +262,23 @@ updateRoles' bbd = do
           traverse_ (updateRoles bbd lb gmem') members
     Left x -> liftIO $ print x
 
+isExtra :: RoleId -> Bool
+isExtra x
+  | x == 838471502364934207 = False
+  | x == 811394985781231616 = False
+  | x == 838237372185444412 = False
+  | x == guildVisitorRoleId = False
+  | otherwise = True
+
 updateRoles :: BowBotData -> [(String, Int, Int, Int)] -> [String] -> GuildMember -> DiscordHandler Bool
 updateRoles BowBotData {..} lb gmem memb = do
   pns <- fmap (>>=(\(_, b, _, d) -> (,d) <$> b)) $ liftIO $ atomically $ readTVar peopleSelectedAccounts
   let did = userId . memberUser $ memb
   case lookup did pns of
-    Nothing -> pure False
+    Nothing -> do
+      --let warn = any isExtra $ memberRoles memb
+      --when warn $ liftIO $ putStrLn $ unpack (userName $ memberUser memb) ++ "#" ++ unpack (userDiscrim $ memberUser memb) ++ maybe "" (\x -> " (" ++ unpack x ++ ")") (memberNick memb)
+      pure False
     Just uuids -> do
       let lb' = map (\(a, b, _, _) -> (a,b)) lb
       let wins' = mapMaybe (`lookup` lb') uuids
@@ -440,7 +451,16 @@ eventHandler dt@BowBotData {..} sm event = case event of
           else respond m "**Processing list of online players. Please send command again later.**"
       "?lb" -> checkPerms perms m DefaultLevel $ commandTimeout 10 $ do
         liftIO . putStrLn $ "recieved " ++ unpack (messageText m)
-        leaderboardCommand dt sm m
+        leaderboardCommand dt sm m "Wins" $ \a _ _ -> (a, show a)
+      "?lbs" -> checkPerms perms m DefaultLevel $ commandTimeout 10 $ do
+        liftIO . putStrLn $ "recieved " ++ unpack (messageText m)
+        leaderboardCommand dt sm m "Winstreak" $ \_ _ c -> (c, show c)
+      "?lbl" -> checkPerms perms m DefaultLevel $ commandTimeout 10 $ do
+        liftIO . putStrLn $ "recieved " ++ unpack (messageText m)
+        leaderboardCommand dt sm m "Losses" $ \_ b _ -> (b, show b)
+      "?lbr" -> checkPerms perms m DefaultLevel $ commandTimeout 10 $ do
+        liftIO . putStrLn $ "recieved " ++ unpack (messageText m)
+        leaderboardCommand dt sm m "WLR" $ \a b _ -> (if b == 0 then a*1000000 else (a*10000) `div` b, showWLR a b)
       "?list" -> checkPerms perms m DefaultLevel $ commandTimeout 2 $ do
         liftIO . putStrLn $ "recieved " ++ unpack (messageText m)
         let wrds = tail $ words $ unpack $ messageText m
@@ -485,8 +505,7 @@ eventHandler dt@BowBotData {..} sm event = case event of
           ++ " - **?n(a) [name]** - *show player's past nicks*\n"
           ++ " - **?head(a) [name]** - *show player's head*\n"
           ++ " - **?skin(a) [name]** - *show player's full skin*\n"
-          ++ " - **?lb [page]** - *show a Bow Duels Wins leaderboard*\n"
-          ++ " - **?lb all** - *upload a file with the whole Bow Duels Wins leaderboard*\n"
+          ++ " - **?lb(|l|s|r) [page number|name|all]** - *show a Bow Duels leaderboard*\n"
           ++ " - **?mc** - *list your linked minecraft nicks*\n"
           ++ " - **?mc [name]** - *select a minecraft account as your default*\n"
           ++ " - **?roles** - *refresh discord roles*\n"

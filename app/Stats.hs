@@ -1,4 +1,5 @@
 {-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE ViewPatterns #-}
 
 module Stats where
 
@@ -138,10 +139,7 @@ showStats StatsSettings {..} Stats {..} = unlines $ catMaybes
     sense WhenSensible x = x
     onlyIf True a = Just a
     onlyIf False _ = Nothing
-    winLossRatio
-      | bowWins == 0, bowLosses == 0 = "NaN"
-      | bowLosses == 0 = "∞"
-      | otherwise = printf "%.04f" (fromRational (bowWins % bowLosses) :: Double)
+    winLossRatio = showWLR bowWins bowLosses
     nextWinLossRatio
       | bowLosses == 0 = "∞"
       | otherwise = show $ (bowWins `div` bowLosses) + 1
@@ -152,3 +150,9 @@ showStats StatsSettings {..} Stats {..} = unlines $ catMaybes
     accuracy
       | bowShots == 0 = "N/A"
       | otherwise = show (round ((bowHits*100) % bowShots) :: Integer) ++ "%"
+      
+showWLR :: Integral a => a -> a -> String
+showWLR (fromIntegral -> bowWins) (fromIntegral -> bowLosses)
+  | bowWins == 0, bowLosses == 0 = "NaN"
+  | bowLosses == 0 = "∞"
+  | otherwise = printf "%.04f" (fromRational (bowWins % bowLosses) :: Double)
