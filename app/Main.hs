@@ -458,14 +458,14 @@ eventHandler dt@BowBotData {..} sm event = case event of
             manager <- liftIO $ newManager managerSettings
             o <- case onlo <|> onlb of
               (Just onl) -> do
-                respond m "**Players in wachList currently in bow duels:** (cached response)"
+                respond m "**Players in watchList currently in bow duels:** (cached response)"
                 pure onl
               Nothing -> do
                 people <- liftIO $ getWatchlist manager
                 status <- liftIO $ mapConcurrently (\u -> (u,) . fromMaybe False <$> isInBowDuels manager u) people
                 let onl = map fst $ filter snd status
                 liftIO . atomically $ writeTVar (if t <= 5 || t >= 55 then hypixelOnlineBorderList else hypixelOnlineList) $ Just onl
-                respond m "**Players in wachList currently in bow duels:**"
+                respond m "**Players in watchList currently in bow duels:**"
                 pure onl
             liftIO . atomically $ writeTVar hypixelOnlineBusyList False
             names <- liftIO $ traverse (fmap head . minecraftUuidToNames' manager minecraftNicks) o
