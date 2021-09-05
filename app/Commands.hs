@@ -226,12 +226,12 @@ urlCommand ac bbd man mkurl m = do
     NotOnList -> sendRegisterMessage m
   pure ()
 
-leaderboardCommand :: BowBotData -> Manager -> Message -> String -> (Int -> Int -> Int -> (Int, String)) -> DiscordHandler ()
-leaderboardCommand BowBotData {..} manager m statname stat = do
+leaderboardCommand :: BowBotData -> Manager -> Message -> String -> (Int -> Int -> Int -> Bool) -> (Int -> Int -> Int -> (Int, String)) -> DiscordHandler ()
+leaderboardCommand BowBotData {..} manager m statname filt stat = do
   dat <- liftIO $ getMinecraftStatList manager
   lb <- traverse (\(u,a,b,c) -> do
     n <- liftIO $ minecraftUuidToNames' manager minecraftNicks u
-    pure ((u, head n), stat a b c)) dat
+    pure ((u, head n), stat a b c)) (filter (\(_,a,b,c) -> filt a b c) dat)
   pns <- fmap (>>=(\(_, b, _, d) -> (,d) <$> b)) $ liftIO $ atomically $ readTVar peopleSelectedAccounts
   let wrds = tail $ words $ unpack $ messageText m
   let did = userId . messageAuthor $ m

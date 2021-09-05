@@ -25,6 +25,8 @@ data Stats = Stats
 
 data DivisionTitle =
     NoDivisionTitle
+  | IronTitle
+  | GoldTitle
   | DiamondTitle
   | MasterTitle
   | LegendTitle
@@ -34,7 +36,9 @@ data DivisionTitle =
 
 winsToTitle :: Integer -> DivisionTitle
 winsToTitle x
-  | x < 500  = NoDivisionTitle
+  | x < 100   = NoDivisionTitle
+  | x < 250   = IronTitle
+  | x < 500   = GoldTitle
   | x < 1000  = DiamondTitle
   | x < 2000  = MasterTitle
   | x < 5000  = LegendTitle

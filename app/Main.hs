@@ -177,7 +177,7 @@ background bbdata@BowBotData {..} = do
         when (mint == "00") $ updateData bbdata
         when (mint == "30") $ do
           hour <- read @Int <$> getTime "%k"
-          when (hour `mod` 2 == 0) $ updateLeaderboard bbdata BiHourly
+          when ((hour `mod` 2 == 0) && (hour /= 0)) $ updateLeaderboard bbdata BiHourly
           when (hour == 0) $ updateLeaderboard bbdata Daily
         putStrLn "New minute finished!"
       threadDelay 60000000
@@ -215,6 +215,8 @@ guildVisitorRoleId :: RoleId
 guildVisitorRoleId = 742874367200854136
 
 roleIdToTitle :: RoleId -> Maybe DivisionTitle
+roleIdToTitle 884063678360596480 = Just IronTitle
+roleIdToTitle 884063422155730984 = Just GoldTitle
 roleIdToTitle 865997053838753814 = Just DiamondTitle
 roleIdToTitle 742734559514329239 = Just MasterTitle
 roleIdToTitle 742734346200285277 = Just LegendTitle
@@ -225,6 +227,8 @@ roleIdToTitle _ = Nothing
 
 titleRoleId :: DivisionTitle -> Maybe RoleId
 titleRoleId NoDivisionTitle = Nothing
+titleRoleId IronTitle = Just 884063678360596480
+titleRoleId GoldTitle = Just 884063422155730984
 titleRoleId DiamondTitle = Just 865997053838753814
 titleRoleId MasterTitle = Just 742734559514329239
 titleRoleId LegendTitle = Just 742734346200285277
@@ -477,16 +481,16 @@ eventHandler dt@BowBotData {..} sm event = case event of
           else respond m "**Processing list of online players. Please send command again later.**"
       "?lb" -> checkPerms perms m DefaultLevel $ commandTimeout 10 $ do
         liftIO . putStrLn $ "recieved " ++ unpack (messageText m)
-        leaderboardCommand dt sm m "Wins" $ \a _ _ -> (a, show a)
+        leaderboardCommand dt sm m "Wins" (\a _ _ -> a >= 500) $ \a _ _ -> (a, show a)
       "?lbs" -> checkPerms perms m DefaultLevel $ commandTimeout 10 $ do
         liftIO . putStrLn $ "recieved " ++ unpack (messageText m)
-        leaderboardCommand dt sm m "Winstreak" $ \_ _ c -> (c, show c)
+        leaderboardCommand dt sm m "Winstreak" (\_ _ c -> c >= 50) $ \_ _ c -> (c, show c)
       "?lbl" -> checkPerms perms m DefaultLevel $ commandTimeout 10 $ do
         liftIO . putStrLn $ "recieved " ++ unpack (messageText m)
-        leaderboardCommand dt sm m "Losses" $ \_ b _ -> (b, show b)
+        leaderboardCommand dt sm m "Losses" (\a _ _ -> a >= 500) $ \_ b _ -> (b, show b)
       "?lbr" -> checkPerms perms m DefaultLevel $ commandTimeout 10 $ do
         liftIO . putStrLn $ "recieved " ++ unpack (messageText m)
-        leaderboardCommand dt sm m "WLR" $ \a b _ -> (if b == 0 then a*1000000 else (a*10000) `div` b, showWLR a b)
+        leaderboardCommand dt sm m "WLR" (\a b _ -> a >= b) $ \a b _ -> (if b == 0 then a*1000000 else (a*10000) `div` b, showWLR a b)
       "?list" -> checkPerms perms m DefaultLevel $ commandTimeout 2 $ do
         liftIO . putStrLn $ "recieved " ++ unpack (messageText m)
         let wrds = tail $ words $ unpack $ messageText m
