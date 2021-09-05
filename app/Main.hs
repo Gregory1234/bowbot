@@ -94,8 +94,8 @@ updateData BowBotData {..} = do
   _ <- forkIO $ updateSettings manager discordPeopleSettings peopleSelectedAccounts
   pure ()
 
-updateLeaderboard :: BowBotData -> IO ()
-updateLeaderboard BowBotData {..} = void . forkIO $ do
+updateLeaderboard :: BowBotData -> UpdateFreq -> IO ()
+updateLeaderboard BowBotData {..} freq = void . forkIO $ do
   lb <- atomically $ do
     a <- readTVar leaderboardBusy
     b <- readTVar hypixelOnlineBusyList
@@ -105,12 +105,12 @@ updateLeaderboard BowBotData {..} = void . forkIO $ do
   unless lb $ do
     manager <- newManager managerSettings
     nickList <- atomically $ readTVar minecraftNicks
-    let chunked = chunksOf 50 (filter mcHypixel nickList)
-    putStrLn "Started updating leaderboards"
+    let chunked = chunksOf 25 (filter ((==freq) . mcHypixel) nickList)
+    putStrLn ("Started updating leaderboards " ++ show freq)
     atomically $ writeTVar leaderboardBusy True
     void $ for chunked (helper manager)
     atomically $ writeTVar leaderboardBusy False
-    putStrLn "Stopped updating leaderboards"
+    putStrLn ("Stopped updating leaderboards " ++ show freq)
   where
     helper :: Manager -> [MinecraftAccount] -> IO ()
     helper manager lst = do
@@ -175,7 +175,10 @@ background bbdata@BowBotData {..} = do
           writeTVar hypixelOnlineList onl
           writeTVar hypixelOnlineBorderList Nothing
         when (mint == "00") $ updateData bbdata
-        when (mint == "30") $ updateLeaderboard bbdata
+        when (mint == "30") $ do
+          hour <- read @Int <$> getTime "%k"
+          when (hour `mod` 2 == 0) $ updateLeaderboard bbdata BiHourly
+          when (hour == 0) $ updateLeaderboard bbdata Daily
         putStrLn "New minute finished!"
       threadDelay 60000000
 
@@ -545,7 +548,11 @@ eventHandler dt@BowBotData {..} sm event = case event of
         updateRoles' dt
       "?lbrefresh" -> commandTimeout 200 $ when (isAdmin (messageAuthor m)) $ do
         liftIO . putStrLn $ "recieved " ++ unpack (messageText m)
-        liftIO $ updateLeaderboard dt
+        let wrds = tail $ words $ unpack $ messageText m
+        liftIO $ updateLeaderboard dt $ case wrds of
+          ["day"] -> Daily
+          ["bihour"] -> BiHourly
+          _ -> BiHourly
       "?mc" -> checkPerms perms m DefaultLevel $ commandTimeout 2 $ do
         liftIO . putStrLn $ "recieved " ++ unpack (messageText m)
         let wrds = tail $ words $ unpack $ messageText m
@@ -571,7 +578,7 @@ eventHandler dt@BowBotData {..} sm event = case event of
                   then do
                     website <- liftIO $ fromMaybe "" <$> getEnv "DB_SITE"
                     apiKey <- liftIO $ fromMaybe "" <$> getEnv "DB_KEY"
-                    let url = "http://" ++ website ++ "/selectMinecraft.php?key=" ++ apiKey ++ "&id=" ++ show gid ++ "&minecraft=" ++ nid
+                    let url = "http://" ++ website ++ "/api/people/select.php?key=" ++ apiKey ++ "&id=" ++ show gid ++ "&minecraft=" ++ nid
                     _ <- liftIO $ sendRequestTo sm url
                     liftIO $ atomically $ writeTVar peopleSelectedAccounts $ map (\u@(i, _, _, _) -> if i == gid then (gid, dids, nid, mc) else u) st
                     respond m "*Success!*"

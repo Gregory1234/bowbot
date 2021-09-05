@@ -21,10 +21,17 @@ import Data.List (intercalate)
 import Text.Read (readMaybe)
 import Control.Monad.Cont (void)
 
+data UpdateFreq =
+    BiHourly
+  | Daily
+  | Weekly
+  | Banned
+    deriving (Eq, Ord, Enum, Bounded, Show)
+
 data MinecraftAccount = MinecraftAccount
   { mcUUID :: String
   , mcNames :: [String]
-  , mcHypixel :: Bool
+  , mcHypixel :: UpdateFreq
   } deriving (Show)
 
 data PermissionLevel =
@@ -78,15 +85,15 @@ minecraftUuidToNames manager uuid = do
 
 updateMinecraftNames :: Manager -> String -> [String] -> IO ()
 updateMinecraftNames manager uuid names =
-  void $ sendDB manager "updateMinecraftNames.php" ["uuid=" ++ uuid, "names=" ++ intercalate "," names]
+  void $ sendDB manager "minecraft/setnames.php" ["uuid=" ++ uuid, "names=" ++ intercalate "," names]
 
-addMinecraftAccount :: Manager -> String -> [String] -> Bool -> IO ()
-addMinecraftAccount manager uuid names hypixel =
-  void $ sendDB manager "addMinecraftName.php" ["uuid=" ++ uuid, "names=" ++ intercalate "," names, "hypixel=" ++ (if hypixel then "1" else "0")]
+addMinecraftAccount :: Manager -> String -> [String] -> IO ()
+addMinecraftAccount manager uuid names =
+  void $ sendDB manager "minecraft/new.php" ["uuid=" ++ uuid, "names=" ++ intercalate "," names]
 
 addAccount :: Manager -> String -> UserId -> String -> IO (Maybe Integer)
 addAccount manager name did uuid = do
-  res <- sendDB manager "addPerson.php" ["name=" ++ name, "discord=" ++ show did, "verified=0", "minecraft=" ++ uuid]
+  res <- sendDB manager "people/new.php" ["name=" ++ name, "discord=" ++ show did, "verified=0", "minecraft=" ++ uuid]
   case decode res :: Maybe Object of
     Nothing -> return Nothing
     (Just js) -> do
@@ -96,7 +103,7 @@ addAccount manager name did uuid = do
 
 addAltAccount :: Manager -> Integer -> String -> IO ()
 addAltAccount manager gid uuid = do
-  _ <- sendDB manager "addAlt.php" ["id=" ++ show gid, "verified=0", "minecraft=" ++ uuid]
+  _ <- sendDB manager "people/alt.php" ["id=" ++ show gid, "verified=0", "minecraft=" ++ uuid]
   return ()
 
 isInBowDuels :: Manager -> String -> IO (Maybe Bool)
@@ -166,14 +173,14 @@ sendDB :: Manager -> String -> [String] -> IO ByteString
 sendDB manager path args = do
   website <- fromMaybe "" <$> getEnv "DB_SITE"
   apiKey <- fromMaybe "" <$> getEnv "DB_KEY"
-  let url = "http://" ++ website ++ "/" ++ path ++ "?key=" ++ apiKey ++ (('&':) =<< args)
+  let url = "http://" ++ website ++ "/api/" ++ path ++ "?key=" ++ apiKey ++ (('&':) =<< args)
   res <- sendRequestTo manager url
   putStrLn $ "Received response from: " ++ url
   return res
 
 getWatchlist :: Manager -> IO [String]
 getWatchlist manager = do
-  res <- sendDB manager "watchlist.php" []
+  res <- sendDB manager "minecraft/watchlist.php" []
   case decode res :: Maybe Object of
     Nothing -> return []
     (Just js) -> case js HM.!? "data" of
@@ -185,7 +192,7 @@ getWatchlist manager = do
 
 getMinecraftNickList :: Manager -> IO [MinecraftAccount]
 getMinecraftNickList manager = do
-  res <- sendDB manager "autocorrect.php" []
+  res <- sendDB manager "minecraft/all.php" []
   case decode res :: Maybe Object of
    Nothing -> return []
    (Just js) -> case js HM.!? "data" of
@@ -194,15 +201,20 @@ getMinecraftNickList manager = do
   where
    person :: Value -> Maybe MinecraftAccount
    person (Object x) = case (x HM.!? "uuid", x HM.!? "names", x HM.!? "hypixel") of
-     (Just (str -> Just uuid), Just (Array (V.toList -> list)), Just (str -> Just b)) -> Just MinecraftAccount {mcUUID = uuid, mcNames = mapMaybe str list, mcHypixel = b == "1"}
+     (Just (str -> Just uuid), Just (Array (V.toList -> list)), Just (readFreq . str -> Just hyp)) -> Just MinecraftAccount {mcUUID = uuid, mcNames = mapMaybe str list, mcHypixel = hyp}
      _ -> Nothing
    person _ = Nothing
    str (String (unpack -> d)) = Just d
    str _ = Nothing
+   readFreq (Just "bihour") = Just BiHourly
+   readFreq (Just "day") = Just Daily
+   readFreq (Just "week") = Just Weekly
+   readFreq (Just "ban") = Just Banned
+   readFreq _ = Nothing
 
 getMinecraftStatList :: Manager -> IO [(String, Int, Int, Int)]
 getMinecraftStatList manager = do
-  res <- sendDB manager "leaderboard.php" []
+  res <- sendDB manager "stats/hypixel/leaderboard.php" []
   case decode res :: Maybe Object of
     Nothing -> return []
     (Just js) -> case js HM.!? "data" of
@@ -219,7 +231,7 @@ getMinecraftStatList manager = do
 
 getPeoplePerms :: Manager -> IO [(UserId, PermissionLevel)]
 getPeoplePerms manager = do
-  res <- sendDB manager "perms.php" []
+  res <- sendDB manager "discord/perms.php" []
   case decode res :: Maybe Object of
       Nothing -> return []
       (Just js) -> case js HM.!? "data" of
@@ -240,7 +252,7 @@ getPeoplePerms manager = do
 
 getPeopleSettings :: Manager -> IO [(UserId, StatsSettings)]
 getPeopleSettings manager = do
-  res <- sendDB manager "settings.php" []
+  res <- sendDB manager "discord/settings/all.php" []
   case decode res :: Maybe Object of
     Nothing -> return []
     (Just js) -> case js HM.!? "data" of
@@ -273,7 +285,7 @@ getPeopleSettings manager = do
 
 getPeopleSelectedAccounts :: Manager -> IO [(Integer, [UserId], String, [String])]
 getPeopleSelectedAccounts manager = do
-  res <- sendDB manager "people.php" []
+  res <- sendDB manager "people/all.php" []
   case decode res :: Maybe Object of
    Nothing -> return []
    (Just js) -> case js HM.!? "data" of
@@ -296,7 +308,7 @@ getPeopleSelectedAccounts manager = do
 
 getDiscordIds :: Manager -> IO [UserId]
 getDiscordIds manager = do
-  res <- sendDB manager "discordIds.php" []
+  res <- sendDB manager "discord/all.php" []
   case decode res :: Maybe Object of
      Nothing -> return []
      (Just js) -> case js HM.!? "data" of
@@ -309,7 +321,7 @@ getDiscordIds manager = do
 
 getDiscordRoleDisabledIds :: Manager -> IO [UserId]
 getDiscordRoleDisabledIds manager = do
-  res <- sendDB manager "discordRoleDisabledIds.php" []
+  res <- sendDB manager "discord/norole.php" []
   case decode res :: Maybe Object of
      Nothing -> return []
      (Just js) -> case js HM.!? "data" of
@@ -324,14 +336,14 @@ sendPostDB :: Manager -> String -> Value -> IO ()
 sendPostDB manager path dat = do
   website <- fromMaybe "" <$> getEnv "DB_SITE"
   apiKey <- fromMaybe "" <$> getEnv "DB_KEY"
-  let url = "http://" ++ website ++ "/" ++ path ++ "?key=" ++ apiKey
+  let url = "http://" ++ website ++ "/api/" ++ path ++ "?key=" ++ apiKey
   putStrLn url
   initRequest <- parseRequest url
   let request = initRequest { method = "POST", requestBody = RequestBodyLBS (encode dat) }
   void $ try @SomeException $ httpLbs request manager
 
 updateDiscords :: Manager -> [GuildMember] -> [User] -> IO ()
-updateDiscords manager mem usr = sendPostDB manager "updateDiscord.php" (object $ map memToObject mem ++ map usrToObject usr)
+updateDiscords manager mem usr = sendPostDB manager "discord/update.php" (object $ map memToObject mem ++ map usrToObject usr)
   where
     memToObject GuildMember {memberUser = memberUser@User {..}, ..} = case memberNick of
       Nothing -> usrToObject memberUser
@@ -340,7 +352,7 @@ updateDiscords manager mem usr = sendPostDB manager "updateDiscord.php" (object 
 
 
 updateStats :: Manager -> [(MinecraftAccount, Maybe Stats)] -> IO ()
-updateStats manager stats = sendPostDB manager "updateStats.php" (object $ mapMaybe statsToObject stats)
+updateStats manager stats = sendPostDB manager "stats/hypixel/update.php" (object $ mapMaybe statsToObject stats)
   where
     statsToObject (MinecraftAccount {..}, Just Stats {..}) = Just $ pack mcUUID .= object ["bowWins" .= bowWins, "bowLosses" .= bowLosses, "bowWinstreak" .= bestWinstreak]
     statsToObject (_, Nothing) = Nothing

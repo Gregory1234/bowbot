@@ -93,10 +93,8 @@ registerCommand BowBotData {..} isalt man name did m = do
       else do
         names <- liftIO $ minecraftUuidToNames' man minecraftNicks uuid'
         unless (uuid' `elem` map mcUUID nicks) $ do
-          stats <- liftIO $ getHypixelStats man uuid'
-          let hypixel = case stats of Nothing -> False; Just s -> bowWins s >= 500
-          liftIO $ addMinecraftAccount man uuid' names hypixel
-          liftIO $ atomically $ writeTVar minecraftNicks (MinecraftAccount {mcUUID = uuid', mcNames = names, mcHypixel = hypixel}:nicks)
+          liftIO $ addMinecraftAccount man uuid' names
+          liftIO $ atomically $ writeTVar minecraftNicks (MinecraftAccount {mcUUID = uuid', mcNames = names, mcHypixel = Daily}:nicks)
         if isalt
         then do
           pns <- fmap (>>=(\(a, c, _, _) -> (, a) <$> c)) $ liftIO $ atomically $ readTVar peopleSelectedAccounts
@@ -187,18 +185,15 @@ statsCommand dt@BowBotData {..} manager sett m = do
           Nothing -> pure s
           (Just Stats {bowWins = 0, bowLosses = 0}) -> pure Nothing
           Just st -> do
-            liftIO $ when (bowWins st >= 500) $ void $ forkIO $ do
+            liftIO $ when (bowWins st >= 50) $ void $ forkIO $ do
               nicks <- atomically $ readTVar minecraftNicks
-              when (u `notElem` map mcUUID nicks || all (\MinecraftAccount {..} -> mcUUID /= u || not mcHypixel) nicks) $ do
+              when (u `notElem` map mcUUID nicks || all (\MinecraftAccount {..} -> mcUUID /= u) nicks) $ do
                 names <- minecraftUuidToNames manager u
-                website <- fromMaybe "" <$> getEnv "DB_SITE"
-                apiKey <- fromMaybe "" <$> getEnv "DB_KEY"
-                let url = "http://" ++ website ++ "/addMinecraftName.php?key=" ++ apiKey ++ "&uuid=" ++ u ++ "&hypixel=1&names=" ++ intercalate "," names
-                _ <- sendRequestTo manager url
-                atomically $ writeTVar minecraftNicks $ MinecraftAccount { mcUUID = u, mcNames = names, mcHypixel = True }:nicks
+                liftIO $ addMinecraftAccount manager u names
+                liftIO $ atomically $ writeTVar minecraftNicks (MinecraftAccount {mcUUID = u, mcNames = names, mcHypixel = Daily}:nicks)
               nicks2 <- atomically $ readTVar minecraftNicks
               let acc = head $ filter (\MinecraftAccount {..} -> mcUUID == u) nicks2
-              updateStats manager [(acc, Just st)]
+              unless (mcHypixel acc == Banned) $ updateStats manager [(acc, Just st)]
             pure s
       _ <- case stats of
         NoResponse -> respond m "*The player doesn't exist!*"
@@ -339,7 +334,7 @@ setSetting BowBotData {..} manager m setting maybeValue = case map toLower setti
     sendReq did s v = do
       website <- liftIO $ fromMaybe "" <$> getEnv "DB_SITE"
       apiKey <- liftIO $ fromMaybe "" <$> getEnv "DB_KEY"
-      let url = "http://" ++ website ++ "/updateSetting.php?key=" ++ apiKey ++ "&discord=" ++ show did ++ "&setting=" ++ s ++ "&value=" ++ v
+      let url = "http://" ++ website ++ "/api/discord/settings/update.php?key=" ++ apiKey ++ "&discord=" ++ show did ++ "&setting=" ++ s ++ "&value=" ++ v
       res <- liftIO $ sendRequestTo manager url
       _ <- case decode res :: Maybe Object of
           Nothing -> respond m "*Something went wrong!*"
