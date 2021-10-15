@@ -17,6 +17,7 @@ import System.Environment.Blank (getEnv)
 import qualified Data.Vector as V
 import Discord.Types
 import Stats
+import Utils
 import Data.List (intercalate)
 import Text.Read (readMaybe)
 import Control.Monad.Cont (void)
@@ -173,7 +174,8 @@ sendDB :: Manager -> String -> [String] -> IO ByteString
 sendDB manager path args = do
   website <- fromMaybe "" <$> getEnv "DB_SITE"
   apiKey <- fromMaybe "" <$> getEnv "DB_KEY"
-  let url = "http://" ++ website ++ "/api/" ++ path ++ "?key=" ++ apiKey ++ (('&':) =<< args)
+  dev <- ifDev "" (return "&dev")
+  let url = "http://" ++ website ++ "/api/" ++ path ++ "?key=" ++ apiKey ++ (('&':) =<< args) ++ dev
   res <- sendRequestTo manager url
   putStrLn $ "Received response from: " ++ url
   return res
@@ -336,7 +338,8 @@ sendPostDB :: Manager -> String -> Value -> IO ()
 sendPostDB manager path dat = do
   website <- fromMaybe "" <$> getEnv "DB_SITE"
   apiKey <- fromMaybe "" <$> getEnv "DB_KEY"
-  let url = "http://" ++ website ++ "/api/" ++ path ++ "?key=" ++ apiKey
+  dev <- ifDev "" (return "&dev")
+  let url = "http://" ++ website ++ "/api/" ++ path ++ "?key=" ++ apiKey ++ dev
   putStrLn url
   initRequest <- parseRequest url
   let request = initRequest { method = "POST", requestBody = RequestBodyLBS (encode dat) }

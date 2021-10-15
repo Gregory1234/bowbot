@@ -2,6 +2,10 @@ module Utils where
 
 import Data.Time.Clock
 import Data.Time.Format (defaultTimeLocale, formatTime)
+import Control.Monad.IO.Class (MonadIO, liftIO)
+import Control.Monad (when)
+import Data.Maybe (fromMaybe)
+import System.Environment.Blank (getEnv)
 
 setAt :: Int -> a -> [a] -> [a]
 setAt i a ls
@@ -65,3 +69,8 @@ ignoreChars a = filter (`notElem` a)
 
 pad :: Int -> String -> String
 pad l x = x ++ replicate (l - length x) ' '
+
+ifDev :: MonadIO m => a -> m a -> m a
+ifDev v action = do
+  devmode <- liftIO $ fromMaybe "" <$> getEnv "IS_DEV"
+  if devmode == "1" then action else return v

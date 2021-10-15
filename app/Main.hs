@@ -15,7 +15,7 @@ import Control.Concurrent.STM
 import Control.Monad (forever, unless, void, when)
 import Control.Monad.IO.Class (liftIO)
 import Data.Maybe (fromMaybe, mapMaybe, listToMaybe, catMaybes, isJust)
-import Data.Text (pack, unpack)
+import Data.Text (pack, unpack, isPrefixOf)
 import qualified Data.Text as T
 import qualified Data.Text.IO as TIO
 import Discord
@@ -44,6 +44,7 @@ main :: IO ()
 main = do
   apiKey <- fromMaybe "" <$> getEnv "API_KEY"
   unless (apiKey == "") $ do
+    ifDev () $ putStrLn "this is dev version of the bot"
     hypixelRequestCount <- atomically $ newTVar 0
     hypixelRequestBorderCount <- atomically $ newTVar 0
     minecraftNicks <- atomically $ newTVar []
@@ -205,6 +206,9 @@ backgroundDiscord bbdata = do
 airplanesId :: GuildId
 airplanesId = 742731987902791751
 
+discordGuildId :: IO GuildId
+discordGuildId = ifDev airplanesId $ return 839516111448178729
+
 airplanesIdHypixel :: String
 airplanesIdHypixel = "5f308a358ea8c97248581e46"
 
@@ -240,7 +244,8 @@ updateDiscords' :: DiscordHandler ()
 updateDiscords' = do
   manager <- liftIO $ newManager managerSettings
   uids <- liftIO $ getDiscordIds manager
-  v <- fmap (filter (not . userIsBot . memberUser)) <$> restCall (R.ListGuildMembers airplanesId R.GuildMembersTiming {R.guildMembersTimingLimit = Just 500, R.guildMembersTimingAfter = Nothing})
+  dgid <- liftIO discordGuildId
+  v <- fmap (filter (not . userIsBot . memberUser)) <$> restCall (R.ListGuildMembers dgid R.GuildMembersTiming {R.guildMembersTimingLimit = Just 500, R.guildMembersTimingAfter = Nothing})
   case v of
     Right x -> do
       let uids' = filter (\u -> all (\m -> userId (memberUser m) /= u) x) uids
@@ -257,7 +262,8 @@ updateRoles' :: BowBotData -> DiscordHandler ()
 updateRoles' bbd = do
   manager <- liftIO $ newManager managerSettings
   uids <- liftIO $ getDiscordRoleDisabledIds manager
-  v <- fmap (filter (not . userIsBot . memberUser)) <$> restCall (R.ListGuildMembers airplanesId R.GuildMembersTiming {R.guildMembersTimingLimit = Just 500, R.guildMembersTimingAfter = Nothing})
+  dgid <- liftIO discordGuildId
+  v <- fmap (filter (not . userIsBot . memberUser)) <$> restCall (R.ListGuildMembers dgid R.GuildMembersTiming {R.guildMembersTimingLimit = Just 500, R.guildMembersTimingAfter = Nothing})
   case v of
     Right x -> do
       let members = filter (\m -> userId (memberUser m) `notElem` uids) x
@@ -280,6 +286,7 @@ isExtra x
 updateRoles :: BowBotData -> [(String, Int, Int, Int)] -> [String] -> GuildMember -> DiscordHandler Bool
 updateRoles BowBotData {..} lb gmem memb = do
   pns <- fmap (>>=(\(_, b, _, d) -> (,d) <$> b)) $ liftIO $ atomically $ readTVar peopleSelectedAccounts
+  dgid <- liftIO discordGuildId
   let did = userId . memberUser $ memb
   case lookup did pns of
     Nothing -> do
@@ -296,24 +303,25 @@ updateRoles BowBotData {..} lb gmem memb = do
         let currentTitle = getFirst $ mconcat (map (First . roleIdToTitle) currentRoles)
         case (currentTitle >>= titleRoleId, titleRoleId title) of
           (Nothing, Nothing) -> pure ()
-          (Nothing, Just rid) -> call $ R.AddGuildMemberRole airplanesId did rid
-          (Just rid, Nothing) -> call $ R.RemoveGuildMemberRole airplanesId did rid
+          (Nothing, Just rid) -> call $ R.AddGuildMemberRole dgid did rid
+          (Just rid, Nothing) -> call $ R.RemoveGuildMemberRole dgid did rid
           (Just rid, Just rid') -> when (rid /= rid') $ do
-            call $ R.RemoveGuildMemberRole airplanesId did rid
-            call $ R.AddGuildMemberRole airplanesId did rid'
+            call $ R.RemoveGuildMemberRole dgid did rid
+            call $ R.AddGuildMemberRole dgid did rid'
       let isMember = any (`elem` gmem) uuids
       let isDiscordMember = guildMemberRoleId `elem` currentRoles
       let isDiscordVisitor = guildVisitorRoleId `elem` currentRoles
-      when (isMember && not isDiscordMember) $ call $ R.AddGuildMemberRole airplanesId did guildMemberRoleId
-      when (isMember && isDiscordVisitor) $ call $ R.RemoveGuildMemberRole airplanesId did guildVisitorRoleId
-      when (not isMember && isDiscordMember) $ call $ R.RemoveGuildMemberRole airplanesId did guildMemberRoleId
-      when (not isMember && not isDiscordVisitor) $ call $ R.AddGuildMemberRole airplanesId did guildVisitorRoleId
+      when (isMember && not isDiscordMember) $ call $ R.AddGuildMemberRole dgid did guildMemberRoleId
+      when (isMember && isDiscordVisitor) $ call $ R.RemoveGuildMemberRole dgid did guildVisitorRoleId
+      when (not isMember && isDiscordMember) $ call $ R.RemoveGuildMemberRole dgid did guildMemberRoleId
+      when (not isMember && not isDiscordVisitor) $ call $ R.AddGuildMemberRole dgid did guildVisitorRoleId
       pure True
-
+-- TODO: refresh lb in ?roles
 updateRolesUser :: BowBotData -> Bool -> Manager -> UserId -> Message -> DiscordHandler ()
 updateRolesUser dt quiet manager did m = do
   lb <- liftIO $ getMinecraftStatList manager
-  mem <- restCall $ R.GetGuildMember airplanesId did
+  dgid <- liftIO discordGuildId
+  mem <- restCall $ R.GetGuildMember dgid did
   case mem of
     Left _ -> pure ()
     Right mem' -> do
@@ -334,22 +342,30 @@ checkPerms p m l success = if not $ hasPerms p l (messageAuthor m)
     _ -> "You don't have the permission to do that!"
  else success
 
+devMsg :: Message -> DiscordHandler ()
+devMsg m = ifDev () $ respond m "```Attention! This is the dev version of the bot! Some features might not be avaliable! You shouldn't be reading this! If you see this message please report it immidately!```"
+
 eventHandler :: BowBotData -> Manager -> Event -> DiscordHandler ()
 eventHandler dt@BowBotData {..} sm event = case event of
   MessageCreate m -> do
     perms <- liftIO $ atomically $ readTVar permissions
-    unless (fromBot m) $ case unpack $ T.toLower . T.takeWhile (/= ' ') $ messageText m of
-      "?s" -> checkPerms perms m DefaultLevel $ commandTimeout 12 $ do
+    prefix <- ifDev "?" $ return "??"
+    when (not (fromBot m) && prefix `isPrefixOf` messageText m) $ case unpack $ T.toLower . T.drop (T.length prefix) . T.takeWhile (/= ' ') $ messageText m of
+      "s" -> checkPerms perms m DefaultLevel $ commandTimeout 12 $ do
+        devMsg m
         liftIO . putStrLn $ "recieved " ++ unpack (messageText m)
         settings <- liftIO $ atomically $ readTVar discordPeopleSettings
         statsCommand dt sm (fromMaybe defSettings $ lookup (userId $ messageAuthor m) settings) m
-      "?sd" -> checkPerms perms m DefaultLevel $ commandTimeout 12 $ do
+      "sd" -> checkPerms perms m DefaultLevel $ commandTimeout 12 $ do
+        devMsg m
         liftIO . putStrLn $ "recieved " ++ unpack (messageText m)
         statsCommand dt sm defSettings m
-      "?sa" -> checkPerms perms m DefaultLevel $ commandTimeout 12 $ do
+      "sa" -> checkPerms perms m DefaultLevel $ commandTimeout 12 $ do
+        devMsg m
         liftIO . putStrLn $ "recieved " ++ unpack (messageText m)
         statsCommand dt sm allSettings m
-      "?register" -> checkPerms perms m DefaultLevel $ commandTimeout 12 $ do
+      "register" -> checkPerms perms m DefaultLevel $ commandTimeout 12 $ do
+        devMsg m
         liftIO . putStrLn $ "recieved " ++ unpack (messageText m)
         rn <- liftIO $ atomically $ readTVar registeredNow
         if rn > 2
@@ -365,7 +381,8 @@ eventHandler dt@BowBotData {..} sm event = case event of
             else do
               registerCommand dt False sm (unpack $ wrd !! 1) (userId (messageAuthor m)) m
               updateRolesUser dt True sm (userId (messageAuthor m)) m
-      "?modhelp" -> checkPerms perms m ModLevel $ commandTimeout 2 $ do
+      "modhelp" -> checkPerms perms m ModLevel $ commandTimeout 2 $ do
+        devMsg m
         liftIO . putStrLn $ "recieved " ++ unpack (messageText m)
         respond m $"**Bow bot help:**\n\n"
           ++ "**Mod Commands:**\n"
@@ -373,7 +390,8 @@ eventHandler dt@BowBotData {..} sm event = case event of
           ++ " - **?add [discord/discord id] [name]** - *register a person with a given minecraft name*\n"
           ++ " - **?addalt [discord/discord id] [name]** - *register a person's alt*\n"
           ++ "\nMade by **GregC**#9698"
-      "?add" -> checkPerms perms m ModLevel $ commandTimeout 12 $ do
+      "add" -> checkPerms perms m ModLevel $ commandTimeout 12 $ do
+        devMsg m
         liftIO . putStrLn $ "recieved " ++ unpack (messageText m)
         rn <- liftIO $ atomically $ readTVar registeredNow
         if rn > 2
@@ -392,7 +410,8 @@ eventHandler dt@BowBotData {..} sm event = case event of
                 registerCommand dt False sm mcn did m
                 updateRolesUser dt False sm did m
             _ -> respond m "*Wrong command syntax*"
-      "?addalt" -> checkPerms perms m ModLevel $ commandTimeout 12 $ do
+      "addalt" -> checkPerms perms m ModLevel $ commandTimeout 12 $ do
+        devMsg m
         liftIO . putStrLn $ "recieved " ++ unpack (messageText m)
         rn <- liftIO $ atomically $ readTVar registeredNow
         if rn > 2
@@ -411,7 +430,8 @@ eventHandler dt@BowBotData {..} sm event = case event of
                 registerCommand dt True sm mcn did m
                 updateRolesUser dt False sm did m
             _ -> respond m "*Wrong command syntax*"
-      "?na" -> checkPerms perms m DefaultLevel $ commandTimeout 12 $ do
+      "na" -> checkPerms perms m DefaultLevel $ commandTimeout 12 $ do
+        devMsg m
         liftIO . putStrLn $ "recieved " ++ unpack (messageText m)
         let wrd = T.words (messageText m)
         names <- liftIO $ withMinecraftFromName False dt sm (unpack <$> listToMaybe (tail wrd)) (userId $ messageAuthor m) $ \u -> do
@@ -424,7 +444,8 @@ eventHandler dt@BowBotData {..} sm event = case event of
           (DidYouMeanResponse n s) -> respond m $ "*Did you mean* **" ++ n ++ "**:```\n" ++ unlines (reverse s) ++ "```"
           (DidYouMeanOldResponse n o s) -> respond m $ "*Did you mean* **" ++ o ++ " (" ++ n ++ ")**:```\n" ++ unlines (reverse s) ++ "```"
           NotOnList -> sendRegisterMessage m
-      "?n" -> checkPerms perms m DefaultLevel $ commandTimeout 12 $ do
+      "n" -> checkPerms perms m DefaultLevel $ commandTimeout 12 $ do
+        devMsg m
         liftIO . putStrLn $ "recieved " ++ unpack (messageText m)
         let wrd = T.words (messageText m)
         names <- liftIO $ withMinecraftFromName True dt sm (unpack <$> listToMaybe (tail wrd)) (userId $ messageAuthor m) $ \u -> do
@@ -438,19 +459,24 @@ eventHandler dt@BowBotData {..} sm event = case event of
           (DidYouMeanOldResponse n o s) -> respond m $ "*Did you mean* **" ++ o ++ " (" ++ n ++ ")**:```\n" ++ unlines (reverse s) ++ "```"
           NotOnList -> sendRegisterMessage m
         pure ()
-      "?head" -> checkPerms perms m DefaultLevel $ commandTimeout 12 $ do
+      "head" -> checkPerms perms m DefaultLevel $ commandTimeout 12 $ do
+        devMsg m
         liftIO . putStrLn $ "recieved " ++ unpack (messageText m)
         urlCommand True dt sm (\s -> "https://crafatar.com/avatars/" ++ s ++ "?overlay") m
-      "?skin" -> checkPerms perms m DefaultLevel $ commandTimeout 12 $ do
+      "skin" -> checkPerms perms m DefaultLevel $ commandTimeout 12 $ do
+        devMsg m
         liftIO . putStrLn $ "recieved " ++ unpack (messageText m)
         urlCommand True dt sm (\s -> "https://crafatar.com/renders/body/" ++ s ++ "?overlay") m
-      "?heada" -> checkPerms perms m DefaultLevel $ commandTimeout 12 $ do
+      "heada" -> checkPerms perms m DefaultLevel $ commandTimeout 12 $ do
+        devMsg m
         liftIO . putStrLn $ "recieved " ++ unpack (messageText m)
         urlCommand False dt sm (\s -> "https://crafatar.com/avatars/" ++ s ++ "?overlay") m
-      "?skina" -> checkPerms perms m DefaultLevel $ commandTimeout 12 $ do
+      "skina" -> checkPerms perms m DefaultLevel $ commandTimeout 12 $ do
+        devMsg m
         liftIO . putStrLn $ "recieved " ++ unpack (messageText m)
         urlCommand False dt sm (\s -> "https://crafatar.com/renders/body/" ++ s ++ "?overlay") m
-      "?online" -> checkPerms perms m DefaultLevel $ commandTimeout 20 $ do
+      "online" -> checkPerms perms m DefaultLevel $ commandTimeout 20 $ do
+        devMsg m
         liftIO . putStrLn $ "recieved " ++ unpack (messageText m)
         t <- liftIO $ read @Int <$> getTime "%S"
         cv <- liftIO . atomically $ do
@@ -479,19 +505,24 @@ eventHandler dt@BowBotData {..} sm event = case event of
             let msg = if null names then "None of the watchListed players are currently in bow duels." else unlines . map (" - " ++) $ names
             respond m $ "```" ++ msg ++ "```"
           else respond m "**Processing list of online players. Please send command again later.**"
-      "?lb" -> checkPerms perms m DefaultLevel $ commandTimeout 10 $ do
+      "lb" -> checkPerms perms m DefaultLevel $ commandTimeout 10 $ do
+        devMsg m
         liftIO . putStrLn $ "recieved " ++ unpack (messageText m)
         leaderboardCommand dt sm m "Wins" (\a _ _ -> a >= 500) $ \a _ _ -> (a, show a)
-      "?lbs" -> checkPerms perms m DefaultLevel $ commandTimeout 10 $ do
+      "lbs" -> checkPerms perms m DefaultLevel $ commandTimeout 10 $ do
+        devMsg m
         liftIO . putStrLn $ "recieved " ++ unpack (messageText m)
         leaderboardCommand dt sm m "Winstreak" (\_ _ c -> c >= 50) $ \_ _ c -> (c, show c)
-      "?lbl" -> checkPerms perms m DefaultLevel $ commandTimeout 10 $ do
+      "lbl" -> checkPerms perms m DefaultLevel $ commandTimeout 10 $ do
+        devMsg m
         liftIO . putStrLn $ "recieved " ++ unpack (messageText m)
         leaderboardCommand dt sm m "Losses" (\a _ _ -> a >= 500) $ \_ b _ -> (b, show b)
-      "?lbr" -> checkPerms perms m DefaultLevel $ commandTimeout 10 $ do
+      "lbr" -> checkPerms perms m DefaultLevel $ commandTimeout 10 $ do
+        devMsg m
         liftIO . putStrLn $ "recieved " ++ unpack (messageText m)
         leaderboardCommand dt sm m "WLR" (\a b _ -> a >= b) $ \a b _ -> (if b == 0 then a*1000000 else (a*10000) `div` b, showWLR a b)
-      "?list" -> checkPerms perms m DefaultLevel $ commandTimeout 2 $ do
+      "list" -> checkPerms perms m DefaultLevel $ commandTimeout 2 $ do
+        devMsg m
         liftIO . putStrLn $ "recieved " ++ unpack (messageText m)
         let wrds = tail $ words $ unpack $ messageText m
         ln <- case wrds of
@@ -522,7 +553,8 @@ eventHandler dt@BowBotData {..} sm event = case event of
               else do
                 _ <- respond m $ "**" ++ name ++ ":**"
                 respondFile m "list.txt" $ unlines list
-      "?help" -> commandTimeout 2 $ do
+      "help" -> commandTimeout 2 $ do
+        devMsg m
         liftIO . putStrLn $ "recieved " ++ unpack (messageText m)
         respond m $"**Bow bot help:**\n\n"
           ++ "**Commands:**\n"
@@ -541,23 +573,28 @@ eventHandler dt@BowBotData {..} sm event = case event of
           ++ " - **?roles** - *refresh discord roles*\n"
           ++ " - **?settings** - *display help for settings*\n"
           ++ "\nMade by **GregC**#9698"
-      "?refresh" -> commandTimeout 2 $ when (isAdmin (messageAuthor m)) $ do
+      "refresh" -> commandTimeout 2 $ when (isAdmin (messageAuthor m)) $ do
+        devMsg m
         liftIO . putStrLn $ "recieved " ++ unpack (messageText m)
         liftIO $ downloadData dt
-      "?discordrefresh" -> commandTimeout 200 $ when (isAdmin (messageAuthor m)) $ do
+      "discordrefresh" -> commandTimeout 200 $ when (isAdmin (messageAuthor m)) $ do
+        devMsg m
         liftIO . putStrLn $ "recieved " ++ unpack (messageText m)
         updateDiscords'
-      "?rolesrefresh" -> commandTimeout 200 $ when (isAdmin (messageAuthor m)) $ do
+      "rolesrefresh" -> commandTimeout 200 $ when (isAdmin (messageAuthor m)) $ do
+        devMsg m
         liftIO . putStrLn $ "recieved " ++ unpack (messageText m)
         updateRoles' dt
-      "?lbrefresh" -> commandTimeout 200 $ when (isAdmin (messageAuthor m)) $ do
+      "lbrefresh" -> commandTimeout 200 $ when (isAdmin (messageAuthor m)) $ do
+        devMsg m
         liftIO . putStrLn $ "recieved " ++ unpack (messageText m)
         let wrds = tail $ words $ unpack $ messageText m
         liftIO $ updateLeaderboard dt $ case wrds of
           ["day"] -> Daily
           ["bihour"] -> BiHourly
           _ -> BiHourly
-      "?mc" -> checkPerms perms m DefaultLevel $ commandTimeout 2 $ do
+      "mc" -> checkPerms perms m DefaultLevel $ commandTimeout 2 $ do
+        devMsg m
         liftIO . putStrLn $ "recieved " ++ unpack (messageText m)
         let wrds = tail $ words $ unpack $ messageText m
         st <- liftIO $ atomically $ readTVar peopleSelectedAccounts
@@ -589,7 +626,8 @@ eventHandler dt@BowBotData {..} sm event = case event of
                   else respond m "*You do not have that minecraft nick linked!*"
           _ -> respond m "*Wrong command syntax*"
         pure ()
-      "?roles" -> checkPerms perms m DefaultLevel $ commandTimeout 12 $ do
+      "roles" -> checkPerms perms m DefaultLevel $ commandTimeout 12 $ do
+        devMsg m
         liftIO . putStrLn $ "recieved " ++ unpack (messageText m)
         t <- liftIO $ read @Int <$> getTime "%S"
         cv <- liftIO . atomically $ do
@@ -605,7 +643,8 @@ eventHandler dt@BowBotData {..} sm event = case event of
             _ <- restCall . R.CreateMessage (messageChannel m) . pack $ "**Too many requests! Wait another " ++ show ((65 - f) `mod` 60) ++ " seconds!**"
             pure ()
         pure ()
-      "?settings" -> commandTimeout 2 $ do
+      "settings" -> commandTimeout 2 $ do
+        devMsg m
         liftIO . putStrLn $ "recieved " ++ unpack (messageText m)
         respond m $ "**You can now customize the output of ?s command!**\n"
           ++ "**Commands:**\n"
@@ -617,13 +656,15 @@ eventHandler dt@BowBotData {..} sm event = case event of
           ++ "**Stat names:** wins, losses, wlr, winsuntil, beststreak, currentstreak, bestdailystreak, bowhits, bowshots, accuracy\n"
           ++ "**Example:** *?show accuracy* makes accuracy visible in the ?s command\n"
         pure ()
-      "?show" -> checkPerms perms m DefaultLevel $ commandTimeout 2 $ do
+      "show" -> checkPerms perms m DefaultLevel $ commandTimeout 2 $ do
+        devMsg m
         let wrds = tail $ words $ unpack $ messageText m
         case wrds of
           [setting] -> setSetting dt sm m setting Nothing
           [setting, value] -> setSetting dt sm m setting (Just value)
           _ -> respond m "*Wrong command syntax*"
-      "?hide" -> checkPerms perms m DefaultLevel $ commandTimeout 2 $ do
+      "hide" -> checkPerms perms m DefaultLevel $ commandTimeout 2 $ do
+        devMsg m
         let wrds = tail $ words $ unpack $ messageText m
         case wrds of
           [setting] -> setSetting dt sm m setting (Just "hide")
