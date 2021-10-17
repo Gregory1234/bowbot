@@ -57,7 +57,7 @@ data BowBotAccount = BowBotAccount
   , accountSelectedMinecraft :: String
   , accountMinecrafts :: [String]
   -- TODO: , permission :: PermissionLevel
-  } deriving (Show)
+  } deriving (Show, Eq)
 
 -- TODO: add manager to BotData
 

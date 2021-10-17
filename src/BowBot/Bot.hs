@@ -8,6 +8,7 @@ import BowBot.Constants
 import Discord
 import BowBot.Command
 import BowBot.Command.Stats
+import BowBot.Command.Register
 import BowBot.Stats.HypixelBow
 import BowBot.BotData
 import BowBot.API
@@ -89,6 +90,7 @@ commands =
   [ statsCommand (Proxy @HypixelBowStats) "s" hypixelRequestCounter UserSettings
   , statsCommand (Proxy @HypixelBowStats) "sd" hypixelRequestCounter AlwaysDefault
   , statsCommand (Proxy @HypixelBowStats) "sa" hypixelRequestCounter AlwaysAll
+  , registerCommand "register" False True
   ]
 
 eventHandler :: BotData -> Manager -> Event -> DiscordHandler ()

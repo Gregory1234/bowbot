@@ -12,6 +12,7 @@ class StatType s where
   data Leaderboards s
   requestStats :: Proxy s -> Manager -> String -> IO (Maybe s)
   showStats :: Settings s -> s -> String
+  statsNotable :: s -> Bool
   toLeaderboard :: s -> Leaderboards s
   getLeaderboard :: Proxy s -> Manager -> IO (Maybe [Leaderboards s])
   updateLeaderboard :: Proxy s -> Manager -> Map String (Leaderboards s) -> IO ()

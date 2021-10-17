@@ -31,6 +31,7 @@ library
       BowBot.Bot
       BowBot.BotData
       BowBot.Command
+      BowBot.Command.Register
       BowBot.Command.Stats
       BowBot.Constants
       BowBot.Minecraft

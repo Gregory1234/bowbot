@@ -124,6 +124,9 @@ instance StatType HypixelBowStats where
       accuracy
         | bowShots == 0 = "N/A"
         | otherwise = show (round ((bowHits*100) % bowShots) :: Integer) ++ "%"
+
+  statsNotable HypixelBowStats {..} = bowWins >= 50
+
   toLeaderboard HypixelBowStats {..} = HypixelBowLeaderboards 
     { bowLbWins = bowWins, bowLbLosses = bowLosses, bowLbWinstreak = bestWinstreak }
   getLeaderboard Proxy manager = return Nothing -- TODO
