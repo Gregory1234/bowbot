@@ -27,6 +27,7 @@ library
   exposed-modules:
       BowBot.API
       BowBot.API.Mojang
+      BowBot.Background
       BowBot.Bot
       BowBot.BotData
       BowBot.Command

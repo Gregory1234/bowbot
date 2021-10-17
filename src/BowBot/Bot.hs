@@ -11,6 +11,7 @@ import BowBot.Command.Stats
 import BowBot.Stats.HypixelBow
 import BowBot.BotData
 import BowBot.API
+import BowBot.Background
 import Discord.Types
 import qualified Data.Text as T
 import qualified Data.Text.IO as TIO
@@ -18,7 +19,7 @@ import Control.Monad (forever, when)
 import Data.Foldable (for_)
 import Data.Text (isPrefixOf, unpack, pack)
 import Control.Monad.Reader (ReaderT(..), void, liftIO)
-import Control.Concurrent (forkIO)
+import Control.Concurrent (forkIO, forkFinally, threadDelay)
 import System.Timeout (timeout)
 import Data.Proxy (Proxy(..))
 import Network.HTTP.Conduit (Manager, newManager)
@@ -28,20 +29,66 @@ runBowBot discordKey = do
   ifDev () $ putStrLn "this is dev version of the bot"
   botData <- createData
   manager <- newManager managerSettings
+  mkBackground botData
   forever $ do
     userFacingError <-
       runDiscord $
         def
           { discordToken = pack discordKey,
+            discordOnStart = onStartup botData,
             discordOnEvent = eventHandler botData manager
           }
     TIO.putStrLn userFacingError
+ where
+  mkBackground bdt = void $ forkFinally (background bdt) $ \e -> do
+    print e
+    mkBackground bdt
+  background bdt = do
+     sec <- read @Int <$> getTime "%S"
+     threadDelay ((65 - sec `mod` 60) * 1000000)
+     void $ forever go
+   where
+     go = do
+       _ <- forkIO $ do
+         mint <- read @Int <$> getTime "%M"
+         putStrLn "New minute!"
+         backgroundMinutely bdt mint
+         putStrLn "New minute finished!"
+       threadDelay 60000000
+
+onStartup :: BotData -> DiscordHandler ()
+onStartup bdt = do
+  sendCommand (UpdateStatus $ UpdateStatusOpts {
+    updateStatusOptsSince = Nothing,
+    updateStatusOptsGame = Just (Activity {activityName = "try out ?settings command", activityType = ActivityTypeGame, activityUrl = Nothing}),
+    updateStatusOptsNewStatus = UpdateStatusOnline,
+    updateStatusOptsAFK = False
+  })
+  mkBackgroundDiscord
+ where
+  mkBackgroundDiscord = do
+    ReaderT $ \x -> void $
+      forkFinally (runReaderT backgroundDiscord x) $ \e -> do
+        print e
+        runReaderT mkBackgroundDiscord x
+  backgroundDiscord = do
+    sec <- liftIO $ read @Int <$> getTime "%S"
+    liftIO $ threadDelay ((60 - sec `mod` 60) * 1000000)
+    void $ forever go
+    where
+      go = do
+        _ <- ReaderT $ \x -> forkIO $ flip runReaderT x $ do
+          mint <- liftIO $ read @Int <$> getTime "%M"
+          liftIO $ putStrLn "New discord minute!"
+          discordBackgroundMinutely bdt mint
+          liftIO $ putStrLn "New discord minute finished!"
+        liftIO $ threadDelay 60000000
 
 commands :: [Command]
 commands =
-  [ statsCommand (Proxy @HypixelBowStats) "s" UserSettings
-  , statsCommand (Proxy @HypixelBowStats) "sd" AlwaysDefault
-  , statsCommand (Proxy @HypixelBowStats) "sa" AlwaysAll
+  [ statsCommand (Proxy @HypixelBowStats) "s" hypixelRequestCounter UserSettings
+  , statsCommand (Proxy @HypixelBowStats) "sd" hypixelRequestCounter AlwaysDefault
+  , statsCommand (Proxy @HypixelBowStats) "sa" hypixelRequestCounter AlwaysAll
   ]
 
 eventHandler :: BotData -> Manager -> Event -> DiscordHandler ()

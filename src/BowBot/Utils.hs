@@ -9,6 +9,8 @@ import Discord.Internal.Rest (GuildId)
 import BowBot.Constants
 import Text.Printf (printf)
 import Data.Ratio ((%))
+import Data.Time.Format (formatTime, defaultTimeLocale)
+import Data.Time.Clock.POSIX (getCurrentTime)
 
 dist :: Eq a => [a] -> [a] -> Int
 dist a b =
@@ -39,6 +41,9 @@ dist a b =
         thisdiag = firstelt : doDiag a b firstelt diagAbove (tail diagBelow)
     lab = length a - length b
     min3 x y z = if x < y then x else min y z
+
+getTime :: String -> IO String
+getTime f = formatTime defaultTimeLocale f <$> getCurrentTime
 
 ifDev :: MonadIO m => a -> m a -> m a
 ifDev v action = do
