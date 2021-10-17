@@ -53,7 +53,7 @@ withMinecraft manager bdt _ (Right author) fun = do
         Nothing -> pure NoResponse
         Just r -> pure (JustResponse (head names) r)
 withMinecraft manager bdt ac (Left mcname) fun = 
-  if ac then withMinecraftNormal manager bdt True mcname fun else withMinecraftAutocorrect manager bdt True mcname fun
+  if ac then withMinecraftAutocorrect manager bdt True mcname fun else withMinecraftNormal manager bdt True mcname fun
 
 withMinecraftNormal :: MonadIO m => Manager -> BotData -> Bool -> String -> (String -> [String] -> m (Maybe a)) -> m (MinecraftResponse a)
 withMinecraftNormal manager bdt cont mcname fun = do

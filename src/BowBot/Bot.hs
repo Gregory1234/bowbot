@@ -9,6 +9,7 @@ import Discord
 import BowBot.Command
 import BowBot.Command.Stats
 import BowBot.Command.Register
+import BowBot.Command.Simple
 import BowBot.Stats.HypixelBow
 import BowBot.BotData
 import BowBot.API
@@ -91,6 +92,36 @@ commands =
   , statsCommand (Proxy @HypixelBowStats) "sd" hypixelRequestCounter AlwaysDefault
   , statsCommand (Proxy @HypixelBowStats) "sa" hypixelRequestCounter AlwaysAll
   , registerCommand "register" False True
+  , urlCommand "head" True (\s -> "https://crafatar.com/avatars/" ++ s ++ "?overlay")
+  , urlCommand "heada" False (\s -> "https://crafatar.com/avatars/" ++ s ++ "?overlay")
+  , urlCommand "skin" True (\s -> "https://crafatar.com/renders/body/" ++ s ++ "?overlay")
+  , urlCommand "skina" False (\s -> "https://crafatar.com/renders/body/" ++ s ++ "?overlay")
+  , constStringCommand "help" $ "**Bow bot help:**\n\n"
+                              ++ "**Commands:**\n"
+                              ++ " - **?help** - *display this message*\n"
+                              ++ " - **?online** - *show all people from watchList currently in Bow Duels*\n"
+                              ++ " - **?list** - *show all players in watchList*\n"
+                              ++ " - **?s [name]** - *show player's Bow Duels stats*\n"
+                              ++ " - **?sa [name]** - *show all Bow Duels stats*\n"
+                              ++ " - **?sd [name]** - *show a default set of Bow Duels stats*\n"
+                              ++ " - **?n(a) [name]** - *show player's past nicks*\n"
+                              ++ " - **?head(a) [name]** - *show player's head*\n"
+                              ++ " - **?skin(a) [name]** - *show player's full skin*\n"
+                              ++ " - **?lb(|l|s|r) [page number|name|all]** - *show a Bow Duels leaderboard*\n"
+                              ++ " - **?mc** - *list your linked minecraft nicks*\n"
+                              ++ " - **?mc [name]** - *select a minecraft account as your default*\n"
+                              ++ " - **?roles** - *refresh discord roles*\n"
+                              ++ " - **?settings** - *display help for settings*\n"
+                              ++ "\nMade by **GregC**#9698"
+  , constStringCommand "settings" $ "**You can now customize the output of ?s command!**\n"
+                                  ++ "**Commands:**\n"
+                                  ++ " - **?settings** - *display this message*\n"
+                                  ++ " - **?show [stat]** - *makes the stat visible*\n"
+                                  ++ " - **?hide [stat]** - *makes the stat hidden*\n"
+                                  ++ " - **?show [stat] [yes|always|show|no|never|hide|maybe|defined]** - *sets the visibility of the stat*\n"
+                                  ++ "*Visibility 'maybe' and 'defined' hide the stat when the value is undefined.*\n"
+                                  ++ "**Stat names:** wins, losses, wlr, winsuntil, beststreak, currentstreak, bestdailystreak, bowhits, bowshots, accuracy\n"
+                                  ++ "**Example:** *?show accuracy* makes accuracy visible in the ?s command\n"
   ]
 
 eventHandler :: BotData -> Manager -> Event -> DiscordHandler ()

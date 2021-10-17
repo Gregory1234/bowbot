@@ -24,7 +24,7 @@ statsCommand pr name rc mode = Command name 2 $ \m man bdt -> do
         [] -> Right (userId $ messageAuthor m)
         mcname -> Left (unwords mcname)
   tryApiRequests (rc bdt) 2 (\sec -> respond m $ "**Too many requests! Wait another " ++ show sec ++ " seconds!**") $ do
-    res <- withMinecraft man bdt True player $ \uuid names -> do
+    res <- withMinecraft man bdt False player $ \uuid names -> do
       st <- liftIO $ requestStats pr man uuid
       for_ st (liftIO . tryRegister bdt man uuid names)
       return st
