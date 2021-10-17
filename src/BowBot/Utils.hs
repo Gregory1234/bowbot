@@ -1,24 +1,14 @@
-module Utils where
+{-# LANGUAGE ViewPatterns #-}
 
-import Data.Time.Clock
-import Data.Time.Format (defaultTimeLocale, formatTime)
-import Control.Monad.IO.Class (MonadIO, liftIO)
-import Control.Monad (when)
+module BowBot.Utils where
+
+import Control.Monad.IO.Class ( liftIO, MonadIO )
 import Data.Maybe (fromMaybe)
 import System.Environment.Blank (getEnv)
-
-setAt :: Int -> a -> [a] -> [a]
-setAt i a ls
-  | i < 0 = ls
-  | otherwise = go i ls
-  where
-    go 0 (_ : xs) = a : xs
-    go n (x : xs) = x : go (n -1) xs
-    go _ [] = []
-{-# INLINE setAt #-}
-
-getTime :: String -> IO String
-getTime f = formatTime defaultTimeLocale f <$> getCurrentTime
+import Discord.Internal.Rest (GuildId)
+import BowBot.Constants
+import Text.Printf (printf)
+import Data.Ratio ((%))
 
 dist :: Eq a => [a] -> [a] -> Int
 dist a b =
@@ -50,27 +40,22 @@ dist a b =
     lab = length a - length b
     min3 x y z = if x < y then x else min y z
 
-data StatsResponse a
-  = JustResponse String a
-  | OldResponse String String a
-  | NoResponse
-  | NotOnList
-  | DidYouMeanResponse String a
-  | DidYouMeanOldResponse String String a
+ifDev :: MonadIO m => a -> m a -> m a
+ifDev v action = do
+  devmode <- liftIO $ fromMaybe "" <$> getEnv "IS_DEV"
+  if devmode == "1" then action else return v
+  
+discordGuildId :: IO GuildId
+discordGuildId = ifDev airplanesId $ return testDiscordId
 
 discordEscape :: String -> String
 discordEscape [] = ""
 discordEscape (x:xs)
   | x `elem` "_*~`>" = '\\':x:discordEscape xs
-  | otherwise = x:discordEscape xs
+  | otherwise = x:discordEscape xs      
 
-ignoreChars :: [Char] -> String -> String
-ignoreChars a = filter (`notElem` a)
-
-pad :: Int -> String -> String
-pad l x = x ++ replicate (l - length x) ' '
-
-ifDev :: MonadIO m => a -> m a -> m a
-ifDev v action = do
-  devmode <- liftIO $ fromMaybe "" <$> getEnv "IS_DEV"
-  if devmode == "1" then action else return v
+showWLR :: Integral a => a -> a -> String
+showWLR (fromIntegral -> bowWins) (fromIntegral -> bowLosses)
+  | bowWins == 0, bowLosses == 0 = "NaN"
+  | bowLosses == 0 = "∞"
+  | otherwise = printf "%.04f" (fromRational (bowWins % bowLosses) :: Double)
