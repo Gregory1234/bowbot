@@ -88,8 +88,7 @@ downloadBowBotAccounts manager = do
   res <- sendDB manager "people/all.php" []
   let parser = parseMaybe $ \o -> do
         dt <- o .: "data"
-        for (toList dt) $ \(maybeAccountId, acc) -> do
-          accountId <- maybe (unexpected (String (pack maybeAccountId))) return (readMaybe maybeAccountId)
+        for (toList dt) $ \(accountId, acc) -> do
           accountDiscords <- acc .: "discord"
           accountSelectedMinecraft <- acc .: "selected"
           accountMinecrafts <- acc .: "minecraft"

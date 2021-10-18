@@ -14,6 +14,7 @@ import Control.Concurrent.STM (atomically, STM)
 import Data.Maybe (fromMaybe)
 import BowBot.Utils
 import Data.Char (toLower)
+import Data.List (sortOn)
 
 
 data MinecraftResponse a
@@ -78,7 +79,7 @@ withMinecraftAutocorrect :: MonadIO m => Manager -> BotData -> Bool -> String ->
 withMinecraftAutocorrect manager bdt cont mcname fun = do
   people <- liftIO $ atomically $ flattenedMinecraftNicks bdt
   let dists = map (\(u,n) -> ((u, n), dist (map toLower n) (map toLower mcname))) people
-  let filtered = map fst . filter (\(_,d) -> d <= 2) $ dists
+  let filtered = map fst . sortOn snd . filter (\(_,d) -> d <= 2) $ dists
   case filtered of
     [] -> if cont then withMinecraftNormal manager bdt False mcname fun else pure NoResponse
     ((uuid, rn):_) -> do

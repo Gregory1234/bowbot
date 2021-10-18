@@ -45,6 +45,9 @@ dist a b =
 getTime :: String -> IO String
 getTime f = formatTime defaultTimeLocale f <$> getCurrentTime
 
+pad :: Int -> String -> String
+pad l x = x ++ replicate (l - length x) ' '
+
 ifDev :: MonadIO m => a -> m a -> m a
 ifDev v action = do
   devmode <- liftIO $ fromMaybe "" <$> getEnv "IS_DEV"

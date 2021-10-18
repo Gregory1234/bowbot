@@ -10,6 +10,7 @@ import BowBot.Command
 import BowBot.Command.Stats
 import BowBot.Command.Register
 import BowBot.Command.Simple
+import BowBot.Command.Leaderboard
 import BowBot.Stats.HypixelBow
 import BowBot.BotData
 import BowBot.API
@@ -96,6 +97,10 @@ commands =
   , urlCommand "heada" False (\s -> "https://crafatar.com/avatars/" ++ s ++ "?overlay")
   , urlCommand "skin" True (\s -> "https://crafatar.com/renders/body/" ++ s ++ "?overlay")
   , urlCommand "skina" False (\s -> "https://crafatar.com/renders/body/" ++ s ++ "?overlay")
+  , leaderboardCommand (Proxy @HypixelBowStats) "lb" "Hypixel Bow Duels Wins Leaderboard" "Wins" hypixelBowWinsLeaderboard
+  , leaderboardCommand (Proxy @HypixelBowStats) "lbl" "Hypixel Bow Duels Losses Leaderboard" "Losses" hypixelBowLossesLeaderboard
+  , leaderboardCommand (Proxy @HypixelBowStats) "lbs" "Hypixel Bow Duels Winstreak Leaderboard" "Winstreak" hypixelBowWinstreakLeaderboard
+  , leaderboardCommand (Proxy @HypixelBowStats) "lbr" "Hypixel Bow Duels WLR Leaderboard" "WLR" hypixelBowWLRLeaderboard
   , constStringCommand "help" $ "**Bow bot help:**\n\n"
                               ++ "**Commands:**\n"
                               ++ " - **?help** - *display this message*\n"

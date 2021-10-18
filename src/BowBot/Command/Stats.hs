@@ -11,9 +11,11 @@ import Data.Char (isSpace)
 import Control.Monad.IO.Class (liftIO)
 import BowBot.Command.Register
 import Network.HTTP.Conduit (Manager)
-import Control.Concurrent.STM.TVar (modifyTVar)
+import Control.Concurrent.STM.TVar (modifyTVar, readTVar)
 import Control.Concurrent.STM (atomically)
 import Data.Foldable (for_)
+import Control.Monad (unless)
+import Data.Map (fromList)
 
 data StatsCommandMode = AlwaysDefault | AlwaysAll | UserSettings
 
@@ -45,6 +47,9 @@ statsMessage _ NotOnList = registerMessage
 
 tryRegister :: StatType s => BotData -> Manager -> String -> [String] -> s -> IO ()
 tryRegister bdt manager uuid names s | statsNotable s = do
-  acc <- addMinecraftAccount manager uuid names
-  for_ acc $ \x -> atomically $ modifyTVar (minecraftAccounts bdt) (x:)
+  registeredPlayers <- liftIO $ atomically $ map mcUUID <$> readTVar (minecraftAccounts bdt)
+  unless (uuid `elem` registeredPlayers) $ do
+    acc <- addMinecraftAccount manager uuid names
+    for_ acc $ \x -> atomically $ modifyTVar (minecraftAccounts bdt) (x:)
+  updateLeaderboard manager (fromList [(uuid, toLeaderboard s)])
 tryRegister _ _ _ _ _ = pure ()

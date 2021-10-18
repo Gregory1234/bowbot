@@ -31,9 +31,7 @@ addMinecraftAccount manager uuid names = do
 addAccount :: Manager -> String -> UserId -> String -> IO (Maybe BowBotAccount)
 addAccount manager name did uuid = do
   res <- sendDB manager "people/new.php" ["name=" ++ name, "discord=" ++ show did, "verified=0", "minecraft=" ++ uuid]
-  let parser = parseMaybe $ \o -> do
-        bid <- o .: "id"
-        maybe (unexpected (String (pack bid))) return (readMaybe bid)
+  let parser = parseMaybe $ \o -> o .: "id"
   return $ case decode res >>= parser of
     Nothing -> Nothing
     Just bid -> Just BowBotAccount { accountId = bid, accountDiscords = [did], accountMinecrafts = [uuid], accountSelectedMinecraft = uuid}
@@ -42,6 +40,8 @@ addAltAccount :: Manager -> Integer -> String -> IO ()
 addAltAccount manager gid uuid = do
   _ <- sendDB manager "people/alt.php" ["id=" ++ show gid, "verified=0", "minecraft=" ++ uuid]
   return ()
+
+-- TODO: check if discord account is registered
 
 registerCommand :: String -> Bool -> Bool -> Command
 registerCommand name isalt isself = Command name 2 $ \m man bdt -> do

@@ -1,6 +1,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE ViewPatterns #-}
 
 module BowBot.API where
 
@@ -12,6 +13,9 @@ import System.Environment.Blank (getEnv)
 import BowBot.Utils
 import Data.Aeson
 import Control.Monad (void)
+import Data.Aeson.Types (Parser, unexpected)
+import Data.Text (pack, Text)
+import Text.Read (readMaybe)
 
 managerSettings :: ManagerSettings
 managerSettings = tlsManagerSettings { managerResponseTimeout = responseTimeoutMicro 15000000 }

@@ -2,8 +2,11 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE ViewPatterns #-}
 
-module BowBot.Stats.HypixelBow(HypixelBowStats) where
+module BowBot.Stats.HypixelBow(HypixelBowStats,
+  hypixelBowWinsLeaderboard, hypixelBowLossesLeaderboard, hypixelBowWinstreakLeaderboard, hypixelBowWLRLeaderboard
+) where
 
 import BowBot.Utils
 import Data.Proxy
@@ -13,8 +16,11 @@ import Data.Maybe (catMaybes, fromMaybe)
 import Data.Ratio ((%))
 import Data.Aeson (decode, (.:))
 import System.Environment.Blank (getEnv)
-import Data.Aeson.Types (parseMaybe, (.!=), (.:?))
+import Data.Aeson.Types (parseMaybe, (.!=), (.:?), object, (.=), parseEither)
 import Data.Traversable (for)
+import Data.Map (fromList, toList)
+import Data.Text (pack)
+import Text.Read (readMaybe)
 
 data HypixelBowStats = HypixelBowStats
   { bowWins :: Integer,
@@ -28,22 +34,17 @@ data HypixelBowStats = HypixelBowStats
 
 instance StatType HypixelBowStats where
   data Settings HypixelBowStats = HypixelBowSettings
-    { sWins :: Bool
-    , sLosses :: Bool
-    , sWLR :: BoolSense
-    , sWinsUntil :: BoolSense
-    , sBestStreak :: Bool
-    , sCurrentStreak :: Bool
-    , sBestDailyStreak :: Bool
-    , sBowHits :: Bool
-    , sBowShots :: Bool
-    , sAccuracy :: BoolSense
+    { sWins :: Bool, sLosses :: Bool, sWLR :: BoolSense, sWinsUntil :: BoolSense
+    , sBestStreak :: Bool, sCurrentStreak :: Bool, sBestDailyStreak :: Bool
+    , sBowHits :: Bool, sBowShots :: Bool, sAccuracy :: BoolSense
     } deriving (Eq, Show)
   data Leaderboards HypixelBowStats = HypixelBowLeaderboards
-    { bowLbWins :: Integer
-    , bowLbLosses :: Integer
-    , bowLbWinstreak :: Integer
-    } deriving (Show)
+    { bowLbWins :: Integer, bowLbLosses :: Integer, bowLbWinstreak :: Integer } deriving (Show)
+  data SettingsUpdate HypixelBowStats
+    = UpdateWins Bool | UpdateLosses Bool | UpdateWLR BoolSense | UpdateWinsUntil BoolSense
+    | UpdateBestStreak Bool | UpdateCurrentStreak Bool | UpdateBestDailyStreak Bool
+    | UpdateBowHist Bool | UpdateBowShots Bool | UpdateAccuracy BoolSense
+    deriving (Eq, Show)
   requestStats Proxy manager uuid = do
     apiKey <- fromMaybe "" <$> getEnv "HYPIXEL_API"
     let url = "https://api.hypixel.net/player?key=" ++ apiKey ++ "&uuid=" ++ uuid
@@ -129,8 +130,20 @@ instance StatType HypixelBowStats where
 
   toLeaderboard HypixelBowStats {..} = HypixelBowLeaderboards 
     { bowLbWins = bowWins, bowLbLosses = bowLosses, bowLbWinstreak = bestWinstreak }
-  getLeaderboard Proxy manager = return Nothing -- TODO
-  updateLeaderboard Proxy manager lb = return () -- TODO ()
+  getLeaderboard Proxy manager = do
+    res <- sendDB manager "stats/hypixel/leaderboard.php" []
+    let parser = parseMaybe $ \o -> do
+            dt <- o .: "data"
+            for dt $ \s -> do
+              uuid <- s .: "uuid"
+              (readMaybe -> Just bowLbWins) <- s .: "bowWins"
+              (readMaybe -> Just bowLbLosses) <- s .: "bowLosses"
+              (readMaybe -> Just bowLbWinstreak) <- s .: "bowWinstreak"
+              return (uuid, HypixelBowLeaderboards {..})
+    return . fmap fromList $ decode res >>= parser
+  updateLeaderboard manager lb = sendPostDB manager "stats/hypixel/update.php" (object $ helper <$> toList lb)
+    where
+      helper (uuid, HypixelBowLeaderboards {..}) = pack uuid .= object ["bowWins" .= bowLbWins, "bowLosses" .= bowLbLosses, "bowWinstreak" .= bowLbWinstreak]
   defSettings Proxy = HypixelBowSettings
     { sWins = True
     , sLosses = True
@@ -158,4 +171,20 @@ instance StatType HypixelBowStats where
     }
   
   getSettings Proxy manager = return Nothing -- TODO
-  updateSettings Proxy manager did HypixelBowSettings {..} = return () -- TODO
+  updateSettings manager did setupt = return () -- TODO
+
+hypixelBowWinsLeaderboard :: Leaderboards HypixelBowStats -> Maybe (Integer, String)
+hypixelBowWinsLeaderboard HypixelBowLeaderboards {..} | bowLbWins >= 500 = Just (bowLbWins, show bowLbWins)
+hypixelBowWinsLeaderboard _ = Nothing
+
+hypixelBowLossesLeaderboard :: Leaderboards HypixelBowStats -> Maybe (Integer, String)
+hypixelBowLossesLeaderboard HypixelBowLeaderboards {..} | bowLbWins >= 500 = Just (bowLbLosses, show bowLbLosses)
+hypixelBowLossesLeaderboard _ = Nothing
+
+hypixelBowWinstreakLeaderboard :: Leaderboards HypixelBowStats -> Maybe (Integer, String)
+hypixelBowWinstreakLeaderboard HypixelBowLeaderboards {..} | bowLbWinstreak >= 50 = Just (bowLbWinstreak, show bowLbWinstreak)
+hypixelBowWinstreakLeaderboard _ = Nothing
+
+hypixelBowWLRLeaderboard :: Leaderboards HypixelBowStats -> Maybe (Integer, String)
+hypixelBowWLRLeaderboard HypixelBowLeaderboards {..} | bowLbWins >= bowLbLosses = Just (if bowLbWins == 0 then bowLbWins*1000000 else (bowLbWins*10000) `div` bowLbLosses, showWLR bowLbWins bowLbLosses)
+hypixelBowWLRLeaderboard _ = Nothing
