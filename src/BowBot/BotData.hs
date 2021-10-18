@@ -22,7 +22,12 @@ import Data.Foldable (traverse_, for_)
 import Text.Read (readMaybe)
 import Data.Aeson.Types (parseMaybe, (.:), unexpected)
 import Control.Monad.IO.Class (MonadIO, liftIO)
-import Control.Monad (when)
+import Control.Monad (when, unless, void)
+import Data.List.Split (chunksOf)
+import Control.Concurrent.Async (mapConcurrently)
+import BowBot.API.Mojang (mojangUUIDToNames)
+import Data.Maybe (fromMaybe)
+import Data.List (intercalate)
 
 data ApiRequestCounter = ApiRequestCounter { mainCounter :: TVar Int, borderCounter :: TVar Int, counterLimit :: Int }
 
@@ -119,6 +124,22 @@ downloadData bdt = do
     traverse_ (writeTVar (minecraftAccounts bdt)) newMinecraftAccounts
     traverse_ (writeTVar (hypixelBowSettings bdt)) newHypixelBowSettings
     traverse_ (writeTVar (bowBotAccounts bdt)) newBowBotAccounts
+
+updateMinecraftAccounts :: BotData -> Manager -> IO ()
+updateMinecraftAccounts bdt manager = do
+  nickList <- atomically $ readTVar $ minecraftAccounts bdt
+  let chunked = chunksOf 10 nickList
+  updatedNicks <- fmap concat $ for chunked $ mapConcurrently helper
+  atomically $ writeTVar (minecraftAccounts bdt) updatedNicks
+  where
+    helper MinecraftAccount {..} = do
+      newNames <- mojangUUIDToNames manager mcUUID
+      for_ newNames $ \names ->
+        unless (mcNames == names) $ updateMinecraftNames mcUUID names
+      return MinecraftAccount {mcNames = fromMaybe mcNames newNames, ..}
+    updateMinecraftNames uuid names = 
+      void $ sendDB manager "minecraft/setnames.php" ["uuid=" ++ uuid, "names=" ++ intercalate "," names]
+    
 
 newRequestCounter :: Int -> STM ApiRequestCounter
 newRequestCounter counterLimit = do
