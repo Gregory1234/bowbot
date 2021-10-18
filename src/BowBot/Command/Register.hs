@@ -1,6 +1,7 @@
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE ViewPatterns #-}
 
 module BowBot.Command.Register where
 
@@ -31,7 +32,9 @@ addMinecraftAccount manager uuid names = do
 addAccount :: Manager -> String -> UserId -> String -> IO (Maybe BowBotAccount)
 addAccount manager name did uuid = do
   res <- sendDB manager "people/new.php" ["name=" ++ name, "discord=" ++ show did, "verified=0", "minecraft=" ++ uuid]
-  let parser = parseMaybe $ \o -> o .: "id"
+  let parser = parseMaybe $ \o -> do
+        (readMaybe -> Just aid) <- o .: "id"
+        return aid
   return $ case decode res >>= parser of
     Nothing -> Nothing
     Just bid -> Just BowBotAccount { accountId = bid, accountDiscords = [did], accountMinecrafts = [uuid], accountSelectedMinecraft = uuid}
@@ -43,39 +46,42 @@ addAltAccount manager gid uuid = do
 
 -- TODO: check if discord account is registered
 
-registerCommand :: String -> Bool -> Bool -> Command
-registerCommand name isalt isself = Command name 2 $ \m man bdt -> do
-  let args = words $ dropWhile isSpace $ dropWhile (not . isSpace) $ unpack (messageText m)
-  let (did, mcname) = if isself then (userId $ messageAuthor m, head args) else (read $ head args, args !! 1)
-  maybeUUID <- liftIO $ mcNameToUUID man bdt mcname
-  case maybeUUID of
-    Nothing -> respond m "*The player doesn't exist!*"
-    Just uuid -> do
-      nicks <- liftIO $ atomically $ readTVar (minecraftAccounts bdt)
-      taken <- fmap (>>=accountMinecrafts) $ liftIO $ atomically $ readTVar (bowBotAccounts bdt)
-      if uuid `elem` taken
-      then respond m "*That account already belongs to someone else!*"
-      else do
-        names <- liftIO $ fromMaybe [] <$> mcUUIDToNames man bdt uuid
-        unless (uuid `elem` map mcUUID nicks) $ do
-          newMc <- liftIO $ addMinecraftAccount man uuid names
-          for_ newMc $ \x -> liftIO $ atomically $ writeTVar (minecraftAccounts bdt) (x:nicks)
-        if isalt
-        then do
-          pns <- fmap (>>=(\BowBotAccount {..} -> (, accountId) <$> accountDiscords)) $ liftIO $ atomically $ readTVar (bowBotAccounts bdt)
-          case lookup did pns of
-            Nothing -> respond m "*Somehing went wrong*"
-            Just gid -> do
-              liftIO $ addAltAccount man gid uuid
-              psa <- liftIO $ atomically $ readTVar (bowBotAccounts bdt)
-              let oldAcc = head $ filter ((==gid) . accountId) psa
-              liftIO $ atomically $ writeTVar (bowBotAccounts bdt) (oldAcc { accountMinecrafts = uuid:accountMinecrafts oldAcc } : filter ((/= gid) . accountId) psa)
-              respond m "*Registered successfully*"
+registerCommand :: String -> [BotData -> ApiRequestCounter] -> Bool -> Bool -> (Manager -> String -> IO ()) -> Command
+registerCommand name apis isalt isself onComplete = Command name 1 $ \m man bdt -> do
+  tryApiRequestsMulti (map (\x -> (x bdt, 2)) apis) (\sec -> respond m $ "**Too many requests! Wait another " ++ show sec ++ " seconds!**") $ do
+    let args = words $ dropWhile isSpace $ dropWhile (not . isSpace) $ unpack (messageText m)
+    let (did, mcname) = if isself then (userId $ messageAuthor m, head args) else (read $ head args, args !! 1)
+    maybeUUID <- liftIO $ mcNameToUUID man bdt mcname
+    case maybeUUID of
+      Nothing -> respond m "*The player doesn't exist!*"
+      Just uuid -> do
+        nicks <- liftIO $ atomically $ readTVar (minecraftAccounts bdt)
+        taken <- fmap (>>=accountMinecrafts) $ liftIO $ atomically $ readTVar (bowBotAccounts bdt)
+        if uuid `elem` taken
+        then respond m "*That account already belongs to someone else!*"
         else do
-          newAcc <- liftIO $ addAccount man (head names) did uuid
-          case newAcc of
-            Nothing -> respond m "*Somehing went wrong*"
-            Just newAcc' -> do
-              psa <- liftIO $ atomically $ readTVar (bowBotAccounts bdt)
-              liftIO $ atomically $ writeTVar (bowBotAccounts bdt) (newAcc':psa)
-              respond m "*Registered successfully*"
+          names <- liftIO $ fromMaybe [] <$> mcUUIDToNames man bdt uuid
+          unless (uuid `elem` map mcUUID nicks) $ do
+            newMc <- liftIO $ addMinecraftAccount man uuid names
+            for_ newMc $ \x -> liftIO $ atomically $ writeTVar (minecraftAccounts bdt) (x:nicks)
+          if isalt
+          then do
+            pns <- fmap (>>=(\BowBotAccount {..} -> (, accountId) <$> accountDiscords)) $ liftIO $ atomically $ readTVar (bowBotAccounts bdt)
+            case lookup did pns of
+              Nothing -> respond m "*Somehing went wrong*"
+              Just gid -> do
+                liftIO $ addAltAccount man gid uuid
+                psa <- liftIO $ atomically $ readTVar (bowBotAccounts bdt)
+                let oldAcc = head $ filter ((==gid) . accountId) psa
+                liftIO $ atomically $ writeTVar (bowBotAccounts bdt) (oldAcc { accountMinecrafts = uuid:accountMinecrafts oldAcc } : filter ((/= gid) . accountId) psa)
+                liftIO $ onComplete man uuid
+                respond m "*Registered successfully*"
+          else do
+            newAcc <- liftIO $ addAccount man (head names) did uuid
+            case newAcc of
+              Nothing -> respond m "*Somehing went wrong*"
+              Just newAcc' -> do
+                psa <- liftIO $ atomically $ readTVar (bowBotAccounts bdt)
+                liftIO $ atomically $ writeTVar (bowBotAccounts bdt) (newAcc':psa)
+                liftIO $ onComplete man uuid
+                respond m "*Registered successfully*"

@@ -18,7 +18,7 @@ import Network.HTTP.Conduit (Manager, newManager)
 import Data.Traversable (for)
 import Data.Text (pack)
 import Data.Proxy
-import Data.Foldable (traverse_)
+import Data.Foldable (traverse_, for_)
 import Text.Read (readMaybe)
 import Data.Aeson.Types (parseMaybe, (.:), unexpected)
 import Control.Monad.IO.Class (MonadIO, liftIO)
@@ -41,6 +41,20 @@ tryApiRequests ApiRequestCounter {..} extra onFail onSuccess = do
     let c = c1 + c2 + extra
     when (c < counterLimit) $ modifyTVar (if t <= 5 || t >= 55 then borderCounter else mainCounter) (+ extra)
     return $ c < counterLimit
+  if cv then onSuccess else onFail ((65 - t) `mod` 60)
+
+tryApiRequestsMulti :: MonadIO m => [(ApiRequestCounter, Int)] -> (Int -> m ()) -> m () -> m ()
+tryApiRequestsMulti apis onFail onSuccess = do
+  t <- liftIO $ read @Int <$> getTime "%S"
+  cv <- liftIO . atomically $ do
+    res <- fmap and . for apis $ \(ApiRequestCounter {..}, extra) -> do
+      c1 <- readTVar mainCounter
+      c2 <- readTVar borderCounter
+      let c = c1 + c2 + extra
+      return $ c < counterLimit
+    when res $ for_ apis $ \(ApiRequestCounter {..}, extra) -> do
+      modifyTVar (if t <= 5 || t >= 55 then borderCounter else mainCounter) (+ extra)
+    return res
   if cv then onSuccess else onFail ((65 - t) `mod` 60)
 
 data CachedData a = CachedData { mainCache :: TVar (Maybe a), borderCache :: TVar (Maybe a), currentlyBusyCache :: TVar Bool }

@@ -41,7 +41,6 @@ leaderboardCommand pr name lbname statname lbfun = Command name 2 $ \m man bdt -
         names <- fromMaybe [] <$> mcUUIDToNames man bdt uuid
         return (head names, str, uuid)
       let elems = zipWith (\lbPos (lbName, lbVal, lbUUID) -> LeaderboardElement {..}) [1..] sortedlb
-      liftIO $ print elems
       let args = words $ dropWhile isSpace $ dropWhile (not . isSpace) $ unpack (messageText m)
       selectedOrMsg <- case args of
         [] -> liftIO $ atomically $ Right . (,Nothing, LeaderboardPage 0) <$> getAuthorNicks bdt (userId $ messageAuthor m)

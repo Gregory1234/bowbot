@@ -11,6 +11,7 @@ import BowBot.Command.Stats
 import BowBot.Command.Register
 import BowBot.Command.Simple
 import BowBot.Command.Leaderboard
+import BowBot.Stats
 import BowBot.Stats.HypixelBow
 import BowBot.BotData
 import BowBot.API
@@ -92,7 +93,8 @@ commands =
   [ statsCommand (Proxy @HypixelBowStats) "s" hypixelRequestCounter UserSettings
   , statsCommand (Proxy @HypixelBowStats) "sd" hypixelRequestCounter AlwaysDefault
   , statsCommand (Proxy @HypixelBowStats) "sa" hypixelRequestCounter AlwaysAll
-  , registerCommand "register" False True
+  , registerCommand "register" [hypixelRequestCounter] False True $ \man uuid -> do
+      fullUpdateStats (Proxy @HypixelBowStats) man uuid
   , urlCommand "head" True (\s -> "https://crafatar.com/avatars/" ++ s ++ "?overlay")
   , urlCommand "heada" False (\s -> "https://crafatar.com/avatars/" ++ s ++ "?overlay")
   , urlCommand "skin" True (\s -> "https://crafatar.com/renders/body/" ++ s ++ "?overlay")
