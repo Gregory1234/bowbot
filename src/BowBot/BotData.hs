@@ -2,6 +2,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE ViewPatterns #-}
 
 module BowBot.BotData where
 
@@ -64,10 +65,24 @@ tryApiRequestsMulti apis onFail onSuccess = do
 
 data CachedData a = CachedData { mainCache :: TVar (Maybe a), borderCache :: TVar (Maybe a), currentlyBusyCache :: TVar Bool }
 
+data UpdateFreq
+  = BiHourly
+  | Daily
+  | Weekly
+  | Banned
+  deriving (Eq, Ord, Enum, Bounded, Show)
+
+stringToUpdateFreq :: String -> Maybe UpdateFreq
+stringToUpdateFreq "bihour" = Just BiHourly
+stringToUpdateFreq "day" = Just Daily
+stringToUpdateFreq "week" = Just Weekly
+stringToUpdateFreq "ban" = Just Banned
+stringToUpdateFreq _ = Nothing
+
 data MinecraftAccount = MinecraftAccount
   { mcUUID :: String
   , mcNames :: [String]
-  -- TODO: , mcHypixel :: UpdateFreq
+  , mcHypixelBow :: UpdateFreq
   } deriving (Show)
 
 data BowBotAccount = BowBotAccount
@@ -98,6 +113,7 @@ downloadMinecraftAccounts manager = do
         for dt $ \acc -> do
           mcUUID <- acc .: "uuid"
           mcNames <- acc .: "names"
+          (stringToUpdateFreq -> Just mcHypixelBow) <- acc .: "hypixel"
           return MinecraftAccount {..}
   return $ decode res >>= parser
 
