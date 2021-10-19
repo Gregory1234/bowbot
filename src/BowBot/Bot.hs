@@ -27,6 +27,10 @@ import Control.Concurrent (forkIO, forkFinally, threadDelay)
 import System.Timeout (timeout)
 import Data.Proxy (Proxy(..))
 import Network.HTTP.Conduit (Manager, newManager)
+import Data.Map ((!?))
+import Data.Maybe (fromMaybe)
+import Control.Concurrent.STM (atomically)
+import Control.Concurrent.STM.TVar (readTVar)
 
 runBowBot :: String -> IO ()
 runBowBot discordKey = do
@@ -103,32 +107,45 @@ commands =
   , leaderboardCommand (Proxy @HypixelBowStats) "lbl" "Hypixel Bow Duels Losses Leaderboard" "Losses" hypixelBowLossesLeaderboard
   , leaderboardCommand (Proxy @HypixelBowStats) "lbs" "Hypixel Bow Duels Winstreak Leaderboard" "Winstreak" hypixelBowWinstreakLeaderboard
   , leaderboardCommand (Proxy @HypixelBowStats) "lbr" "Hypixel Bow Duels WLR Leaderboard" "WLR" hypixelBowWLRLeaderboard
-  , constStringCommand "help" $ "**Bow bot help:**\n\n"
-                              ++ "**Commands:**\n"
-                              ++ " - **?help** - *display this message*\n"
-                              ++ " - **?online** - *show all people from watchList currently in Bow Duels*\n"
-                              ++ " - **?list** - *show all players in watchList*\n"
-                              ++ " - **?s [name]** - *show player's Bow Duels stats*\n"
-                              ++ " - **?sa [name]** - *show all Bow Duels stats*\n"
-                              ++ " - **?sd [name]** - *show a default set of Bow Duels stats*\n"
-                              ++ " - **?n(a) [name]** - *show player's past nicks*\n"
-                              ++ " - **?head(a) [name]** - *show player's head*\n"
-                              ++ " - **?skin(a) [name]** - *show player's full skin*\n"
-                              ++ " - **?lb(|l|s|r) [page number|name|all]** - *show a Bow Duels leaderboard*\n"
-                              ++ " - **?mc** - *list your linked minecraft nicks*\n"
-                              ++ " - **?mc [name]** - *select a minecraft account as your default*\n"
-                              ++ " - **?roles** - *refresh discord roles*\n"
-                              ++ " - **?settings** - *display help for settings*\n"
-                              ++ "\nMade by **GregC**#9698"
-  , constStringCommand "settings" $ "**You can now customize the output of ?s command!**\n"
-                                  ++ "**Commands:**\n"
-                                  ++ " - **?settings** - *display this message*\n"
-                                  ++ " - **?show [stat]** - *makes the stat visible*\n"
-                                  ++ " - **?hide [stat]** - *makes the stat hidden*\n"
-                                  ++ " - **?show [stat] [yes|always|show|no|never|hide|maybe|defined]** - *sets the visibility of the stat*\n"
-                                  ++ "*Visibility 'maybe' and 'defined' hide the stat when the value is undefined.*\n"
-                                  ++ "**Stat names:** wins, losses, wlr, winsuntil, beststreak, currentstreak, bestdailystreak, bowhits, bowshots, accuracy\n"
-                                  ++ "**Example:** *?show accuracy* makes accuracy visible in the ?s command\n"
+  , registerCommand "add" [hypixelRequestCounter] False False $ \man uuid -> do
+      fullUpdateStats (Proxy @HypixelBowStats) man uuid
+  , registerCommand "addalt" [hypixelRequestCounter] True False $ \man uuid -> do
+      fullUpdateStats (Proxy @HypixelBowStats) man uuid
+  , constStringCommand "help" DefaultLevel 
+    $ "**Bow bot help:**\n\n"
+    ++ "**Commands:**\n"
+    ++ " - **?help** - *display this message*\n"
+    ++ " - **?online** - *show all people from watchList currently in Bow Duels*\n"
+    ++ " - **?list** - *show all players in watchList*\n"
+    ++ " - **?s [name]** - *show player's Bow Duels stats*\n"
+    ++ " - **?sa [name]** - *show all Bow Duels stats*\n"
+    ++ " - **?sd [name]** - *show a default set of Bow Duels stats*\n"
+    ++ " - **?n(a) [name]** - *show player's past nicks*\n"
+    ++ " - **?head(a) [name]** - *show player's head*\n"
+    ++ " - **?skin(a) [name]** - *show player's full skin*\n"
+    ++ " - **?lb(|l|s|r) [page number|name|all]** - *show a Bow Duels leaderboard*\n"
+    ++ " - **?mc** - *list your linked minecraft nicks*\n"
+    ++ " - **?mc [name]** - *select a minecraft account as your default*\n"
+    ++ " - **?roles** - *refresh discord roles*\n"
+    ++ " - **?settings** - *display help for settings*\n"
+    ++ "\nMade by **GregC**#9698"
+  , constStringCommand "settings" DefaultLevel 
+    $ "**You can now customize the output of ?s command!**\n"
+    ++ "**Commands:**\n"
+    ++ " - **?settings** - *display this message*\n"
+    ++ " - **?show [stat]** - *makes the stat visible*\n"
+    ++ " - **?hide [stat]** - *makes the stat hidden*\n"
+    ++ " - **?show [stat] [yes|always|show|no|never|hide|maybe|defined]** - *sets the visibility of the stat*\n"
+    ++ "*Visibility 'maybe' and 'defined' hide the stat when the value is undefined.*\n"
+    ++ "**Stat names:** wins, losses, wlr, winsuntil, beststreak, currentstreak, bestdailystreak, bowhits, bowshots, accuracy\n"
+    ++ "**Example:** *?show accuracy* makes accuracy visible in the ?s command\n"
+  , constStringCommand "modhelp" ModLevel 
+    $ "**Bow bot help:**\n\n"
+    ++ "**Mod Commands:**\n"
+    ++ " - **?modhelp** - *display this message*\n"
+    ++ " - **?add [discord/discord id] [name]** - *register a person with a given minecraft name*\n"
+    ++ " - **?addalt [discord/discord id] [name]** - *register a person's alt*\n"
+    ++ "\nMade by **GregC**#9698"
   ]
 
 eventHandler :: BotData -> Manager -> Event -> DiscordHandler ()
@@ -141,7 +158,13 @@ eventHandler bdt man (MessageCreate m) = do
         liftIO . putStrLn $ "recieved " ++ unpack (messageText m)
         when (messageGuild m /= Just testDiscordId) $
           ifDev () $ respond m "```Attention! This is the dev version of the bot! Some features might not be avaliable! You shouldn't be reading this! If you see this message please report it immidately!```"
-        commandHandler c m man bdt
+        dPerms <- liftIO $ atomically $ readTVar $ discordPerms bdt
+        let perms = fromMaybe DefaultLevel $ dPerms !? userId (messageAuthor m)
+        if perms == BanLevel
+        then respond m "You have been blacklisted. You can probably appeal this decision. Or not. I don't know. I'm just a pre-programmed response."
+        else if perms >= commandPerms c
+          then commandHandler c m man bdt
+          else respond m "You don't have the permission to do that!"
       
 eventHandler _ _ _ = pure ()
 

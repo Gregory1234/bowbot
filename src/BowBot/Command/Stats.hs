@@ -20,7 +20,7 @@ import Data.Map (fromList)
 data StatsCommandMode = AlwaysDefault | AlwaysAll | UserSettings
 
 statsCommand :: StatType s => Proxy s -> String -> (BotData -> ApiRequestCounter) -> StatsCommandMode -> Command
-statsCommand pr name rc mode = Command name 2 $ \m man bdt -> do
+statsCommand pr name rc mode = Command name DefaultLevel 2 $ \m man bdt -> do
   let args = words $ dropWhile isSpace $ dropWhile (not . isSpace) $ unpack (messageText m)
   let player = case args of
         [] -> Right (userId $ messageAuthor m)

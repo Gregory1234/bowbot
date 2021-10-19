@@ -12,7 +12,7 @@ import Control.Monad (void)
 import Network.HTTP.Conduit (Manager)
 
 -- TODO: make argument order better
-data Command = Command { commandName :: String, commandTimeout :: Int, commandHandler :: Message -> Manager -> BotData -> DiscordHandler () }
+data Command = Command { commandName :: String, commandPerms :: PermissionLevel, commandTimeout :: Int, commandHandler :: Message -> Manager -> BotData -> DiscordHandler () }
 
 call :: (FromJSON a, R.Request (r a)) => r a -> DiscordHandler ()
 call = void . restCall

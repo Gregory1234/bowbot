@@ -19,7 +19,7 @@ import Text.Read (readMaybe)
 import BowBot.API
 import Data.Aeson (decode)
 import Data.Foldable (for_)
-import Data.Char (isSpace)
+import Data.Char (isSpace, isDigit)
 import Data.List (intercalate)
 import BowBot.Background
 import Control.Monad (when)
@@ -47,10 +47,10 @@ addAltAccount manager gid uuid = do
   return ()
 
 registerCommand :: String -> [BotData -> ApiRequestCounter] -> Bool -> Bool -> (Manager -> String -> IO ()) -> Command
-registerCommand name apis isalt isself onComplete = Command name 6 $ \m man bdt -> do
+registerCommand name apis isalt isself onComplete = Command name (if isself then DefaultLevel else ModLevel) 6 $ \m man bdt -> do
   tryApiRequestsMulti (map (\x -> (x bdt, 2)) apis) (\sec -> respond m $ "**Too many requests! Wait another " ++ show sec ++ " seconds!**") $ do
     let args = words $ dropWhile isSpace $ dropWhile (not . isSpace) $ unpack (messageText m)
-    let (did, mcname) = if isself then (userId $ messageAuthor m, head args) else (read $ head args, args !! 1)
+    let (did, mcname) = if isself then (userId $ messageAuthor m, head args) else (read . filter isDigit $ head args, args !! 1)
     discords <- liftIO $ getDiscordIds man
     when (did `notElem` discords) addDiscords
     discords' <- liftIO $ getDiscordIds man -- TODO: remove double request

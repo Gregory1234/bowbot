@@ -7,7 +7,7 @@
 module BowBot.BotData where
 
 import Control.Concurrent.STM.TVar (TVar, newTVar, writeTVar, modifyTVar, readTVar)
-import Data.Map (Map, empty, toList)
+import Data.Map (Map, empty, toList, fromList)
 import Discord.Types
 import BowBot.Stats
 import BowBot.API
@@ -21,7 +21,7 @@ import Data.Text (pack)
 import Data.Proxy
 import Data.Foldable (traverse_, for_)
 import Text.Read (readMaybe)
-import Data.Aeson.Types (parseMaybe, (.:), unexpected)
+import Data.Aeson.Types (parseMaybe, (.:), unexpected, (.:?))
 import Control.Monad.IO.Class (MonadIO, liftIO)
 import Control.Monad (when, unless, void)
 import Data.List.Split (chunksOf)
@@ -85,12 +85,25 @@ data MinecraftAccount = MinecraftAccount
   , mcHypixelBow :: UpdateFreq
   } deriving (Show)
 
+data PermissionLevel
+  = BanLevel
+  | DefaultLevel
+  | ModLevel
+  | AdminLevel
+  deriving (Eq, Ord, Enum, Bounded, Show)
+
+stringToPermissionLevel :: String -> Maybe PermissionLevel
+stringToPermissionLevel "ban" = Just BanLevel
+stringToPermissionLevel "default" = Just DefaultLevel
+stringToPermissionLevel "mod" = Just ModLevel
+stringToPermissionLevel "admin" = Just AdminLevel
+stringToPermissionLevel _ = Nothing
+
 data BowBotAccount = BowBotAccount
   { accountId :: Integer
   , accountDiscords :: [UserId]
   , accountSelectedMinecraft :: String
   , accountMinecrafts :: [String]
-  -- TODO: , permission :: PermissionLevel
   } deriving (Show, Eq)
 
 -- TODO: add manager to BotData
@@ -100,6 +113,7 @@ data BotData = BotData
   , minecraftAccounts :: TVar [MinecraftAccount]
   , hypixelBowOnlineList :: CachedData [String]
   , hypixelBowSettings :: TVar (Map UserId (Settings HypixelBowStats))
+  , discordPerms :: TVar (Map UserId PermissionLevel)
   , bowBotAccounts :: TVar [BowBotAccount]
   }
 
@@ -130,16 +144,29 @@ downloadBowBotAccounts manager = do
           return BowBotAccount {..}
   return $ decode res >>= parser
 
+downloadDiscordPerms :: Manager -> IO (Maybe (Map UserId PermissionLevel))
+downloadDiscordPerms manager = do
+  res <- sendDB manager "discord/perms.php" []
+  let parser = parseMaybe $ \o -> do
+        dt <- o .: "data"
+        fmap fromList . for dt $ \dp -> do
+          did <- dp .: "id"
+          (stringToPermissionLevel -> Just level) <- dp .: "level"
+          return (did, level)
+  return $ decode res >>= parser
+
 downloadData :: BotData -> IO ()
 downloadData bdt = do
   manager <- newManager managerSettings
   newMinecraftAccounts <- downloadMinecraftAccounts manager
   newHypixelBowSettings <- getSettings (Proxy @HypixelBowStats) manager
   newBowBotAccounts <- downloadBowBotAccounts manager
+  newDiscordPerms <- downloadDiscordPerms manager
   atomically $ do
     traverse_ (writeTVar (minecraftAccounts bdt)) newMinecraftAccounts
     traverse_ (writeTVar (hypixelBowSettings bdt)) newHypixelBowSettings
     traverse_ (writeTVar (bowBotAccounts bdt)) newBowBotAccounts
+    traverse_ (writeTVar (discordPerms bdt)) newDiscordPerms
 
 updateMinecraftAccounts :: BotData -> Manager -> IO ()
 updateMinecraftAccounts bdt manager = do
@@ -177,6 +204,7 @@ emptyData = do
   hypixelBowOnlineList <- newCachedData
   hypixelBowSettings <- newTVar empty
   bowBotAccounts <- newTVar []
+  discordPerms <- newTVar empty
   return BotData {..}
 
 createData :: IO BotData
