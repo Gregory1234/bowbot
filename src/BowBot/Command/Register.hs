@@ -2,12 +2,14 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ViewPatterns #-}
+{-# LANGUAGE TypeApplications #-}
 
 module BowBot.Command.Register where
 
 import BowBot.Command
 import BowBot.Minecraft
 import BowBot.BotData
+import BowBot.Stats
 import Control.Monad.Cont (liftIO, unless)
 import Control.Concurrent.STM (atomically, readTVar, writeTVar)
 import Network.HTTP.Conduit (Manager)
@@ -23,6 +25,8 @@ import Data.Char (isSpace, isDigit)
 import Data.List (intercalate)
 import BowBot.Background
 import Control.Monad (when)
+import BowBot.Stats.HypixelBow (HypixelBowStats)
+import Data.Proxy
 
 -- TODO: check if creation was successful
 
@@ -47,7 +51,7 @@ addAltAccount manager gid uuid = do
   return ()
 
 registerCommand :: String -> [BotData -> ApiRequestCounter] -> Bool -> Bool -> (Manager -> String -> IO ()) -> Command
-registerCommand name apis isalt isself onComplete = Command name (if isself then DefaultLevel else ModLevel) 6 $ \m man bdt -> do
+registerCommand name apis isalt isself onComplete = Command name (if isself then DefaultLevel else ModLevel) 12 $ \m man bdt -> do
   tryApiRequestsMulti (map (\x -> (x bdt, 2)) apis) (\sec -> respond m $ "**Too many requests! Wait another " ++ show sec ++ " seconds!**") $ do
     let args = words $ dropWhile isSpace $ dropWhile (not . isSpace) $ unpack (messageText m)
     let (did, mcname) = if isself then (userId $ messageAuthor m, head args) else (read . filter isDigit $ head args, args !! 1)
@@ -82,6 +86,8 @@ registerCommand name apis isalt isself onComplete = Command name (if isself then
                   let oldAcc = head $ filter ((==gid) . accountId) psa
                   liftIO $ atomically $ writeTVar (bowBotAccounts bdt) (oldAcc { accountMinecrafts = uuid:accountMinecrafts oldAcc } : filter ((/= gid) . accountId) psa)
                   liftIO $ onComplete man uuid
+                  lb <- liftIO $ getLeaderboard (Proxy @HypixelBowStats) man
+                  for_ lb $ \x -> updateRolesSingleId bdt x did
                   respond m "*Registered successfully*"
             else do
               newAcc <- liftIO $ addAccount man (head names) did uuid
@@ -91,4 +97,6 @@ registerCommand name apis isalt isself onComplete = Command name (if isself then
                   psa <- liftIO $ atomically $ readTVar (bowBotAccounts bdt)
                   liftIO $ atomically $ writeTVar (bowBotAccounts bdt) (newAcc':psa)
                   liftIO $ onComplete man uuid
+                  lb <- liftIO $ getLeaderboard (Proxy @HypixelBowStats) man
+                  for_ lb $ \x -> updateRolesSingleId bdt x did
                   respond m "*Registered successfully*"

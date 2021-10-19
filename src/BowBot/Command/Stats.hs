@@ -1,3 +1,5 @@
+{-# LANGUAGE TypeApplications #-}
+
 module BowBot.Command.Stats where
 
 import BowBot.Stats
@@ -6,6 +8,7 @@ import BowBot.Minecraft
 import BowBot.BotData
 import Data.Proxy
 import Discord.Types
+import BowBot.Stats.HypixelBow
 import Data.Text (unpack)
 import Data.Char (isSpace)
 import Control.Monad.IO.Class (liftIO)
@@ -16,6 +19,7 @@ import Control.Concurrent.STM (atomically)
 import Data.Foldable (for_)
 import Control.Monad (unless)
 import Data.Map (fromList)
+import BowBot.Background (updateRolesSingleId)
 
 data StatsCommandMode = AlwaysDefault | AlwaysAll | UserSettings
 
@@ -36,6 +40,8 @@ statsCommand pr name rc mode = Command name DefaultLevel 2 $ \m man bdt -> do
       UserSettings -> do
         pure $ defSettings pr
     respond m $ statsMessage settings res
+    lb <- liftIO $ getLeaderboard (Proxy @HypixelBowStats) man -- TODO: make this into a function
+    for_ lb $ \x -> updateRolesSingleId bdt x (userId $ messageAuthor m)
 
 statsMessage :: StatType s => Settings s -> MinecraftResponse s -> String
 statsMessage _ NoResponse = "*The player doesn't exist!*"

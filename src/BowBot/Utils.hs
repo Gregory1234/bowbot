@@ -5,7 +5,7 @@ module BowBot.Utils where
 import Control.Monad.IO.Class ( liftIO, MonadIO )
 import Data.Maybe (fromMaybe)
 import System.Environment.Blank (getEnv)
-import Discord.Internal.Rest (GuildId)
+import Discord.Internal.Rest
 import BowBot.Constants
 import Text.Printf (printf)
 import Data.Ratio ((%))
@@ -55,6 +55,9 @@ ifDev v action = do
   
 discordGuildId :: IO GuildId
 discordGuildId = ifDev airplanesId $ return testDiscordId
+
+discordDivisionRoles :: IO [(Integer, RoleId)]
+discordDivisionRoles = ifDev airplanesDivisionRoles $ return testDiscordDivisionRoles
 
 discordEscape :: String -> String
 discordEscape [] = ""

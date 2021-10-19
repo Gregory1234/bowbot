@@ -15,6 +15,7 @@ import Control.Concurrent.STM (atomically)
 import Control.Concurrent.STM.TVar (readTVar, writeTVar, modifyTVar)
 import Data.Maybe (fromMaybe)
 import Data.Traversable (for)
+import Network.HTTP.Conduit (Manager)
 
 minecraftCommand :: Command
 minecraftCommand = Command "mc" DefaultLevel 2 $ \m man bdt -> do

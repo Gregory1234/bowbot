@@ -128,11 +128,10 @@ commands =
     ++ " - **?lb(|l|s|r) [page number|name|all]** - *show a Bow Duels leaderboard*\n"
     ++ " - **?mc** - *list your linked minecraft nicks*\n"
     ++ " - **?mc [name]** - *select a minecraft account as your default*\n"
-    ++ " - **?roles** - *refresh discord roles*\n"
     ++ " - **?settings** - *display help for settings*\n"
     ++ "\nMade by **GregC**#9698"
   , constStringCommand "settings" DefaultLevel
-    $ "**You can now customize the output of ?s command!**\n"
+    $ "**Bow bot settings help:**\n"
     ++ "**Commands:**\n"
     ++ " - **?settings** - *display this message*\n"
     ++ " - **?show [stat]** - *makes the stat visible*\n"

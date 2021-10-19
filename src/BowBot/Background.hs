@@ -2,6 +2,7 @@
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ViewPatterns #-}
+{-# LANGUAGE TupleSections #-}
 
 module BowBot.Background where
 
@@ -18,18 +19,53 @@ import BowBot.API
 import Data.List.Split (chunksOf)
 import Data.Traversable (for)
 import Control.Concurrent (threadDelay)
-import Data.Map (fromList)
+import Data.Map (fromList, Map, (!?))
 import Control.Concurrent.Async (mapConcurrently)
 import Data.Foldable (for_)
-import Data.Maybe (catMaybes, fromMaybe)
+import Data.Maybe (catMaybes, fromMaybe, mapMaybe)
 import BowBot.Utils
-import Discord.Types
+import Discord.Types hiding (accountId)
 import Control.Monad.IO.Class (liftIO)
 import Data.Aeson.Types (object, (.=), parseMaybe, (.:))
 import Data.Text (pack)
 import Data.Either (fromRight)
 import Text.Read (readMaybe)
 import Data.Aeson (decode)
+import Data.List ((\\))
+import BowBot.Command (call)
+
+updateRolesSingle :: BotData -> Map String (Leaderboards HypixelBowStats) -> GuildMember -> DiscordHandler Bool
+updateRolesSingle bdt lb memb = do
+  gid <- liftIO discordGuildId
+  accs <- liftIO $ fmap (>>=(\u -> (, accountMinecrafts u) <$> accountDiscords u)) $ atomically $ readTVar $ bowBotAccounts bdt
+  let did = userId . memberUser $ memb
+  case lookup did accs of
+      Nothing -> pure False
+      Just mc -> do
+        let wins = maximum $ mapMaybe (fmap bowLbWins . (lb !?)) mc
+        divisionRoles <- liftIO discordDivisionRoles
+        let currentDivisionRoles = filter (`elem` map snd divisionRoles) (memberRoles memb)
+        let targetDivisionRoles = take 1 $ map snd $ filter ((< wins) . fst) $ reverse divisionRoles
+        for_ (currentDivisionRoles \\ targetDivisionRoles) $ call . R.RemoveGuildMemberRole gid did
+        for_ (targetDivisionRoles \\ currentDivisionRoles) $ call . R.AddGuildMemberRole gid did
+        pure True
+
+updateRolesSingleId :: BotData -> Map String (Leaderboards HypixelBowStats) -> UserId -> DiscordHandler Bool
+updateRolesSingleId bdt lb did = do
+  gid <- liftIO discordGuildId
+  maybeMem <- restCall $ R.GetGuildMember gid did
+  case maybeMem of
+    Left _ -> pure False
+    Right mem -> updateRolesSingle bdt lb mem
+
+updateRolesAll :: BotData -> Manager -> DiscordHandler ()
+updateRolesAll bdt man = do
+  gid <- liftIO discordGuildId
+  maybeGmembs <- fmap (filter (not . userIsBot . memberUser)) <$> restCall (R.ListGuildMembers gid R.GuildMembersTiming {R.guildMembersTimingLimit = Just 500, R.guildMembersTimingAfter = Nothing})
+  lb <- liftIO $ getLeaderboard (Proxy @HypixelBowStats) man
+  case maybeGmembs of
+    Left _ -> pure ()
+    Right gmembs -> for_ lb $ \x -> for_ gmembs $ updateRolesSingle bdt x
 
 getDiscordIds :: Manager -> IO [UserId]
 getDiscordIds manager = do
@@ -66,9 +102,11 @@ addDiscords = do
          usrToObject User {..} = pack (show userId) .= object ["name" .= userName, "discriminator" .= userDiscrim]
 
 discordBackgroundMinutely :: BotData -> Int -> DiscordHandler ()
-discordBackgroundMinutely _ mint = do
+discordBackgroundMinutely bdt mint = do
   when (mint == 0) $ do
     addDiscords
+    manager <- liftIO $ newManager managerSettings
+    updateRolesAll bdt manager
 
 -- TODO: frequency updates
 

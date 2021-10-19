@@ -31,7 +31,7 @@ data LeaderboardElement = LeaderboardElement { lbPos :: Integer, lbName :: Strin
 data LeaderboardPage = LeaderboardPage Int | LeaderboardAll | LeaderboardSearch String
 
 leaderboardCommand :: StatType s => Proxy s -> String -> String -> String -> (Leaderboards s -> Maybe (Integer, String)) -> Command
-leaderboardCommand pr name lbname statname lbfun = Command name DefaultLevel 2 $ \m man bdt -> do
+leaderboardCommand pr name lbname statname lbfun = Command name DefaultLevel 10 $ \m man bdt -> do
   maybedat <- liftIO $ getLeaderboard pr man
   case maybedat of
     Nothing -> respond m ""
@@ -47,7 +47,7 @@ leaderboardCommand pr name lbname statname lbfun = Command name DefaultLevel 2 $
         ["all"] -> liftIO $ atomically $ Right . (,Nothing, LeaderboardAll) <$> getAuthorNicks bdt (userId $ messageAuthor m)
         [readMaybe -> Just page] -> liftIO $ atomically $ Right . (,Nothing, LeaderboardPage (page - 1)) <$> getAuthorNicks bdt (userId $ messageAuthor m)
         [mcName] -> do
-          res <- withMinecraft man bdt True (Left mcName) $ \uuid _ -> do
+          res <- withMinecraftAutocorrect man bdt False mcName $ \uuid _ -> do
             liftIO $ print uuid
             return $ if uuid `elem` map lbUUID elems then Just uuid else Nothing
           return $ case res of

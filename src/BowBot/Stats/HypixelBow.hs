@@ -4,9 +4,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE ViewPatterns #-}
 
-module BowBot.Stats.HypixelBow(HypixelBowStats,
-  hypixelBowWinsLeaderboard, hypixelBowLossesLeaderboard, hypixelBowWinstreakLeaderboard, hypixelBowWLRLeaderboard
-) where
+module BowBot.Stats.HypixelBow where
 
 import BowBot.Utils
 import Data.Proxy

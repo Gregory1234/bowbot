@@ -1,14 +1,21 @@
+{-# LANGUAGE TypeApplications #-}
+
 module BowBot.Command.Simple where
 
 import BowBot.Command
 import BowBot.Minecraft
 import BowBot.BotData
+import BowBot.Stats.HypixelBow
 import Control.Monad.IO.Class (liftIO)
 import Discord.Types
 import Data.Text (unpack)
 import Data.Char (isSpace)
 import Control.Monad (void)
-  
+import BowBot.Stats
+import BowBot.Background
+import Data.Proxy
+import Data.Foldable (for_)
+
 urlCommand :: String -> Bool -> (String -> String) -> Command
 urlCommand name ac mkurl = Command name DefaultLevel 2 $ \m man bdt -> do
   let args = words $ dropWhile isSpace $ dropWhile (not . isSpace) $ unpack (messageText m)
