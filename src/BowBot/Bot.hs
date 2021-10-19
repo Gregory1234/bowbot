@@ -11,6 +11,7 @@ import BowBot.Command.Stats
 import BowBot.Command.Register
 import BowBot.Command.Simple
 import BowBot.Command.Leaderboard
+import BowBot.Command.Minecraft
 import BowBot.Stats
 import BowBot.Stats.HypixelBow
 import BowBot.BotData
@@ -111,7 +112,8 @@ commands =
       fullUpdateStats (Proxy @HypixelBowStats) man uuid
   , registerCommand "addalt" [hypixelRequestCounter] True False $ \man uuid -> do
       fullUpdateStats (Proxy @HypixelBowStats) man uuid
-  , constStringCommand "help" DefaultLevel 
+  , minecraftCommand
+  , constStringCommand "help" DefaultLevel
     $ "**Bow bot help:**\n\n"
     ++ "**Commands:**\n"
     ++ " - **?help** - *display this message*\n"
@@ -129,7 +131,7 @@ commands =
     ++ " - **?roles** - *refresh discord roles*\n"
     ++ " - **?settings** - *display help for settings*\n"
     ++ "\nMade by **GregC**#9698"
-  , constStringCommand "settings" DefaultLevel 
+  , constStringCommand "settings" DefaultLevel
     $ "**You can now customize the output of ?s command!**\n"
     ++ "**Commands:**\n"
     ++ " - **?settings** - *display this message*\n"
@@ -139,7 +141,7 @@ commands =
     ++ "*Visibility 'maybe' and 'defined' hide the stat when the value is undefined.*\n"
     ++ "**Stat names:** wins, losses, wlr, winsuntil, beststreak, currentstreak, bestdailystreak, bowhits, bowshots, accuracy\n"
     ++ "**Example:** *?show accuracy* makes accuracy visible in the ?s command\n"
-  , constStringCommand "modhelp" ModLevel 
+  , constStringCommand "modhelp" ModLevel
     $ "**Bow bot help:**\n\n"
     ++ "**Mod Commands:**\n"
     ++ " - **?modhelp** - *display this message*\n"

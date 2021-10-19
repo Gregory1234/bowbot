@@ -32,6 +32,7 @@ library
       BowBot.BotData
       BowBot.Command
       BowBot.Command.Leaderboard
+      BowBot.Command.Minecraft
       BowBot.Command.Register
       BowBot.Command.Simple
       BowBot.Command.Stats
