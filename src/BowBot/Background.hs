@@ -125,7 +125,9 @@ completeLeaderboardUpdate pr bdt api filt = do
 
 backgroundMinutely :: BotData -> Int -> IO ()
 backgroundMinutely bdt@BotData {..} mint = do
-  atomically $ clearApiRequestCounter hypixelRequestCounter
+  atomically $ do
+    clearApiRequestCounter hypixelRequestCounter
+    clearCache hypixelBowOnlineList
   when (mint == 0) $ do
     downloadData bdt
     manager <- newManager managerSettings

@@ -12,6 +12,7 @@ import BowBot.Command.Register
 import BowBot.Command.Simple
 import BowBot.Command.Leaderboard
 import BowBot.Command.Minecraft
+import BowBot.Command.Watchlist
 import BowBot.Stats
 import BowBot.Stats.HypixelBow
 import BowBot.BotData
@@ -113,6 +114,8 @@ commands =
   , registerCommand "addalt" [hypixelRequestCounter] True False $ \man uuid -> do
       fullUpdateStats (Proxy @HypixelBowStats) man uuid
   , minecraftCommand
+  , listCommand
+  , onlineCommand
   , constStringCommand "help" DefaultLevel
     $ "**Bow bot help:**\n\n"
     ++ "**Commands:**\n"

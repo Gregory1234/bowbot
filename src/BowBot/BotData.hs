@@ -65,6 +65,40 @@ tryApiRequestsMulti apis onFail onSuccess = do
 
 data CachedData a = CachedData { mainCache :: TVar (Maybe a), borderCache :: TVar (Maybe a), currentlyBusyCache :: TVar Bool }
 
+clearCache :: CachedData a -> STM ()
+clearCache CachedData {..} = do
+  border <- readTVar borderCache
+  writeTVar mainCache border
+
+data CacheResponse a
+  = CacheBusy
+  | CacheFailed
+  | CacheFresh a
+  | CacheOld a
+
+getOrCalculateCache :: MonadIO m => CachedData a -> m (Maybe a) -> m (CacheResponse a)
+getOrCalculateCache CachedData {..} exec = do
+  (ret, busy) <- liftIO $ atomically $ do
+    busy <- readTVar currentlyBusyCache
+    mainVal <- readTVar mainCache
+    borderVal <- readTVar borderCache
+    case (mainVal, borderVal) of
+      (Nothing, Nothing) -> do
+        unless busy $ writeTVar currentlyBusyCache True
+        return (Nothing, busy)
+      (Nothing, _) -> return (borderVal, busy)
+      (Just _,_) -> return (mainVal, busy)
+  case (ret, busy) of
+    (Nothing, True) -> return CacheBusy
+    (Just a, _) -> return (CacheOld a)
+    (Nothing, False) -> do
+      val <- exec
+      t <- liftIO $ read @Int <$> getTime "%S"
+      liftIO $ atomically $ do
+        writeTVar currentlyBusyCache False
+        writeTVar (if t <= 5 || t >= 55 then borderCache else mainCache) val
+      return (maybe CacheFailed CacheFresh val)
+
 data UpdateFreq
   = BiHourly
   | Daily
