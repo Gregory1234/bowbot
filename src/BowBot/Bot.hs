@@ -13,6 +13,7 @@ import BowBot.Command.Simple
 import BowBot.Command.Leaderboard
 import BowBot.Command.Minecraft
 import BowBot.Command.Watchlist
+import BowBot.Command.Name
 import BowBot.Stats
 import BowBot.Stats.HypixelBow
 import BowBot.BotData
@@ -116,6 +117,8 @@ commands =
   , minecraftCommand
   , listCommand
   , onlineCommand
+  , nameCommand "n" True
+  , nameCommand "na" False
   , constStringCommand "help" DefaultLevel
     $ "**Bow bot help:**\n\n"
     ++ "**Commands:**\n"
