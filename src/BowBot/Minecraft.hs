@@ -1,6 +1,7 @@
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TupleSections #-}
+{-# LANGUAGE ViewPatterns #-}
 
 module BowBot.Minecraft where
 
@@ -13,8 +14,9 @@ import Control.Concurrent.STM.TVar (readTVar)
 import Control.Concurrent.STM (atomically, STM)
 import Data.Maybe (fromMaybe)
 import BowBot.Utils
-import Data.Char (toLower)
-import Data.List (sortOn)
+import Data.Char (toLower, isDigit)
+import Data.List (sortOn, isPrefixOf, isSuffixOf)
+import Text.Read (readMaybe)
 
 
 data MinecraftResponse a
@@ -41,11 +43,24 @@ mcUUIDToNames manager bdt uuid = do
     [MinecraftAccount {mcNames}] -> return (Just mcNames)
     _ -> mojangUUIDToNames manager uuid
 
+fromPingDiscordUser :: String -> Maybe UserId
+fromPingDiscordUser str | "<@!" `isPrefixOf` str && ">" `isSuffixOf` str = readMaybe $ filter isDigit str
+fromPingDiscordUser _ = Nothing
+
 withMinecraft :: MonadIO m => Manager -> BotData -> Bool -> Either String UserId -> (String -> [String] -> m (Maybe a)) -> m (MinecraftResponse a)
-withMinecraft manager bdt _ (Right author) fun = do
+withMinecraft manager bdt _ (Right author) fun = withMinecraftDiscord manager bdt author fun
+withMinecraft manager bdt _ (Left (fromPingDiscordUser -> Just did)) fun = do
+  ret <- withMinecraftDiscord manager bdt did fun
+  return $ case ret of
+    NotOnList -> NoResponse -- TODO: make more granular responses
+    _ -> ret
+withMinecraft manager bdt ac (Left mcname) fun = 
+  if ac then withMinecraftAutocorrect manager bdt True mcname fun else withMinecraftNormal manager bdt True mcname fun
+
+withMinecraftDiscord :: MonadIO m => Manager -> BotData -> UserId -> (String -> [String] -> m (Maybe a)) -> m (MinecraftResponse a)
+withMinecraftDiscord manager bdt did fun = do
   pns <- fmap (>>=(\BowBotAccount {..} -> (,accountSelectedMinecraft) <$> accountDiscords)) $ liftIO $ atomically $ readTVar (bowBotAccounts bdt)
-  liftIO $ print $ lookup author pns
-  case lookup author pns of
+  case lookup did pns of
     Nothing -> pure NotOnList
     Just uuid -> do
       names <- liftIO $ fromMaybe [] <$> mcUUIDToNames manager bdt uuid
@@ -53,8 +68,6 @@ withMinecraft manager bdt _ (Right author) fun = do
       case res of
         Nothing -> pure NoResponse
         Just r -> pure (JustResponse (head names) r)
-withMinecraft manager bdt ac (Left mcname) fun = 
-  if ac then withMinecraftAutocorrect manager bdt True mcname fun else withMinecraftNormal manager bdt True mcname fun
 
 withMinecraftNormal :: MonadIO m => Manager -> BotData -> Bool -> String -> (String -> [String] -> m (Maybe a)) -> m (MinecraftResponse a)
 withMinecraftNormal manager bdt cont mcname fun = do
