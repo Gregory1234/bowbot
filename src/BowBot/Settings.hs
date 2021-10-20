@@ -29,7 +29,7 @@ parseBool _ = Nothing
 
 parseSense :: String -> Maybe BoolSense
 parseSense "always" = Just Always
-parseSense "never" = Just Always
+parseSense "never" = Just Never
 parseSense "sensibly" = Just WhenSensible
 parseSense _ = Nothing
 
@@ -52,9 +52,6 @@ getSettings manager = do
           (parseSense -> Just sAccuracy) <- settings .: "accuracy"
           pure (discord, Settings {..})
   return $ decode res >>= parser
-
-updateSettings :: Manager -> UserId -> String -> String -> IO (Maybe String)
-updateSettings = undefined
 
 defSettings :: Settings
 defSettings = Settings

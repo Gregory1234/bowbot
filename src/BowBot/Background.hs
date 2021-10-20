@@ -47,7 +47,7 @@ updateDivisionRolesSingle bdt lb memb = do
         let wins = maximum $ mapMaybe (fmap bowLbWins . (lb !?)) mc
         divisionRoles <- liftIO discordDivisionRoles
         let currentDivisionRoles = filter (`elem` map snd divisionRoles) (memberRoles memb)
-        let targetDivisionRoles = take 1 $ map snd $ filter ((< wins) . fst) $ reverse divisionRoles
+        let targetDivisionRoles = take 1 $ map snd $ filter ((<= wins) . fst) $ reverse divisionRoles
         for_ (currentDivisionRoles \\ targetDivisionRoles) $ call . R.RemoveGuildMemberRole gid did
         for_ (targetDivisionRoles \\ currentDivisionRoles) $ call . R.AddGuildMemberRole gid did
         pure True

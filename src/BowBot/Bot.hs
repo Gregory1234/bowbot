@@ -14,11 +14,13 @@ import BowBot.Command.Leaderboard
 import BowBot.Command.Minecraft
 import BowBot.Command.Watchlist
 import BowBot.Command.Name
+import BowBot.Command.Settings
 import BowBot.Stats
 import BowBot.Stats.HypixelBow
 import BowBot.BotData
 import BowBot.API
 import BowBot.Background
+import BowBot.Settings
 import Discord.Types
 import qualified Data.Text as T
 import qualified Data.Text.IO as TIO
@@ -119,6 +121,9 @@ commands =
   , onlineCommand
   , nameCommand "n" True
   , nameCommand "na" False
+  , settingsCommand "set" Nothing
+  , settingsCommand "show" (Just (True, Always))
+  , settingsCommand "hide" (Just (False, Never))
   , constStringCommand "help" DefaultLevel
     $ "**Bow bot help:**\n\n"
     ++ "**Commands:**\n"
@@ -142,7 +147,7 @@ commands =
     ++ " - **?settings** - *display this message*\n"
     ++ " - **?show [stat]** - *makes the stat visible*\n"
     ++ " - **?hide [stat]** - *makes the stat hidden*\n"
-    ++ " - **?show [stat] [yes|always|show|no|never|hide|maybe|defined]** - *sets the visibility of the stat*\n"
+    ++ " - **?set [stat] [yes|always|show|no|never|hide|maybe|defined]** - *sets the visibility of the stat*\n"
     ++ "*Visibility 'maybe' and 'defined' hide the stat when the value is undefined.*\n"
     ++ "**Stat names:** wins, losses, wlr, winsuntil, beststreak, currentstreak, bestdailystreak, bowhits, bowshots, accuracy\n"
     ++ "**Example:** *?show accuracy* makes accuracy visible in the ?s command\n"
