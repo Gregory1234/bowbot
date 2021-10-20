@@ -23,3 +23,12 @@ airplanesDivisionRoles =
 
 testDiscordDivisionRoles :: [(Integer, RoleId)]
 testDiscordDivisionRoles = [(15000, 900080311822581771)]
+
+airplanesMemberVisitorRoles :: (RoleId, RoleId)
+airplanesMemberVisitorRoles = (742890312690827345, 742874367200854136)
+
+testDiscordMemberVisitorRoles :: (RoleId, RoleId)
+testDiscordMemberVisitorRoles = (900346056968130640, 900346092850401310)
+
+airplanesHypixelId :: String
+airplanesHypixelId = "5f308a358ea8c97248581e46"

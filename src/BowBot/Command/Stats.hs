@@ -19,7 +19,7 @@ import Control.Concurrent.STM (atomically)
 import Data.Foldable (for_)
 import Control.Monad (unless)
 import Data.Map (fromList)
-import BowBot.Background (updateRolesSingleId)
+import BowBot.Background
 
 data StatsCommandMode = AlwaysDefault | AlwaysAll | UserSettings
 
@@ -41,7 +41,7 @@ statsCommand pr name rc mode = Command name DefaultLevel 2 $ \m man bdt -> do
         pure $ defSettings pr
     respond m $ statsMessage settings res
     lb <- liftIO $ getLeaderboard (Proxy @HypixelBowStats) man -- TODO: make this into a function
-    for_ lb $ \x -> updateRolesSingleId bdt x (userId $ messageAuthor m)
+    for_ lb $ \x -> updateDivisionRolesSingleId bdt x (userId $ messageAuthor m)
 
 statsMessage :: StatType s => Settings s -> MinecraftResponse s -> String
 statsMessage _ NoResponse = "*The player doesn't exist!*"

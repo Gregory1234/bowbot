@@ -87,7 +87,7 @@ registerCommand name apis isalt isself onComplete = Command name (if isself then
                   liftIO $ atomically $ writeTVar (bowBotAccounts bdt) (oldAcc { accountMinecrafts = uuid:accountMinecrafts oldAcc } : filter ((/= gid) . accountId) psa)
                   liftIO $ onComplete man uuid
                   lb <- liftIO $ getLeaderboard (Proxy @HypixelBowStats) man
-                  for_ lb $ \x -> updateRolesSingleId bdt x did
+                  for_ lb $ \x -> updateDivisionRolesSingleId bdt x did
                   respond m "*Registered successfully*"
             else do
               newAcc <- liftIO $ addAccount man (head names) did uuid
@@ -98,5 +98,5 @@ registerCommand name apis isalt isself onComplete = Command name (if isself then
                   liftIO $ atomically $ writeTVar (bowBotAccounts bdt) (newAcc':psa)
                   liftIO $ onComplete man uuid
                   lb <- liftIO $ getLeaderboard (Proxy @HypixelBowStats) man
-                  for_ lb $ \x -> updateRolesSingleId bdt x did
+                  for_ lb $ \x -> updateDivisionRolesSingleId bdt x did
                   respond m "*Registered successfully*"

@@ -216,7 +216,7 @@ updateMinecraftAccounts bdt manager = do
       return MinecraftAccount {mcNames = fromMaybe mcNames newNames, ..}
     updateMinecraftNames uuid names = 
       void $ sendDB manager "minecraft/setnames.php" ["uuid=" ++ uuid, "names=" ++ intercalate "," names]
-    
+
 
 newRequestCounter :: Int -> STM ApiRequestCounter
 newRequestCounter counterLimit = do

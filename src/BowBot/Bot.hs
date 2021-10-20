@@ -153,7 +153,7 @@ commands =
     ++ " - **?add [discord/discord id] [name]** - *register a person with a given minecraft name*\n"
     ++ " - **?addalt [discord/discord id] [name]** - *register a person's alt*\n"
     ++ "\nMade by **GregC**#9698"
-  ]
+  ] ++ adminCommands
 
 eventHandler :: BotData -> Manager -> Event -> DiscordHandler ()
 eventHandler bdt man (MessageCreate m) = do

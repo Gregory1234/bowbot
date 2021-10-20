@@ -14,6 +14,7 @@ import Control.Monad (when)
 import BowBot.Stats.HypixelBow
 import Data.Proxy
 import BowBot.Stats
+import BowBot.Constants
 import Network.HTTP.Conduit (newManager, Manager)
 import BowBot.API
 import Data.List.Split (chunksOf)
@@ -32,10 +33,11 @@ import Data.Either (fromRight)
 import Text.Read (readMaybe)
 import Data.Aeson (decode)
 import Data.List ((\\))
-import BowBot.Command (call)
+import BowBot.Command
+import System.Environment.Blank (getEnv)
 
-updateRolesSingle :: BotData -> Map String (Leaderboards HypixelBowStats) -> GuildMember -> DiscordHandler Bool
-updateRolesSingle bdt lb memb = do
+updateDivisionRolesSingle :: BotData -> Map String (Leaderboards HypixelBowStats) -> GuildMember -> DiscordHandler Bool
+updateDivisionRolesSingle bdt lb memb = do
   gid <- liftIO discordGuildId
   accs <- liftIO $ fmap (>>=(\u -> (, accountMinecrafts u) <$> accountDiscords u)) $ atomically $ readTVar $ bowBotAccounts bdt
   let did = userId . memberUser $ memb
@@ -50,22 +52,54 @@ updateRolesSingle bdt lb memb = do
         for_ (targetDivisionRoles \\ currentDivisionRoles) $ call . R.AddGuildMemberRole gid did
         pure True
 
-updateRolesSingleId :: BotData -> Map String (Leaderboards HypixelBowStats) -> UserId -> DiscordHandler Bool
-updateRolesSingleId bdt lb did = do
+updateDivisionRolesSingleId :: BotData -> Map String (Leaderboards HypixelBowStats) -> UserId -> DiscordHandler Bool
+updateDivisionRolesSingleId bdt lb did = do
   gid <- liftIO discordGuildId
   maybeMem <- restCall $ R.GetGuildMember gid did
   case maybeMem of
     Left _ -> pure False
-    Right mem -> updateRolesSingle bdt lb mem
+    Right mem -> updateDivisionRolesSingle bdt lb mem
+
+updateGuildMemberRolesSingle :: BotData -> [String] -> GuildMember -> DiscordHandler Bool
+updateGuildMemberRolesSingle bdt members memb = do
+  gid <- liftIO discordGuildId
+  accs <- liftIO $ fmap (>>=(\u -> (, accountMinecrafts u) <$> accountDiscords u)) $ atomically $ readTVar $ bowBotAccounts bdt
+  let did = userId . memberUser $ memb
+  case lookup did accs of
+      Nothing -> pure False
+      Just mc -> do
+        let isMember = any (`elem` members) mc
+        memberVisitorRoles <- liftIO discordMemberVisitorRoles
+        let currentRoles = filter (\x -> x == fst memberVisitorRoles || x == snd memberVisitorRoles) (memberRoles memb)
+        let targetRoles = [(if isMember then fst else snd) memberVisitorRoles]
+        for_ (currentRoles \\ targetRoles) $ call . R.RemoveGuildMemberRole gid did -- TODO: remove repetition
+        for_ (targetRoles \\ currentRoles) $ call . R.AddGuildMemberRole gid did
+        pure True
+
+downloadGuildMemberList :: Manager -> IO (Maybe [String]) -- TODO: cache this to use in register command
+downloadGuildMemberList man = do
+  apiKey <- fromMaybe "" <$> getEnv "HYPIXEL_API"
+  let url = "https://api.hypixel.net/guild?key=" ++ apiKey ++ "&id=" ++ airplanesHypixelId
+  let cleanUrl = "https://api.hypixel.net/guild?key=[REDACTED]&id=" ++ airplanesHypixelId
+  res <- sendRequestTo man url cleanUrl
+  let parser = parseMaybe $ \o -> do
+        guild <- o .: "guild"
+        members <- guild .: "members"
+        for members $ \m -> m .: "uuid"
+  return $ decode res >>= parser
 
 updateRolesAll :: BotData -> Manager -> DiscordHandler ()
 updateRolesAll bdt man = do
-  gid <- liftIO discordGuildId
-  maybeGmembs <- fmap (filter (not . userIsBot . memberUser)) <$> restCall (R.ListGuildMembers gid R.GuildMembersTiming {R.guildMembersTimingLimit = Just 500, R.guildMembersTimingAfter = Nothing})
-  lb <- liftIO $ getLeaderboard (Proxy @HypixelBowStats) man
-  case maybeGmembs of
-    Left _ -> pure ()
-    Right gmembs -> for_ lb $ \x -> for_ gmembs $ updateRolesSingle bdt x
+  tryApiRequests (hypixelRequestCounter bdt) 1 (\_ -> pure ()) $ do
+    members <- liftIO $ downloadGuildMemberList man
+    gid <- liftIO discordGuildId
+    maybeGmembs <- fmap (filter (not . userIsBot . memberUser)) <$> restCall (R.ListGuildMembers gid R.GuildMembersTiming {R.guildMembersTimingLimit = Just 500, R.guildMembersTimingAfter = Nothing})
+    lb <- liftIO $ getLeaderboard (Proxy @HypixelBowStats) man
+    case maybeGmembs of
+      Left _ -> pure ()
+      Right gmembs -> for_ gmembs $ \m -> do
+        for_ lb $ \x -> updateDivisionRolesSingle bdt x m
+        for_ members $ \x -> updateGuildMemberRolesSingle bdt x m
 
 getDiscordIds :: Manager -> IO [UserId]
 getDiscordIds manager = do
@@ -138,3 +172,21 @@ backgroundMinutely bdt@BotData {..} mint = do
       completeLeaderboardUpdate (Proxy @HypixelBowStats) bdt hypixelRequestCounter $ \MinecraftAccount {..} -> mcHypixelBow == BiHourly
     when (hour == 0) $
       completeLeaderboardUpdate (Proxy @HypixelBowStats) bdt hypixelRequestCounter $ \MinecraftAccount {..} -> mcHypixelBow == Daily
+
+adminCommands :: [Command]
+adminCommands = 
+  [ Command "refresh" AdminLevel 120 $ \m _ bdt -> do
+          liftIO $ downloadData bdt
+          manager <- liftIO $ newManager managerSettings
+          liftIO $ updateMinecraftAccounts bdt manager
+          respond m "Done"
+  , Command "discordrefresh" AdminLevel 120 $ \m _ _ -> do
+          addDiscords
+          respond m "Done"
+  , Command "rolesrefresh" AdminLevel 120 $ \m man bdt -> do
+          updateRolesAll bdt man
+          respond m "Done"
+  , Command "lbrefresh" AdminLevel 120 $ \m _ bdt -> do
+          liftIO $ completeLeaderboardUpdate (Proxy @HypixelBowStats) bdt (hypixelRequestCounter bdt) $ const True
+          respond m "Done"
+  ]
