@@ -18,8 +18,10 @@ import Control.Concurrent.STM.TVar (modifyTVar, readTVar)
 import Control.Concurrent.STM (atomically)
 import Data.Foldable (for_)
 import Control.Monad (unless)
-import Data.Map (fromList)
+import Data.Map (fromList, (!?))
 import BowBot.Background
+import BowBot.Settings
+import Data.Maybe (fromMaybe)
 
 data StatsCommandMode = AlwaysDefault | AlwaysAll | UserSettings
 
@@ -35,15 +37,16 @@ statsCommand pr name rc mode = Command name DefaultLevel 2 $ \m man bdt -> do
       for_ st (liftIO . tryRegister bdt man uuid names)
       return st
     settings <- case mode of
-      AlwaysDefault -> pure $ defSettings pr
-      AlwaysAll -> pure $ allSettings pr
+      AlwaysDefault -> pure defSettings
+      AlwaysAll -> pure allSettings
       UserSettings -> do
-        pure $ defSettings pr
+        settings <- liftIO $ atomically $ readTVar $ discordSettings bdt
+        pure $ fromMaybe defSettings $ settings !? userId (messageAuthor m)
     respond m $ statsMessage settings res
     lb <- liftIO $ getLeaderboard (Proxy @HypixelBowStats) man -- TODO: make this into a function
     for_ lb $ \x -> updateDivisionRolesSingleId bdt x (userId $ messageAuthor m)
 
-statsMessage :: StatType s => Settings s -> MinecraftResponse s -> String
+statsMessage :: StatType s => Settings -> MinecraftResponse s -> String
 statsMessage _ NoResponse = "*The player doesn't exist!*"
 statsMessage settings (JustResponse n s) = "**" ++ n ++ ":**\n" ++ showStats settings s
 statsMessage settings (OldResponse o n s) = "**" ++ o ++ " (" ++ n ++ "):**\n" ++ showStats settings s

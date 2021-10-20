@@ -19,6 +19,7 @@ import Data.Traversable (for)
 import Data.Map (fromList, toList)
 import Data.Text (pack)
 import Text.Read (readMaybe)
+import BowBot.Settings
 
 data HypixelBowStats = HypixelBowStats
   { bowWins :: Integer,
@@ -31,18 +32,8 @@ data HypixelBowStats = HypixelBowStats
   } deriving (Show)
 
 instance StatType HypixelBowStats where
-  data Settings HypixelBowStats = HypixelBowSettings
-    { sWins :: Bool, sLosses :: Bool, sWLR :: BoolSense, sWinsUntil :: BoolSense
-    , sBestStreak :: Bool, sCurrentStreak :: Bool, sBestDailyStreak :: Bool
-    , sBowHits :: Bool, sBowShots :: Bool, sAccuracy :: BoolSense
-    } deriving (Eq, Show)
   data Leaderboards HypixelBowStats = HypixelBowLeaderboards
     { bowLbWins :: Integer, bowLbLosses :: Integer, bowLbWinstreak :: Integer } deriving (Show)
-  data SettingsUpdate HypixelBowStats
-    = UpdateWins Bool | UpdateLosses Bool | UpdateWLR BoolSense | UpdateWinsUntil BoolSense
-    | UpdateBestStreak Bool | UpdateCurrentStreak Bool | UpdateBestDailyStreak Bool
-    | UpdateBowHist Bool | UpdateBowShots Bool | UpdateAccuracy BoolSense
-    deriving (Eq, Show)
   requestStats Proxy manager uuid = do
     apiKey <- fromMaybe "" <$> getEnv "HYPIXEL_API"
     let url = "https://api.hypixel.net/player?key=" ++ apiKey ++ "&uuid=" ++ uuid
@@ -62,7 +53,7 @@ instance StatType HypixelBowStats where
           return HypixelBowStats {..}
     return $ decode res >>= parser
 
-  showStats HypixelBowSettings {..} HypixelBowStats {..} = unlines $ catMaybes
+  showStats Settings {..} HypixelBowStats {..} = unlines $ catMaybes
     [ onlyIf sWins
     $ " - *Bow Duels Wins:* **"
     ++ show bowWins
@@ -142,34 +133,6 @@ instance StatType HypixelBowStats where
   updateLeaderboard manager lb = sendPostDB manager "stats/hypixel/update.php" (object $ helper <$> toList lb)
     where
       helper (uuid, HypixelBowLeaderboards {..}) = pack uuid .= object ["bowWins" .= bowLbWins, "bowLosses" .= bowLbLosses, "bowWinstreak" .= bowLbWinstreak]
-  defSettings Proxy = HypixelBowSettings
-    { sWins = True
-    , sLosses = True
-    , sWLR = Always
-    , sWinsUntil = Always
-    , sBestStreak = True
-    , sCurrentStreak = True
-    , sBestDailyStreak = False
-    , sBowHits = False
-    , sBowShots = False
-    , sAccuracy = Never
-    }
-  
-  allSettings Proxy = HypixelBowSettings
-    { sWins = True
-    , sLosses = True
-    , sWLR = Always
-    , sWinsUntil = Always
-    , sBestStreak = True
-    , sCurrentStreak = True
-    , sBestDailyStreak = True
-    , sBowHits = True
-    , sBowShots = True
-    , sAccuracy = Always
-    }
-  
-  getSettings Proxy manager = return Nothing -- TODO
-  updateSettings manager did setupt = return () -- TODO
 
 hypixelBowWinsLeaderboard :: Leaderboards HypixelBowStats -> Maybe (Integer, String)
 hypixelBowWinsLeaderboard HypixelBowLeaderboards {..} | bowLbWins >= 500 = Just (bowLbWins, show bowLbWins)

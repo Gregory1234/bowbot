@@ -40,6 +40,7 @@ library
       BowBot.Command.Watchlist
       BowBot.Constants
       BowBot.Minecraft
+      BowBot.Settings
       BowBot.Stats
       BowBot.Stats.HypixelBow
       BowBot.Utils

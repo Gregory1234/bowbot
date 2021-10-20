@@ -71,7 +71,7 @@ onStartup :: BotData -> DiscordHandler ()
 onStartup bdt = do
   sendCommand (UpdateStatus $ UpdateStatusOpts {
     updateStatusOptsSince = Nothing,
-    updateStatusOptsGame = Just (Activity {activityName = "try out ?settings command", activityType = ActivityTypeGame, activityUrl = Nothing}),
+    updateStatusOptsGame = Just (Activity {activityName = "NEW UPDATE NOW!", activityType = ActivityTypeGame, activityUrl = Nothing}), -- TODO: make this controllable from db
     updateStatusOptsNewStatus = UpdateStatusOnline,
     updateStatusOptsAFK = False
   })

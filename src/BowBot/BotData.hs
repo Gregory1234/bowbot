@@ -12,6 +12,7 @@ import Discord.Types
 import BowBot.Stats
 import BowBot.API
 import BowBot.Utils
+import BowBot.Settings
 import BowBot.Stats.HypixelBow
 import Control.Concurrent.STM (STM, atomically)
 import Data.Aeson (decode, Value(..))
@@ -146,8 +147,8 @@ data BotData = BotData
   { hypixelRequestCounter :: ApiRequestCounter
   , minecraftAccounts :: TVar [MinecraftAccount]
   , hypixelBowOnlineList :: CachedData [String]
-  , hypixelBowSettings :: TVar (Map UserId (Settings HypixelBowStats))
   , discordPerms :: TVar (Map UserId PermissionLevel)
+  , discordSettings :: TVar (Map UserId Settings)
   , bowBotAccounts :: TVar [BowBotAccount]
   }
 
@@ -193,12 +194,12 @@ downloadData :: BotData -> IO ()
 downloadData bdt = do
   manager <- newManager managerSettings
   newMinecraftAccounts <- downloadMinecraftAccounts manager
-  newHypixelBowSettings <- getSettings (Proxy @HypixelBowStats) manager
+  newDiscordSettings <- getSettings manager
   newBowBotAccounts <- downloadBowBotAccounts manager
   newDiscordPerms <- downloadDiscordPerms manager
   atomically $ do
     traverse_ (writeTVar (minecraftAccounts bdt)) newMinecraftAccounts
-    traverse_ (writeTVar (hypixelBowSettings bdt)) newHypixelBowSettings
+    traverse_ (writeTVar (discordSettings bdt)) newDiscordSettings
     traverse_ (writeTVar (bowBotAccounts bdt)) newBowBotAccounts
     traverse_ (writeTVar (discordPerms bdt)) newDiscordPerms
 
@@ -236,7 +237,7 @@ emptyData = do
   hypixelRequestCounter <- newRequestCounter 100
   minecraftAccounts <- newTVar []
   hypixelBowOnlineList <- newCachedData
-  hypixelBowSettings <- newTVar empty
+  discordSettings <- newTVar empty
   bowBotAccounts <- newTVar []
   discordPerms <- newTVar empty
   return BotData {..}
