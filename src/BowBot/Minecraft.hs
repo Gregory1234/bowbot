@@ -44,7 +44,7 @@ mcUUIDToNames manager bdt uuid = do
     _ -> mojangUUIDToNames manager uuid
 
 fromPingDiscordUser :: String -> Maybe UserId
-fromPingDiscordUser str | "<@!" `isPrefixOf` str && ">" `isSuffixOf` str = readMaybe $ filter isDigit str
+fromPingDiscordUser str | "<@" `isPrefixOf` str && ">" `isSuffixOf` str = readMaybe $ filter isDigit str
 fromPingDiscordUser _ = Nothing
 
 withMinecraft :: MonadIO m => Manager -> BotData -> Bool -> Either String UserId -> (String -> [String] -> m (Maybe a)) -> m (MinecraftResponse a)
