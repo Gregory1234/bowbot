@@ -32,7 +32,7 @@ minecraftCommand = Command "mc" DefaultLevel 2 $ \m man bdt -> do
       [mc] -> do -- TODO: add autocorrect for ?mc
         maybeUUID <- liftIO $ mcNameToUUID man bdt mc
         case maybeUUID of
-          Nothing -> respond m "*The player doesn't exist!*"
+          Nothing -> respond m playerNotFoundMessage
           Just mcUUID -> if mcUUID `elem` accountMinecrafts bac
             then do
               _ <- liftIO $ sendDB man "people/select.php" ["id=" ++ show (accountId bac), "minecraft=" ++ mcUUID]
@@ -40,4 +40,4 @@ minecraftCommand = Command "mc" DefaultLevel 2 $ \m man bdt -> do
               respond m "*Success!*"
             else
               respond m "*You do not have that minecraft nick registered! If this is your alt, ask someone to add it.*"
-      _ -> respond m "*Wrong command syntax*"
+      _ -> respond m wrongSyntaxMessage

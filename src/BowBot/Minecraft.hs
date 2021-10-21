@@ -19,10 +19,12 @@ import Data.List (sortOn, isPrefixOf, isSuffixOf)
 import Text.Read (readMaybe)
 
 
-data MinecraftResponse a
+data MinecraftResponse e a
   = JustResponse String a
   | OldResponse String String a
-  | NoResponse
+  | PlayerNotFound
+  | UserError e
+  | DiscordUserNotFound
   | NotOnList
   | DidYouMeanResponse String a
   | DidYouMeanOldResponse String String a
@@ -47,17 +49,17 @@ fromPingDiscordUser :: String -> Maybe UserId
 fromPingDiscordUser str | "<@" `isPrefixOf` str && ">" `isSuffixOf` str = readMaybe $ filter isDigit str
 fromPingDiscordUser _ = Nothing
 
-withMinecraft :: MonadIO m => Manager -> BotData -> Bool -> Either String UserId -> (String -> [String] -> m (Maybe a)) -> m (MinecraftResponse a)
+withMinecraft :: MonadIO m => Manager -> BotData -> Bool -> Either String UserId -> (String -> [String] -> m (Either e a)) -> m (MinecraftResponse e a)
 withMinecraft manager bdt _ (Right author) fun = withMinecraftDiscord manager bdt author fun
 withMinecraft manager bdt _ (Left (fromPingDiscordUser -> Just did)) fun = do
   ret <- withMinecraftDiscord manager bdt did fun
   return $ case ret of
-    NotOnList -> NoResponse -- TODO: make more granular responses
+    NotOnList -> DiscordUserNotFound
     _ -> ret
 withMinecraft manager bdt ac (Left mcname) fun = 
   if ac then withMinecraftAutocorrect manager bdt True mcname fun else withMinecraftNormal manager bdt True mcname fun
 
-withMinecraftDiscord :: MonadIO m => Manager -> BotData -> UserId -> (String -> [String] -> m (Maybe a)) -> m (MinecraftResponse a)
+withMinecraftDiscord :: MonadIO m => Manager -> BotData -> UserId -> (String -> [String] -> m (Either e a)) -> m (MinecraftResponse e a)
 withMinecraftDiscord manager bdt did fun = do
   pns <- fmap (>>=(\BowBotAccount {..} -> (,accountSelectedMinecraft) <$> accountDiscords)) $ liftIO $ atomically $ readTVar (bowBotAccounts bdt)
   case lookup did pns of
@@ -66,20 +68,20 @@ withMinecraftDiscord manager bdt did fun = do
       names <- liftIO $ fromMaybe [] <$> mcUUIDToNames manager bdt uuid
       res <- fun uuid names
       case res of
-        Nothing -> pure NoResponse
-        Just r -> pure (JustResponse (head names) r)
+        Left e -> pure (UserError e)
+        Right r -> pure (JustResponse (head names) r)
 
-withMinecraftNormal :: MonadIO m => Manager -> BotData -> Bool -> String -> (String -> [String] -> m (Maybe a)) -> m (MinecraftResponse a)
+withMinecraftNormal :: MonadIO m => Manager -> BotData -> Bool -> String -> (String -> [String] -> m (Either e a)) -> m (MinecraftResponse e a)
 withMinecraftNormal manager bdt cont mcname fun = do
   maybeUUID <- liftIO $ mcNameToUUID manager bdt mcname
   case maybeUUID of
-    Nothing -> if cont then withMinecraftAutocorrect manager bdt False mcname fun else pure NoResponse
+    Nothing -> if cont then withMinecraftAutocorrect manager bdt False mcname fun else pure PlayerNotFound
     Just uuid -> do
       names <- liftIO $ fromMaybe [] <$> mcUUIDToNames manager bdt uuid
       res <- fun uuid names
       case res of
-        Nothing -> if cont then withMinecraftAutocorrect manager bdt False mcname fun else pure NoResponse
-        Just r -> pure (JustResponse (head names) r)
+        Left e -> if cont then withMinecraftAutocorrect manager bdt False mcname fun else pure (UserError e)
+        Right r -> pure (JustResponse (head names) r)
 
 flattenedMinecraftNicks :: BotData -> STM [(String, String)]
 flattenedMinecraftNicks BotData {..} = do
@@ -89,19 +91,19 @@ flattenedMinecraftNicks BotData {..} = do
   return $ currentNicks ++ restOfNicks
 
 -- TODO: distinguish between no uuid and "fun" failing
-withMinecraftAutocorrect :: MonadIO m => Manager -> BotData -> Bool -> String -> (String -> [String] -> m (Maybe a)) -> m (MinecraftResponse a)
+withMinecraftAutocorrect :: MonadIO m => Manager -> BotData -> Bool -> String -> (String -> [String] -> m (Either e a)) -> m (MinecraftResponse e a)
 withMinecraftAutocorrect manager bdt cont mcname fun = do
   people <- liftIO $ atomically $ flattenedMinecraftNicks bdt
   let dists = map (\(u,n) -> ((u, n), dist (map toLower n) (map toLower mcname))) people
   let filtered = map fst . sortOn snd . filter (\(_,d) -> d <= 2) $ dists
   case filtered of
-    [] -> if cont then withMinecraftNormal manager bdt False mcname fun else pure NoResponse
+    [] -> if cont then withMinecraftNormal manager bdt False mcname fun else pure PlayerNotFound
     ((uuid, rn):_) -> do
       names <- liftIO $ fromMaybe [] <$> mcUUIDToNames manager bdt uuid
       res <- fun uuid names
       case res of
-        Nothing -> pure NoResponse
-        Just r -> 
+        Left e -> pure (UserError e)
+        Right r -> 
           if dist (map toLower $ head names) (map toLower mcname) <= 2
           then if map toLower mcname == map toLower rn
             then pure (JustResponse rn r)

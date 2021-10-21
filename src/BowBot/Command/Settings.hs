@@ -86,4 +86,4 @@ settingsCommand name values = Command name DefaultLevel 2 $ \m man bdt -> do
         liftIO $ unsafeUpdateSettings man did k v
         liftIO $ atomically $ modifyTVar (discordSettings bdt) $ alter (Just . u . fromMaybe defSettings) did
         respond m "*Successfully updated!*"
-    _ -> respond m "*Wrong command syntax*"
+    _ -> respond m wrongSyntaxMessage

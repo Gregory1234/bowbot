@@ -1,4 +1,3 @@
-{-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE RecordWildCards #-}
@@ -9,7 +8,6 @@ import BowBot.Stats
 import BowBot.Command
 import BowBot.Minecraft
 import Data.Proxy (Proxy)
-import Discord
 import Control.Monad.IO.Class (liftIO)
 import Data.Char (isSpace)
 import Data.Text (unpack, pack)
@@ -49,15 +47,17 @@ leaderboardCommand pr name lbname statname lbfun = Command name DefaultLevel 10 
         [mcName] -> do
           res <- withMinecraftAutocorrect man bdt False mcName $ \uuid _ -> do
             liftIO $ print uuid
-            return $ if uuid `elem` map lbUUID elems then Just uuid else Nothing
+            return $ if uuid `elem` map lbUUID elems then Right uuid else Left ()
           return $ case res of
-            NoResponse -> Left "*The player doesn't exist or isn't on this leaderboard!*"
+            PlayerNotFound -> Left playerNotFoundMessage
+            DiscordUserNotFound -> Left discordNotFoundMessage
+            (UserError ()) -> Left "*The player isn't on this leaderboard!*"
+            NotOnList -> Left registerMessage
             JustResponse _ u -> Right ([u], Nothing, LeaderboardSearch u)
             OldResponse _ _ u -> Right ([u], Nothing, LeaderboardSearch u)
             DidYouMeanResponse n u -> Right ([u], Just $ "*Did you mean* **" ++ n ++ "**:\n", LeaderboardSearch u)
             DidYouMeanOldResponse o n u -> Right ([u], Just $ "*Did you mean* **" ++ o ++ " (" ++ n ++ "):**\n", LeaderboardSearch u)
-            NotOnList -> Left registerMessage
-        _ -> return $ Left "*Wrong command syntax*"
+        _ -> return $ Left wrongSyntaxMessage
       case selectedOrMsg of
         Left msg -> respond m msg
         Right (selected, msg, lbPage) -> do

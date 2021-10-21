@@ -64,7 +64,7 @@ registerCommand name apis isalt isself onComplete = Command name (if isself then
     else do
       maybeUUID <- liftIO $ mcNameToUUID man bdt mcname
       case maybeUUID of
-        Nothing -> respond m "*The player doesn't exist!*"
+        Nothing -> respond m playerNotFoundMessage
         Just uuid -> do
           nicks <- liftIO $ atomically $ readTVar (minecraftAccounts bdt)
           taken <- fmap (>>=accountMinecrafts) $ liftIO $ atomically $ readTVar (bowBotAccounts bdt)
@@ -79,7 +79,7 @@ registerCommand name apis isalt isself onComplete = Command name (if isself then
             then do
               pns <- fmap (>>=(\BowBotAccount {..} -> (, accountId) <$> accountDiscords)) $ liftIO $ atomically $ readTVar (bowBotAccounts bdt)
               case lookup did pns of
-                Nothing -> respond m "*Somehing went wrong*"
+                Nothing -> respond m somethingWrongMessage
                 Just gid -> do
                   liftIO $ addAltAccount man gid uuid
                   psa <- liftIO $ atomically $ readTVar (bowBotAccounts bdt)
@@ -92,7 +92,7 @@ registerCommand name apis isalt isself onComplete = Command name (if isself then
             else do
               newAcc <- liftIO $ addAccount man (head names) did uuid
               case newAcc of
-                Nothing -> respond m "*Somehing went wrong*"
+                Nothing -> respond m somethingWrongMessage
                 Just newAcc' -> do
                   psa <- liftIO $ atomically $ readTVar (bowBotAccounts bdt)
                   liftIO $ atomically $ writeTVar (bowBotAccounts bdt) (newAcc':psa)

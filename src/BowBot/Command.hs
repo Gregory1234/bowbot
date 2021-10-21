@@ -26,5 +26,14 @@ respondFile m n = call . R.CreateMessageUploadFile (messageChannel m) n . encode
 registerMessage :: String
 registerMessage = "*You aren't on the list! To register, type `?register yourign`.*"
 
-sendRegisterMessage :: Message -> DiscordHandler ()
-sendRegisterMessage m = respond m registerMessage
+discordNotFoundMessage :: String
+discordNotFoundMessage = "*The discord user is not registered!*"
+
+wrongSyntaxMessage :: String
+wrongSyntaxMessage = "*Wrong command syntax!*"
+
+playerNotFoundMessage :: String
+playerNotFoundMessage = "*The player doesn't exist!*"
+
+somethingWrongMessage :: String
+somethingWrongMessage = "*Something went wrong!*"

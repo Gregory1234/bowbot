@@ -35,7 +35,7 @@ statsCommand pr name rc mode = Command name DefaultLevel 10 $ \m man bdt -> do
     res <- withMinecraft man bdt False player $ \uuid names -> do
       st <- liftIO $ requestStats pr man uuid
       for_ st (liftIO . tryRegister bdt man uuid names)
-      return st
+      return $ maybe (Left ()) Right st
     settings <- case mode of
       AlwaysDefault -> pure defSettings
       AlwaysAll -> pure allSettings
@@ -46,13 +46,15 @@ statsCommand pr name rc mode = Command name DefaultLevel 10 $ \m man bdt -> do
     lb <- liftIO $ getLeaderboard (Proxy @HypixelBowStats) man -- TODO: make this into a function
     for_ lb $ \x -> updateDivisionRolesSingleId bdt x (userId $ messageAuthor m)
 
-statsMessage :: StatType s => Settings -> MinecraftResponse s -> String
-statsMessage _ NoResponse = "*The player doesn't exist!*"
+statsMessage :: StatType s => Settings -> MinecraftResponse () s -> String
+statsMessage _ PlayerNotFound = playerNotFoundMessage
+statsMessage _ DiscordUserNotFound = discordNotFoundMessage
+statsMessage _ (UserError ()) = playerNotFoundMessage -- TODO: add a better message here
+statsMessage _ NotOnList = registerMessage
 statsMessage settings (JustResponse n s) = "**" ++ n ++ ":**\n" ++ showStats settings s
 statsMessage settings (OldResponse o n s) = "**" ++ o ++ " (" ++ n ++ "):**\n" ++ showStats settings s
 statsMessage settings (DidYouMeanResponse n s) = "*Did you mean* **" ++ n ++ ":**\n" ++ showStats settings s
 statsMessage settings (DidYouMeanOldResponse o n s) = "*Did you mean* **" ++ o ++ " (" ++ n ++ "):**\n" ++ showStats settings s
-statsMessage _ NotOnList = registerMessage
 
 tryRegister :: StatType s => BotData -> Manager -> String -> [String] -> s -> IO ()
 tryRegister bdt manager uuid names s | statsNotable s = do
