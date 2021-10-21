@@ -15,11 +15,10 @@ import Control.Concurrent.STM (atomically, readTVar, writeTVar)
 import Network.HTTP.Conduit (Manager)
 import Data.Maybe (fromMaybe)
 import Discord.Types hiding (accountId)
-import Data.Aeson.Types (unexpected, Value(..), parseMaybe, (.:))
-import Data.Text (pack, unpack)
+import Data.Aeson.Types ((.:))
+import Data.Text (unpack)
 import Text.Read (readMaybe)
 import BowBot.API
-import Data.Aeson (decode)
 import Data.Foldable (for_)
 import Data.Char (isSpace, isDigit)
 import Data.List (intercalate)
@@ -38,12 +37,9 @@ addMinecraftAccount manager uuid names = do
 addAccount :: Manager -> String -> UserId -> String -> IO (Maybe BowBotAccount)
 addAccount manager name did uuid = do
   res <- sendDB manager "people/new.php" ["name=" ++ name, "discord=" ++ show did, "verified=0", "minecraft=" ++ uuid]
-  let parser = parseMaybe $ \o -> do
-        (readMaybe -> Just aid) <- o .: "id"
-        return aid
-  return $ case decode res >>= parser of
-    Nothing -> Nothing
-    Just bid -> Just BowBotAccount { accountId = bid, accountDiscords = [did], accountMinecrafts = [uuid], accountSelectedMinecraft = uuid}
+  decodeParse res $ \o -> do
+    (readMaybe -> Just aid) <- o .: "id"
+    return BowBotAccount { accountId = aid, accountDiscords = [did], accountMinecrafts = [uuid], accountSelectedMinecraft = uuid}
 
 addAltAccount :: Manager -> Integer -> String -> IO ()
 addAltAccount manager gid uuid = do

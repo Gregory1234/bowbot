@@ -12,10 +12,8 @@ import Data.Text (unpack)
 import Discord.Types hiding (accountId)
 import Control.Monad.Cont (liftIO)
 import Control.Concurrent.STM (atomically)
-import Control.Concurrent.STM.TVar (readTVar, writeTVar, modifyTVar)
-import Data.Maybe (fromMaybe)
+import Control.Concurrent.STM.TVar (readTVar, modifyTVar)
 import Data.Traversable (for)
-import Network.HTTP.Conduit (Manager)
 
 minecraftCommand :: Command
 minecraftCommand = Command "mc" DefaultLevel 2 $ \m man bdt -> do

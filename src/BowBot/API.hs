@@ -13,9 +13,7 @@ import System.Environment.Blank (getEnv)
 import BowBot.Utils
 import Data.Aeson
 import Control.Monad (void)
-import Data.Aeson.Types (Parser, unexpected)
-import Data.Text (pack, Text)
-import Text.Read (readMaybe)
+import Data.Aeson.Types (Parser, parseEither)
 
 managerSettings :: ManagerSettings
 managerSettings = tlsManagerSettings { managerResponseTimeout = responseTimeoutMicro 15000000 }
@@ -53,3 +51,13 @@ sendPostDB manager path dat = do
   initRequest <- parseRequest url
   let request = initRequest { method = "POST", requestBody = RequestBodyLBS (encode dat) }
   void $ try @SomeException $ httpLbs request manager
+
+decodeParse :: FromJSON o => ByteString -> (o -> Parser a) -> IO (Maybe a)
+decodeParse (decode -> Just str) parser = case parseEither parser str of
+  Left e -> do
+    print e
+    return Nothing
+  Right a -> return $ Just a
+decodeParse str _ = do
+  putStrLn $ "Decoding failed in " ++ show str ++ "!"
+  return Nothing

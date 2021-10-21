@@ -11,7 +11,7 @@ import Network.HTTP.Conduit (Manager)
 import Control.Monad (void)
 import BowBot.API
 import Control.Monad.IO.Class (liftIO)
-import Data.Map (adjust, alter)
+import Data.Map (alter)
 import Control.Concurrent.STM.TVar (modifyTVar)
 import Control.Concurrent.STM (atomically)
 import Data.Maybe (fromMaybe)

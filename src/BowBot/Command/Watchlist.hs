@@ -9,8 +9,7 @@ import BowBot.Minecraft
 import Network.HTTP.Conduit (Manager)
 import Control.Monad.IO.Class (liftIO)
 import Data.Maybe (catMaybes, fromMaybe)
-import Data.Aeson (decode)
-import Data.Aeson.Types (parseMaybe, (.:))
+import Data.Aeson.Types ((.:))
 import BowBot.API
 import Control.Concurrent.STM.TVar (newTVar, readTVar, writeTVar)
 import Control.Concurrent.STM (atomically)
@@ -54,15 +53,13 @@ isInBowDuels manager uuid = do
   let url = "https://api.hypixel.net/status?key=" ++ apiKey ++ "&uuid=" ++ uuid
   let cleanUrl = "https://api.hypixel.net/status?key=[REDACTED]&uuid=" ++ uuid
   res <- sendRequestTo manager url cleanUrl
-  let parser = parseMaybe $ \o -> do
-        session <- o .: "session"
-        mode :: String <- session .: "mode"
-        return $ mode == "DUELS_BOW_DUEL"
-  return $ decode res >>= parser
+  decodeParse res $ \o -> do
+    session <- o .: "session"
+    mode :: String <- session .: "mode"
+    return $ mode == "DUELS_BOW_DUEL"
 
 
 getWatchlist :: Manager -> IO (Maybe [String])
 getWatchlist manager = do
   res <- sendDB manager "minecraft/watchlist.php" []
-  let parser = parseMaybe $ \o -> o .: "data"
-  return $ decode res >>= parser
+  decodeParse res $ \o -> o .: "data"

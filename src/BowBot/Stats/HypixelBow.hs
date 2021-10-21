@@ -12,9 +12,8 @@ import BowBot.Stats
 import BowBot.API
 import Data.Maybe (catMaybes, fromMaybe)
 import Data.Ratio ((%))
-import Data.Aeson (decode, (.:))
 import System.Environment.Blank (getEnv)
-import Data.Aeson.Types (parseMaybe, (.!=), (.:?), object, (.=), parseEither)
+import Data.Aeson.Types ((.:), (.!=), (.:?), object, (.=))
 import Data.Traversable (for)
 import Data.Map (fromList, toList)
 import Data.Text (pack)
@@ -39,19 +38,18 @@ instance StatType HypixelBowStats where
     let url = "https://api.hypixel.net/player?key=" ++ apiKey ++ "&uuid=" ++ uuid
     let cleanUrl = "https://api.hypixel.net/player?key=[REDACTED]&uuid=" ++ uuid
     res <- sendRequestTo manager url cleanUrl
-    let parser = parseMaybe $ \o -> do
-          pl <- o .: "player"
-          stats <- pl .: "stats"
-          duelsStats <- stats .:? "Duels"
-          bowWins <- fromMaybe 0 <$> for duelsStats (\x -> x .:? "bow_duel_wins" .!= 0)
-          bowLosses <- fromMaybe 0 <$> for duelsStats (\x -> x .:? "bow_duel_losses" .!= 0)
-          currentWinstreak <- fromMaybe 0 <$> for duelsStats (\x -> x .:? "current_bow_winstreak" .!= 0)
-          bestWinstreak <- fromMaybe 0 <$> for duelsStats (\x -> x .:? "best_bow_winstreak" .!= 0)
-          bestDailyWinstreak <- fromMaybe 0 <$> for duelsStats (\x -> x .:? "duels_winstreak_best_bow_duel" .!= 0)
-          bowHits <- fromMaybe 0 <$> for duelsStats (\x -> x .:? "bow_duel_bow_hits" .!= 0)
-          bowShots <- fromMaybe 0 <$> for duelsStats (\x -> x .:? "bow_duel_bow_shots" .!= 0)
-          return HypixelBowStats {..}
-    return $ decode res >>= parser
+    decodeParse res $ \o -> do
+      pl <- o .: "player"
+      stats <- pl .: "stats"
+      duelsStats <- stats .:? "Duels"
+      bowWins <- fromMaybe 0 <$> for duelsStats (\x -> x .:? "bow_duel_wins" .!= 0)
+      bowLosses <- fromMaybe 0 <$> for duelsStats (\x -> x .:? "bow_duel_losses" .!= 0)
+      currentWinstreak <- fromMaybe 0 <$> for duelsStats (\x -> x .:? "current_bow_winstreak" .!= 0)
+      bestWinstreak <- fromMaybe 0 <$> for duelsStats (\x -> x .:? "best_bow_winstreak" .!= 0)
+      bestDailyWinstreak <- fromMaybe 0 <$> for duelsStats (\x -> x .:? "duels_winstreak_best_bow_duel" .!= 0)
+      bowHits <- fromMaybe 0 <$> for duelsStats (\x -> x .:? "bow_duel_bow_hits" .!= 0)
+      bowShots <- fromMaybe 0 <$> for duelsStats (\x -> x .:? "bow_duel_bow_shots" .!= 0)
+      return HypixelBowStats {..}
 
   showStats Settings {..} HypixelBowStats {..} = unlines $ catMaybes
     [ onlyIf sWins
@@ -121,15 +119,14 @@ instance StatType HypixelBowStats where
     { bowLbWins = bowWins, bowLbLosses = bowLosses, bowLbWinstreak = bestWinstreak }
   getLeaderboard Proxy manager = do
     res <- sendDB manager "stats/hypixel/leaderboard.php" []
-    let parser = parseMaybe $ \o -> do
-            dt <- o .: "data"
-            for dt $ \s -> do
-              uuid <- s .: "uuid"
-              (readMaybe -> Just bowLbWins) <- s .: "bowWins"
-              (readMaybe -> Just bowLbLosses) <- s .: "bowLosses"
-              (readMaybe -> Just bowLbWinstreak) <- s .: "bowWinstreak"
-              return (uuid, HypixelBowLeaderboards {..})
-    return . fmap fromList $ decode res >>= parser
+    decodeParse res $ \o -> do
+      dt <- o .: "data"
+      fmap fromList $ for dt $ \s -> do
+        uuid <- s .: "uuid"
+        (readMaybe -> Just bowLbWins) <- s .: "bowWins"
+        (readMaybe -> Just bowLbLosses) <- s .: "bowLosses"
+        (readMaybe -> Just bowLbWinstreak) <- s .: "bowWinstreak"
+        return (uuid, HypixelBowLeaderboards {..})
   updateLeaderboard manager lb = sendPostDB manager "stats/hypixel/update.php" (object $ helper <$> toList lb)
     where
       helper (uuid, HypixelBowLeaderboards {..}) = pack uuid .= object ["bowWins" .= bowLbWins, "bowLosses" .= bowLbLosses, "bowWinstreak" .= bowLbWinstreak]

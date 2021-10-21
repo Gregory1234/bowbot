@@ -9,20 +9,14 @@ module BowBot.BotData where
 import Control.Concurrent.STM.TVar (TVar, newTVar, writeTVar, modifyTVar, readTVar)
 import Data.Map (Map, empty, toList, fromList)
 import Discord.Types
-import BowBot.Stats
 import BowBot.API
 import BowBot.Utils
 import BowBot.Settings
-import BowBot.Stats.HypixelBow
 import Control.Concurrent.STM (STM, atomically)
-import Data.Aeson (decode, Value(..))
 import Network.HTTP.Conduit (Manager, newManager)
 import Data.Traversable (for)
-import Data.Text (pack)
-import Data.Proxy
 import Data.Foldable (traverse_, for_)
-import Text.Read (readMaybe)
-import Data.Aeson.Types (parseMaybe, (.:), unexpected, (.:?))
+import Data.Aeson.Types ((.:))
 import Control.Monad.IO.Class (MonadIO, liftIO)
 import Control.Monad (when, unless, void)
 import Data.List.Split (chunksOf)
@@ -157,38 +151,35 @@ data BotData = BotData
 downloadMinecraftAccounts :: Manager -> IO (Maybe [MinecraftAccount])
 downloadMinecraftAccounts manager = do
   res <- sendDB manager "minecraft/all.php" []
-  let parser = parseMaybe $ \o -> do
-        dt <- o .: "data"
-        for dt $ \acc -> do
-          mcUUID <- acc .: "uuid"
-          mcNames <- acc .: "names"
-          (stringToUpdateFreq -> Just mcHypixelBow) <- acc .: "hypixel"
-          return MinecraftAccount {..}
-  return $ decode res >>= parser
+  decodeParse res $ \o -> do
+    dt <- o .: "data"
+    for dt $ \acc -> do
+      mcUUID <- acc .: "uuid"
+      mcNames <- acc .: "names"
+      (stringToUpdateFreq -> Just mcHypixelBow) <- acc .: "hypixel"
+      return MinecraftAccount {..}
 
 
 downloadBowBotAccounts :: Manager -> IO (Maybe [BowBotAccount])
 downloadBowBotAccounts manager = do
   res <- sendDB manager "people/all.php" []
-  let parser = parseMaybe $ \o -> do
-        dt <- o .: "data"
-        for (toList dt) $ \(accountId, acc) -> do
-          accountDiscords <- acc .: "discord"
-          accountSelectedMinecraft <- acc .: "selected"
-          accountMinecrafts <- acc .: "minecraft"
-          return BowBotAccount {..}
-  return $ decode res >>= parser
+  decodeParse res $ \o -> do
+    dt <- o .: "data"
+    for (toList dt) $ \(accountId, acc) -> do
+      accountDiscords <- acc .: "discord"
+      accountSelectedMinecraft <- acc .: "selected"
+      accountMinecrafts <- acc .: "minecraft"
+      return BowBotAccount {..}
 
 downloadDiscordPerms :: Manager -> IO (Maybe (Map UserId PermissionLevel))
 downloadDiscordPerms manager = do
   res <- sendDB manager "discord/perms.php" []
-  let parser = parseMaybe $ \o -> do
-        dt <- o .: "data"
-        fmap fromList . for dt $ \dp -> do
-          did <- dp .: "id"
-          (stringToPermissionLevel -> Just level) <- dp .: "level"
-          return (did, level)
-  return $ decode res >>= parser
+  decodeParse res $ \o -> do
+    dt <- o .: "data"
+    fmap fromList . for dt $ \dp -> do
+      did <- dp .: "id"
+      (stringToPermissionLevel -> Just level) <- dp .: "level"
+      return (did, level)
 
 downloadData :: BotData -> IO ()
 downloadData bdt = do

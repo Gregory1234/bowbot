@@ -8,8 +8,7 @@ import Discord.Types
 import Data.Map (Map, fromList)
 import Network.HTTP.Conduit (Manager)
 import BowBot.API
-import Data.Aeson.Types (parseMaybe, (.:))
-import Data.Aeson (decode)
+import Data.Aeson.Types ((.:))
 import Data.Traversable (for)
 import Text.Read (readMaybe)
 
@@ -36,22 +35,21 @@ parseSense _ = Nothing
 getSettings :: Manager -> IO (Maybe (Map UserId Settings))
 getSettings manager = do
   res <- sendDB manager "discord/settings/all.php" []
-  let parser = parseMaybe $ \o -> do
-        dt <- o .: "data"
-        fmap fromList $ for dt $ \settings -> do
-          (readMaybe -> Just discord) <- settings .: "discord"
-          (parseBool -> Just sWins) <- settings .: "wins"
-          (parseBool -> Just sLosses) <- settings .: "losses"
-          (parseSense -> Just sWLR) <- settings .: "wlr"
-          (parseSense -> Just sWinsUntil) <- settings .: "winsUntil"
-          (parseBool -> Just sBestStreak) <- settings .: "bestStreak"
-          (parseBool -> Just sCurrentStreak) <- settings .: "currentStreak"
-          (parseBool -> Just sBestDailyStreak) <- settings .: "bestDailyStreak"
-          (parseBool -> Just sBowHits) <- settings .: "bowHits"
-          (parseBool -> Just sBowShots) <- settings .: "bowShots"
-          (parseSense -> Just sAccuracy) <- settings .: "accuracy"
-          pure (discord, Settings {..})
-  return $ decode res >>= parser
+  decodeParse res $ \o -> do
+    dt <- o .: "data"
+    fmap fromList $ for dt $ \settings -> do
+      (readMaybe -> Just discord) <- settings .: "discord"
+      (parseBool -> Just sWins) <- settings .: "wins"
+      (parseBool -> Just sLosses) <- settings .: "losses"
+      (parseSense -> Just sWLR) <- settings .: "wlr"
+      (parseSense -> Just sWinsUntil) <- settings .: "winsUntil"
+      (parseBool -> Just sBestStreak) <- settings .: "bestStreak"
+      (parseBool -> Just sCurrentStreak) <- settings .: "currentStreak"
+      (parseBool -> Just sBestDailyStreak) <- settings .: "bestDailyStreak"
+      (parseBool -> Just sBowHits) <- settings .: "bowHits"
+      (parseBool -> Just sBowShots) <- settings .: "bowShots"
+      (parseSense -> Just sAccuracy) <- settings .: "accuracy"
+      pure (discord, Settings {..})
 
 defSettings :: Settings
 defSettings = Settings

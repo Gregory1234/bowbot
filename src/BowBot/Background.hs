@@ -27,11 +27,10 @@ import Data.Maybe (catMaybes, fromMaybe, mapMaybe)
 import BowBot.Utils
 import Discord.Types hiding (accountId)
 import Control.Monad.IO.Class (liftIO)
-import Data.Aeson.Types (object, (.=), parseMaybe, (.:))
+import Data.Aeson.Types (object, (.=), (.:))
 import Data.Text (pack)
 import Data.Either (fromRight)
 import Text.Read (readMaybe)
-import Data.Aeson (decode)
 import Data.List ((\\))
 import BowBot.Command
 import System.Environment.Blank (getEnv)
@@ -82,11 +81,10 @@ downloadGuildMemberList man = do
   let url = "https://api.hypixel.net/guild?key=" ++ apiKey ++ "&id=" ++ airplanesHypixelId
   let cleanUrl = "https://api.hypixel.net/guild?key=[REDACTED]&id=" ++ airplanesHypixelId
   res <- sendRequestTo man url cleanUrl
-  let parser = parseMaybe $ \o -> do
-        guild <- o .: "guild"
-        members <- guild .: "members"
-        for members $ \m -> m .: "uuid"
-  return $ decode res >>= parser
+  decodeParse res $ \o -> do
+    guild <- o .: "guild"
+    members <- guild .: "members"
+    for members $ \m -> m .: "uuid"
 
 updateRolesAll :: BotData -> Manager -> DiscordHandler ()
 updateRolesAll bdt man = do
@@ -104,12 +102,11 @@ updateRolesAll bdt man = do
 getDiscordIds :: Manager -> IO [UserId]
 getDiscordIds manager = do
   res <- sendDB manager "discord/all.php" []
-  let parser = parseMaybe $ \o -> do
-        dt <- o .: "data"
-        for dt $ \s -> do
-          (readMaybe -> Just x) <- pure s
-          return x
-  return . fromMaybe [] $ decode res >>= parser
+  fmap (fromMaybe []) $ decodeParse res $ \o -> do
+    dt <- o .: "data"
+    for dt $ \s -> do
+      (readMaybe -> Just x) <- pure s
+      return x
 
 addDiscords :: DiscordHandler ()
 addDiscords = do
