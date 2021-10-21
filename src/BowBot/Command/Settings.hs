@@ -4,17 +4,8 @@ module BowBot.Command.Settings where
 
 import BowBot.Command
 import BowBot.Settings
-import BowBot.BotData
-import Discord.Types
-import Data.Text (unpack)
-import Network.HTTP.Conduit (Manager)
-import Control.Monad (void)
 import BowBot.API
-import Control.Monad.IO.Class (liftIO)
 import Data.Map (alter)
-import Control.Concurrent.STM.TVar (modifyTVar)
-import Control.Concurrent.STM (atomically)
-import Data.Maybe (fromMaybe)
 
 boolArg :: String -> Maybe Bool
 boolArg "yes" = Just True

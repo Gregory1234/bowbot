@@ -5,23 +5,11 @@ module BowBot.Command.Stats where
 import BowBot.Stats
 import BowBot.Command
 import BowBot.Minecraft
-import BowBot.BotData
-import Data.Proxy
-import Discord.Types
 import BowBot.Stats.HypixelBow
-import Data.Text (unpack)
 import Data.Char (isSpace)
-import Control.Monad.IO.Class (liftIO)
 import BowBot.Command.Register
-import Network.HTTP.Conduit (Manager)
-import Control.Concurrent.STM.TVar (modifyTVar, readTVar)
-import Control.Concurrent.STM (atomically)
-import Data.Foldable (for_)
-import Control.Monad (unless)
-import Data.Map (fromList, (!?))
+import Data.Map ((!?))
 import BowBot.Background
-import BowBot.Settings
-import Data.Maybe (fromMaybe)
 
 data StatsCommandMode = AlwaysDefault | AlwaysAll | UserSettings
 

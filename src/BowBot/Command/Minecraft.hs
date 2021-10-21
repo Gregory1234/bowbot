@@ -4,16 +4,9 @@
 module BowBot.Command.Minecraft where
 
 import BowBot.Command
-import BowBot.BotData
 import BowBot.Minecraft
 import BowBot.API
 import Data.Char (isSpace)
-import Data.Text (unpack)
-import Discord.Types hiding (accountId)
-import Control.Monad.Cont (liftIO)
-import Control.Concurrent.STM (atomically)
-import Control.Concurrent.STM.TVar (readTVar, modifyTVar)
-import Data.Traversable (for)
 
 minecraftCommand :: Command
 minecraftCommand = Command "mc" DefaultLevel 2 $ \m man bdt -> do

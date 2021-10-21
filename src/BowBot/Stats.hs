@@ -1,6 +1,8 @@
 {-# LANGUAGE TypeFamilies #-}
 
-module BowBot.Stats where
+module BowBot.Stats(
+  module BowBot.Stats, module Data.Proxy, Map, fromList, Manager, module BowBot.Settings
+) where
 
 import Data.Proxy
 import Data.Map (Map, fromList)

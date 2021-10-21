@@ -2,12 +2,7 @@ module BowBot.Command.Simple where
 
 import BowBot.Command
 import BowBot.Minecraft
-import BowBot.BotData
-import Control.Monad.IO.Class (liftIO)
-import Discord.Types
-import Data.Text (unpack)
 import Data.Char (isSpace)
-import Control.Monad (void)
 import Data.Void (absurd)
 
 urlCommand :: String -> Bool -> (String -> String) -> Command

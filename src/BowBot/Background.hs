@@ -9,31 +9,21 @@ module BowBot.Background where
 import Discord
 import qualified Discord.Requests as R
 import BowBot.BotData
-import Control.Concurrent.STM (atomically, readTVar)
-import Control.Monad (when)
 import BowBot.Stats.HypixelBow
 import Data.Proxy
 import BowBot.Stats
-import BowBot.Constants
-import Network.HTTP.Conduit (newManager, Manager)
 import BowBot.API
+import Network.HTTP.Conduit (newManager)
 import Data.List.Split (chunksOf)
-import Data.Traversable (for)
 import Control.Concurrent (threadDelay)
-import Data.Map (fromList, Map, (!?))
+import Data.Map ((!?))
 import Control.Concurrent.Async (mapConcurrently)
-import Data.Foldable (for_)
-import Data.Maybe (catMaybes, fromMaybe, mapMaybe)
-import BowBot.Utils
+import Data.Maybe (catMaybes, mapMaybe)
 import Discord.Types hiding (accountId)
-import Control.Monad.IO.Class (liftIO)
-import Data.Aeson.Types (object, (.=), (.:))
-import Data.Text (pack)
+import Data.Aeson.Types (object, (.=))
 import Data.Either (fromRight)
-import Text.Read (readMaybe)
 import Data.List ((\\))
 import BowBot.Command
-import System.Environment.Blank (getEnv)
 
 updateDivisionRolesSingle :: BotData -> Map String (Leaderboards HypixelBowStats) -> GuildMember -> DiscordHandler Bool
 updateDivisionRolesSingle bdt lb memb = do

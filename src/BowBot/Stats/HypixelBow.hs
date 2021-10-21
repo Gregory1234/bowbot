@@ -10,15 +10,10 @@ import BowBot.Utils
 import Data.Proxy
 import BowBot.Stats
 import BowBot.API
-import Data.Maybe (catMaybes, fromMaybe)
+import Data.Maybe (catMaybes)
 import Data.Ratio ((%))
-import System.Environment.Blank (getEnv)
-import Data.Aeson.Types ((.:), (.!=), (.:?), object, (.=))
-import Data.Traversable (for)
-import Data.Map (fromList, toList)
-import Data.Text (pack)
-import Text.Read (readMaybe)
-import BowBot.Settings
+import Data.Aeson.Types (object, (.=))
+import Data.Map (toList)
 
 data HypixelBowStats = HypixelBowStats
   { bowWins :: Integer,

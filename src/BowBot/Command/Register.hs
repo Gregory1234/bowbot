@@ -8,24 +8,12 @@ module BowBot.Command.Register where
 
 import BowBot.Command
 import BowBot.Minecraft
-import BowBot.BotData
 import BowBot.Stats
-import Control.Monad.Cont (liftIO, unless)
-import Control.Concurrent.STM (atomically, readTVar, writeTVar)
-import Network.HTTP.Conduit (Manager)
-import Data.Maybe (fromMaybe)
-import Discord.Types hiding (accountId)
-import Data.Aeson.Types ((.:))
-import Data.Text (unpack)
-import Text.Read (readMaybe)
 import BowBot.API
-import Data.Foldable (for_)
 import Data.Char (isSpace, isDigit)
 import Data.List (intercalate)
 import BowBot.Background
-import Control.Monad (when)
 import BowBot.Stats.HypixelBow (HypixelBowStats)
-import Data.Proxy
 
 -- TODO: check if creation was successful
 

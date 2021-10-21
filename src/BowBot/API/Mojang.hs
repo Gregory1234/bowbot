@@ -2,10 +2,7 @@
 
 module BowBot.API.Mojang where
 
-import Data.Aeson.Types ((.:))
 import BowBot.API
-import Network.HTTP.Conduit (Manager)
-import Data.Traversable (for)
 
 
 mojangNameToUUID :: Manager -> String -> IO (Maybe String)

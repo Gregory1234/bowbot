@@ -2,10 +2,6 @@ module BowBot.Command.Name where
 
 import BowBot.Command
 import BowBot.Minecraft
-import Discord.Types
-import BowBot.BotData
-import Data.Text (unpack)
-import Control.Monad.IO.Class (liftIO)
 
 
 nameCommand :: String -> Bool -> Command

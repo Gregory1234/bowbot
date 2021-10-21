@@ -6,17 +6,13 @@
 module BowBot.Minecraft where
 
 import Discord.Types
-import Control.Monad.IO.Class (MonadIO, liftIO)
 import BowBot.BotData
 import Network.HTTP.Conduit (Manager)
 import BowBot.API.Mojang
-import Control.Concurrent.STM.TVar (readTVar)
-import Control.Concurrent.STM (atomically, STM)
-import Data.Maybe (fromMaybe)
+import Control.Concurrent.STM (STM)
 import BowBot.Utils
 import Data.Char (toLower, isDigit)
 import Data.List (sortOn, isPrefixOf, isSuffixOf)
-import Text.Read (readMaybe)
 
 
 data MinecraftResponse e a

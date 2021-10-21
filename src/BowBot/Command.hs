@@ -1,14 +1,15 @@
-module BowBot.Command where
+module BowBot.Command(
+  module BowBot.Command, module Discord, module Discord.Types, module BowBot.BotData, module BowBot.Utils
+) where
 
 import Discord
+import BowBot.Utils
 import qualified Discord.Requests as R
 import qualified Discord.Internal.Rest as R
-import Discord.Types
+import Discord.Types hiding (accountId)
 import BowBot.BotData
 import qualified Data.Text as T
-import Data.Text (pack)
 import Data.Text.Encoding (encodeUtf8)
-import Control.Monad (void)
 import Network.HTTP.Conduit (Manager)
 
 -- TODO: make argument order better

@@ -6,11 +6,7 @@ module BowBot.Settings where
 
 import Discord.Types
 import Data.Map (Map, fromList)
-import Network.HTTP.Conduit (Manager)
 import BowBot.API
-import Data.Aeson.Types ((.:))
-import Data.Traversable (for)
-import Text.Read (readMaybe)
 
 
 data BoolSense = Never | WhenSensible | Always deriving (Show, Eq, Ord, Enum)

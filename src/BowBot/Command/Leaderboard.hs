@@ -7,22 +7,10 @@ module BowBot.Command.Leaderboard where
 import BowBot.Stats
 import BowBot.Command
 import BowBot.Minecraft
-import Data.Proxy (Proxy)
-import Control.Monad.IO.Class (liftIO)
 import Data.Char (isSpace)
-import Data.Text (unpack, pack)
-import Discord.Types
 import Data.Map (toList)
 import Data.List (sortOn)
-import Data.Traversable (for)
-import Data.Maybe (fromMaybe)
-import Control.Concurrent.STM (atomically)
-import Control.Concurrent.STM.TVar (readTVar)
-import BowBot.BotData
-import BowBot.Utils
-import Text.Read (readMaybe)
 import Data.List.Split (chunksOf)
-import Data.Foldable (for_)
 
 data LeaderboardElement = LeaderboardElement { lbPos :: Integer, lbName :: String, lbVal :: String, lbUUID :: String } deriving Show
 

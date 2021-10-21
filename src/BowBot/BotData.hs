@@ -6,23 +6,16 @@
 
 module BowBot.BotData where
 
-import Control.Concurrent.STM.TVar (TVar, newTVar, writeTVar, modifyTVar, readTVar)
+import Control.Concurrent.STM.TVar (TVar, newTVar)
 import Data.Map (Map, empty, toList, fromList)
 import Discord.Types
 import BowBot.API
-import BowBot.Utils
 import BowBot.Settings
-import Control.Concurrent.STM (STM, atomically)
-import Network.HTTP.Conduit (Manager, newManager)
-import Data.Traversable (for)
-import Data.Foldable (traverse_, for_)
-import Data.Aeson.Types ((.:))
-import Control.Monad.IO.Class (MonadIO, liftIO)
-import Control.Monad (when, unless, void)
+import Control.Concurrent.STM (STM)
+import Network.HTTP.Conduit (newManager)
 import Data.List.Split (chunksOf)
 import Control.Concurrent.Async (mapConcurrently)
 import BowBot.API.Mojang (mojangUUIDToNames)
-import Data.Maybe (fromMaybe)
 import Data.List (intercalate)
 
 data ApiRequestCounter = ApiRequestCounter { mainCounter :: TVar Int, borderCounter :: TVar Int, counterLimit :: Int }
@@ -189,10 +182,10 @@ downloadData bdt = do
   newBowBotAccounts <- downloadBowBotAccounts manager
   newDiscordPerms <- downloadDiscordPerms manager
   atomically $ do
-    traverse_ (writeTVar (minecraftAccounts bdt)) newMinecraftAccounts
-    traverse_ (writeTVar (discordSettings bdt)) newDiscordSettings
-    traverse_ (writeTVar (bowBotAccounts bdt)) newBowBotAccounts
-    traverse_ (writeTVar (discordPerms bdt)) newDiscordPerms
+    for_ newMinecraftAccounts (writeTVar (minecraftAccounts bdt))
+    for_ newDiscordSettings (writeTVar (discordSettings bdt))
+    for_ newBowBotAccounts (writeTVar (bowBotAccounts bdt))
+    for_ newDiscordPerms (writeTVar (discordPerms bdt))
 
 updateMinecraftAccounts :: BotData -> Manager -> IO ()
 updateMinecraftAccounts bdt manager = do

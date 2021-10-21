@@ -4,7 +4,6 @@
 module BowBot.Bot where
 
 import BowBot.Utils
-import BowBot.Constants
 import Discord
 import BowBot.Command
 import BowBot.Command.Stats
@@ -17,25 +16,17 @@ import BowBot.Command.Name
 import BowBot.Command.Settings
 import BowBot.Stats
 import BowBot.Stats.HypixelBow
-import BowBot.BotData
 import BowBot.API
 import BowBot.Background
-import BowBot.Settings
-import Discord.Types
 import qualified Data.Text as T
 import qualified Data.Text.IO as TIO
-import Control.Monad (forever, when)
-import Data.Foldable (for_)
-import Data.Text (isPrefixOf, unpack, pack)
-import Control.Monad.Reader (ReaderT(..), void, liftIO)
+import Data.Text (isPrefixOf)
+import Control.Monad.Reader (ReaderT(..))
 import Control.Concurrent (forkIO, forkFinally, threadDelay)
 import System.Timeout (timeout)
-import Data.Proxy (Proxy(..))
-import Network.HTTP.Conduit (Manager, newManager)
+import Network.HTTP.Conduit (newManager)
 import Data.Map ((!?))
-import Data.Maybe (fromMaybe)
-import Control.Concurrent.STM (atomically)
-import Control.Concurrent.STM.TVar (readTVar)
+import Control.Monad (forever)
 
 runBowBot :: String -> IO ()
 runBowBot discordKey = do

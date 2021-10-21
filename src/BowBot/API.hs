@@ -3,17 +3,16 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ViewPatterns #-}
 
-module BowBot.API where
+module BowBot.API(
+  module BowBot.API, module BowBot.Utils, (.:), (.:?), (.!=), Manager
+) where
 
 import Network.HTTP.Conduit
 import Control.Exception.Base (try, SomeException)
 import Data.ByteString.Lazy (ByteString)
-import Data.Maybe (fromMaybe)
-import System.Environment.Blank (getEnv)
 import BowBot.Utils
 import Data.Aeson
-import Control.Monad (void)
-import Data.Aeson.Types (Parser, parseEither)
+import Data.Aeson.Types (Parser, parseEither, (.:), (.:?), (.!=))
 
 managerSettings :: ManagerSettings
 managerSettings = tlsManagerSettings { managerResponseTimeout = responseTimeoutMicro 15000000 }

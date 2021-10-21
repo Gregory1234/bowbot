@@ -4,17 +4,11 @@
 module BowBot.Command.Watchlist where
 
 import BowBot.Command
-import BowBot.BotData
 import BowBot.Minecraft
-import Network.HTTP.Conduit (Manager)
-import Control.Monad.IO.Class (liftIO)
-import Data.Maybe (catMaybes, fromMaybe)
-import Data.Aeson.Types ((.:))
+import Data.Maybe (catMaybes)
 import BowBot.API
-import Control.Concurrent.STM.TVar (newTVar, readTVar, writeTVar)
-import Control.Concurrent.STM (atomically)
-import System.Environment.Blank (getEnv)
 import Control.Monad (filterM)
+import Control.Concurrent.STM.TVar (newTVar)
 
 listCommand :: Command
 listCommand = Command "list" DefaultLevel 2 $ \m man bdt -> do -- TODO: add other lists
