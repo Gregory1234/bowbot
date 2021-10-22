@@ -15,4 +15,4 @@ mojangUUIDToNames :: Manager -> String -> IO (Maybe [String])
 mojangUUIDToNames manager uuid = do
   let url = "https://api.mojang.com/user/profiles/" ++ uuid ++ "/names"
   res <- sendRequestTo manager url url
-  decodeParse res $ \o -> for o $ \n -> n .: "name"
+  decodeParse res $ \o -> fmap reverse . for o $ \n -> n .: "name"
