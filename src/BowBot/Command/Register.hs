@@ -51,7 +51,13 @@ registerCommand name apis isalt isself onComplete = Command name (if isself then
           nicks <- liftIO $ atomically $ readTVar (minecraftAccounts bdt)
           taken <- fmap (>>=accountMinecrafts) $ liftIO $ atomically $ readTVar (bowBotAccounts bdt)
           if uuid `elem` taken
-          then respond m "*That account already belongs to someone else!*"
+          then do
+            pns <- fmap (>>=(\x -> (, x) <$> accountDiscords x)) $ liftIO $ atomically $ readTVar (bowBotAccounts bdt)
+            case lookup did pns of
+              Nothing -> respond m "*That account already belongs to someone else!*"
+              Just bac -> respond m $ if uuid `elem` accountMinecrafts bac
+                then (if isself then "*That account already belongs to you!*" else "*That account already belongs to this user!*")
+                else "*That account already belongs to someone else!*"
           else do
             names <- liftIO $ fromMaybe [] <$> mcUUIDToNames man bdt uuid
             unless (uuid `elem` map mcUUID nicks) $ do
@@ -61,7 +67,7 @@ registerCommand name apis isalt isself onComplete = Command name (if isself then
             then do
               pns <- fmap (>>=(\BowBotAccount {..} -> (, accountId) <$> accountDiscords)) $ liftIO $ atomically $ readTVar (bowBotAccounts bdt)
               case lookup did pns of
-                Nothing -> respond m somethingWrongMessage
+                Nothing -> respond m (if isself then "*You are not registered!*" else "*That person is not registered!*")
                 Just gid -> do
                   liftIO $ addAltAccount man gid uuid
                   psa <- liftIO $ atomically $ readTVar (bowBotAccounts bdt)
@@ -71,12 +77,16 @@ registerCommand name apis isalt isself onComplete = Command name (if isself then
                   updateDiscordRolesSingleId bdt man did
                   respond m "*Registered successfully*"
             else do
-              newAcc <- liftIO $ addAccount man (head names) did uuid
-              case newAcc of
-                Nothing -> respond m somethingWrongMessage
-                Just newAcc' -> do
-                  psa <- liftIO $ atomically $ readTVar (bowBotAccounts bdt)
-                  liftIO $ atomically $ writeTVar (bowBotAccounts bdt) (newAcc':psa)
-                  liftIO $ onComplete man uuid
-                  updateDiscordRolesSingleId bdt man did
-                  respond m "*Registered successfully*"
+              pns <- fmap (>>=(\BowBotAccount {..} -> (, accountId) <$> accountDiscords)) $ liftIO $ atomically $ readTVar (bowBotAccounts bdt)
+              case lookup did pns of
+                Nothing -> do
+                  newAcc <- liftIO $ addAccount man (head names) did uuid
+                  case newAcc of
+                    Nothing -> respond m somethingWrongMessage
+                    Just newAcc' -> do
+                      psa <- liftIO $ atomically $ readTVar (bowBotAccounts bdt)
+                      liftIO $ atomically $ writeTVar (bowBotAccounts bdt) (newAcc':psa)
+                      liftIO $ onComplete man uuid
+                      updateDiscordRolesSingleId bdt man did
+                      respond m "*Registered successfully*"
+                Just _ -> respond m (if isself then "*You are already registered!*" else "*That person is already registered!*")
