@@ -14,7 +14,7 @@ import Data.List.Split (chunksOf)
 
 data LeaderboardElement = LeaderboardElement { lbPos :: Integer, lbName :: String, lbVal :: String, lbUUID :: String } deriving Show
 
-data LeaderboardPage = LeaderboardPage Int | LeaderboardAll | LeaderboardSearch String
+data LeaderboardPage = LeaderboardPage Int | LeaderboardAll | LeaderboardSearch String deriving Show
 
 leaderboardCommand :: StatType s => Proxy s -> String -> String -> String -> (Leaderboards s -> Maybe (Integer, String)) -> Command
 leaderboardCommand pr name lbname statname lbfun = Command name DefaultLevel 10 $ \m man bdt -> do
@@ -29,7 +29,7 @@ leaderboardCommand pr name lbname statname lbfun = Command name DefaultLevel 10 
       let elems = zipWith (\lbPos (lbName, lbVal, lbUUID) -> LeaderboardElement {..}) [1..] sortedlb
       let args = words $ dropWhile isSpace $ dropWhile (not . isSpace) $ unpack (messageText m)
       selectedOrMsg <- case args of
-        [] -> liftIO $ atomically $ Right . (,Nothing, LeaderboardPage 0) <$> getAuthorNicks bdt (userId $ messageAuthor m)
+        [] -> liftIO $ atomically $ (\x -> Right (x ,Nothing, LeaderboardSearch (head $ filter (`elem` x) $ map lbUUID elems))) <$> getAuthorNicks bdt (userId $ messageAuthor m)
         ["all"] -> liftIO $ atomically $ Right . (,Nothing, LeaderboardAll) <$> getAuthorNicks bdt (userId $ messageAuthor m)
         [readMaybe -> Just page] -> liftIO $ atomically $ Right . (,Nothing, LeaderboardPage (page - 1)) <$> getAuthorNicks bdt (userId $ messageAuthor m)
         [mcName] -> do
