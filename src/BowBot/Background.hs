@@ -47,7 +47,7 @@ updateGuildMemberRolesSingle members memb BowBotAccount { accountMinecrafts = mc
   for_ (currentRoles \\ targetRoles) $ call . R.RemoveGuildMemberRole gid did -- TODO: remove repetition
   for_ (targetRoles \\ currentRoles) $ call . R.AddGuildMemberRole gid did
 
-updateDiscordRolesSingle 
+updateDiscordRolesSingle
   :: Maybe (Map String (Leaderboards HypixelBowStats)) -> Maybe [String] -> GuildId
   -> GuildMember -> Maybe BowBotAccount -> DiscordHandler ()
 updateDiscordRolesSingle lb members gid m (Just bac) = do
@@ -62,6 +62,8 @@ updateDiscordRolesSingle _ _ gid m Nothing = do
   illegalRole <- liftIO discordIllegalRole
   when (illegalRole `notElem` memberRoles m && any (`elem` (memberRole:divisionRoles)) (memberRoles m)) $ do
     call $ R.AddGuildMemberRole gid (userId $ memberUser m) illegalRole
+  when (illegalRole `elem` memberRoles m && all (`notElem` (memberRole:divisionRoles)) (memberRoles m)) $ do
+    call $ R.RemoveGuildMemberRole gid (userId $ memberUser m) illegalRole
 
 updateDiscordRolesSingleId :: BotData -> Manager -> UserId -> DiscordHandler ()
 updateDiscordRolesSingleId bdt man did = do
@@ -75,7 +77,7 @@ updateDiscordRolesSingleId bdt man did = do
       accs <- liftIO $ fmap (>>=(\u -> (, u) <$> accountDiscords u)) $ atomically $ readTVar $ bowBotAccounts bdt
       let bac = lookup did accs
       updateDiscordRolesSingle lb members gid m bac
-  
+
 downloadGuildMemberList :: Manager -> IO (Maybe [String]) -- TODO: cache this to use in register command
 downloadGuildMemberList man = do
   apiKey <- fromMaybe "" <$> getEnv "HYPIXEL_API"

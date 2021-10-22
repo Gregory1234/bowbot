@@ -36,11 +36,15 @@ registerCommand :: String -> [BotData -> ApiRequestCounter] -> Bool -> Bool -> (
 registerCommand name apis isalt isself onComplete = Command name (if isself then DefaultLevel else ModLevel) 12 $ \m man bdt -> do
   tryApiRequestsMulti (map (\x -> (x bdt, 2)) apis) (\sec -> respond m $ "**Too many requests! Wait another " ++ show sec ++ " seconds!**") $ do
     let args = words $ dropWhile isSpace $ dropWhile (not . isSpace) $ unpack (messageText m)
+    when (null args) $ respond m wrongSyntaxMessage
     let (did, mcname) = if isself then (userId $ messageAuthor m, head args) else (read . filter isDigit $ head args, args !! 1)
-    discords <- liftIO $ getDiscordIds man
-    when (did `notElem` discords) addDiscords
-    discords' <- liftIO $ getDiscordIds man -- TODO: remove double request
-    if did `notElem` discords'
+    discords <- do
+      discords <- liftIO $ getDiscordIds man
+      if did `notElem` discords then do
+        addDiscords
+        liftIO $ getDiscordIds man
+      else return discords
+    if did `notElem` discords
     then do
       respond m "*The discord id doesn't exist!*"
     else do
