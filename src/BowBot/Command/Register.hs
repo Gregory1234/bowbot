@@ -2,7 +2,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ViewPatterns #-}
-{-# LANGUAGE TypeApplications #-}
 
 module BowBot.Command.Register where
 
@@ -13,7 +12,6 @@ import BowBot.API
 import Data.Char (isSpace, isDigit)
 import Data.List (intercalate)
 import BowBot.Background
-import BowBot.Stats.HypixelBow (HypixelBowStats)
 
 -- TODO: check if creation was successful
 
@@ -70,8 +68,7 @@ registerCommand name apis isalt isself onComplete = Command name (if isself then
                   let oldAcc = head $ filter ((==gid) . accountId) psa
                   liftIO $ atomically $ writeTVar (bowBotAccounts bdt) (oldAcc { accountMinecrafts = uuid:accountMinecrafts oldAcc } : filter ((/= gid) . accountId) psa)
                   liftIO $ onComplete man uuid
-                  lb <- liftIO $ getLeaderboard (Proxy @HypixelBowStats) man
-                  for_ lb $ \x -> updateDivisionRolesSingleId bdt x did
+                  updateDiscordRolesSingleId bdt man did
                   respond m "*Registered successfully*"
             else do
               newAcc <- liftIO $ addAccount man (head names) did uuid
@@ -81,6 +78,5 @@ registerCommand name apis isalt isself onComplete = Command name (if isself then
                   psa <- liftIO $ atomically $ readTVar (bowBotAccounts bdt)
                   liftIO $ atomically $ writeTVar (bowBotAccounts bdt) (newAcc':psa)
                   liftIO $ onComplete man uuid
-                  lb <- liftIO $ getLeaderboard (Proxy @HypixelBowStats) man
-                  for_ lb $ \x -> updateDivisionRolesSingleId bdt x did
+                  updateDiscordRolesSingleId bdt man did
                   respond m "*Registered successfully*"

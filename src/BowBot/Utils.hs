@@ -74,6 +74,9 @@ discordDivisionRoles = ifDev airplanesDivisionRoles $ return testDiscordDivision
 discordMemberVisitorRoles :: IO (RoleId, RoleId)
 discordMemberVisitorRoles = ifDev airplanesMemberVisitorRoles $ return testDiscordMemberVisitorRoles
 
+discordIllegalRole :: IO RoleId
+discordIllegalRole = ifDev airplanesIllegalRole $ return testDiscordIllegalRole
+
 discordEscape :: String -> String
 discordEscape [] = ""
 discordEscape (x:xs)

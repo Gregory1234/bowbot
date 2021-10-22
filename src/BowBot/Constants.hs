@@ -30,5 +30,11 @@ airplanesMemberVisitorRoles = (742890312690827345, 742874367200854136)
 testDiscordMemberVisitorRoles :: (RoleId, RoleId)
 testDiscordMemberVisitorRoles = (900346056968130640, 900346092850401310)
 
+testDiscordIllegalRole :: RoleId
+testDiscordIllegalRole = 901109205145096232
+
+airplanesIllegalRole :: RoleId
+airplanesIllegalRole = 901117803023728700
+
 airplanesHypixelId :: String
 airplanesHypixelId = "5f308a358ea8c97248581e46"

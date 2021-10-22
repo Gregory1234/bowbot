@@ -31,8 +31,7 @@ statsCommand pr name rc mode = Command name DefaultLevel 10 $ \m man bdt -> do
         settings <- liftIO $ atomically $ readTVar $ discordSettings bdt
         pure $ fromMaybe defSettings $ settings !? userId (messageAuthor m)
     respond m $ statsMessage settings res
-    lb <- liftIO $ getLeaderboard (Proxy @HypixelBowStats) man -- TODO: make this into a function
-    for_ lb $ \x -> updateDivisionRolesSingleId bdt x (userId $ messageAuthor m)
+    updateDiscordRolesSingleId bdt man (userId $ messageAuthor m)
 
 statsMessage :: StatType s => Settings -> MinecraftResponse () s -> String
 statsMessage _ PlayerNotFound = playerNotFoundMessage
