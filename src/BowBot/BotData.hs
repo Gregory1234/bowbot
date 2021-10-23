@@ -138,6 +138,7 @@ data BotData = BotData
   , discordSettings :: TVar (Map UserId Settings)
   , bowBotAccounts :: TVar [BowBotAccount]
   , hypixelGuildMembers :: TVar (Maybe [String])
+  , snipeMessage :: TVar (Map ChannelId (UserId, String))
   }
 
 -- TODO: log errors
@@ -226,6 +227,7 @@ emptyData = do
   bowBotAccounts <- newTVar []
   discordPerms <- newTVar empty
   hypixelGuildMembers <- newTVar Nothing
+  snipeMessage <- newTVar empty
   return BotData {..}
 
 createData :: IO BotData

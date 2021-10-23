@@ -14,10 +14,12 @@ import BowBot.Command.Minecraft
 import BowBot.Command.Watchlist
 import BowBot.Command.Name
 import BowBot.Command.Settings
+import BowBot.Command.Snipe
 import BowBot.Stats
 import BowBot.Stats.HypixelBow
 import BowBot.API
 import BowBot.Background
+import BowBot.Snipe
 import qualified Data.Text as T
 import qualified Data.Text.IO as TIO
 import Data.Text (isPrefixOf)
@@ -115,6 +117,7 @@ commands =
   , settingsCommand "set" Nothing
   , settingsCommand "show" (Just (True, Always))
   , settingsCommand "hide" (Just (False, Never))
+  , snipeCommand
   , constStringCommand "help" DefaultLevel
     $ "**Bow bot help:**\n\n"
     ++ "**Commands:**\n"
@@ -153,6 +156,7 @@ commands =
 
 eventHandler :: BotData -> Manager -> Event -> DiscordHandler ()
 eventHandler bdt man (MessageCreate m) = do
+  liftIO $ atomically $ detectDeleteMessage bdt m
   prefix <- ifDev "?" $ return "??"
   when (not (fromBot m) && prefix `isPrefixOf` messageText m) $ do
     let n = unpack $ T.toLower . T.drop (T.length prefix) . T.takeWhile (/= ' ') $ messageText m
