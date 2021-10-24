@@ -157,7 +157,7 @@ commands =
 
 eventHandler :: BotData -> Manager -> Event -> DiscordHandler ()
 eventHandler bdt man (MessageCreate m) = do
-  liftIO $ atomically $ detectDeleteMessage bdt m
+  detectDeleteMessage bdt m
   prefix <- ifDev "?" $ return "??"
   when (not (fromBot m) && prefix `isPrefixOf` messageText m) $ do
     let n = unpack $ T.toLower . T.drop (T.length prefix) . T.takeWhile (/= ' ') $ messageText m

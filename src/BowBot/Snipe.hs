@@ -4,12 +4,12 @@
 module BowBot.Snipe where
 
 import BowBot.Command
-import Control.Concurrent.STM (STM)
 import Data.Char (isDigit)
 import Data.Map (insert)
+import Data.List.Split (splitOn)
+import qualified Discord.Requests as R
 
-
-detectDeleteMessage :: BotData -> Message -> STM ()
+detectDeleteMessage :: BotData -> Message -> DiscordHandler ()
 detectDeleteMessage bdt m
   | let author = messageAuthor m
   , userAvatar author == Just "a06062af9b11085ab715e340deaab267"
@@ -23,6 +23,14 @@ detectDeleteMessage bdt m
     Just embed -> case words (head $ lines embed) of
       ("**Message":"sent":"by":(readMaybe . filter isDigit -> Just sender):"deleted":"in":(readMaybe . filter isDigit -> Just channel):_) -> do
         let content = tail $ dropWhile (/='\n') embed
-        modifyTVar (snipeMessage bdt) $ insert channel (sender, content)
+        liftIO $ atomically $ modifyTVar (snipeMessage bdt) $ insert channel 
+          SnipeMessage { snipeMessageAuthor = sender, snipeMessageContent = content, snipeMessageWasEdited = False, snipeMessageTimestamp = messageTimestamp m }
+      ("**Message":"edited":"in":(readMaybe . filter isDigit -> Just channel):"[Jump":"to":_) -> do
+        case (>>=readMaybe . filter isDigit . unpack . embedFooterText) $ embedFooter $ head (messageEmbeds m) of
+          Nothing -> pure ()
+          Just sender -> do
+            let content = unpack $ embedFieldValue $ head $ embedFields $ head (messageEmbeds m)
+            liftIO $ atomically $ modifyTVar (snipeMessage bdt) $ insert channel 
+              SnipeMessage { snipeMessageAuthor = sender, snipeMessageContent = content, snipeMessageWasEdited = False, snipeMessageTimestamp = messageTimestamp m }
       _ -> pure ()
 detectDeleteMessage _ _ = pure ()

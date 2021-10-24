@@ -128,6 +128,13 @@ data BowBotAccount = BowBotAccount
   , accountMinecrafts :: [String]
   } deriving (Show, Eq)
 
+data SnipeMessage = SnipeMessage
+  { snipeMessageAuthor :: UserId
+  , snipeMessageContent :: String
+  , snipeMessageWasEdited :: Bool
+  , snipeMessageTimestamp :: UTCTime
+  } deriving Show
+
 -- TODO: add manager to BotData
 
 data BotData = BotData
@@ -138,7 +145,7 @@ data BotData = BotData
   , discordSettings :: TVar (Map UserId Settings)
   , bowBotAccounts :: TVar [BowBotAccount]
   , hypixelGuildMembers :: TVar (Maybe [String])
-  , snipeMessage :: TVar (Map ChannelId (UserId, String))
+  , snipeMessage :: TVar (Map ChannelId SnipeMessage)
   }
 
 -- TODO: log errors
