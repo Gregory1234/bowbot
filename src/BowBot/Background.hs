@@ -122,7 +122,7 @@ addDiscords = do
       let uids' = filter (\u -> all (\m -> userId (memberUser m) /= u) x) uids
       y <- traverse helper uids'
       liftIO $ updateDiscords manager x y
-    Left x -> liftIO $ print x
+    Left x -> logError manager $ show x
   where
     helper :: UserId -> DiscordHandler User
     helper u = do

@@ -44,10 +44,10 @@ runBowBot discordKey = do
             discordOnStart = onStartup botData,
             discordOnEvent = eventHandler botData manager
           }
-    TIO.putStrLn userFacingError
+    logError manager $ unpack userFacingError
  where
   mkBackground bdt = void $ forkFinally (background bdt) $ \e -> do
-    print e
+    logError' $ show e
     mkBackground bdt
   background bdt = do
      sec <- read @Int <$> getTime "%S"
@@ -57,9 +57,9 @@ runBowBot discordKey = do
      go = do
        _ <- forkIO $ do
          mint <- read @Int <$> getTime "%M"
-         putStrLn "New minute!"
+         logInfo' "New minute!"
          backgroundMinutely bdt mint
-         putStrLn "New minute finished!"
+         logInfo' "New minute finished!"
        threadDelay 60000000
 
 onStartup :: BotData -> DiscordHandler ()
@@ -75,7 +75,7 @@ onStartup bdt = do
   mkBackgroundDiscord = do
     ReaderT $ \x -> void $
       forkFinally (runReaderT backgroundDiscord x) $ \e -> do
-        print e
+        logError' $ show e
         runReaderT mkBackgroundDiscord x
   backgroundDiscord = do
     sec <- liftIO $ read @Int <$> getTime "%S"
@@ -85,9 +85,9 @@ onStartup bdt = do
       go = do
         _ <- ReaderT $ \x -> forkIO $ flip runReaderT x $ do
           mint <- liftIO $ read @Int <$> getTime "%M"
-          liftIO $ putStrLn "New discord minute!"
+          logInfo' "New discord minute!"
           discordBackgroundMinutely bdt mint
-          liftIO $ putStrLn "New discord minute finished!"
+          logInfo' "New discord minute finished!"
         liftIO $ threadDelay 60000000
 
 commands :: [Command]
@@ -163,7 +163,7 @@ eventHandler bdt man (MessageCreate m) = do
     let n = unpack $ T.toLower . T.drop (T.length prefix) . T.takeWhile (/= ' ') $ messageText m
     for_ (filter ((==n) . commandName) commands) $ \c ->
       commandTimeoutRun (commandTimeout c) $ do
-        liftIO . putStrLn $ "recieved " ++ unpack (messageText m)
+        liftIO . logInfo man $ "recieved " ++ unpack (messageText m)
         when (messageGuild m /= Just testDiscordId) $
           ifDev () $ respond m "```Attention! This is the dev version of the bot! Some features might not be avaliable! You shouldn't be reading this! If you see this message please report it immidately!```"
         dPerms <- liftIO $ atomically $ readTVar $ discordPerms bdt

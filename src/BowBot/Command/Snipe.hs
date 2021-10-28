@@ -5,9 +5,10 @@ module BowBot.Command.Snipe where
 import qualified Discord.Requests as R
 import BowBot.Command
 import Data.Map ((!?))
+import BowBot.API
 
 snipeCommand :: Command
-snipeCommand = Command "snipe" DefaultLevel 2 $ \m _ bdt -> do
+snipeCommand = Command "snipe" DefaultLevel 2 $ \m man bdt -> do
   msgs <- liftIO $ atomically $ readTVar (snipeMessage bdt)
   case msgs !? messageChannel m of
     Nothing -> respond m "*Nothing to snipe!*"
@@ -15,7 +16,7 @@ snipeCommand = Command "snipe" DefaultLevel 2 $ \m _ bdt -> do
       users <- restCall $ R.GetUser snipeMessageAuthor
       case users of
         Left err -> do
-          liftIO $ print err
+          logError man $ show err
           respond m somethingWrongMessage
         Right u -> do
           respond m $ "**" ++ unpack (userName u) ++ "#" ++ unpack (userDiscrim u) ++ "** *wrote:* \n" ++ snipeMessageContent

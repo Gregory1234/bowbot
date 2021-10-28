@@ -36,6 +36,7 @@ dependencies:
 - transformers
 - split
 - mtl
+- base64
 
 library:
   source-dirs: src

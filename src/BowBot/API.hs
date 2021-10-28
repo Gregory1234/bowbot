@@ -8,23 +8,55 @@ module BowBot.API(
 ) where
 
 import Network.HTTP.Conduit
+import qualified Data.ByteString.Char8 as BS
+import Data.ByteString.Base64.URL (encodeBase64)
 import Control.Exception.Base (try, SomeException)
 import Data.ByteString.Lazy (ByteString)
 import BowBot.Utils
 import Data.Aeson
 import Data.Aeson.Types (Parser, parseEither, (.:), (.:?), (.!=))
+import Control.Concurrent (forkIO, threadDelay)
 
 managerSettings :: ManagerSettings
 managerSettings = tlsManagerSettings { managerResponseTimeout = responseTimeoutMicro 15000000 }
 
+logInfo :: MonadIO m => Manager -> String -> m ()
+logInfo man msg = liftIO $ void $ forkIO $ do
+  putStrLn msg
+  website <- fromMaybe "" <$> getEnv "DB_SITE"
+  apiKey <- fromMaybe "" <$> getEnv "DB_KEY"
+  let url = "http://" ++ website ++ "/api/log/info.php?key=" ++ apiKey ++ "&msg=" ++ unpack (encodeBase64 (BS.pack msg))
+  request <- parseRequest url
+  void $ try @SomeException $ httpLbs request man
+
+logInfo' :: MonadIO m => String -> m ()
+logInfo' msg = do
+  man <- liftIO $ newManager managerSettings
+  logInfo man msg
+
+logError :: MonadIO m => Manager -> String -> m ()
+logError man msg = liftIO $ void $ forkIO $ do
+  putStrLn msg
+  website <- fromMaybe "" <$> getEnv "DB_SITE"
+  apiKey <- fromMaybe "" <$> getEnv "DB_KEY"
+  let url = "http://" ++ website ++ "/api/log/err.php?key=" ++ apiKey ++ "&msg=" ++ unpack (encodeBase64 (BS.pack msg))
+  request <- parseRequest url
+  void $ try @SomeException $ httpLbs request man
+
+logError' :: MonadIO m => String -> m ()
+logError' msg = do
+  man <- liftIO $ newManager managerSettings
+  logError man msg
+
 sendRequestTo :: Manager -> String -> String -> IO ByteString
 sendRequestTo manager url cleanUrl = do
-  putStrLn cleanUrl
+  logInfo manager cleanUrl
   request <- parseRequest url
   res <- try $ httpLbs request manager
   case res of
     (Left (e :: SomeException)) -> do
-      print e
+      logError manager $ show e
+      threadDelay 3000000
       sendRequestTo manager url cleanUrl
     (Right v) -> return $ responseBody v
 
@@ -36,7 +68,7 @@ sendDB manager path args = do
   let url = "http://" ++ website ++ "/api/" ++ path ++ "?key=" ++ apiKey ++ (('&':) =<< args) ++ dev
   let cleanUrl = "http://[REDACTED]/api/" ++ path ++ "?key=[REDACTED]" ++ (('&':) =<< args) ++ dev
   res <- sendRequestTo manager url cleanUrl
-  putStrLn $ "Received response from: " ++ cleanUrl
+  logInfo manager $ "Received response from: " ++ cleanUrl
   return res
 
 sendPostDB :: Manager -> String -> Value -> IO ()
@@ -46,7 +78,7 @@ sendPostDB manager path dat = do
   dev <- ifDev "" (return "&dev")
   let url = "http://" ++ website ++ "/api/" ++ path ++ "?key=" ++ apiKey ++ dev
   let cleanUrl = "http://[REDACTED]/api/" ++ path ++ "?key=[REDACTED]" ++ dev
-  putStrLn cleanUrl
+  logInfo manager cleanUrl
   initRequest <- parseRequest url
   let request = initRequest { method = "POST", requestBody = RequestBodyLBS (encode dat) }
   void $ try @SomeException $ httpLbs request manager
@@ -54,9 +86,9 @@ sendPostDB manager path dat = do
 decodeParse :: FromJSON o => ByteString -> (o -> Parser a) -> IO (Maybe a)
 decodeParse (decode -> Just str) parser = case parseEither parser str of
   Left e -> do
-    print e
+    logError' $ show e
     return Nothing
   Right a -> return $ Just a
 decodeParse str _ = do
-  putStrLn $ "Decoding failed in " ++ show str ++ "!"
+  logError' $ "Decoding failed in " ++ show str ++ "!"
   return Nothing

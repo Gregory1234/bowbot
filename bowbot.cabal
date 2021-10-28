@@ -55,6 +55,7 @@ library
       aeson
     , async
     , base >=4.7 && <5
+    , base64
     , bytestring
     , containers
     , discord-haskell
@@ -81,6 +82,7 @@ executable bowbot-exe
       aeson
     , async
     , base >=4.7 && <5
+    , base64
     , bowbot
     , bytestring
     , containers
@@ -109,6 +111,7 @@ test-suite bowbot-test
       aeson
     , async
     , base >=4.7 && <5
+    , base64
     , bowbot
     , bytestring
     , containers
