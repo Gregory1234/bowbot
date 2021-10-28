@@ -35,6 +35,7 @@ runBowBot discordKey = do
   ifDev () $ putStrLn "this is dev version of the bot"
   botData <- createData
   manager <- newManager managerSettings
+  logInfo manager "bot started"
   mkBackground botData
   forever $ do
     userFacingError <-
@@ -57,9 +58,7 @@ runBowBot discordKey = do
      go = do
        _ <- forkIO $ do
          mint <- read @Int <$> getTime "%M"
-         logInfo' "New minute!"
          backgroundMinutely bdt mint
-         logInfo' "New minute finished!"
        threadDelay 60000000
 
 onStartup :: BotData -> DiscordHandler ()
@@ -85,9 +84,7 @@ onStartup bdt = do
       go = do
         _ <- ReaderT $ \x -> forkIO $ flip runReaderT x $ do
           mint <- liftIO $ read @Int <$> getTime "%M"
-          logInfo' "New discord minute!"
           discordBackgroundMinutely bdt mint
-          logInfo' "New discord minute finished!"
         liftIO $ threadDelay 60000000
 
 commands :: [Command]
