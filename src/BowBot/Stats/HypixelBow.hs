@@ -139,5 +139,5 @@ hypixelBowWinstreakLeaderboard HypixelBowLeaderboards {..} | bowLbWinstreak >= 5
 hypixelBowWinstreakLeaderboard _ = Nothing
 
 hypixelBowWLRLeaderboard :: Leaderboards HypixelBowStats -> Maybe (Integer, String)
-hypixelBowWLRLeaderboard HypixelBowLeaderboards {..} | bowLbWins >= bowLbLosses = Just (if bowLbWins == 0 then bowLbWins*1000000 else (bowLbWins*10000) `div` bowLbLosses, showWLR bowLbWins bowLbLosses)
+hypixelBowWLRLeaderboard HypixelBowLeaderboards {..} | bowLbWins >= bowLbLosses = Just (if bowLbLosses == 0 then bowLbWins*1000000 else (bowLbWins*10000) `div` bowLbLosses, showWLR bowLbWins bowLbLosses)
 hypixelBowWLRLeaderboard _ = Nothing
