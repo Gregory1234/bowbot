@@ -171,7 +171,12 @@ eventHandler bdt man (MessageCreate m) = do
         else if perms >= commandPerms c
           then commandHandler c m man bdt
           else respond m "You don't have the permission to do that!"
-      
+
+eventHandler bdt man (GuildMemberAdd gid mem) = do
+  trueId <- liftIO discordGuildId
+  when (gid == trueId) $
+    updateDiscordRolesSingleId bdt man (userId $ memberUser mem)
+
 eventHandler _ _ _ = pure ()
 
 commandTimeoutRun :: Int -> DiscordHandler () -> DiscordHandler ()

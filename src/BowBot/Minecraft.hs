@@ -86,7 +86,6 @@ flattenedMinecraftNicks BotData {..} = do
   let restOfNicks = [(mcUUID,u) | MinecraftAccount {..} <- people, u <- drop 1 mcNames]
   return $ currentNicks ++ restOfNicks
 
--- TODO: distinguish between no uuid and "fun" failing
 withMinecraftAutocorrect :: MonadIO m => Manager -> BotData -> Bool -> String -> (String -> [String] -> m (Either e a)) -> m (MinecraftResponse e a)
 withMinecraftAutocorrect manager bdt cont mcname fun = do
   people <- liftIO $ atomically $ flattenedMinecraftNicks bdt

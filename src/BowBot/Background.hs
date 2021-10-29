@@ -58,13 +58,15 @@ updateDiscordRolesSingle lb members gid m (Just bac) = do
   when (illegalRole `elem` memberRoles m) $ do
     call $ R.RemoveGuildMemberRole gid (userId $ memberUser m) illegalRole
 updateDiscordRolesSingle _ _ gid m Nothing = do
-  memberRole <- fst <$> liftIO discordMemberVisitorRoles
+  (memberRole, visitorRole) <- liftIO discordMemberVisitorRoles
   divisionRoles <- map snd <$> liftIO discordDivisionRoles
   illegalRole <- liftIO discordIllegalRole
   when (illegalRole `notElem` memberRoles m && any (`elem` (memberRole:divisionRoles)) (memberRoles m)) $ do
     call $ R.AddGuildMemberRole gid (userId $ memberUser m) illegalRole
   when (illegalRole `elem` memberRoles m && all (`notElem` (memberRole:divisionRoles)) (memberRoles m)) $ do
     call $ R.RemoveGuildMemberRole gid (userId $ memberUser m) illegalRole
+  when (memberRole `notElem` memberRoles m && visitorRole `notElem` memberRoles m) $ do
+    call $ R.AddGuildMemberRole gid (userId $ memberUser m) visitorRole
 
 updateDiscordRolesSingleId :: BotData -> Manager -> UserId -> DiscordHandler ()
 updateDiscordRolesSingleId bdt man did = do
@@ -77,18 +79,7 @@ updateDiscordRolesSingleId bdt man did = do
       lb <- liftIO $ getLeaderboard (Proxy @HypixelBowStats) man
       accs <- liftIO $ fmap (>>=(\u -> (, u) <$> accountDiscords u)) $ atomically $ readTVar $ bowBotAccounts bdt
       let bac = lookup did accs
-      updateDiscordRolesSingle lb members gid m bac
-
-downloadGuildMemberList :: Manager -> IO (Maybe [String]) -- TODO: cache this to use in register command
-downloadGuildMemberList man = do
-  apiKey <- fromMaybe "" <$> getEnv "HYPIXEL_API"
-  let url = "https://api.hypixel.net/guild?key=" ++ apiKey ++ "&id=" ++ airplanesHypixelId
-  let cleanUrl = "https://api.hypixel.net/guild?key=[REDACTED]&id=" ++ airplanesHypixelId
-  res <- sendRequestTo man url cleanUrl
-  decodeParse res $ \o -> do
-    guild <- o .: "guild"
-    members <- guild .: "members"
-    for members $ \m -> m .: "uuid"
+      updateDiscordRolesSingle lb (if null members then Nothing else Just members) gid m bac
 
 updateRolesAll :: BotData -> Manager -> DiscordHandler ()
 updateRolesAll bdt man = do
@@ -101,7 +92,7 @@ updateRolesAll bdt man = do
     Right gmembs -> for_ gmembs $ \m -> do
       accs <- liftIO $ fmap (>>=(\u -> (, u) <$> accountDiscords u)) $ atomically $ readTVar $ bowBotAccounts bdt
       let bac = lookup (userId (memberUser m)) accs
-      updateDiscordRolesSingle lb members gid m bac
+      updateDiscordRolesSingle lb (if null members then Nothing else Just members) gid m bac
 
 getDiscordIds :: Manager -> IO [UserId]
 getDiscordIds manager = do
@@ -158,15 +149,6 @@ completeLeaderboardUpdate pr bdt api filt = do
           dt <- fmap (fromList . zip lst . catMaybes . concat) $ for chunked $ mapConcurrently $ fmap (fmap toLeaderboard) . requestStats pr manager
           updateLeaderboard manager dt
 
-updateHypixelGuildMemberList :: BotData -> Manager -> IO ()
-updateHypixelGuildMemberList bdt man = do
-  tryApiRequests (hypixelRequestCounter bdt) 1 (\_ -> pure ()) $ do
-    list <- downloadGuildMemberList man
-    case list of
-      Nothing -> pure ()
-      Just members -> do
-        atomically $ writeTVar (hypixelGuildMembers bdt) (Just members)
-
 clearLogs :: Manager -> IO ()
 clearLogs man = do
   website <- fromMaybe "" <$> getEnv "DB_SITE"
@@ -187,7 +169,6 @@ backgroundMinutely bdt@BotData {..} mint = do
     unless dev $ do
       hour <- read @Int <$> getTime "%k"
       when (even hour) $ clearLogs manager
-    updateHypixelGuildMemberList bdt manager
     updateMinecraftAccounts bdt manager
   when (mint == 30) $ do
     hour <- read @Int <$> getTime "%k"
@@ -201,7 +182,6 @@ adminCommands =
   [ Command "refresh" AdminLevel 120 $ \m _ bdt -> do
           liftIO $ downloadData bdt
           manager <- liftIO $ newManager managerSettings
-          liftIO $ updateHypixelGuildMemberList bdt manager
           liftIO $ updateMinecraftAccounts bdt manager
           respond m "Done"
   , Command "discordrefresh" AdminLevel 120 $ \m _ _ -> do

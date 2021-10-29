@@ -26,6 +26,7 @@ clearApiRequestCounter ApiRequestCounter {..} = do
   writeTVar mainCounter border
   writeTVar borderCounter 0
 
+-- TODO: create a version with a return value
 tryApiRequests :: MonadIO m => ApiRequestCounter -> Int -> (Int -> m ()) -> m () -> m ()
 tryApiRequests ApiRequestCounter {..} extra onFail onSuccess = do
   t <- liftIO $ read @Int <$> getTime "%S"
@@ -144,11 +145,20 @@ data BotData = BotData
   , discordPerms :: TVar (Map UserId PermissionLevel)
   , discordSettings :: TVar (Map UserId Settings)
   , bowBotAccounts :: TVar [BowBotAccount]
-  , hypixelGuildMembers :: TVar (Maybe [String])
+  , hypixelGuildMembers :: TVar [String]
   , snipeMessage :: TVar (Map ChannelId SnipeMessage)
   }
-
--- TODO: log errors
+  
+downloadGuildMemberList :: Manager -> IO (Maybe [String])
+downloadGuildMemberList man = do
+  apiKey <- fromMaybe "" <$> getEnv "HYPIXEL_API"
+  let url = "https://api.hypixel.net/guild?key=" ++ apiKey ++ "&id=" ++ airplanesHypixelId
+  let cleanUrl = "https://api.hypixel.net/guild?key=[REDACTED]&id=" ++ airplanesHypixelId
+  res <- sendRequestTo man url cleanUrl
+  decodeParse res $ \o -> do
+    guild <- o .: "guild"
+    members <- guild .: "members"
+    for members $ \m -> m .: "uuid"
 
 downloadMinecraftAccounts :: Manager -> IO (Maybe [MinecraftAccount])
 downloadMinecraftAccounts manager = do
@@ -195,6 +205,10 @@ downloadData bdt = do
     for_ newDiscordSettings (writeTVar (discordSettings bdt))
     for_ newBowBotAccounts (writeTVar (bowBotAccounts bdt))
     for_ newDiscordPerms (writeTVar (discordPerms bdt))
+  tryApiRequests (hypixelRequestCounter bdt) 1 (\_ -> pure ()) $ do
+    newGuildMembers <- downloadGuildMemberList manager
+    atomically $ for_ newGuildMembers (writeTVar (hypixelGuildMembers bdt))
+    
 
 updateMinecraftAccounts :: BotData -> Manager -> IO ()
 updateMinecraftAccounts bdt manager = do
@@ -233,7 +247,7 @@ emptyData = do
   discordSettings <- newTVar empty
   bowBotAccounts <- newTVar []
   discordPerms <- newTVar empty
-  hypixelGuildMembers <- newTVar Nothing
+  hypixelGuildMembers <- newTVar []
   snipeMessage <- newTVar empty
   return BotData {..}
 

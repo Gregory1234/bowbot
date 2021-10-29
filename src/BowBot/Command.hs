@@ -12,7 +12,6 @@ import qualified Data.Text as T
 import Data.Text.Encoding (encodeUtf8)
 import Network.HTTP.Conduit (Manager)
 
--- TODO: make argument order better
 data Command = Command { commandName :: String, commandPerms :: PermissionLevel, commandTimeout :: Int, commandHandler :: Message -> Manager -> BotData -> DiscordHandler () }
 
 call :: (FromJSON a, R.Request (r a)) => r a -> DiscordHandler ()
