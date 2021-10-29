@@ -13,7 +13,7 @@ import BowBot.Stats.HypixelBow
 import Data.Proxy
 import BowBot.Stats
 import BowBot.API
-import Network.HTTP.Conduit (newManager)
+import Network.HTTP.Conduit (newManager, httpLbs, parseRequest)
 import Data.List.Split (chunksOf)
 import Control.Concurrent (threadDelay)
 import Data.Map ((!?))
@@ -24,6 +24,7 @@ import Data.Aeson.Types (object, (.=))
 import Data.Either (fromRight)
 import Data.List ((\\))
 import BowBot.Command
+import Control.Exception.Base (SomeException, try)
 
 updateDivisionRolesSingle :: Map String (Leaderboards HypixelBowStats) -> GuildMember -> BowBotAccount -> DiscordHandler ()
 updateDivisionRolesSingle lb memb BowBotAccount { accountMinecrafts = mc } = do
@@ -166,6 +167,14 @@ updateHypixelGuildMemberList bdt man = do
       Just members -> do
         atomically $ writeTVar (hypixelGuildMembers bdt) (Just members)
 
+clearLogs :: Manager -> IO ()
+clearLogs man = do
+  website <- fromMaybe "" <$> getEnv "DB_SITE"
+  apiKey <- fromMaybe "" <$> getEnv "DB_KEY"
+  let url = "http://" ++ website ++ "/api/log/clear.php?key=" ++ apiKey
+  request <- parseRequest url
+  void $ try @SomeException $ httpLbs request man
+
 backgroundMinutely :: BotData -> Int -> IO ()
 backgroundMinutely bdt@BotData {..} mint = do
   atomically $ do
@@ -174,6 +183,10 @@ backgroundMinutely bdt@BotData {..} mint = do
   when (mint == 0) $ do
     downloadData bdt
     manager <- newManager managerSettings
+    dev <- ifDev False $ return True
+    unless dev $ do
+      hour <- read @Int <$> getTime "%k"
+      when (even hour) $ clearLogs manager
     updateHypixelGuildMemberList bdt manager
     updateMinecraftAccounts bdt manager
   when (mint == 30) $ do
@@ -199,5 +212,8 @@ adminCommands =
           respond m "Done"
   , Command "lbrefresh" AdminLevel 120 $ \m _ bdt -> do
           liftIO $ completeLeaderboardUpdate (Proxy @HypixelBowStats) bdt (hypixelRequestCounter bdt) $ const True
+          respond m "Done"
+  , Command "clearlogs" AdminLevel 120 $ \m man _ -> do
+          liftIO $ clearLogs man
           respond m "Done"
   ]
