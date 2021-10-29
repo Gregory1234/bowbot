@@ -54,11 +54,11 @@ leaderboardCommand pr name lbname statname lbfun = Command name DefaultLevel 10 
             LeaderboardPage page ->
               if page < 0 || page >= length pages
               then respond m $ "*Wrong page number, it has to be between **1** and **" ++ show (length pages) ++ "**.*"
-              else respond m $ lbname ++ " (page **" ++ show (page + 1) ++ "**):\n" ++ fromMaybe "" msg ++ "```\n" ++ unlines (pages !! page) ++ "```"
+              else respond m $ lbname ++ " (page **" ++ show (page + 1) ++ "/" ++ show (length pages) ++ "**):\n" ++ fromMaybe "" msg ++ "```\n" ++ unlines (pages !! page) ++ "```"
             LeaderboardSearch uuid -> do
               let searched = head $ filter ((==uuid) . lbUUID) elems
               let page = fromIntegral $ (lbPos searched - 1) `div` 20
-              respond m $ lbname ++ " (page **" ++ show (page + 1) ++ "**):\n" ++ fromMaybe "" msg ++ "```\n" ++ unlines (pages !! page) ++ "```"
+              respond m $ lbname ++ " (page **" ++ show (page + 1) ++ "/" ++ show (length pages) ++ "**):\n" ++ fromMaybe "" msg ++ "```\n" ++ unlines (pages !! page) ++ "```"
             LeaderboardAll -> do
               for_ msg $ respond m
               respondFile m (pack $ statname ++ ".txt") $ unlines lbFull

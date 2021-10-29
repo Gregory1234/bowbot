@@ -29,6 +29,7 @@ import System.Timeout (timeout)
 import Network.HTTP.Conduit (newManager)
 import Data.Map ((!?))
 import Control.Monad (forever)
+import Control.Exception.Base (SomeException, try)
 
 runBowBot :: String -> IO ()
 runBowBot discordKey = do
@@ -174,7 +175,13 @@ eventHandler bdt man (MessageCreate m) = do
 eventHandler _ _ _ = pure ()
 
 commandTimeoutRun :: Int -> DiscordHandler () -> DiscordHandler ()
-commandTimeoutRun n x = ReaderT (void . forkIO . void . timeout (n * 1000000) . runReaderT x)
+commandTimeoutRun n x = ReaderT (void . forkIO . printErrors . void . timeout (n * 1000000) . runReaderT x)
+  where
+    printErrors m = do
+      v <- try @SomeException m
+      case v of
+        Left e -> logError' $ show e
+        Right _ -> pure ()
 
 fromBot :: Message -> Bool
 fromBot m = userIsBot (messageAuthor m)
