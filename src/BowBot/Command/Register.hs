@@ -38,12 +38,7 @@ registerCommand name apis isalt isself onComplete = Command name (if isself then
     let args = words $ dropWhile isSpace $ dropWhile (not . isSpace) $ unpack (messageText m)
     when (null args) $ respond m wrongSyntaxMessage
     let (did, mcname) = if isself then (userId $ messageAuthor m, head args) else (read . filter isDigit $ head args, args !! 1)
-    discords <- do
-      discords <- liftIO $ getDiscordIds man
-      if did `notElem` discords then do
-        addDiscords
-        liftIO $ getDiscordIds man
-      else return discords
+    discords <- liftIO $ getDiscordIds man
     if did `notElem` discords
     then do
       respond m "*The discord id doesn't exist!*"

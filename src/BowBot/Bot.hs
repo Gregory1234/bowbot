@@ -30,6 +30,7 @@ import Network.HTTP.Conduit (newManager)
 import Data.Map ((!?))
 import Control.Monad (forever)
 import Control.Exception.Base (SomeException, try)
+import Data.Aeson.Types (object, (.=))
 
 runBowBot :: String -> IO ()
 runBowBot discordKey = do
@@ -176,7 +177,8 @@ eventHandler bdt man (GuildMemberAdd gid mem) = do
   trueId <- liftIO discordGuildId
   when (gid == trueId) $
     updateDiscordRolesSingleId bdt man (userId $ memberUser mem)
-  addDiscords
+  liftIO $ sendPostDB man "discord/update.php" $
+    object [pack (show (userId (memberUser mem))) .= object ["name" .= userName (memberUser mem), "discriminator" .= userDiscrim (memberUser mem), "nickname" .= memberNick mem]]
 
 eventHandler _ _ _ = pure ()
 
