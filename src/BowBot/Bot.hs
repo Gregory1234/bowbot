@@ -176,6 +176,7 @@ eventHandler bdt man (GuildMemberAdd gid mem) = do
   trueId <- liftIO discordGuildId
   when (gid == trueId) $
     updateDiscordRolesSingleId bdt man (userId $ memberUser mem)
+  addDiscords
 
 eventHandler _ _ _ = pure ()
 

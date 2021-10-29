@@ -172,10 +172,13 @@ backgroundMinutely bdt@BotData {..} mint = do
     updateMinecraftAccounts bdt manager
   when (mint == 30) $ do
     hour <- read @Int <$> getTime "%k"
+    weekday <- read @Int <$> getTime "%u"
     when (even hour) $
       completeLeaderboardUpdate (Proxy @HypixelBowStats) bdt hypixelRequestCounter $ \MinecraftAccount {..} -> mcHypixelBow == BiHourly
     when (hour == 0) $
       completeLeaderboardUpdate (Proxy @HypixelBowStats) bdt hypixelRequestCounter $ \MinecraftAccount {..} -> mcHypixelBow == Daily
+    when (weekday == 1) $
+      completeLeaderboardUpdate (Proxy @HypixelBowStats) bdt hypixelRequestCounter $ \MinecraftAccount {..} -> mcHypixelBow == Weekly
 
 adminCommands :: [Command]
 adminCommands = 
