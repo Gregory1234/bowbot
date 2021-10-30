@@ -135,6 +135,7 @@ commands =
     ++ " - **?settings** - *display help for settings*\n"
     ++ " - **?snipe** - *show the last deleted message from this channel*\n"
     ++ "\nMade by **GregC**#9698"
+  , constStringCommand "gregc" DefaultLevel "<:gregc:904127204865228851>"
   , constStringCommand "settings" DefaultLevel
     $ "**Bow bot settings help:**\n"
     ++ "**Commands:**\n"
