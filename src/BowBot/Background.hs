@@ -168,7 +168,7 @@ backgroundMinutely bdt@BotData {..} mint = do
     dev <- ifDev False $ return True
     unless dev $ do
       hour <- read @Int <$> getTime "%k"
-      when (even hour) $ clearLogs manager
+      when (hour `mod` 8 == 0) $ clearLogs manager
     updateMinecraftAccounts bdt manager
   when (mint == 30) $ do
     hour <- read @Int <$> getTime "%k"

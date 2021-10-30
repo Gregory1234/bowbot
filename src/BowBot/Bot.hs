@@ -182,6 +182,8 @@ eventHandler bdt man (GuildMemberAdd gid mem) = do
 
 eventHandler _ _ _ = pure ()
 
+-- TODO: print on time out
+
 commandTimeoutRun :: Int -> DiscordHandler () -> DiscordHandler ()
 commandTimeoutRun n x = ReaderT (void . forkIO . printErrors . void . timeout (n * 1000000) . runReaderT x)
   where

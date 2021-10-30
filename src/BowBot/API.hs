@@ -20,6 +20,8 @@ import Control.Concurrent (forkIO, threadDelay)
 managerSettings :: ManagerSettings
 managerSettings = tlsManagerSettings { managerResponseTimeout = responseTimeoutMicro 15000000 }
 
+-- TODO: create a logger monad
+
 logInfo :: MonadIO m => Manager -> String -> m ()
 logInfo man msg = liftIO $ void $ forkIO $ do
   putStrLn msg
