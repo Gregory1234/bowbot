@@ -66,7 +66,7 @@ divisionRankFromWins x
   | x < 250 = Just $ calc HIron
   | x < 500 = Just $ calc HGold
   | x < 1000 = Just $ calc HDiamond
-  | x < 2500 = Just $ calc HMaster
+  | x < 2000 = Just $ calc HMaster
   | x < 5000 = Just $ calc HLegend
   | x < 10000 = Just $ calc HGrandmaster
   | x < 25000 = Just $ calc HGodlike
