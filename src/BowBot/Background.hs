@@ -163,6 +163,7 @@ backgroundMinutely bdt@BotData {..} mint = do
     clearApiRequestCounter hypixelRequestCounter
     clearCache hypixelBowOnlineList
   when (mint == 0) $ do
+    logInfo' "started update"
     downloadData bdt
     manager <- newManager managerSettings
     dev <- ifDev False $ return True
@@ -170,7 +171,9 @@ backgroundMinutely bdt@BotData {..} mint = do
       hour <- read @Int <$> getTime "%k"
       when (hour `mod` 8 == 0) $ clearLogs manager
     updateMinecraftAccounts bdt manager
+    logInfo' "finished update"
   when (mint == 30) $ do
+    logInfo' "started update"
     hour <- read @Int <$> getTime "%k"
     weekday <- read @Int <$> getTime "%u"
     when (even hour) $
@@ -179,6 +182,7 @@ backgroundMinutely bdt@BotData {..} mint = do
       completeLeaderboardUpdate (Proxy @HypixelBowStats) bdt hypixelRequestCounter $ \MinecraftAccount {..} -> mcHypixelBow == Daily
     when (weekday == 1) $
       completeLeaderboardUpdate (Proxy @HypixelBowStats) bdt hypixelRequestCounter $ \MinecraftAccount {..} -> mcHypixelBow == Weekly
+    logInfo' "finished update"
 
 adminCommands :: [Command]
 adminCommands = 

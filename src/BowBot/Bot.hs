@@ -67,7 +67,7 @@ onStartup :: BotData -> DiscordHandler ()
 onStartup bdt = do
   sendCommand (UpdateStatus $ UpdateStatusOpts {
     updateStatusOptsSince = Nothing,
-    updateStatusOptsGame = Just (Activity {activityName = "NEW UPDATE NOW!", activityType = ActivityTypeGame, activityUrl = Nothing}), -- TODO: make this controllable from db
+    updateStatusOptsGame = Just (Activity {activityName = "AAAAAAA!", activityType = ActivityTypeGame, activityUrl = Nothing}), -- TODO: make this controllable from db
     updateStatusOptsNewStatus = UpdateStatusOnline,
     updateStatusOptsAFK = False
   })
@@ -173,6 +173,7 @@ eventHandler bdt man (MessageCreate m) = do
         else if perms >= commandPerms c
           then commandHandler c m man bdt
           else respond m "You don't have the permission to do that!"
+        liftIO . logInfo man $ "finished " ++ unpack (messageText m)
 
 eventHandler bdt man (GuildMemberAdd gid mem) = do
   trueId <- liftIO discordGuildId
