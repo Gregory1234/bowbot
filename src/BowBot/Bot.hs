@@ -187,13 +187,18 @@ eventHandler _ _ _ = pure ()
 -- TODO: print on time out
 
 commandTimeoutRun :: Int -> DiscordHandler () -> DiscordHandler ()
-commandTimeoutRun n x = ReaderT (void . forkIO . printErrors . void . timeout (n * 1000000) . runReaderT x)
+commandTimeoutRun n x = ReaderT (void . forkIO . printErrors . void . printTimeout . runReaderT x)
   where
     printErrors m = do
       v <- try @SomeException m
       case v of
         Left e -> logError' $ show e
         Right _ -> pure ()
+    printTimeout m = do
+      a <- timeout (n * 1000000) m
+      case a of
+        Nothing -> logError' $ "Timed out: " ++ show n ++ "s"
+        Just () -> pure ()
 
 fromBot :: Message -> Bool
 fromBot m = userIsBot (messageAuthor m)
