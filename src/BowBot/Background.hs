@@ -147,6 +147,7 @@ completeLeaderboardUpdate pr bdt api filt = do
         tryApiRequests api 25 (\x -> do { threadDelay ((x+10) * 1000000); helper manager lst }) $ do
           let chunked = chunksOf 10 lst
           dt <- fmap (fromList . zip lst . catMaybes . concat) $ for chunked $ mapConcurrently $ fmap (fmap toLeaderboard) . requestStats pr manager
+          logInfo' $ show dt
           updateLeaderboard manager dt
 
 clearLogs :: Manager -> IO ()
@@ -197,8 +198,8 @@ adminCommands =
   , Command "rolesrefresh" AdminLevel 120 $ \m man bdt -> do
           updateRolesAll bdt man
           respond m "Done"
-  , Command "lbrefresh" AdminLevel 120 $ \m _ bdt -> do
-          liftIO $ completeLeaderboardUpdate (Proxy @HypixelBowStats) bdt (hypixelRequestCounter bdt) $ const True
+  , Command "lbrefresh" AdminLevel 1200 $ \m _ bdt -> do
+          liftIO $ completeLeaderboardUpdate (Proxy @HypixelBowStats) bdt (hypixelRequestCounter bdt) $ \MinecraftAccount {..} -> mcHypixelBow /= Banned
           respond m "Done"
   , Command "clearlogs" AdminLevel 120 $ \m man _ -> do
           liftIO $ clearLogs man

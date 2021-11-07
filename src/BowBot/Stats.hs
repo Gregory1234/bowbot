@@ -1,4 +1,5 @@
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE FlexibleContexts #-}
 
 module BowBot.Stats(
   module BowBot.Stats, module Data.Proxy, Map, fromList, Manager, module BowBot.Settings
@@ -10,7 +11,7 @@ import Network.HTTP.Conduit (Manager)
 import Data.Foldable (for_)
 import BowBot.Settings
 
-class StatType s where
+class (Show s, Show (Leaderboards s)) => StatType s where
   data Leaderboards s
   requestStats :: Proxy s -> Manager -> String -> IO (Maybe s)
   showStats :: Settings -> s -> String
