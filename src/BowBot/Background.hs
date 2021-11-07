@@ -146,7 +146,7 @@ completeLeaderboardUpdate pr bdt api filt = do
       helper manager lst = do
         tryApiRequests api 25 (\x -> do { threadDelay ((x+10) * 1000000); helper manager lst }) $ do
           let chunked = chunksOf 10 lst
-          dt <- fmap (fromList . zip lst . catMaybes . concat) $ for chunked $ mapConcurrently $ fmap (fmap toLeaderboard) . requestStats pr manager
+          dt <- fmap (fromList . catMaybes . zipWith (\a b -> (a,) <$> b) lst . concat) $ for chunked $ mapConcurrently $ fmap (fmap toLeaderboard) . requestStats pr manager
           logInfo' $ show dt
           updateLeaderboard manager dt
 
