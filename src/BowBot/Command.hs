@@ -11,17 +11,25 @@ import BowBot.BotData
 import qualified Data.Text as T
 import Data.Text.Encoding (encodeUtf8)
 import Network.HTTP.Conduit (Manager)
+import Control.Exception.Base (evaluate)
 
 data Command = Command { commandName :: String, commandPerms :: PermissionLevel, commandTimeout :: Int, commandHandler :: Message -> Manager -> BotData -> DiscordHandler () }
 
 call :: (FromJSON a, R.Request (r a)) => r a -> DiscordHandler ()
-call = void . restCall
+call r = do
+  _ <- liftIO $ evaluate r
+  void $ restCall r
 
 respond :: Message -> String -> DiscordHandler ()
-respond m = call . R.CreateMessage (messageChannel m) . pack
+respond m s = do
+  _ <- liftIO $ evaluate s
+  call $ R.CreateMessage (messageChannel m) $ pack s
 
 respondFile :: Message -> T.Text -> String -> DiscordHandler ()
-respondFile m n = call . R.CreateMessageUploadFile (messageChannel m) n . encodeUtf8 . pack
+respondFile m n s = do
+  _ <- liftIO $ evaluate n
+  _ <- liftIO $ evaluate s
+  call $ R.CreateMessageUploadFile (messageChannel m) n $ encodeUtf8 $ pack s
 
 registerMessage :: String
 registerMessage = "*You aren't on the list! To register, type `?register yourign`.*"

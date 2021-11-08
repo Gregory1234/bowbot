@@ -24,7 +24,7 @@ import Data.Aeson.Types (object, (.=))
 import Data.Either (fromRight)
 import Data.List ((\\))
 import BowBot.Command
-import Control.Exception.Base (SomeException, try)
+import Control.Exception.Base (SomeException, try, evaluate)
 
 updateDivisionRolesSingle :: Map String (Leaderboards HypixelBowStats) -> GuildMember -> BowBotAccount -> DiscordHandler ()
 updateDivisionRolesSingle lb memb BowBotAccount { accountMinecrafts = mc } = do
@@ -71,6 +71,8 @@ updateDiscordRolesSingle _ _ gid m Nothing = do
 updateDiscordRolesSingleId :: BotData -> Manager -> UserId -> DiscordHandler ()
 updateDiscordRolesSingleId bdt man did = do
   gid <- liftIO discordGuildId
+  _ <- liftIO $ evaluate gid
+  _ <- liftIO $ evaluate did
   maybeMem <- restCall $ R.GetGuildMember gid did
   case maybeMem of
     Left _ -> pure ()
@@ -108,6 +110,7 @@ addDiscords = do
   manager <- liftIO $ newManager managerSettings
   uids <- liftIO $ getDiscordIds manager
   dgid <- liftIO discordGuildId
+  _ <- liftIO $ evaluate dgid
   v <- fmap (filter (not . userIsBot . memberUser)) <$> restCall (R.ListGuildMembers dgid R.GuildMembersTiming {R.guildMembersTimingLimit = Just 500, R.guildMembersTimingAfter = Nothing})
   case v of
     Right x -> do
@@ -118,6 +121,7 @@ addDiscords = do
   where
     helper :: UserId -> DiscordHandler User
     helper u = do
+      _ <- liftIO $ evaluate u
       y <- restCall (R.GetUser u)
       return $ fromRight undefined y
     updateDiscords manager mem usr = sendPostDB manager "discord/update.php" (object $ map memToObject mem ++ map usrToObject usr)

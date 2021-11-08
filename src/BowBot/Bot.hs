@@ -25,13 +25,14 @@ import qualified Data.Text as T
 import qualified Data.Text.IO as TIO
 import Data.Text (isPrefixOf)
 import Control.Monad.Reader (ReaderT(..))
-import Control.Concurrent (forkIO, forkFinally, threadDelay, ThreadId)
+import Control.Concurrent (forkIO, forkFinally, threadDelay, ThreadId, killThread, myThreadId)
 import System.Timeout (timeout)
 import Network.HTTP.Conduit (newManager)
 import Data.Map ((!?))
 import Control.Monad (forever)
-import Control.Exception.Base (SomeException, try, Exception, throw)
+import Control.Exception.Base (SomeException, try, Exception, throw, evaluate)
 import Data.Aeson.Types (object, (.=))
+import System.Exit (exitWith, ExitCode(..), die)
 
 runBowBot :: String -> IO ()
 runBowBot discordKey = do
@@ -119,6 +120,7 @@ commands =
   , settingsCommand "hide" (Just (False, Never))
   , snipeCommand
   , banCommand "sban"
+  , constStringCommand "throw" AdminLevel $ show @Integer (1 `div` 0)
   , constStringCommand "help" DefaultLevel
     $ "**Bow bot help:**\n\n"
     ++ "**Commands:**\n"
