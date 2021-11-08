@@ -24,12 +24,12 @@ import qualified Data.Text as T
 import qualified Data.Text.IO as TIO
 import Data.Text (isPrefixOf)
 import Control.Monad.Reader (ReaderT(..))
-import Control.Concurrent (forkIO, forkFinally, threadDelay)
+import Control.Concurrent (forkIO, forkFinally, threadDelay, ThreadId)
 import System.Timeout (timeout)
 import Network.HTTP.Conduit (newManager)
 import Data.Map ((!?))
 import Control.Monad (forever)
-import Control.Exception.Base (SomeException, try)
+import Control.Exception.Base (SomeException, try, Exception, throw)
 import Data.Aeson.Types (object, (.=))
 
 runBowBot :: String -> IO ()
@@ -162,8 +162,8 @@ eventHandler bdt man (MessageCreate m) = do
   when (not (fromBot m) && prefix `isPrefixOf` messageText m) $ do
     let n = unpack $ T.toLower . T.drop (T.length prefix) . T.takeWhile (/= ' ') $ messageText m
     for_ (filter ((==n) . commandName) commands) $ \c ->
-      commandTimeoutRun (commandTimeout c) $ do
-        liftIO . logInfo man $ "recieved " ++ unpack (messageText m)
+      commandTimeoutRun (commandTimeout c) m $ do
+        logInfo man $ "recieved " ++ unpack (messageText m)
         when (messageGuild m /= Just testDiscordId) $
           ifDev () $ respond m "```Attention! This is the dev version of the bot! Some features might not be avaliable! You shouldn't be reading this! If you see this message please report it immidately!```"
         dPerms <- liftIO $ atomically $ readTVar $ discordPerms bdt
@@ -173,7 +173,7 @@ eventHandler bdt man (MessageCreate m) = do
         else if perms >= commandPerms c
           then commandHandler c m man bdt
           else respond m "You don't have the permission to do that!"
-        liftIO . logInfo man $ "finished " ++ unpack (messageText m)
+        logInfo man $ "finished " ++ unpack (messageText m)
 
 eventHandler bdt man (GuildMemberAdd gid mem) = do
   trueId <- liftIO discordGuildId
@@ -184,21 +184,24 @@ eventHandler bdt man (GuildMemberAdd gid mem) = do
 
 eventHandler _ _ _ = pure ()
 
--- TODO: print on time out
+timeoutDiscord :: Int -> DiscordHandler a -> DiscordHandler (Maybe a)
+timeoutDiscord n x = ReaderT (timeout n . runReaderT x)
 
-commandTimeoutRun :: Int -> DiscordHandler () -> DiscordHandler ()
-commandTimeoutRun n x = ReaderT (void . forkIO . printErrors . void . printTimeout . runReaderT x)
-  where
-    printErrors m = do
-      v <- try @SomeException m
-      case v of
-        Left e -> logError' $ show e
-        Right _ -> pure ()
-    printTimeout m = do
-      a <- timeout (n * 1000000) m
-      case a of
-        Nothing -> logError' $ "Timed out: " ++ show n ++ "s"
-        Just () -> pure ()
+tryDiscord :: Exception e => DiscordHandler a -> DiscordHandler (Either e a)
+tryDiscord x = ReaderT (try . runReaderT x)
+
+commandTimeoutRun :: Int -> Message -> DiscordHandler () -> DiscordHandler ()
+commandTimeoutRun n msg x = do
+  tm <- tryDiscord @SomeException (timeoutDiscord (n * 1000000) x)
+  case tm of
+    Left e -> do
+      logError' $ "Exception happened in command: " ++ show e
+      respond msg "Something went horribly wrong! Please report this!"
+      throw e
+    Right Nothing -> do
+      logError' $ "Timed out: " ++ show n ++ "s"
+      respond msg "Timed out! Please report this!"
+    Right (Just ()) -> pure ()
 
 fromBot :: Message -> Bool
 fromBot m = userIsBot (messageAuthor m)
