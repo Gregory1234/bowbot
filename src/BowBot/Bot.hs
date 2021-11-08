@@ -15,6 +15,7 @@ import BowBot.Command.Watchlist
 import BowBot.Command.Name
 import BowBot.Command.Settings
 import BowBot.Command.Snipe
+import BowBot.Command.Ban
 import BowBot.Stats
 import BowBot.Stats.HypixelBow
 import BowBot.API
@@ -117,6 +118,7 @@ commands =
   , settingsCommand "show" (Just (True, Always))
   , settingsCommand "hide" (Just (False, Never))
   , snipeCommand
+  , banCommand "sban"
   , constStringCommand "help" DefaultLevel
     $ "**Bow bot help:**\n\n"
     ++ "**Commands:**\n"
@@ -152,6 +154,7 @@ commands =
     ++ " - **?modhelp** - *display this message*\n"
     ++ " - **?add [discord/discord id] [name]** - *register a person with a given minecraft name*\n"
     ++ " - **?addalt [discord/discord id] [name]** - *register a person's alt*\n"
+    ++ " - **?sban [name]** - *ban a minecraft account from the hypixel bow duels leaderboard*\n"
     ++ "\nMade by **GregC**#9698"
   ] ++ adminCommands
 
