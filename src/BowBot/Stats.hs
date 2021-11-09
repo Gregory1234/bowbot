@@ -19,6 +19,7 @@ class (Show s, Show (Leaderboards s)) => StatType s where
   toLeaderboard :: s -> Leaderboards s
   getLeaderboard :: Proxy s -> Manager -> IO (Maybe (Map String (Leaderboards s)))
   updateLeaderboard :: Manager -> Map String (Leaderboards s) -> IO ()
+  banLeaderboard :: Proxy s -> Manager -> String -> IO (Maybe Bool)
 
 fullUpdateStats :: StatType s => Proxy s -> Manager -> String -> IO ()
 fullUpdateStats pr man uuid = do

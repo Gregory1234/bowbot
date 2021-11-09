@@ -186,6 +186,10 @@ instance StatType HypixelBowStats where
   updateLeaderboard manager lb = sendPostDB manager "stats/hypixel/update.php" (object $ helper <$> toList lb)
     where
       helper (uuid, HypixelBowLeaderboards {..}) = pack uuid .= object ["bowWins" .= bowLbWins, "bowLosses" .= bowLbLosses, "bowWinstreak" .= bowLbWinstreak]
+      
+  banLeaderboard _ man uuid = do
+    res <- sendDB man "stats/hypixel/ban.php" ["uuid="++uuid]
+    decodeParse res $ \o -> o .: "success"
 
 hypixelBowWinsLeaderboard :: Leaderboards HypixelBowStats -> Maybe (Integer, String)
 hypixelBowWinsLeaderboard HypixelBowLeaderboards {..} | bowLbWins >= 500 = Just (bowLbWins, show bowLbWins)
@@ -200,5 +204,5 @@ hypixelBowWinstreakLeaderboard HypixelBowLeaderboards {..} | bowLbWinstreak >= 5
 hypixelBowWinstreakLeaderboard _ = Nothing
 
 hypixelBowWLRLeaderboard :: Leaderboards HypixelBowStats -> Maybe (Integer, String)
-hypixelBowWLRLeaderboard HypixelBowLeaderboards {..} | bowLbWins >= bowLbLosses, bowLbWins >= 50 = Just (if bowLbLosses == 0 then bowLbWins*100000000 else (bowLbWins*10000) `div` bowLbLosses, showWLR bowLbWins bowLbLosses)
+hypixelBowWLRLeaderboard HypixelBowLeaderboards {..} | bowLbWins >= bowLbLosses, bowLbWins >= 150 = Just (if bowLbLosses == 0 then bowLbWins*100000000 else (bowLbWins*10000) `div` bowLbLosses, showWLR bowLbWins bowLbLosses)
 hypixelBowWLRLeaderboard _ = Nothing

@@ -119,7 +119,7 @@ commands =
   , settingsCommand "show" (Just (True, Always))
   , settingsCommand "hide" (Just (False, Never))
   , snipeCommand
-  , banCommand "sban"
+  , banCommand (Proxy @HypixelBowStats) "sban" (\x -> x { mcHypixelBow = Banned })
   , constStringCommand "throw" AdminLevel $ show @Integer (1 `div` 0)
   , constStringCommand "help" DefaultLevel
     $ "**Bow bot help:**\n\n"
