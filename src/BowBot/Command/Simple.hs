@@ -6,7 +6,7 @@ import Data.Char (isSpace)
 import Data.Void (absurd)
 
 urlCommand :: String -> Bool -> (String -> String) -> Command
-urlCommand name ac mkurl = Command name DefaultLevel 2 $ \m man bdt -> do
+urlCommand name ac mkurl = Command name DefaultLevel 8 $ \m man bdt -> do
   let args = words $ dropWhile isSpace $ dropWhile (not . isSpace) $ unpack (messageText m)
   let player = case args of
         [] -> Right (userId $ messageAuthor m)
