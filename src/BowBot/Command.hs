@@ -12,6 +12,7 @@ import qualified Data.Text as T
 import Data.Text.Encoding (encodeUtf8)
 import Network.HTTP.Conduit (Manager)
 import Control.Exception.Base (evaluate)
+import Control.DeepSeq (force)
 
 data Command = Command { commandName :: String, commandPerms :: PermissionLevel, commandTimeout :: Int, commandHandler :: Message -> Manager -> BotData -> DiscordHandler () }
 
@@ -22,13 +23,13 @@ call r = do
 
 respond :: Message -> String -> DiscordHandler ()
 respond m s = do
-  _ <- liftIO $ evaluate s
+  _ <- liftIO $ evaluate $ force s
   call $ R.CreateMessage (messageChannel m) $ pack s
 
 respondFile :: Message -> T.Text -> String -> DiscordHandler ()
 respondFile m n s = do
-  _ <- liftIO $ evaluate n
-  _ <- liftIO $ evaluate s
+  _ <- liftIO $ evaluate $ force n
+  _ <- liftIO $ evaluate $ force s
   call $ R.CreateMessageUploadFile (messageChannel m) n $ encodeUtf8 $ pack s
 
 registerMessage :: String
