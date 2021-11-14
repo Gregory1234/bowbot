@@ -59,6 +59,7 @@ library
     , base64
     , bytestring
     , containers
+    , deepseq
     , discord-haskell
     , http-client-tls
     , http-conduit
@@ -87,6 +88,7 @@ executable bowbot-exe
     , bowbot
     , bytestring
     , containers
+    , deepseq
     , discord-haskell
     , http-client-tls
     , http-conduit
@@ -116,6 +118,7 @@ test-suite bowbot-test
     , bowbot
     , bytestring
     , containers
+    , deepseq
     , discord-haskell
     , http-client-tls
     , http-conduit

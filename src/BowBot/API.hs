@@ -10,12 +10,13 @@ module BowBot.API(
 import Network.HTTP.Conduit
 import qualified Data.ByteString.Char8 as BS
 import Data.ByteString.Base64.URL (encodeBase64)
-import Control.Exception.Base (try, SomeException)
+import Control.Exception.Base (try, SomeException, evaluate)
 import Data.ByteString.Lazy (ByteString)
 import BowBot.Utils
 import Data.Aeson
 import Data.Aeson.Types (Parser, parseEither, (.:), (.:?), (.!=))
 import Control.Concurrent (forkIO, threadDelay)
+import Control.DeepSeq (force)
 
 managerSettings :: ManagerSettings
 managerSettings = tlsManagerSettings { managerResponseTimeout = responseTimeoutMicro 15000000 }
@@ -24,6 +25,7 @@ managerSettings = tlsManagerSettings { managerResponseTimeout = responseTimeoutM
 
 logInfo :: MonadIO m => Manager -> String -> m ()
 logInfo man msg = liftIO $ void $ forkIO $ do
+  _ <- evaluate $ force msg
   putStrLn msg
   website <- fromMaybe "" <$> getEnv "DB_SITE"
   apiKey <- fromMaybe "" <$> getEnv "DB_KEY"
@@ -38,6 +40,7 @@ logInfo' msg = do
 
 logError :: MonadIO m => Manager -> String -> m ()
 logError man msg = liftIO $ void $ forkIO $ do
+  _ <- evaluate $ force msg
   putStrLn msg
   website <- fromMaybe "" <$> getEnv "DB_SITE"
   apiKey <- fromMaybe "" <$> getEnv "DB_KEY"
@@ -52,6 +55,8 @@ logError' msg = do
 
 sendRequestTo :: Manager -> String -> String -> IO ByteString
 sendRequestTo manager url cleanUrl = do
+  _ <- evaluate $ force url
+  _ <- evaluate $ force cleanUrl
   logInfo manager cleanUrl
   request <- parseRequest url
   res <- try $ httpLbs request manager
@@ -75,6 +80,8 @@ sendDB manager path args = do
 
 sendPostDB :: Manager -> String -> Value -> IO ()
 sendPostDB manager path dat = do
+  _ <- evaluate $ force path
+  _ <- evaluate $ force dat
   website <- fromMaybe "" <$> getEnv "DB_SITE"
   apiKey <- fromMaybe "" <$> getEnv "DB_KEY"
   dev <- ifDev "" (return "&dev")

@@ -37,6 +37,7 @@ dependencies:
 - split
 - mtl
 - base64
+- deepseq
 
 library:
   source-dirs: src
