@@ -9,7 +9,6 @@ import Discord.Types
 import BowBot.BotData
 import Network.HTTP.Conduit (Manager)
 import BowBot.API.Mojang
-import Control.Concurrent.STM (STM)
 import BowBot.Utils
 import Data.Char (toLower, isDigit)
 import Data.List (sortOn, isPrefixOf, isSuffixOf)

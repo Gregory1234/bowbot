@@ -70,25 +70,23 @@ updateDiscordRolesSingle bdt lb members gid m (Just bac) = do
   for_ members $ \x -> updateGuildMemberRolesSingle bdt x m bac
   illegalRole <- liftIO $ atomically $ readTVar (discordIllegalRole bdt)
   when (illegalRole `elem` memberRoles m) $ do
-    call $ R.RemoveGuildMemberRole gid (userId $ memberUser m) illegalRole
+    call_ $ R.RemoveGuildMemberRole gid (userId $ memberUser m) illegalRole
 updateDiscordRolesSingle bdt _ _ gid m Nothing = do
   memberRole <- liftIO $ atomically $ readTVar (discordMemberRole bdt)
   visitorRole <- liftIO $ atomically $ readTVar (discordVisitorRole bdt)
   divisionRoles <- map snd <$> liftIO (atomically $ readTVar (discordDivisionRoles bdt))
   illegalRole <- liftIO $ atomically $ readTVar (discordIllegalRole bdt)
   when (illegalRole `notElem` memberRoles m && any (`elem` (memberRole:divisionRoles)) (memberRoles m)) $ do
-    call $ R.AddGuildMemberRole gid (userId $ memberUser m) illegalRole
+    call_ $ R.AddGuildMemberRole gid (userId $ memberUser m) illegalRole
   when (illegalRole `elem` memberRoles m && all (`notElem` (memberRole:divisionRoles)) (memberRoles m)) $ do
-    call $ R.RemoveGuildMemberRole gid (userId $ memberUser m) illegalRole
+    call_ $ R.RemoveGuildMemberRole gid (userId $ memberUser m) illegalRole
   when (memberRole `notElem` memberRoles m && visitorRole `notElem` memberRoles m) $ do
-    call $ R.AddGuildMemberRole gid (userId $ memberUser m) visitorRole
+    call_ $ R.AddGuildMemberRole gid (userId $ memberUser m) visitorRole
 
 updateDiscordRolesSingleId :: BotData -> Manager -> UserId -> DiscordHandler ()
 updateDiscordRolesSingleId bdt man did = do
   gid <- liftIO $ atomically $ readTVar (discordGuildId bdt)
-  _ <- liftIO $ evaluate gid
-  _ <- liftIO $ evaluate did
-  maybeMem <- restCall $ R.GetGuildMember gid did
+  maybeMem <- call $ R.GetGuildMember gid did
   case maybeMem of
     Left _ -> pure ()
     Right m -> do
@@ -102,7 +100,7 @@ updateRolesAll :: BotData -> Manager -> DiscordHandler ()
 updateRolesAll bdt man = do
   gid <- liftIO $ atomically $ readTVar (discordGuildId bdt)
   members <- liftIO $ atomically $ readTVar (hypixelGuildMembers bdt)
-  maybeGmembs <- fmap (filter (not . userIsBot . memberUser)) <$> restCall (R.ListGuildMembers gid R.GuildMembersTiming {R.guildMembersTimingLimit = Just 500, R.guildMembersTimingAfter = Nothing})
+  maybeGmembs <- fmap (filter (not . userIsBot . memberUser)) <$> call (R.ListGuildMembers gid R.GuildMembersTiming {R.guildMembersTimingLimit = Just 500, R.guildMembersTimingAfter = Nothing})
   lb <- liftIO $ getLeaderboard (Proxy @HypixelBowStats) man
   case maybeGmembs of
     Left _ -> pure ()
@@ -125,8 +123,7 @@ addDiscords bdt = do
   manager <- liftIO $ newManager managerSettings
   uids <- liftIO $ getDiscordIds manager
   dgid <- liftIO $ atomically $ readTVar (discordGuildId bdt)
-  _ <- liftIO $ evaluate dgid
-  v <- fmap (filter (not . userIsBot . memberUser)) <$> restCall (R.ListGuildMembers dgid R.GuildMembersTiming {R.guildMembersTimingLimit = Just 500, R.guildMembersTimingAfter = Nothing})
+  v <- fmap (filter (not . userIsBot . memberUser)) <$> call (R.ListGuildMembers dgid R.GuildMembersTiming {R.guildMembersTimingLimit = Just 500, R.guildMembersTimingAfter = Nothing})
   case v of
     Right x -> do
       let uids' = filter (\u -> all (\m -> userId (memberUser m) /= u) x) uids
@@ -136,8 +133,7 @@ addDiscords bdt = do
   where
     helper :: UserId -> DiscordHandler User
     helper u = do
-      _ <- liftIO $ evaluate u
-      y <- restCall (R.GetUser u)
+      y <- call (R.GetUser u)
       return $ fromRight undefined y
     updateDiscords manager mem usr = sendPostDB manager "discord/update.php" (object $ map memToObject mem ++ map usrToObject usr)
        where

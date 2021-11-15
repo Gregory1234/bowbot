@@ -1,15 +1,13 @@
 {-# LANGUAGE ViewPatterns #-}
 
 module BowBot.Utils(
-  module BowBot.Utils, module BowBot.Constants, liftIO, MonadIO, getEnv, fromMaybe, for, for_, readMaybe,
+  module BowBot.Utils, liftIO, MonadIO, getEnv, fromMaybe, for, for_, readMaybe,
   atomically, readTVar, writeTVar, modifyTVar, pack, unpack, when, unless, void
 ) where
 
 import Control.Monad.IO.Class ( liftIO, MonadIO )
 import Data.Maybe (fromMaybe)
 import System.Environment.Blank (getEnv)
-import Discord.Internal.Rest
-import BowBot.Constants
 import Text.Printf (printf)
 import Data.Ratio ((%))
 import Data.Time.Format (formatTime, defaultTimeLocale)

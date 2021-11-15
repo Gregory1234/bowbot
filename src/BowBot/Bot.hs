@@ -22,17 +22,15 @@ import BowBot.API
 import BowBot.Background
 import BowBot.Snipe
 import qualified Data.Text as T
-import qualified Data.Text.IO as TIO
 import Data.Text (isPrefixOf)
 import Control.Monad.Reader (ReaderT(..))
-import Control.Concurrent (forkIO, forkFinally, threadDelay, ThreadId, killThread, myThreadId)
+import Control.Concurrent (forkIO, forkFinally, threadDelay)
 import System.Timeout (timeout)
 import Network.HTTP.Conduit (newManager)
 import Data.Map ((!?))
 import Control.Monad (forever)
-import Control.Exception.Base (SomeException, try, Exception, throw, evaluate)
+import Control.Exception.Base (SomeException, try, Exception, throw)
 import Data.Aeson.Types (object, (.=))
-import System.Exit (exitWith, ExitCode(..), die)
 
 runBowBot :: String -> IO ()
 runBowBot discordKey = do

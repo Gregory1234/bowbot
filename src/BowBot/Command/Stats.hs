@@ -1,11 +1,8 @@
-{-# LANGUAGE TypeApplications #-}
-
 module BowBot.Command.Stats where
 
 import BowBot.Stats
 import BowBot.Command
 import BowBot.Minecraft
-import BowBot.Stats.HypixelBow
 import Data.Char (isSpace)
 import BowBot.Command.Register
 import Data.Map ((!?))

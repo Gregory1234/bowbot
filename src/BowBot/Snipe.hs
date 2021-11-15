@@ -6,8 +6,6 @@ module BowBot.Snipe where
 import BowBot.Command
 import Data.Char (isDigit)
 import Data.Map (insert)
-import Data.List.Split (splitOn)
-import qualified Discord.Requests as R
 
 detectDeleteMessage :: BotData -> Message -> DiscordHandler ()
 detectDeleteMessage bdt m

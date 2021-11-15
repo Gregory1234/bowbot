@@ -17,7 +17,6 @@ import Data.List.Split (chunksOf, splitOn)
 import Control.Concurrent.Async (mapConcurrently)
 import BowBot.API.Mojang (mojangUUIDToNames)
 import Data.List (intercalate)
-import Data.Maybe (mapMaybe)
 
 data ApiRequestCounter = ApiRequestCounter { mainCounter :: TVar Int, borderCounter :: TVar Int, counterLimit :: Int }
 
