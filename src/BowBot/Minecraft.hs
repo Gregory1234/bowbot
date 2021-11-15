@@ -79,18 +79,14 @@ withMinecraftNormal manager bdt cont mcname fun = do
         Left e -> if cont then withMinecraftAutocorrect manager bdt False mcname fun else pure (UserError e)
         Right r -> pure (JustResponse (head names) r)
 
-flattenedMinecraftNicks :: BotData -> STM [(String, String)]
-flattenedMinecraftNicks BotData {..} = do
-  people <- readTVar minecraftAccounts
-  let currentNicks = [(mcUUID,u) | MinecraftAccount {..} <- people, u <- take 1 mcNames]
-  let restOfNicks = [(mcUUID,u) | MinecraftAccount {..} <- people, u <- drop 1 mcNames]
-  return $ currentNicks ++ restOfNicks
-
 withMinecraftAutocorrect :: MonadIO m => Manager -> BotData -> Bool -> String -> (String -> [String] -> m (Either e a)) -> m (MinecraftResponse e a)
 withMinecraftAutocorrect manager bdt cont mcname fun = do
-  people <- liftIO $ atomically $ flattenedMinecraftNicks bdt
-  let dists = map (\(u,n) -> ((u, n), dist (map toLower n) (map toLower mcname))) people
-  let filtered = map fst . sortOn snd . filter (\(_,d) -> d <= 2) $ dists
+  people <- liftIO $ atomically $ readTVar (minecraftAccounts bdt)
+  let process f = let 
+        nicks = [(mcUUID,u) | MinecraftAccount {..} <- people, u <- f mcNames]
+        dists = map (\(u,n) -> ((u, n), dist (map toLower n) (map toLower mcname))) nicks
+          in map fst . sortOn snd . filter (\(_,d) -> d <= 2) $ dists
+  let filtered = process (take 1) ++ process (drop 1)
   case filtered of
     [] -> if cont then withMinecraftNormal manager bdt False mcname fun else pure PlayerNotFound
     ((uuid, rn):_) -> do
