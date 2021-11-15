@@ -38,9 +38,9 @@ updateDiscordStatus man = do
       updateStatusOptsAFK = False
     })
 
-updateDivisionRolesSingle :: Map String (Leaderboards HypixelBowStats) -> GuildMember -> BowBotAccount -> DiscordHandler ()
-updateDivisionRolesSingle lb memb BowBotAccount { accountMinecrafts = mc } = do
-  gid <- liftIO discordGuildId
+updateDivisionRolesSingle :: BotData -> Map String (Leaderboards HypixelBowStats) -> GuildMember -> BowBotAccount -> DiscordHandler ()
+updateDivisionRolesSingle bdt lb memb BowBotAccount { accountMinecrafts = mc } = do
+  gid <- liftIO $ atomically $ readTVar (discordGuildId bdt)
   let did = userId . memberUser $ memb
   let wins = maximum $ mapMaybe (fmap bowLbWins . (lb !?)) mc
   divisionRoles <- liftIO discordDivisionRoles
@@ -49,30 +49,33 @@ updateDivisionRolesSingle lb memb BowBotAccount { accountMinecrafts = mc } = do
   for_ (currentDivisionRoles \\ targetDivisionRoles) $ call . R.RemoveGuildMemberRole gid did
   for_ (targetDivisionRoles \\ currentDivisionRoles) $ call . R.AddGuildMemberRole gid did
 
-updateGuildMemberRolesSingle :: [String] -> GuildMember -> BowBotAccount -> DiscordHandler ()
-updateGuildMemberRolesSingle members memb BowBotAccount { accountMinecrafts = mc } = do
-  gid <- liftIO discordGuildId
+updateGuildMemberRolesSingle :: BotData -> [String] -> GuildMember -> BowBotAccount -> DiscordHandler ()
+updateGuildMemberRolesSingle bdt members memb BowBotAccount { accountMinecrafts = mc } = do
+  gid <- liftIO $ atomically $ readTVar (discordGuildId bdt)
   let did = userId . memberUser $ memb
   let isMember = any (`elem` members) mc
-  memberVisitorRoles <- liftIO discordMemberVisitorRoles
-  let currentRoles = filter (\x -> x == fst memberVisitorRoles || x == snd memberVisitorRoles) (memberRoles memb)
-  let targetRoles = [(if isMember then fst else snd) memberVisitorRoles]
+  memberRole <- liftIO $ atomically $ readTVar (discordMemberRole bdt)
+  visitorRole <- liftIO $ atomically $ readTVar (discordVisitorRole bdt)
+  let currentRoles = filter (\x -> x == memberRole || x == visitorRole) (memberRoles memb)
+  let targetRoles = [if isMember then memberRole else visitorRole]
   for_ (currentRoles \\ targetRoles) $ call . R.RemoveGuildMemberRole gid did -- TODO: remove repetition
   for_ (targetRoles \\ currentRoles) $ call . R.AddGuildMemberRole gid did
 
+-- TODO: remove BotData from here - take it out to a new type
 updateDiscordRolesSingle
-  :: Maybe (Map String (Leaderboards HypixelBowStats)) -> Maybe [String] -> GuildId
+  :: BotData -> Maybe (Map String (Leaderboards HypixelBowStats)) -> Maybe [String] -> GuildId
   -> GuildMember -> Maybe BowBotAccount -> DiscordHandler ()
-updateDiscordRolesSingle lb members gid m (Just bac) = do
-  for_ lb $ \x -> updateDivisionRolesSingle x m bac
-  for_ members $ \x -> updateGuildMemberRolesSingle x m bac
-  illegalRole <- liftIO discordIllegalRole
+updateDiscordRolesSingle bdt lb members gid m (Just bac) = do
+  for_ lb $ \x -> updateDivisionRolesSingle bdt x m bac
+  for_ members $ \x -> updateGuildMemberRolesSingle bdt x m bac
+  illegalRole <- liftIO $ atomically $ readTVar (discordIllegalRole bdt)
   when (illegalRole `elem` memberRoles m) $ do
     call $ R.RemoveGuildMemberRole gid (userId $ memberUser m) illegalRole
-updateDiscordRolesSingle _ _ gid m Nothing = do
-  (memberRole, visitorRole) <- liftIO discordMemberVisitorRoles
+updateDiscordRolesSingle bdt _ _ gid m Nothing = do
+  memberRole <- liftIO $ atomically $ readTVar (discordMemberRole bdt)
+  visitorRole <- liftIO $ atomically $ readTVar (discordVisitorRole bdt)
   divisionRoles <- map snd <$> liftIO discordDivisionRoles
-  illegalRole <- liftIO discordIllegalRole
+  illegalRole <- liftIO $ atomically $ readTVar (discordIllegalRole bdt)
   when (illegalRole `notElem` memberRoles m && any (`elem` (memberRole:divisionRoles)) (memberRoles m)) $ do
     call $ R.AddGuildMemberRole gid (userId $ memberUser m) illegalRole
   when (illegalRole `elem` memberRoles m && all (`notElem` (memberRole:divisionRoles)) (memberRoles m)) $ do
@@ -82,7 +85,7 @@ updateDiscordRolesSingle _ _ gid m Nothing = do
 
 updateDiscordRolesSingleId :: BotData -> Manager -> UserId -> DiscordHandler ()
 updateDiscordRolesSingleId bdt man did = do
-  gid <- liftIO discordGuildId
+  gid <- liftIO $ atomically $ readTVar (discordGuildId bdt)
   _ <- liftIO $ evaluate gid
   _ <- liftIO $ evaluate did
   maybeMem <- restCall $ R.GetGuildMember gid did
@@ -93,11 +96,11 @@ updateDiscordRolesSingleId bdt man did = do
       lb <- liftIO $ getLeaderboard (Proxy @HypixelBowStats) man
       accs <- liftIO $ fmap (>>=(\u -> (, u) <$> accountDiscords u)) $ atomically $ readTVar $ bowBotAccounts bdt
       let bac = lookup did accs
-      updateDiscordRolesSingle lb (if null members then Nothing else Just members) gid m bac
+      updateDiscordRolesSingle bdt lb (if null members then Nothing else Just members) gid m bac
 
 updateRolesAll :: BotData -> Manager -> DiscordHandler ()
 updateRolesAll bdt man = do
-  gid <- liftIO discordGuildId
+  gid <- liftIO $ atomically $ readTVar (discordGuildId bdt)
   members <- liftIO $ atomically $ readTVar (hypixelGuildMembers bdt)
   maybeGmembs <- fmap (filter (not . userIsBot . memberUser)) <$> restCall (R.ListGuildMembers gid R.GuildMembersTiming {R.guildMembersTimingLimit = Just 500, R.guildMembersTimingAfter = Nothing})
   lb <- liftIO $ getLeaderboard (Proxy @HypixelBowStats) man
@@ -106,7 +109,7 @@ updateRolesAll bdt man = do
     Right gmembs -> for_ gmembs $ \m -> do
       accs <- liftIO $ fmap (>>=(\u -> (, u) <$> accountDiscords u)) $ atomically $ readTVar $ bowBotAccounts bdt
       let bac = lookup (userId (memberUser m)) accs
-      updateDiscordRolesSingle lb (if null members then Nothing else Just members) gid m bac
+      updateDiscordRolesSingle bdt lb (if null members then Nothing else Just members) gid m bac
 
 getDiscordIds :: Manager -> IO [UserId]
 getDiscordIds manager = do
@@ -117,11 +120,11 @@ getDiscordIds manager = do
       (readMaybe -> Just x) <- pure s
       return x
 
-addDiscords :: DiscordHandler ()
-addDiscords = do
+addDiscords :: BotData -> DiscordHandler ()
+addDiscords bdt = do
   manager <- liftIO $ newManager managerSettings
   uids <- liftIO $ getDiscordIds manager
-  dgid <- liftIO discordGuildId
+  dgid <- liftIO $ atomically $ readTVar (discordGuildId bdt)
   _ <- liftIO $ evaluate dgid
   v <- fmap (filter (not . userIsBot . memberUser)) <$> restCall (R.ListGuildMembers dgid R.GuildMembersTiming {R.guildMembersTimingLimit = Just 500, R.guildMembersTimingAfter = Nothing})
   case v of
@@ -145,8 +148,8 @@ addDiscords = do
 
 discordBackgroundMinutely :: BotData -> Int -> DiscordHandler ()
 discordBackgroundMinutely bdt mint = do
-  when (mint == 0) $ do
-    addDiscords
+  when (mint == 1) $ do
+    addDiscords bdt
     manager <- liftIO $ newManager managerSettings
     updateDiscordStatus manager
     updateRolesAll bdt manager
@@ -209,8 +212,8 @@ adminCommands =
           manager <- liftIO $ newManager managerSettings
           liftIO $ updateMinecraftAccounts bdt manager
           respond m "Done"
-  , Command "discordrefresh" AdminLevel 120 $ \m _ _ -> do
-          addDiscords
+  , Command "discordrefresh" AdminLevel 120 $ \m _ bdt -> do
+          addDiscords bdt
           respond m "Done"
   , Command "rolesrefresh" AdminLevel 120 $ \m man bdt -> do
           updateRolesAll bdt man

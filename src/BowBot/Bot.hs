@@ -165,8 +165,10 @@ eventHandler bdt man (MessageCreate m) = do
     for_ (filter ((==n) . commandName) commands) $ \c ->
       commandTimeoutRun (commandTimeout c) m $ do
         logInfo man $ "recieved " ++ unpack (messageText m)
-        when (messageGuild m /= Just testDiscordId) $
-          ifDev () $ respond m "```Attention! This is the dev version of the bot! Some features might not be avaliable! You shouldn't be reading this! If you see this message please report it immidately!```"
+        ifDev () $ do
+          testDiscordId <- liftIO $ atomically $ readTVar (discordGuildId bdt)
+          when (messageGuild m /= Just testDiscordId) $
+            respond m "```Attention! This is the dev version of the bot! Some features might not be avaliable! You shouldn't be reading this! If you see this message please report it immidately!```"
         dPerms <- liftIO $ atomically $ readTVar $ discordPerms bdt
         let perms = fromMaybe DefaultLevel $ dPerms !? userId (messageAuthor m)
         if perms == BanLevel
@@ -177,7 +179,7 @@ eventHandler bdt man (MessageCreate m) = do
         logInfo man $ "finished " ++ unpack (messageText m)
 
 eventHandler bdt man (GuildMemberAdd gid mem) = do
-  trueId <- liftIO discordGuildId
+  trueId <- liftIO $ atomically $ readTVar (discordGuildId bdt)
   when (gid == trueId) $
     updateDiscordRolesSingleId bdt man (userId $ memberUser mem)
   liftIO $ sendPostDB man "discord/update.php" $

@@ -65,17 +65,8 @@ ifDev v action = do
   devmode <- liftIO $ fromMaybe "" <$> getEnv "IS_DEV"
   if devmode == "1" then action else return v
 
-discordGuildId :: IO GuildId
-discordGuildId = ifDev airplanesId $ return testDiscordId
-
 discordDivisionRoles :: IO [(Integer, RoleId)]
 discordDivisionRoles = ifDev airplanesDivisionRoles $ return testDiscordDivisionRoles
-
-discordMemberVisitorRoles :: IO (RoleId, RoleId)
-discordMemberVisitorRoles = ifDev airplanesMemberVisitorRoles $ return testDiscordMemberVisitorRoles
-
-discordIllegalRole :: IO RoleId
-discordIllegalRole = ifDev airplanesIllegalRole $ return testDiscordIllegalRole
 
 discordEscape :: String -> String
 discordEscape [] = ""

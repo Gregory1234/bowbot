@@ -147,13 +147,18 @@ data BotData = BotData
   , bowBotAccounts :: TVar [BowBotAccount]
   , hypixelGuildMembers :: TVar [String]
   , snipeMessage :: TVar (Map ChannelId SnipeMessage)
+  , hypixelGuildId :: TVar String
+  , discordGuildId :: TVar GuildId
+  , discordIllegalRole :: TVar RoleId
+  , discordMemberRole :: TVar RoleId
+  , discordVisitorRole :: TVar RoleId
   }
   
-downloadGuildMemberList :: Manager -> IO (Maybe [String])
-downloadGuildMemberList man = do
+downloadGuildMemberList :: Manager -> String -> IO (Maybe [String])
+downloadGuildMemberList man gid = do
   apiKey <- fromMaybe "" <$> getEnv "HYPIXEL_API"
-  let url = "https://api.hypixel.net/guild?key=" ++ apiKey ++ "&id=" ++ airplanesHypixelId
-  let cleanUrl = "https://api.hypixel.net/guild?key=[REDACTED]&id=" ++ airplanesHypixelId
+  let url = "https://api.hypixel.net/guild?key=" ++ apiKey ++ "&id=" ++ gid
+  let cleanUrl = "https://api.hypixel.net/guild?key=[REDACTED]&id=" ++ gid
   res <- sendRequestTo man url cleanUrl
   decodeParse res $ \o -> do
     guild <- o .: "guild"
@@ -205,8 +210,10 @@ downloadData bdt = do
     for_ newDiscordSettings (writeTVar (discordSettings bdt))
     for_ newBowBotAccounts (writeTVar (bowBotAccounts bdt))
     for_ newDiscordPerms (writeTVar (discordPerms bdt))
+  updateDiscordConstants bdt manager
   tryApiRequests (hypixelRequestCounter bdt) 1 (\_ -> pure ()) $ do
-    newGuildMembers <- downloadGuildMemberList manager
+    gid <- atomically $ readTVar (hypixelGuildId bdt)
+    newGuildMembers <- downloadGuildMemberList manager gid
     atomically $ for_ newGuildMembers (writeTVar (hypixelGuildMembers bdt))
     
 
@@ -224,6 +231,21 @@ updateMinecraftAccounts bdt manager = do
       return MinecraftAccount {mcNames = fromMaybe mcNames newNames, ..}
     updateMinecraftNames uuid names = 
       void $ sendDB manager "minecraft/setnames.php" ["uuid=" ++ uuid, "names=" ++ intercalate "," names]
+
+updateDiscordConstants :: BotData -> Manager -> IO ()
+updateDiscordConstants bdt manager = do
+  let getSnowflake name = (>>= readMaybe @Snowflake) <$> getInfoDB manager name
+  newHypixelGuildId <- getInfoDB manager "hypixel_guild_id"
+  newDiscordGuildId <- getSnowflake "discord_guild_id"
+  newDiscordIllegalRole <- getSnowflake "illegal_role"
+  newDiscordMemberRole <- getSnowflake "member_role"
+  newDiscordVisitorRole <- getSnowflake "visitor_role"
+  atomically $ do
+    for_ newHypixelGuildId (writeTVar (hypixelGuildId bdt))
+    for_ newDiscordGuildId (writeTVar (discordGuildId bdt))
+    for_ newDiscordIllegalRole (writeTVar (discordIllegalRole bdt))
+    for_ newDiscordMemberRole (writeTVar (discordMemberRole bdt))
+    for_ newDiscordVisitorRole (writeTVar (discordVisitorRole bdt))
 
 
 newRequestCounter :: Int -> STM ApiRequestCounter
@@ -249,6 +271,11 @@ emptyData = do
   discordPerms <- newTVar empty
   hypixelGuildMembers <- newTVar []
   snipeMessage <- newTVar empty
+  hypixelGuildId <- newTVar ""
+  discordGuildId <- newTVar 0
+  discordIllegalRole <- newTVar 0
+  discordMemberRole <- newTVar 0
+  discordVisitorRole <- newTVar 0
   return BotData {..}
 
 createData :: IO BotData
