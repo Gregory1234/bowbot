@@ -15,8 +15,8 @@ import Data.Time.Clock.POSIX (getCurrentTime)
 import Data.Traversable (for)
 import Data.Foldable (for_)
 import Text.Read (readMaybe)
-import Control.Concurrent.STM (atomically)
-import Control.Concurrent.STM.TVar (readTVar, writeTVar, modifyTVar)
+import Control.Concurrent.STM (atomically, STM)
+import Control.Concurrent.STM.TVar (readTVar, writeTVar, modifyTVar, TVar)
 import Data.Text (pack, unpack)
 import Control.Monad (when, unless, void)
 
@@ -62,6 +62,18 @@ ifDev :: MonadIO m => a -> m a -> m a
 ifDev v action = do
   devmode <- liftIO $ fromMaybe "" <$> getEnv "IS_DEV"
   if devmode == "1" then action else return v
+
+stm :: MonadIO m => STM a -> m a
+stm = liftIO . atomically
+
+readProp :: MonadIO m => (a -> TVar b) -> a -> m b
+readProp f a = stm $ readTVar (f a)
+
+modifyProp :: MonadIO m => (a -> TVar b) -> a -> (b -> b) -> m ()
+modifyProp f a g = stm $ modifyTVar (f a) g
+
+writeProp :: MonadIO m => (a -> TVar b) -> a -> b -> m ()
+writeProp f a g = stm $ writeTVar (f a) g
 
 discordEscape :: String -> String
 discordEscape [] = ""

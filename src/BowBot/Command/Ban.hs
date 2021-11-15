@@ -16,7 +16,7 @@ banCommand p name f = Command name ModLevel 10 $ \m man bdt -> do
       r <- liftIO $ banLeaderboard p man uuid
       case r of
         Just True -> do
-          liftIO $ atomically $ modifyTVar (minecraftAccounts bdt) $ map $ \mc@MinecraftAccount {..} -> if mcUUID == uuid then f mc else mc
+          modifyProp minecraftAccounts bdt $ map $ \mc@MinecraftAccount {..} -> if mcUUID == uuid then f mc else mc
           respond m "Success, player got banned!"
         Just False -> respond m "Player not found! For safety reasons this command does not have autocorrect enabled."
         Nothing -> respond m somethingWrongMessage

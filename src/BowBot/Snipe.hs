@@ -21,14 +21,14 @@ detectDeleteMessage bdt m
     Just embed -> case words (head $ lines embed) of
       ("**Message":"sent":"by":(readMaybe . filter isDigit -> Just sender):"deleted":"in":(readMaybe . filter isDigit -> Just channel):_) -> do
         let content = tail $ dropWhile (/='\n') embed
-        liftIO $ atomically $ modifyTVar (snipeMessage bdt) $ insert channel 
+        modifyProp snipeMessage bdt $ insert channel
           SnipeMessage { snipeMessageAuthor = sender, snipeMessageContent = content, snipeMessageWasEdited = False, snipeMessageTimestamp = messageTimestamp m }
       ("**Message":"edited":"in":(readMaybe . filter isDigit -> Just channel):"[Jump":"to":_) -> do
         case (>>=readMaybe . filter isDigit . unpack . embedFooterText) $ embedFooter $ head (messageEmbeds m) of
           Nothing -> pure ()
           Just sender -> do
             let content = unpack $ embedFieldValue $ head $ embedFields $ head (messageEmbeds m)
-            liftIO $ atomically $ modifyTVar (snipeMessage bdt) $ insert channel 
+            modifyProp snipeMessage bdt $ insert channel 
               SnipeMessage { snipeMessageAuthor = sender, snipeMessageContent = content, snipeMessageWasEdited = False, snipeMessageTimestamp = messageTimestamp m }
       _ -> pure ()
 detectDeleteMessage _ _ = pure ()

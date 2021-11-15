@@ -29,9 +29,9 @@ leaderboardCommand pr name lbname statname lbfun = Command name DefaultLevel 10 
       let elems = zipWith (\lbPos (lbName, lbVal, lbUUID) -> LeaderboardElement {..}) [1..] sortedlb
       let args = words $ dropWhile isSpace $ dropWhile (not . isSpace) $ unpack (messageText m)
       selectedOrMsg <- case args of
-        [] -> liftIO $ atomically $ (\x -> Right (x ,Nothing, LeaderboardSearch (head $ filter (`elem` x) $ map lbUUID elems))) <$> getAuthorNicks bdt (userId $ messageAuthor m)
-        ["all"] -> liftIO $ atomically $ Right . (,Nothing, LeaderboardAll) <$> getAuthorNicks bdt (userId $ messageAuthor m)
-        [readMaybe -> Just page] -> liftIO $ atomically $ Right . (,Nothing, LeaderboardPage (page - 1)) <$> getAuthorNicks bdt (userId $ messageAuthor m)
+        [] -> stm $ (\x -> Right (x ,Nothing, LeaderboardSearch (head $ filter (`elem` x) $ map lbUUID elems))) <$> getAuthorNicks bdt (userId $ messageAuthor m)
+        ["all"] -> stm $ Right . (,Nothing, LeaderboardAll) <$> getAuthorNicks bdt (userId $ messageAuthor m)
+        [readMaybe -> Just page] -> stm $ Right . (,Nothing, LeaderboardPage (page - 1)) <$> getAuthorNicks bdt (userId $ messageAuthor m)
         [mcName] -> do
           res <- withMinecraftAutocorrect man bdt False mcName $ \uuid _ ->
             return $ if uuid `elem` map lbUUID elems then Right uuid else Left ()

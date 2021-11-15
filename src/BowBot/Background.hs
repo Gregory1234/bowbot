@@ -40,10 +40,10 @@ updateDiscordStatus man = do
 
 updateDivisionRolesSingle :: BotData -> Map String (Leaderboards HypixelBowStats) -> GuildMember -> BowBotAccount -> DiscordHandler ()
 updateDivisionRolesSingle bdt lb memb BowBotAccount { accountMinecrafts = mc } = do
-  gid <- liftIO $ atomically $ readTVar (discordGuildId bdt)
+  gid <- readProp discordGuildId bdt
   let did = userId . memberUser $ memb
   let wins = maximum $ mapMaybe (fmap bowLbWins . (lb !?)) mc
-  divisionRoles <- liftIO $ atomically $ readTVar (discordDivisionRoles bdt)
+  divisionRoles <- readProp discordDivisionRoles bdt
   let currentDivisionRoles = filter (`elem` map snd divisionRoles) (memberRoles memb)
   let targetDivisionRoles = take 1 $ map snd $ filter ((<= wins) . fst) $ reverse divisionRoles
   for_ (currentDivisionRoles \\ targetDivisionRoles) $ call . R.RemoveGuildMemberRole gid did
@@ -51,11 +51,11 @@ updateDivisionRolesSingle bdt lb memb BowBotAccount { accountMinecrafts = mc } =
 
 updateGuildMemberRolesSingle :: BotData -> [String] -> GuildMember -> BowBotAccount -> DiscordHandler ()
 updateGuildMemberRolesSingle bdt members memb BowBotAccount { accountMinecrafts = mc } = do
-  gid <- liftIO $ atomically $ readTVar (discordGuildId bdt)
+  gid <- readProp discordGuildId bdt
   let did = userId . memberUser $ memb
   let isMember = any (`elem` members) mc
-  memberRole <- liftIO $ atomically $ readTVar (discordMemberRole bdt)
-  visitorRole <- liftIO $ atomically $ readTVar (discordVisitorRole bdt)
+  memberRole <- readProp discordMemberRole bdt
+  visitorRole <- readProp discordVisitorRole bdt
   let currentRoles = filter (\x -> x == memberRole || x == visitorRole) (memberRoles memb)
   let targetRoles = [if isMember then memberRole else visitorRole]
   for_ (currentRoles \\ targetRoles) $ call . R.RemoveGuildMemberRole gid did -- TODO: remove repetition
@@ -68,14 +68,14 @@ updateDiscordRolesSingle
 updateDiscordRolesSingle bdt lb members gid m (Just bac) = do
   for_ lb $ \x -> updateDivisionRolesSingle bdt x m bac
   for_ members $ \x -> updateGuildMemberRolesSingle bdt x m bac
-  illegalRole <- liftIO $ atomically $ readTVar (discordIllegalRole bdt)
+  illegalRole <- readProp discordIllegalRole bdt
   when (illegalRole `elem` memberRoles m) $ do
     call_ $ R.RemoveGuildMemberRole gid (userId $ memberUser m) illegalRole
 updateDiscordRolesSingle bdt _ _ gid m Nothing = do
-  memberRole <- liftIO $ atomically $ readTVar (discordMemberRole bdt)
-  visitorRole <- liftIO $ atomically $ readTVar (discordVisitorRole bdt)
-  divisionRoles <- map snd <$> liftIO (atomically $ readTVar (discordDivisionRoles bdt))
-  illegalRole <- liftIO $ atomically $ readTVar (discordIllegalRole bdt)
+  memberRole <- readProp discordMemberRole bdt
+  visitorRole <- readProp discordVisitorRole bdt
+  divisionRoles <- map snd <$> readProp discordDivisionRoles bdt
+  illegalRole <- readProp discordIllegalRole bdt
   when (illegalRole `notElem` memberRoles m && any (`elem` (memberRole:divisionRoles)) (memberRoles m)) $ do
     call_ $ R.AddGuildMemberRole gid (userId $ memberUser m) illegalRole
   when (illegalRole `elem` memberRoles m && all (`notElem` (memberRole:divisionRoles)) (memberRoles m)) $ do
@@ -85,27 +85,27 @@ updateDiscordRolesSingle bdt _ _ gid m Nothing = do
 
 updateDiscordRolesSingleId :: BotData -> Manager -> UserId -> DiscordHandler ()
 updateDiscordRolesSingleId bdt man did = do
-  gid <- liftIO $ atomically $ readTVar (discordGuildId bdt)
+  gid <- readProp discordGuildId bdt
   maybeMem <- call $ R.GetGuildMember gid did
   case maybeMem of
     Left _ -> pure ()
     Right m -> do
-      members <- liftIO $ atomically $ readTVar (hypixelGuildMembers bdt)
+      members <- readProp hypixelGuildMembers bdt
       lb <- liftIO $ getLeaderboard (Proxy @HypixelBowStats) man
-      accs <- liftIO $ fmap (>>=(\u -> (, u) <$> accountDiscords u)) $ atomically $ readTVar $ bowBotAccounts bdt
+      accs <- (>>=(\u -> (, u) <$> accountDiscords u)) <$> readProp bowBotAccounts bdt
       let bac = lookup did accs
       updateDiscordRolesSingle bdt lb (if null members then Nothing else Just members) gid m bac
 
 updateRolesAll :: BotData -> Manager -> DiscordHandler ()
 updateRolesAll bdt man = do
-  gid <- liftIO $ atomically $ readTVar (discordGuildId bdt)
-  members <- liftIO $ atomically $ readTVar (hypixelGuildMembers bdt)
+  gid <- readProp discordGuildId bdt
+  members <- readProp hypixelGuildMembers bdt
   maybeGmembs <- fmap (filter (not . userIsBot . memberUser)) <$> call (R.ListGuildMembers gid R.GuildMembersTiming {R.guildMembersTimingLimit = Just 500, R.guildMembersTimingAfter = Nothing})
   lb <- liftIO $ getLeaderboard (Proxy @HypixelBowStats) man
   case maybeGmembs of
     Left _ -> pure ()
     Right gmembs -> for_ gmembs $ \m -> do
-      accs <- liftIO $ fmap (>>=(\u -> (, u) <$> accountDiscords u)) $ atomically $ readTVar $ bowBotAccounts bdt
+      accs <- (>>=(\u -> (, u) <$> accountDiscords u)) <$> readProp bowBotAccounts bdt
       let bac = lookup (userId (memberUser m)) accs
       updateDiscordRolesSingle bdt lb (if null members then Nothing else Just members) gid m bac
 
@@ -122,7 +122,7 @@ addDiscords :: BotData -> DiscordHandler ()
 addDiscords bdt = do
   manager <- liftIO $ newManager managerSettings
   uids <- liftIO $ getDiscordIds manager
-  dgid <- liftIO $ atomically $ readTVar (discordGuildId bdt)
+  dgid <- readProp discordGuildId bdt
   v <- fmap (filter (not . userIsBot . memberUser)) <$> call (R.ListGuildMembers dgid R.GuildMembersTiming {R.guildMembersTimingLimit = Just 500, R.guildMembersTimingAfter = Nothing})
   case v of
     Right x -> do
@@ -155,7 +155,7 @@ discordBackgroundMinutely bdt mint = do
 completeLeaderboardUpdate :: StatType s => Proxy s -> BotData -> ApiRequestCounter -> (MinecraftAccount -> Bool) -> IO ()
 completeLeaderboardUpdate pr bdt api filt = do
   manager <- newManager managerSettings
-  mcs <- atomically $ readTVar $ minecraftAccounts bdt
+  mcs <- readProp minecraftAccounts bdt
   let chunked = chunksOf 25 (map mcUUID $ filter filt mcs)
   for_ chunked $ helper manager
     where

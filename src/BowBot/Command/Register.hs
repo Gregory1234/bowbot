@@ -47,11 +47,11 @@ registerCommand name apis isalt isself onComplete = Command name (if isself then
       case maybeUUID of
         Nothing -> respond m playerNotFoundMessage
         Just uuid -> do
-          nicks <- liftIO $ atomically $ readTVar (minecraftAccounts bdt)
-          taken <- fmap (>>=accountMinecrafts) $ liftIO $ atomically $ readTVar (bowBotAccounts bdt)
+          nicks <- readProp minecraftAccounts bdt
+          taken <- (>>=accountMinecrafts) <$> readProp bowBotAccounts bdt
           if uuid `elem` taken
           then do
-            pns <- fmap (>>=(\x -> (, x) <$> accountDiscords x)) $ liftIO $ atomically $ readTVar (bowBotAccounts bdt)
+            pns <- (>>=(\x -> (, x) <$> accountDiscords x)) <$> readProp bowBotAccounts bdt
             case lookup did pns of
               Nothing -> respond m "*That account already belongs to someone else!*"
               Just bac -> respond m $ if uuid `elem` accountMinecrafts bac
@@ -61,30 +61,30 @@ registerCommand name apis isalt isself onComplete = Command name (if isself then
             names <- liftIO $ fromMaybe [] <$> mcUUIDToNames man bdt uuid
             unless (uuid `elem` map mcUUID nicks) $ do
               newMc <- liftIO $ addMinecraftAccount man uuid names
-              for_ newMc $ \x -> liftIO $ atomically $ writeTVar (minecraftAccounts bdt) (x:nicks)
+              for_ newMc $ \x -> writeProp minecraftAccounts bdt (x:nicks)
             if isalt
             then do
-              pns <- fmap (>>=(\BowBotAccount {..} -> (, accountId) <$> accountDiscords)) $ liftIO $ atomically $ readTVar (bowBotAccounts bdt)
+              pns <- (>>=(\BowBotAccount {..} -> (, accountId) <$> accountDiscords)) <$> readProp bowBotAccounts bdt
               case lookup did pns of
                 Nothing -> respond m (if isself then "*You are not registered!*" else "*That person is not registered!*")
                 Just gid -> do
                   liftIO $ addAltAccount man gid uuid
-                  psa <- liftIO $ atomically $ readTVar (bowBotAccounts bdt)
+                  psa <- readProp bowBotAccounts bdt
                   let oldAcc = head $ filter ((==gid) . accountId) psa
-                  liftIO $ atomically $ writeTVar (bowBotAccounts bdt) (oldAcc { accountMinecrafts = uuid:accountMinecrafts oldAcc } : filter ((/= gid) . accountId) psa)
+                  writeProp bowBotAccounts bdt (oldAcc { accountMinecrafts = uuid:accountMinecrafts oldAcc } : filter ((/= gid) . accountId) psa)
                   liftIO $ onComplete man uuid
                   updateDiscordRolesSingleId bdt man did
                   respond m "*Registered successfully*"
             else do
-              pns <- fmap (>>=(\BowBotAccount {..} -> (, accountId) <$> accountDiscords)) $ liftIO $ atomically $ readTVar (bowBotAccounts bdt)
+              pns <- (>>=(\BowBotAccount {..} -> (, accountId) <$> accountDiscords)) <$> readProp bowBotAccounts bdt
               case lookup did pns of
                 Nothing -> do
                   newAcc <- liftIO $ addAccount man (head names) did uuid
                   case newAcc of
                     Nothing -> respond m somethingWrongMessage
                     Just newAcc' -> do
-                      psa <- liftIO $ atomically $ readTVar (bowBotAccounts bdt)
-                      liftIO $ atomically $ writeTVar (bowBotAccounts bdt) (newAcc':psa)
+                      psa <- readProp bowBotAccounts bdt
+                      writeProp bowBotAccounts bdt (newAcc':psa)
                       liftIO $ onComplete man uuid
                       updateDiscordRolesSingleId bdt man did
                       respond m "*Registered successfully*"

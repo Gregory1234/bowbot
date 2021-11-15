@@ -25,7 +25,7 @@ statsCommand pr name rc mode = Command name DefaultLevel 10 $ \m man bdt -> do
       AlwaysDefault -> pure defSettings
       AlwaysAll -> pure allSettings
       UserSettings -> do
-        settings <- liftIO $ atomically $ readTVar $ discordSettings bdt
+        settings <- readProp discordSettings bdt
         pure $ fromMaybe defSettings $ settings !? userId (messageAuthor m)
     respond m $ statsMessage settings res
     updateDiscordRolesSingleId bdt man (userId $ messageAuthor m)
@@ -42,9 +42,9 @@ statsMessage settings (DidYouMeanOldResponse o n s) = "*Did you mean* **" ++ o +
 
 tryRegister :: StatType s => BotData -> Manager -> String -> [String] -> s -> IO ()
 tryRegister bdt manager uuid names s | statsNotable s = do
-  registeredPlayers <- liftIO $ atomically $ map mcUUID <$> readTVar (minecraftAccounts bdt)
+  registeredPlayers <- atomically $ map mcUUID <$> readTVar (minecraftAccounts bdt)
   unless (uuid `elem` registeredPlayers) $ do
     acc <- addMinecraftAccount manager uuid names
-    for_ acc $ \x -> atomically $ modifyTVar (minecraftAccounts bdt) (x:)
+    atomically $ for_ acc $ \x -> modifyTVar (minecraftAccounts bdt) (x:)
   updateLeaderboard manager (fromList [(uuid, toLeaderboard s)])
 tryRegister _ _ _ _ _ = pure ()

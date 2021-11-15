@@ -12,7 +12,7 @@ import Data.Char (isSpace)
 minecraftCommand :: Command
 minecraftCommand = Command "mc" DefaultLevel 2 $ \m man bdt -> do
   let args = words $ dropWhile isSpace $ dropWhile (not . isSpace) $ unpack (messageText m)
-  pns <- fmap (>>=(\account@BowBotAccount {..} -> (,account) <$> accountDiscords)) $ liftIO $ atomically $ readTVar (bowBotAccounts bdt)
+  pns <- fmap (>>=(\account@BowBotAccount {..} -> (,account) <$> accountDiscords)) $ readProp bowBotAccounts bdt
   case lookup (userId $ messageAuthor m) pns of
     Nothing -> case args of
       [readMaybe . filter (`notElem` "<@!>") -> Just did] -> case lookup did pns of
@@ -44,7 +44,7 @@ minecraftCommand = Command "mc" DefaultLevel 2 $ \m man bdt -> do
           Just mcUUID -> if mcUUID `elem` accountMinecrafts bac
             then do
               _ <- liftIO $ sendDB man "people/select.php" ["id=" ++ show (accountId bac), "minecraft=" ++ mcUUID]
-              liftIO $ atomically $ modifyTVar (bowBotAccounts bdt) $ map (\u -> if accountId bac == accountId u then u { accountSelectedMinecraft = mcUUID } else u)
+              modifyProp bowBotAccounts bdt $ map (\u -> if accountId bac == accountId u then u { accountSelectedMinecraft = mcUUID } else u)
               respond m "*Success!*"
             else
               respond m "*You do not have that minecraft nick registered! If this is your alt, ask someone to add it.*"

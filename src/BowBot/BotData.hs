@@ -30,7 +30,7 @@ clearApiRequestCounter ApiRequestCounter {..} = do
 tryApiRequests :: MonadIO m => ApiRequestCounter -> Int -> (Int -> m ()) -> m () -> m ()
 tryApiRequests ApiRequestCounter {..} extra onFail onSuccess = do
   t <- liftIO $ read @Int <$> getTime "%S"
-  cv <- liftIO . atomically $ do
+  cv <- stm $ do
     c1 <- readTVar mainCounter
     c2 <- readTVar borderCounter
     let c = c1 + c2 + extra
@@ -41,7 +41,7 @@ tryApiRequests ApiRequestCounter {..} extra onFail onSuccess = do
 tryApiRequestsMulti :: MonadIO m => [(ApiRequestCounter, Int)] -> (Int -> m ()) -> m () -> m ()
 tryApiRequestsMulti apis onFail onSuccess = do
   t <- liftIO $ read @Int <$> getTime "%S"
-  cv <- liftIO . atomically $ do
+  cv <- stm $ do
     res <- fmap and . for apis $ \(ApiRequestCounter {..}, extra) -> do
       c1 <- readTVar mainCounter
       c2 <- readTVar borderCounter
@@ -67,7 +67,7 @@ data CacheResponse a
 
 getOrCalculateCache :: MonadIO m => CachedData a -> m (Maybe a) -> m (CacheResponse a)
 getOrCalculateCache CachedData {..} exec = do
-  (ret, busy) <- liftIO $ atomically $ do
+  (ret, busy) <- stm $ do
     busy <- readTVar currentlyBusyCache
     mainVal <- readTVar mainCache
     borderVal <- readTVar borderCache
@@ -83,7 +83,7 @@ getOrCalculateCache CachedData {..} exec = do
     (Nothing, False) -> do
       val <- exec
       t <- liftIO $ read @Int <$> getTime "%S"
-      liftIO $ atomically $ do
+      stm $ do
         writeTVar currentlyBusyCache False
         writeTVar (if t <= 5 || t >= 55 then borderCache else mainCache) val
       return (maybe CacheFailed CacheFresh val)
@@ -213,17 +213,17 @@ downloadData bdt = do
     for_ newDiscordPerms (writeTVar (discordPerms bdt))
   updateDiscordConstants bdt manager
   tryApiRequests (hypixelRequestCounter bdt) 1 (\_ -> pure ()) $ do
-    gid <- atomically $ readTVar (hypixelGuildId bdt)
+    gid <- readProp hypixelGuildId bdt
     newGuildMembers <- downloadGuildMemberList manager gid
     atomically $ for_ newGuildMembers (writeTVar (hypixelGuildMembers bdt))
     
 
 updateMinecraftAccounts :: BotData -> Manager -> IO ()
 updateMinecraftAccounts bdt manager = do
-  nickList <- atomically $ readTVar $ minecraftAccounts bdt
+  nickList <- readProp minecraftAccounts bdt
   let chunked = chunksOf 10 nickList
   updatedNicks <- fmap concat $ for chunked $ mapConcurrently helper
-  atomically $ writeTVar (minecraftAccounts bdt) updatedNicks
+  writeProp minecraftAccounts bdt updatedNicks
   where
     helper MinecraftAccount {..} = do
       newNames <- mojangUUIDToNames manager mcUUID

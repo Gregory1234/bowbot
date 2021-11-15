@@ -21,11 +21,11 @@ onlineCommand :: Command
 onlineCommand = Command "online" DefaultLevel 30 $ \m man bdt -> do
   maybeOnlinePlayers <- getOrCalculateCache (hypixelBowOnlineList bdt) $ do
     st <- liftIO $ fromMaybe [] <$> getWatchlist man
-    ret <- liftIO $ atomically $ newTVar Nothing
+    ret <- stm $ newTVar Nothing
     tryApiRequests (hypixelRequestCounter bdt) (length st) (\sec -> respond m $ "**Too many requests! Wait another " ++ show sec ++ " seconds!**") $ do
       values <- filterM (\uuid -> fromMaybe False <$> liftIO (isInBowDuels man uuid)) st
-      liftIO $ atomically $ writeTVar ret (Just values)
-    liftIO $ atomically $ readTVar ret
+      stm $ writeTVar ret (Just values)
+    stm $ readTVar ret
   case maybeOnlinePlayers of
     CacheFailed -> pure ()
     CacheBusy -> respond m "**Processing list of online players. Please send command again later.**"

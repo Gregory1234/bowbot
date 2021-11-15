@@ -69,12 +69,12 @@ settingsCommand name values = Command name DefaultLevel 2 $ \m man bdt -> do
       Left err -> respond m err
       Right (k, v, u) -> do
         liftIO $ unsafeUpdateSettings man did k v
-        liftIO $ atomically $ modifyTVar (discordSettings bdt) $ alter (Just . u . fromMaybe defSettings) did
+        modifyProp discordSettings bdt $ alter (Just . u . fromMaybe defSettings) did
         respond m "*Successfully updated!*"
     (Just bs, [setting]) -> case getSettingToSet setting (Left bs) of
       Left err -> respond m err
       Right (k, v, u) -> do
         liftIO $ unsafeUpdateSettings man did k v
-        liftIO $ atomically $ modifyTVar (discordSettings bdt) $ alter (Just . u . fromMaybe defSettings) did
+        modifyProp discordSettings bdt $ alter (Just . u . fromMaybe defSettings) did
         respond m "*Successfully updated!*"
     _ -> respond m wrongSyntaxMessage

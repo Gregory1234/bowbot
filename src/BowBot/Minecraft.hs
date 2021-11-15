@@ -26,7 +26,7 @@ data MinecraftResponse e a
 
 mcNameToUUID :: Manager -> BotData -> String -> IO (Maybe String)
 mcNameToUUID manager bdt name = do
-  mcAcc <- atomically $ readTVar (minecraftAccounts bdt)
+  mcAcc <- readProp minecraftAccounts bdt
   let goodAcc = filter ((==name) . head . mcNames) mcAcc
   case goodAcc of
     [MinecraftAccount {mcUUID}] -> return (Just mcUUID)
@@ -34,7 +34,7 @@ mcNameToUUID manager bdt name = do
 
 mcUUIDToNames :: Manager -> BotData -> String -> IO (Maybe [String])
 mcUUIDToNames manager bdt uuid = do
-  mcAcc <- atomically $ readTVar (minecraftAccounts bdt)
+  mcAcc <- readProp minecraftAccounts bdt
   let goodAcc = filter ((==uuid) . mcUUID) mcAcc
   case goodAcc of
     [MinecraftAccount {mcNames}] -> return (Just mcNames)
@@ -56,7 +56,7 @@ withMinecraft manager bdt ac (Left mcname) fun =
 
 withMinecraftDiscord :: MonadIO m => Manager -> BotData -> UserId -> (String -> [String] -> m (Either e a)) -> m (MinecraftResponse e a)
 withMinecraftDiscord manager bdt did fun = do
-  pns <- fmap (>>=(\BowBotAccount {..} -> (,accountSelectedMinecraft) <$> accountDiscords)) $ liftIO $ atomically $ readTVar (bowBotAccounts bdt)
+  pns <- fmap (>>=(\BowBotAccount {..} -> (,accountSelectedMinecraft) <$> accountDiscords)) $ readProp bowBotAccounts bdt
   case lookup did pns of
     Nothing -> pure NotOnList
     Just uuid -> do
@@ -80,7 +80,7 @@ withMinecraftNormal manager bdt cont mcname fun = do
 
 withMinecraftAutocorrect :: MonadIO m => Manager -> BotData -> Bool -> String -> (String -> [String] -> m (Either e a)) -> m (MinecraftResponse e a)
 withMinecraftAutocorrect manager bdt cont mcname fun = do
-  people <- liftIO $ atomically $ readTVar (minecraftAccounts bdt)
+  people <- readProp minecraftAccounts bdt
   let process f = let 
         nicks = [(mcUUID,u) | MinecraftAccount {..} <- people, u <- f mcNames]
         dists = map (\(u,n) -> ((u, n), dist (map toLower n) (map toLower mcname))) nicks

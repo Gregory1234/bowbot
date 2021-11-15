@@ -9,7 +9,7 @@ import BowBot.API
 
 snipeCommand :: Command
 snipeCommand = Command "snipe" DefaultLevel 2 $ \m man bdt -> do
-  msgs <- liftIO $ atomically $ readTVar (snipeMessage bdt)
+  msgs <- readProp snipeMessage bdt
   case msgs !? messageChannel m of
     Nothing -> respond m "*Nothing to snipe!*"
     Just SnipeMessage {..} -> do

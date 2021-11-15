@@ -164,10 +164,10 @@ eventHandler bdt man (MessageCreate m) = do
       commandTimeoutRun (commandTimeout c) m $ do
         logInfo man $ "recieved " ++ unpack (messageText m)
         ifDev () $ do
-          testDiscordId <- liftIO $ atomically $ readTVar (discordGuildId bdt)
+          testDiscordId <- readProp discordGuildId bdt
           when (messageGuild m /= Just testDiscordId) $
             respond m "```Attention! This is the dev version of the bot! Some features might not be avaliable! You shouldn't be reading this! If you see this message please report it immidately!```"
-        dPerms <- liftIO $ atomically $ readTVar $ discordPerms bdt
+        dPerms <- readProp discordPerms bdt
         let perms = fromMaybe DefaultLevel $ dPerms !? userId (messageAuthor m)
         if perms == BanLevel
         then respond m "You have been blacklisted. You can probably appeal this decision. Or not. I don't know. I'm just a pre-programmed response."
@@ -177,7 +177,7 @@ eventHandler bdt man (MessageCreate m) = do
         logInfo man $ "finished " ++ unpack (messageText m)
 
 eventHandler bdt man (GuildMemberAdd gid mem) = do
-  trueId <- liftIO $ atomically $ readTVar (discordGuildId bdt)
+  trueId <- readProp discordGuildId bdt
   when (gid == trueId) $
     updateDiscordRolesSingleId bdt man (userId $ memberUser mem)
   liftIO $ sendPostDB man "discord/update.php" $
