@@ -43,7 +43,7 @@ updateDivisionRolesSingle bdt lb memb BowBotAccount { accountMinecrafts = mc } =
   gid <- liftIO $ atomically $ readTVar (discordGuildId bdt)
   let did = userId . memberUser $ memb
   let wins = maximum $ mapMaybe (fmap bowLbWins . (lb !?)) mc
-  divisionRoles <- liftIO discordDivisionRoles
+  divisionRoles <- liftIO $ atomically $ readTVar (discordDivisionRoles bdt)
   let currentDivisionRoles = filter (`elem` map snd divisionRoles) (memberRoles memb)
   let targetDivisionRoles = take 1 $ map snd $ filter ((<= wins) . fst) $ reverse divisionRoles
   for_ (currentDivisionRoles \\ targetDivisionRoles) $ call . R.RemoveGuildMemberRole gid did
@@ -74,7 +74,7 @@ updateDiscordRolesSingle bdt lb members gid m (Just bac) = do
 updateDiscordRolesSingle bdt _ _ gid m Nothing = do
   memberRole <- liftIO $ atomically $ readTVar (discordMemberRole bdt)
   visitorRole <- liftIO $ atomically $ readTVar (discordVisitorRole bdt)
-  divisionRoles <- map snd <$> liftIO discordDivisionRoles
+  divisionRoles <- map snd <$> liftIO (atomically $ readTVar (discordDivisionRoles bdt))
   illegalRole <- liftIO $ atomically $ readTVar (discordIllegalRole bdt)
   when (illegalRole `notElem` memberRoles m && any (`elem` (memberRole:divisionRoles)) (memberRoles m)) $ do
     call $ R.AddGuildMemberRole gid (userId $ memberUser m) illegalRole

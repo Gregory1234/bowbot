@@ -13,10 +13,11 @@ import BowBot.API
 import BowBot.Settings
 import Control.Concurrent.STM (STM)
 import Network.HTTP.Conduit (newManager)
-import Data.List.Split (chunksOf)
+import Data.List.Split (chunksOf, splitOn)
 import Control.Concurrent.Async (mapConcurrently)
 import BowBot.API.Mojang (mojangUUIDToNames)
 import Data.List (intercalate)
+import Data.Maybe (mapMaybe)
 
 data ApiRequestCounter = ApiRequestCounter { mainCounter :: TVar Int, borderCounter :: TVar Int, counterLimit :: Int }
 
@@ -152,6 +153,7 @@ data BotData = BotData
   , discordIllegalRole :: TVar RoleId
   , discordMemberRole :: TVar RoleId
   , discordVisitorRole :: TVar RoleId
+  , discordDivisionRoles :: TVar [(Integer, RoleId)]
   }
   
 downloadGuildMemberList :: Manager -> String -> IO (Maybe [String])
@@ -240,12 +242,18 @@ updateDiscordConstants bdt manager = do
   newDiscordIllegalRole <- getSnowflake "illegal_role"
   newDiscordMemberRole <- getSnowflake "member_role"
   newDiscordVisitorRole <- getSnowflake "visitor_role"
+  let parseDivisionRole s = case splitOn "->" s of
+        [readMaybe -> Just wins, readMaybe -> Just role] -> Just (wins, role)
+        _ -> Nothing
+  let parseDivisionRoles s = traverse parseDivisionRole $ lines s
+  newDiscordDivisionRoles <- (>>= parseDivisionRoles) <$> getInfoDB manager "division_title_roles"
   atomically $ do
     for_ newHypixelGuildId (writeTVar (hypixelGuildId bdt))
     for_ newDiscordGuildId (writeTVar (discordGuildId bdt))
     for_ newDiscordIllegalRole (writeTVar (discordIllegalRole bdt))
     for_ newDiscordMemberRole (writeTVar (discordMemberRole bdt))
     for_ newDiscordVisitorRole (writeTVar (discordVisitorRole bdt))
+    for_ newDiscordDivisionRoles (writeTVar (discordDivisionRoles bdt))
 
 
 newRequestCounter :: Int -> STM ApiRequestCounter
@@ -276,6 +284,7 @@ emptyData = do
   discordIllegalRole <- newTVar 0
   discordMemberRole <- newTVar 0
   discordVisitorRole <- newTVar 0
+  discordDivisionRoles <- newTVar []
   return BotData {..}
 
 createData :: IO BotData
