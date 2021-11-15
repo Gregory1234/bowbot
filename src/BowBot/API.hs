@@ -67,6 +67,11 @@ sendRequestTo manager url cleanUrl = do
       sendRequestTo manager url cleanUrl
     (Right v) -> return $ responseBody v
 
+getInfoDB :: Manager -> String -> IO (Maybe String)
+getInfoDB man name = do
+  res <- sendDB man "info/get.php" ["name=" ++ name]
+  decodeParse res $ \o -> o .: "value"
+
 sendDB :: Manager -> String -> [String] -> IO ByteString
 sendDB manager path args = do
   website <- fromMaybe "" <$> getEnv "DB_SITE"

@@ -67,12 +67,8 @@ runBowBot discordKey = do
 
 onStartup :: BotData -> DiscordHandler ()
 onStartup bdt = do
-  sendCommand (UpdateStatus $ UpdateStatusOpts {
-    updateStatusOptsSince = Nothing,
-    updateStatusOptsGame = Just (Activity {activityName = "AAAAAAA!", activityType = ActivityTypeGame, activityUrl = Nothing}), -- TODO: make this controllable from db
-    updateStatusOptsNewStatus = UpdateStatusOnline,
-    updateStatusOptsAFK = False
-  })
+  manager <- liftIO $ newManager managerSettings
+  updateDiscordStatus manager
   mkBackgroundDiscord
  where
   mkBackgroundDiscord = do

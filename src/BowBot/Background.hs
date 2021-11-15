@@ -26,6 +26,18 @@ import Data.List ((\\))
 import BowBot.Command
 import Control.Exception.Base (SomeException, try, evaluate)
 
+updateDiscordStatus :: Manager -> DiscordHandler ()
+updateDiscordStatus man = do
+  status <- liftIO $ getInfoDB man "discord_status"
+  sendCommand (UpdateStatus $ UpdateStatusOpts {
+      updateStatusOptsSince = Nothing,
+      updateStatusOptsGame = case status of
+         Nothing -> Nothing
+         Just s -> Just (Activity {activityName = pack s, activityType = ActivityTypeGame, activityUrl = Nothing}),
+      updateStatusOptsNewStatus = UpdateStatusOnline,
+      updateStatusOptsAFK = False
+    })
+
 updateDivisionRolesSingle :: Map String (Leaderboards HypixelBowStats) -> GuildMember -> BowBotAccount -> DiscordHandler ()
 updateDivisionRolesSingle lb memb BowBotAccount { accountMinecrafts = mc } = do
   gid <- liftIO discordGuildId
@@ -136,6 +148,7 @@ discordBackgroundMinutely bdt mint = do
   when (mint == 0) $ do
     addDiscords
     manager <- liftIO $ newManager managerSettings
+    updateDiscordStatus manager
     updateRolesAll bdt manager
 
 -- TODO: frequency updates
@@ -207,5 +220,8 @@ adminCommands =
           respond m "Done"
   , Command "clearlogs" AdminLevel 120 $ \m man _ -> do
           liftIO $ clearLogs man
+          respond m "Done"
+  , Command "statusrefresh" AdminLevel 120 $ \m man _ -> do
+          updateDiscordStatus man
           respond m "Done"
   ]
