@@ -9,6 +9,7 @@ import Data.Maybe (catMaybes)
 import BowBot.API
 import Control.Monad (filterM)
 import Control.Concurrent.STM.TVar (newTVar)
+import BowBot.API.Hypixel
 
 listCommand :: Command
 listCommand = Command "list" DefaultLevel 2 $ \m man bdt -> do -- TODO: add other lists
@@ -42,12 +43,7 @@ onlineCommand = Command "online" DefaultLevel 30 $ \m man bdt -> do
       return $ unlines . map (" - " ++) $ names
 
 isInBowDuels :: Manager -> String -> IO (Maybe Bool)
-isInBowDuels manager uuid = do
-  apiKey <- fromMaybe "" <$> getEnv "HYPIXEL_API"
-  let url = "https://api.hypixel.net/status?key=" ++ apiKey ++ "&uuid=" ++ uuid
-  let cleanUrl = "https://api.hypixel.net/status?key=[REDACTED]&uuid=" ++ uuid
-  res <- sendRequestTo manager url cleanUrl
-  decodeParse res $ \o -> do
+isInBowDuels manager uuid = hypixelWithPlayerStatus manager uuid $ \o -> do
     session <- o .: "session"
     mode :: String <- session .: "mode"
     return $ mode == "DUELS_BOW_DUEL"

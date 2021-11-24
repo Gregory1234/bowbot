@@ -4,17 +4,17 @@
 {-# LANGUAGE ViewPatterns #-}
 
 module BowBot.API(
-  module BowBot.API, module BowBot.Utils, (.:), (.:?), (.!=), Manager
+  module BowBot.API, module BowBot.Utils, (.:), (.:?), (.!=), Object, Parser, Manager
 ) where
 
-import Network.HTTP.Conduit
+import Network.HTTP.Conduit hiding (path)
 import qualified Data.ByteString.Char8 as BS
 import Data.ByteString.Base64.URL (encodeBase64)
 import Control.Exception.Base (try, SomeException, evaluate)
 import Data.ByteString.Lazy (ByteString)
 import BowBot.Utils
 import Data.Aeson
-import Data.Aeson.Types (Parser, parseEither, (.:), (.:?), (.!=))
+import Data.Aeson.Types
 import Control.Concurrent (forkIO, threadDelay)
 import Control.DeepSeq (force)
 
@@ -65,7 +65,9 @@ sendRequestTo manager url cleanUrl = do
       logError manager $ show e
       threadDelay 3000000
       sendRequestTo manager url cleanUrl
-    (Right v) -> return $ responseBody v
+    (Right v) -> do
+      logInfo manager $ "Received response from: " ++ cleanUrl
+      return $ responseBody v
 
 getInfoDB :: Manager -> String -> IO (Maybe String)
 getInfoDB man name = do
@@ -79,9 +81,7 @@ sendDB manager path args = do
   dev <- ifDev "" (return "&dev")
   let url = "http://" ++ website ++ "/api/" ++ path ++ "?key=" ++ apiKey ++ (('&':) =<< args) ++ dev
   let cleanUrl = "http://[REDACTED]/api/" ++ path ++ "?key=[REDACTED]" ++ (('&':) =<< args) ++ dev
-  res <- sendRequestTo manager url cleanUrl
-  logInfo manager $ "Received response from: " ++ cleanUrl
-  return res
+  sendRequestTo manager url cleanUrl
 
 sendPostDB :: Manager -> String -> Value -> IO ()
 sendPostDB manager path dat = do

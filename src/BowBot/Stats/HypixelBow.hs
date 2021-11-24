@@ -14,6 +14,7 @@ import Data.Maybe (catMaybes)
 import Data.Ratio ((%))
 import Data.Aeson.Types (object, (.=))
 import Data.Map (toList)
+import BowBot.API.Hypixel
 
 data HypixelDivisionRankName
   = HRookie | HIron | HGold | HDiamond | HMaster | HLegend | HGrandmaster | HGodlike | HWorldElite | HWorldMaster | HWorldsBest
@@ -89,12 +90,7 @@ data HypixelBowStats = HypixelBowStats
 instance StatType HypixelBowStats where
   data Leaderboards HypixelBowStats = HypixelBowLeaderboards
     { bowLbWins :: Integer, bowLbLosses :: Integer, bowLbWinstreak :: Integer } deriving (Show)
-  requestStats Proxy manager uuid = do
-    apiKey <- fromMaybe "" <$> getEnv "HYPIXEL_API"
-    let url = "https://api.hypixel.net/player?key=" ++ apiKey ++ "&uuid=" ++ uuid
-    let cleanUrl = "https://api.hypixel.net/player?key=[REDACTED]&uuid=" ++ uuid
-    res <- sendRequestTo manager url cleanUrl
-    decodeParse res $ \o -> do
+  requestStats Proxy manager uuid = hypixelWithPlayerData manager uuid $ \o -> do
       pl <- o .: "player"
       stats <- pl .: "stats"
       duelsStats <- stats .:? "Duels"

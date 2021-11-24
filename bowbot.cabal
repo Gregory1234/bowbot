@@ -26,6 +26,7 @@ source-repository head
 library
   exposed-modules:
       BowBot.API
+      BowBot.API.Hypixel
       BowBot.API.Mojang
       BowBot.Background
       BowBot.Bot

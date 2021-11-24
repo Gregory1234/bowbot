@@ -17,6 +17,7 @@ import Data.List.Split (chunksOf, splitOn)
 import Control.Concurrent.Async (mapConcurrently)
 import BowBot.API.Mojang (mojangUUIDToNames)
 import Data.List (intercalate)
+import BowBot.API.Hypixel
 
 data ApiRequestCounter = ApiRequestCounter { mainCounter :: TVar Int, borderCounter :: TVar Int, counterLimit :: Int }
 
@@ -154,17 +155,6 @@ data BotData = BotData
   , discordVisitorRole :: TVar RoleId
   , discordDivisionRoles :: TVar [(Integer, RoleId)]
   }
-  
-downloadGuildMemberList :: Manager -> String -> IO (Maybe [String])
-downloadGuildMemberList man gid = do
-  apiKey <- fromMaybe "" <$> getEnv "HYPIXEL_API"
-  let url = "https://api.hypixel.net/guild?key=" ++ apiKey ++ "&id=" ++ gid
-  let cleanUrl = "https://api.hypixel.net/guild?key=[REDACTED]&id=" ++ gid
-  res <- sendRequestTo man url cleanUrl
-  decodeParse res $ \o -> do
-    guild <- o .: "guild"
-    members <- guild .: "members"
-    for members $ \m -> m .: "uuid"
 
 downloadMinecraftAccounts :: Manager -> IO (Maybe [MinecraftAccount])
 downloadMinecraftAccounts manager = do
@@ -214,7 +204,7 @@ downloadData bdt = do
   updateDiscordConstants bdt manager
   tryApiRequests (hypixelRequestCounter bdt) 1 (\_ -> pure ()) $ do
     gid <- readProp hypixelGuildId bdt
-    newGuildMembers <- downloadGuildMemberList manager gid
+    newGuildMembers <- hypixelGuildMemberList manager gid
     atomically $ for_ newGuildMembers (writeTVar (hypixelGuildMembers bdt))
     
 
