@@ -10,7 +10,19 @@ roleCommand = Command "role" DefaultLevel 10 $ \m _ bdt -> do
   case args of
     [] -> do
       allRoles <- readProp discordToggleableRoles bdt
-      respond m $ "Toggleable roles: ```\n" ++ unwords (map fst allRoles) ++ "```"
+      gid <- readProp discordGuildId bdt
+      maybeMem <- call $ R.GetGuildMember gid (userId $ messageAuthor m)
+      case maybeMem of
+        Left _ -> respond m somethingWrongMessage
+        Right mem -> do
+          maybeRoles <- call $ R.GetGuildRoles gid
+          case maybeRoles of
+            Left _ -> respond m somethingWrongMessage
+            Right roleList -> do
+              respond m $ "Toggleable roles: ```\n" ++ unwords (map (\(n,r) ->
+                (if r `elem` memberRoles mem then "*" else "") ++ n
+                  ++ " (@" ++ head (unpack . roleName <$> filter ((==r) . roleId) roleList) ++ ")") allRoles
+                ) ++ "```"
     [role] -> do
       allRoles <- readProp discordToggleableRoles bdt
       case lookup role allRoles of
