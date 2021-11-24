@@ -16,6 +16,7 @@ import BowBot.Command.Name
 import BowBot.Command.Settings
 import BowBot.Command.Snipe
 import BowBot.Command.Ban
+import BowBot.Command.Role
 import BowBot.Stats
 import BowBot.Stats.HypixelBow
 import BowBot.API
@@ -114,6 +115,7 @@ commands =
   , settingsCommand "hide" (Just (False, Never))
   , snipeCommand
   , banCommand (Proxy @HypixelBowStats) "sban" (\x -> x { mcHypixelBow = Banned })
+  , roleCommand
   , constStringCommand "throw" AdminLevel $ show @Integer (1 `div` 0)
   , constStringCommand "help" DefaultLevel
     $ "**Bow bot help:**\n\n"
@@ -132,6 +134,8 @@ commands =
     ++ " - **?mc [name]** - *select a minecraft account as your default*\n"
     ++ " - **?settings** - *display help for settings*\n"
     ++ " - **?snipe** - *show the last deleted message from this channel*\n"
+    ++ " - **?role** - *show all toggleable roles*\n"
+    ++ " - **?role [name]** - *toggle a discord role*\n"
     ++ "\nMade by **GregC**#9698"
   , constStringCommand "gregc" DefaultLevel "<:gregc:904127204865228851>"
   , constStringCommand "settings" DefaultLevel

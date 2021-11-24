@@ -154,6 +154,7 @@ data BotData = BotData
   , discordMemberRole :: TVar RoleId
   , discordVisitorRole :: TVar RoleId
   , discordDivisionRoles :: TVar [(Integer, RoleId)]
+  , discordToggleableRoles :: TVar [(String, RoleId)]
   }
 
 downloadMinecraftAccounts :: Manager -> IO (Maybe [MinecraftAccount])
@@ -236,6 +237,11 @@ updateDiscordConstants bdt manager = do
         _ -> Nothing
   let parseDivisionRoles s = traverse parseDivisionRole $ lines s
   newDiscordDivisionRoles <- (>>= parseDivisionRoles) <$> getInfoDB manager "division_title_roles"
+  let parseToggleableRole s = case splitOn "->" s of
+        [name, readMaybe -> Just role] -> Just (name, role)
+        _ -> Nothing
+  let parseToggleableRoles s = traverse parseToggleableRole $ lines s
+  newDiscordToggleableRoles <- (>>= parseToggleableRoles) <$> getInfoDB manager "toggleable_roles"
   atomically $ do
     for_ newHypixelGuildId (writeTVar (hypixelGuildId bdt))
     for_ newDiscordGuildId (writeTVar (discordGuildId bdt))
@@ -243,6 +249,7 @@ updateDiscordConstants bdt manager = do
     for_ newDiscordMemberRole (writeTVar (discordMemberRole bdt))
     for_ newDiscordVisitorRole (writeTVar (discordVisitorRole bdt))
     for_ newDiscordDivisionRoles (writeTVar (discordDivisionRoles bdt))
+    for_ newDiscordToggleableRoles (writeTVar (discordToggleableRoles bdt))
 
 
 newRequestCounter :: Int -> STM ApiRequestCounter
@@ -274,6 +281,7 @@ emptyData = do
   discordMemberRole <- newTVar 0
   discordVisitorRole <- newTVar 0
   discordDivisionRoles <- newTVar []
+  discordToggleableRoles <- newTVar []
   return BotData {..}
 
 createData :: IO BotData

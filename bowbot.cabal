@@ -37,6 +37,7 @@ library
       BowBot.Command.Minecraft
       BowBot.Command.Name
       BowBot.Command.Register
+      BowBot.Command.Role
       BowBot.Command.Settings
       BowBot.Command.Simple
       BowBot.Command.Snipe
