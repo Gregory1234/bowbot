@@ -3,6 +3,7 @@ module BowBot.Command.Role where
 import BowBot.Command
 import qualified Discord.Requests as R
 import Data.Char (isSpace)
+import Data.List (intercalate)
 
 roleCommand :: Command
 roleCommand = Command "role" DefaultLevel 10 $ \m _ bdt -> do
@@ -19,7 +20,7 @@ roleCommand = Command "role" DefaultLevel 10 $ \m _ bdt -> do
           case maybeRoles of
             Left _ -> respond m somethingWrongMessage
             Right roleList -> do
-              respond m $ "Toggleable roles: ```\n" ++ unwords (map (\(n,r) ->
+              respond m $ "Toggleable roles: ```\n" ++ intercalate ", " (map (\(n,r) ->
                 (if r `elem` memberRoles mem then "*" else "") ++ n
                   ++ " (@" ++ head (unpack . roleName <$> filter ((==r) . roleId) roleList) ++ ")") allRoles
                 ) ++ "```"
