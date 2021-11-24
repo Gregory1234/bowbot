@@ -203,10 +203,12 @@ backgroundMinutely bdt@BotData {..} mint = do
 
 adminCommands :: [Command]
 adminCommands = 
-  [ Command "refresh" AdminLevel 120 $ \m _ bdt -> do
-          liftIO $ downloadData bdt
+  [ Command "mcrefresh" AdminLevel 120 $ \m _ bdt -> do
           manager <- liftIO $ newManager managerSettings
           liftIO $ updateMinecraftAccounts bdt manager
+          respond m "Done"
+  , Command "datarefresh" AdminLevel 120 $ \m _ bdt -> do
+          liftIO $ downloadData bdt
           respond m "Done"
   , Command "discordrefresh" AdminLevel 120 $ \m _ bdt -> do
           addDiscords bdt

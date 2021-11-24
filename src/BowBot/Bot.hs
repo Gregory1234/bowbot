@@ -117,53 +117,53 @@ commands =
   , banCommand (Proxy @HypixelBowStats) "sban" (\x -> x { mcHypixelBow = Banned })
   , roleCommand
   , constStringCommand "throw" AdminLevel $ show @Integer (1 `div` 0)
-  , constStringCommand "help" DefaultLevel
-    $ "**Bow bot help:**\n\n"
+  , helpCommand "help" DefaultLevel
+    $ \pr -> "**Bow bot help:**\n\n"
     ++ "**Commands:**\n"
-    ++ " - **?help** - *display this message*\n"
-    ++ " - **?online** - *show all people from watchList currently in Bow Duels*\n"
-    ++ " - **?list** - *show all players in watchList*\n"
-    ++ " - **?s [name]** - *show player's Bow Duels stats*\n"
-    ++ " - **?sa [name]** - *show all Bow Duels stats*\n"
-    ++ " - **?sd [name]** - *show a default set of Bow Duels stats*\n"
-    ++ " - **?n(a) [name]** - *show player's past nicks*\n"
-    ++ " - **?head(a) [name]** - *show player's head*\n"
-    ++ " - **?skin(a) [name]** - *show player's full skin*\n"
-    ++ " - **?lb(|l|s|r) [page number|name|all]** - *show a Bow Duels leaderboard*\n"
-    ++ " - **?mc** - *list your linked minecraft nicks*\n"
-    ++ " - **?mc [name]** - *select a minecraft account as your default*\n"
-    ++ " - **?settings** - *display help for settings*\n"
-    ++ " - **?snipe** - *show the last deleted message from this channel*\n"
-    ++ " - **?role** - *show all toggleable roles*\n"
-    ++ " - **?role [name]** - *toggle a discord role*\n"
+    ++ " - **" ++ pr ++ "help** - *display this message*\n"
+    ++ " - **" ++ pr ++ "online** - *show all people from watchList currently in Bow Duels*\n"
+    ++ " - **" ++ pr ++ "list** - *show all players in watchList*\n"
+    ++ " - **" ++ pr ++ "s [name]** - *show player's Bow Duels stats*\n"
+    ++ " - **" ++ pr ++ "sa [name]** - *show all Bow Duels stats*\n"
+    ++ " - **" ++ pr ++ "sd [name]** - *show a default set of Bow Duels stats*\n"
+    ++ " - **" ++ pr ++ "n(a) [name]** - *show player's past nicks*\n"
+    ++ " - **" ++ pr ++ "head(a) [name]** - *show player's head*\n"
+    ++ " - **" ++ pr ++ "skin(a) [name]** - *show player's full skin*\n"
+    ++ " - **" ++ pr ++ "lb(|l|s|r) [page number|name|all]** - *show a Bow Duels leaderboard*\n"
+    ++ " - **" ++ pr ++ "mc** - *list your linked minecraft nicks*\n"
+    ++ " - **" ++ pr ++ "mc [name]** - *select a minecraft account as your default*\n"
+    ++ " - **" ++ pr ++ "settings** - *display help for settings*\n"
+    ++ " - **" ++ pr ++ "snipe** - *show the last deleted message from this channel*\n"
+    ++ " - **" ++ pr ++ "role** - *show all toggleable roles*\n"
+    ++ " - **" ++ pr ++ "role [name]** - *toggle a discord role*\n"
     ++ "\nMade by **GregC**#9698"
   , constStringCommand "gregc" DefaultLevel "<:gregc:904127204865228851>"
-  , constStringCommand "settings" DefaultLevel
-    $ "**Bow bot settings help:**\n"
+  , helpCommand "settings" DefaultLevel
+    $ \pr -> "**Bow bot settings help:**\n"
     ++ "**Commands:**\n"
-    ++ " - **?settings** - *display this message*\n"
-    ++ " - **?show [stat]** - *makes the stat visible*\n"
-    ++ " - **?hide [stat]** - *makes the stat hidden*\n"
-    ++ " - **?set [stat] [yes|always|show|no|never|hide|maybe|defined]** - *sets the visibility of the stat*\n"
+    ++ " - **" ++ pr ++ "settings** - *display this message*\n"
+    ++ " - **" ++ pr ++ "show [stat]** - *makes the stat visible*\n"
+    ++ " - **" ++ pr ++ "hide [stat]** - *makes the stat hidden*\n"
+    ++ " - **" ++ pr ++ "set [stat] [yes|always|show|no|never|hide|maybe|defined]** - *sets the visibility of the stat*\n"
     ++ "*Visibility 'maybe' and 'defined' hide the stat when the value is undefined.*\n"
     ++ "**Stat names:** wins, losses, wlr, winsuntil, beststreak, currentstreak, bestdailystreak, bowhits, bowshots, accuracy\n"
     ++ "**Example:** *?show accuracy* makes accuracy visible in the ?s command\n"
-  , constStringCommand "modhelp" ModLevel
-    $ "**Bow bot help:**\n\n"
+  , helpCommand "modhelp" ModLevel
+    $ \pr -> "**Bow bot help:**\n\n"
     ++ "**Mod Commands:**\n"
-    ++ " - **?modhelp** - *display this message*\n"
-    ++ " - **?add [discord/discord id] [name]** - *register a person with a given minecraft name*\n"
-    ++ " - **?addalt [discord/discord id] [name]** - *register a person's alt*\n"
-    ++ " - **?sban [name]** - *ban a minecraft account from the hypixel bow duels leaderboard*\n"
+    ++ " - **" ++ pr ++ "modhelp** - *display this message*\n"
+    ++ " - **" ++ pr ++ "add [discord/discord id] [name]** - *register a person with a given minecraft name*\n"
+    ++ " - **" ++ pr ++ "addalt [discord/discord id] [name]** - *register a person's alt*\n"
+    ++ " - **" ++ pr ++ "sban [name]** - *ban a minecraft account from the hypixel bow duels leaderboard*\n"
     ++ "\nMade by **GregC**#9698"
   ] ++ adminCommands
 
 eventHandler :: BotData -> Manager -> Event -> DiscordHandler ()
 eventHandler bdt man (MessageCreate m) = do
   detectDeleteMessage bdt m
-  prefix <- ifDev "?" $ return "??"
-  when (not (fromBot m) && prefix `isPrefixOf` messageText m) $ do
-    let n = unpack $ T.toLower . T.drop (T.length prefix) . T.takeWhile (/= ' ') $ messageText m
+  prefix <- readProp discordCommandPrefix bdt
+  when (not (fromBot m) && pack prefix `isPrefixOf` messageText m) $ do
+    let n = unpack $ T.toLower . T.drop (length prefix) . T.takeWhile (/= ' ') $ messageText m
     for_ (filter ((==n) . commandName) commands) $ \c ->
       commandTimeoutRun (commandTimeout c) m $ do
         logInfo man $ "recieved " ++ unpack (messageText m)

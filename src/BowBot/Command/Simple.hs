@@ -27,5 +27,10 @@ urlCommand name ac mkurl = Command name DefaultLevel 8 $ \m man bdt -> do
       respond m $ "*Did you mean* **" ++ o ++ " (" ++ n ++ ")**:"
       respond m url'
 
+helpCommand :: String -> PermissionLevel -> (String -> String) -> Command
+helpCommand name lvl str = Command name lvl 2 $ \m _ bdt -> do
+  prefix <- readProp discordCommandPrefix bdt
+  respond m (str prefix)
+
 constStringCommand :: String -> PermissionLevel -> String -> Command
 constStringCommand name lvl str = Command name lvl 2 $ \m _ _ -> respond m str
