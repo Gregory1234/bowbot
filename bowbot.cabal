@@ -29,10 +29,12 @@ library
       BowBot.API.Hypixel
       BowBot.API.Mojang
       BowBot.Background
+      BowBot.Birthday
       BowBot.Bot
       BowBot.BotData
       BowBot.Command
       BowBot.Command.Ban
+      BowBot.Command.Birthday
       BowBot.Command.Leaderboard
       BowBot.Command.Minecraft
       BowBot.Command.Name

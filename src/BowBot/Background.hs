@@ -22,9 +22,28 @@ import Data.Maybe (catMaybes, mapMaybe)
 import Discord.Types hiding (accountId)
 import Data.Aeson.Types (object, (.=))
 import Data.Either (fromRight)
-import Data.List ((\\))
+import Data.List ((\\), intercalate)
 import BowBot.Command
-import Control.Exception.Base (SomeException, try, evaluate)
+import BowBot.Birthday
+import Control.Exception.Base (SomeException, try)
+
+announceBirthdays :: Manager -> BotData -> DiscordHandler ()
+announceBirthdays man bdt = do
+  currentDay <- liftIO currentBirthdayDate
+  maybeBirthdays <- liftIO $ getBirthdayPeople man currentDay
+  case maybeBirthdays of
+    Nothing -> logError man "Birthday parsing failed!"
+    Just birthdays -> do
+      dgid <- readProp discordGuildId bdt
+      people <- fmap (filter ((`elem` birthdays) . userId . memberUser)) <$> call (R.ListGuildMembers dgid R.GuildMembersTiming {R.guildMembersTimingLimit = Just 500, R.guildMembersTimingAfter = Nothing})
+      case people of
+        Left err -> logError man $ show err
+        Right ppl -> unless (null ppl) $ do
+          birthdayChannel <- readProp discordBirthdayChannel bdt
+          call_ $ R.CreateMessage birthdayChannel $ pack $
+            if length ppl == 1
+            then "**Happy birthday** to " ++ showMemberOrUser True (Right $ head ppl) ++ "!"
+            else "**Happy birthday** to: " ++ intercalate ", " (map (showMemberOrUser True . Right) ppl) ++ "!"
 
 updateDiscordStatus :: Manager -> DiscordHandler ()
 updateDiscordStatus man = do
@@ -149,6 +168,8 @@ discordBackgroundMinutely bdt mint = do
     manager <- liftIO $ newManager managerSettings
     updateDiscordStatus manager
     updateRolesAll bdt manager
+    hour <- liftIO $ getTime "%k"
+    when (hour == "5") $ announceBirthdays manager bdt
 
 -- TODO: frequency updates
 

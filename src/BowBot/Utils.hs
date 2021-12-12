@@ -1,4 +1,5 @@
 {-# LANGUAGE ViewPatterns #-}
+{-# LANGUAGE RecordWildCards #-}
 
 module BowBot.Utils(
   module BowBot.Utils, liftIO, MonadIO, getEnv, fromMaybe, for, for_, readMaybe,
@@ -19,6 +20,7 @@ import Control.Concurrent.STM (atomically, STM)
 import Control.Concurrent.STM.TVar (readTVar, writeTVar, modifyTVar, TVar)
 import Data.Text (pack, unpack)
 import Control.Monad (when, unless, void)
+import Discord.Types
 
 dist :: Eq a => [a] -> [a] -> Int
 dist a b =
@@ -53,8 +55,18 @@ dist a b =
 getTime :: String -> IO String
 getTime f = formatTime defaultTimeLocale f <$> getCurrentTime
 
+pad' :: Bool -> Char -> Int -> String -> String
+pad' d c l x = if d then x ++ replicate (l - length x) c else replicate (l - length x) c ++ x
+
 pad :: Int -> String -> String
-pad l x = x ++ replicate (l - length x) ' '
+pad = pad' True ' '
+
+showMemberOrUser :: Bool -> Either User GuildMember -> String
+showMemberOrUser False (Left User {..}) = unpack userName ++ "#" ++ unpack userDiscrim
+showMemberOrUser True (Left User {..}) = "**" ++ unpack userName ++ "**#" ++ unpack userDiscrim
+showMemberOrUser b (Right GuildMember {memberNick = Nothing, ..}) = showMemberOrUser b $ Left memberUser
+showMemberOrUser False (Right GuildMember {memberNick = Just nick, ..}) = unpack nick ++ " (" ++ showMemberOrUser False (Left memberUser) ++ ")"
+showMemberOrUser True (Right GuildMember {memberNick = Just nick, ..}) = "**" ++ unpack nick ++ "** (" ++ showMemberOrUser False (Left memberUser) ++ ")"
 
 -- TODO: move ifDev and the ids into BotData
 

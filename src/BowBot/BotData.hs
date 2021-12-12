@@ -156,6 +156,7 @@ data BotData = BotData
   , discordDivisionRoles :: TVar [(Integer, RoleId)]
   , discordToggleableRoles :: TVar [(String, RoleId)]
   , discordCommandPrefix :: TVar String
+  , discordBirthdayChannel :: TVar ChannelId
   }
 
 downloadMinecraftAccounts :: Manager -> IO (Maybe [MinecraftAccount])
@@ -244,6 +245,7 @@ updateDiscordConstants bdt manager = do
   let parseToggleableRoles s = traverse parseToggleableRole $ lines s
   newDiscordToggleableRoles <- (>>= parseToggleableRoles) <$> getInfoDB manager "toggleable_roles"
   newDiscordCommandPrefix <- getInfoDB manager "command_prefix"
+  newDiscordBirthdayChannel <- getSnowflake "birthday_channel"
   atomically $ do
     for_ newHypixelGuildId (writeTVar (hypixelGuildId bdt))
     for_ newDiscordGuildId (writeTVar (discordGuildId bdt))
@@ -253,6 +255,7 @@ updateDiscordConstants bdt manager = do
     for_ newDiscordDivisionRoles (writeTVar (discordDivisionRoles bdt))
     for_ newDiscordToggleableRoles (writeTVar (discordToggleableRoles bdt))
     for_ newDiscordCommandPrefix (writeTVar (discordCommandPrefix bdt))
+    for_ newDiscordBirthdayChannel (writeTVar (discordBirthdayChannel bdt))
 
 
 newRequestCounter :: Int -> STM ApiRequestCounter
@@ -286,6 +289,7 @@ emptyData = do
   discordDivisionRoles <- newTVar []
   discordToggleableRoles <- newTVar []
   discordCommandPrefix <- newTVar "???"
+  discordBirthdayChannel <- newTVar 0
   return BotData {..}
 
 createData :: IO BotData

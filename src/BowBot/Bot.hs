@@ -17,6 +17,7 @@ import BowBot.Command.Settings
 import BowBot.Command.Snipe
 import BowBot.Command.Ban
 import BowBot.Command.Role
+import BowBot.Command.Birthday
 import BowBot.Stats
 import BowBot.Stats.HypixelBow
 import BowBot.API
@@ -113,6 +114,8 @@ commands =
   , settingsCommand "set" Nothing
   , settingsCommand "show" (Just (True, Always))
   , settingsCommand "hide" (Just (False, Never))
+  , birthdayAnnounceCommand
+  , birthdaySetCommand
   , snipeCommand
   , banCommand (Proxy @HypixelBowStats) "sban" (\x -> x { mcHypixelBow = Banned })
   , roleCommand
@@ -155,6 +158,8 @@ commands =
     ++ " - **" ++ pr ++ "add [discord/discord id] [name]** - *register a person with a given minecraft name*\n"
     ++ " - **" ++ pr ++ "addalt [discord/discord id] [name]** - *register a person's alt*\n"
     ++ " - **" ++ pr ++ "sban [name]** - *ban a minecraft account from the hypixel bow duels leaderboard*\n"
+    ++ " - **" ++ pr ++ "bdsay** - *announce today's birthdays*\n"
+    ++ " - **" ++ pr ++ "bdset [discord/discord id] [day(1-31).month(1-12)]** - *override someone's birthday*"
     ++ "\nMade by **GregC**#9698"
   ] ++ adminCommands
 
