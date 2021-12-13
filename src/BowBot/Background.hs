@@ -246,4 +246,7 @@ adminCommands =
   , Command "statusrefresh" AdminLevel 120 $ \m man _ -> do
           updateDiscordStatus man
           respond m "Done"
+  , Command "time" AdminLevel 120 $ \m _ _ -> do
+          t <- liftIO $ getTime "Month: %m, Day: %d, Weekday: %u, Hour: %k, Minute: %M, Second %S"
+          respond m t
   ]
