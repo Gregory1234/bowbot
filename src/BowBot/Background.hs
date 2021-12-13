@@ -40,6 +40,7 @@ announceBirthdays man bdt = do
         Left err -> logError man $ show err
         Right ppl -> unless (null ppl) $ do
           birthdayChannel <- readProp discordBirthdayChannel bdt
+          logInfo man $ "Announcing birthdays: " ++ intercalate ", " (map (showMemberOrUser True . Right) ppl)
           call_ $ R.CreateMessage birthdayChannel $ pack $
             if length ppl == 1
             then "**Happy birthday** to " ++ showMemberOrUser True (Right $ head ppl) ++ "!"
