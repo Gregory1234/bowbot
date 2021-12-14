@@ -169,8 +169,8 @@ discordBackgroundMinutely bdt mint = do
     manager <- liftIO $ newManager managerSettings
     updateDiscordStatus manager
     updateRolesAll bdt manager
-    hour <- liftIO $ getTime "%k"
-    when (hour == "5") $ announceBirthdays manager bdt
+    hour <- liftIO $ read @Integer <$> getTime "%k"
+    when (hour == 5) $ announceBirthdays manager bdt
 
 -- TODO: frequency updates
 
