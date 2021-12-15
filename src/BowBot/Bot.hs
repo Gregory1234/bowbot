@@ -60,7 +60,7 @@ runBowBot discordKey = do
      void $ forever go
    where
      go = do
-       _ <- forkIO $ do
+       _ <- forkIO $ backgroundTimeoutRun 600 $ do
          mint <- read @Int <$> getTime "%M"
          backgroundMinutely bdt mint
        threadDelay 60000000
@@ -82,7 +82,7 @@ onStartup bdt = do
     void $ forever go
     where
       go = do
-        _ <- ReaderT $ \x -> forkIO $ flip runReaderT x $ do
+        _ <- ReaderT $ \x -> forkIO $ flip runReaderT x $ backgroundDiscordTimeoutRun 600 $ do
           mint <- liftIO $ read @Int <$> getTime "%M"
           discordBackgroundMinutely bdt mint
         liftIO $ threadDelay 60000000
@@ -199,6 +199,28 @@ timeoutDiscord n x = ReaderT (timeout n . runReaderT x)
 
 tryDiscord :: Exception e => DiscordHandler a -> DiscordHandler (Either e a)
 tryDiscord x = ReaderT (try . runReaderT x)
+
+backgroundTimeoutRun :: Int -> IO () -> IO ()
+backgroundTimeoutRun n x = do
+  tm <- try @SomeException (timeout (n * 1000000) x)
+  case tm of
+    Left e -> do
+      logError' $ "Exception happened in background: " ++ show e
+      throw e
+    Right Nothing -> do
+      logError' $ "Timed out in background: " ++ show n ++ "s"
+    Right (Just ()) -> pure ()
+
+backgroundDiscordTimeoutRun :: Int -> DiscordHandler () -> DiscordHandler ()
+backgroundDiscordTimeoutRun n x = do
+  tm <- tryDiscord @SomeException (timeoutDiscord (n * 1000000) x)
+  case tm of
+    Left e -> do
+      logError' $ "Exception happened in discord background: " ++ show e
+      throw e
+    Right Nothing -> do
+      logError' $ "Timed out in discord background: " ++ show n ++ "s"
+    Right (Just ()) -> pure ()
 
 commandTimeoutRun :: Int -> Message -> DiscordHandler () -> DiscordHandler ()
 commandTimeoutRun n msg x = do

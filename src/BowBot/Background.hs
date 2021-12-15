@@ -31,6 +31,7 @@ announceBirthdays :: Manager -> BotData -> DiscordHandler ()
 announceBirthdays man bdt = do
   currentDay <- liftIO currentBirthdayDate
   maybeBirthdays <- liftIO $ getBirthdayPeople man currentDay
+  liftIO $ print maybeBirthdays
   case maybeBirthdays of
     Nothing -> logError man "Birthday parsing failed!"
     Just birthdays -> do
@@ -165,12 +166,12 @@ addDiscords bdt = do
 discordBackgroundMinutely :: BotData -> Int -> DiscordHandler ()
 discordBackgroundMinutely bdt mint = do
   when (mint == 1) $ do
-    addDiscords bdt
     manager <- liftIO $ newManager managerSettings
-    updateDiscordStatus manager
-    updateRolesAll bdt manager
     hour <- liftIO $ read @Integer <$> getTime "%k"
     when (hour == 5) $ announceBirthdays manager bdt
+    addDiscords bdt
+    updateDiscordStatus manager
+    updateRolesAll bdt manager
 
 -- TODO: frequency updates
 
