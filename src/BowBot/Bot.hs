@@ -181,7 +181,7 @@ eventHandler bdt man (MessageCreate m) = do
         if perms == BanLevel
         then respond m "You have been blacklisted. You can probably appeal this decision. Or not. I don't know. I'm just a pre-programmed response."
         else if perms >= commandPerms c
-          then commandHandler c m man bdt
+          then runCommandHandler (commandHandler c) m man bdt
           else respond m "You don't have the permission to do that!"
         logInfo man $ "finished " ++ unpack (messageText m)
 

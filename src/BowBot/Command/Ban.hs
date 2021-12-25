@@ -8,15 +8,18 @@ import BowBot.Minecraft
 import BowBot.Stats
 
 banCommand :: StatType s => Proxy s -> String -> (MinecraftAccount -> MinecraftAccount) -> Command
-banCommand p name f = Command name ModLevel 10 $ \m man bdt -> do
-  uuid' <- liftIO $ mcNameToUUID man bdt (words (unpack (messageText m)) !! 1)
+banCommand p name f = Command name ModLevel 10 $ do
+  man <- hManager
+  bdt <- hData
+  pName <- hArg 1
+  uuid' <- liftIO $ mcNameToUUID man bdt (fromMaybe "" pName)
   case uuid' of
-    Nothing -> respond m "Player not found! For safety reasons this command does not have autocorrect enabled."
+    Nothing -> hRespond "Player not found! For safety reasons this command does not have autocorrect enabled."
     Just uuid -> do
       r <- liftIO $ banLeaderboard p man uuid
       case r of
         Just True -> do
-          modifyProp minecraftAccounts bdt $ map $ \mc@MinecraftAccount {..} -> if mcUUID == uuid then f mc else mc
-          respond m "Success, player got banned!"
-        Just False -> respond m "Player not found! For safety reasons this command does not have autocorrect enabled."
-        Nothing -> respond m somethingWrongMessage
+          hModify minecraftAccounts $ map $ \mc@MinecraftAccount {..} -> if mcUUID == uuid then f mc else mc
+          hRespond "Success, player got banned!"
+        Just False -> hRespond "Player not found! For safety reasons this command does not have autocorrect enabled."
+        Nothing -> hRespond somethingWrongMessage

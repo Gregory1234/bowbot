@@ -3,7 +3,6 @@ module BowBot.Command.Stats where
 import BowBot.Stats
 import BowBot.Command
 import BowBot.Minecraft
-import Data.Char (isSpace)
 import BowBot.Command.Register
 import Data.Map ((!?))
 import BowBot.Background
@@ -11,12 +10,15 @@ import BowBot.Background
 data StatsCommandMode = AlwaysDefault | AlwaysAll | UserSettings
 
 statsCommand :: StatType s => Proxy s -> String -> (BotData -> ApiRequestCounter) -> StatsCommandMode -> Command
-statsCommand pr name rc mode = Command name DefaultLevel 15 $ \m man bdt -> do
-  let args = words $ dropWhile isSpace $ dropWhile (not . isSpace) $ unpack (messageText m)
+statsCommand pr name rc mode = Command name DefaultLevel 15 $ do
+  bdt <- hData
+  man <- hManager
+  args <- hArgs
+  caller <- hCaller
   let player = case args of
-        [] -> Right (userId $ messageAuthor m)
+        [] -> Right (userId caller)
         mcname -> Left (unwords mcname)
-  tryApiRequests (rc bdt) 2 (\sec -> respond m $ "**Too many requests! Wait another " ++ show sec ++ " seconds!**") $ do
+  tryApiRequests (rc bdt) 2 (\sec -> hRespond $ "**Too many requests! Wait another " ++ show sec ++ " seconds!**") $ do
     res <- withMinecraft man bdt False player $ \uuid names -> do
       st <- liftIO $ requestStats pr man uuid
       for_ st (liftIO . tryRegister bdt man uuid names)
@@ -26,9 +28,9 @@ statsCommand pr name rc mode = Command name DefaultLevel 15 $ \m man bdt -> do
       AlwaysAll -> pure allSettings
       UserSettings -> do
         settings <- readProp discordSettings bdt
-        pure $ fromMaybe defSettings $ settings !? userId (messageAuthor m)
-    respond m $ statsMessage settings res
-    updateDiscordRolesSingleId bdt man (userId $ messageAuthor m)
+        pure $ fromMaybe defSettings $ settings !? userId caller
+    hRespond $ statsMessage settings res
+    hDiscord $ updateDiscordRolesSingleId bdt man (userId caller)
 
 statsMessage :: StatType s => Settings -> MinecraftResponse () s -> String
 statsMessage _ PlayerNotFound = playerNotFoundMessage

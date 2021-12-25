@@ -61,20 +61,21 @@ getSettingToSet "accuracy" (senseFromEither -> Just b) = Right ("accuracy", from
 getSettingToSet _ _ = Left "*Wrong command argument!*"
 
 settingsCommand :: String -> Maybe (Bool, BoolSense) -> Command
-settingsCommand name values = Command name DefaultLevel 2 $ \m man bdt -> do
-  let args = tail $ words (unpack $ messageText m)
-  let did = userId $ messageAuthor m
+settingsCommand name values = Command name DefaultLevel 2 $ do
+  man <- hManager
+  args <- hArgs
+  did <- userId <$> hCaller
   case (values, args) of
     (Nothing, [setting, value]) -> case getSettingToSet setting (Right value) of
-      Left err -> respond m err
+      Left err -> hRespond err
       Right (k, v, u) -> do
         liftIO $ unsafeUpdateSettings man did k v
-        modifyProp discordSettings bdt $ alter (Just . u . fromMaybe defSettings) did
-        respond m "*Successfully updated!*"
+        hModify discordSettings $ alter (Just . u . fromMaybe defSettings) did
+        hRespond "*Successfully updated!*"
     (Just bs, [setting]) -> case getSettingToSet setting (Left bs) of
-      Left err -> respond m err
+      Left err -> hRespond err
       Right (k, v, u) -> do
         liftIO $ unsafeUpdateSettings man did k v
-        modifyProp discordSettings bdt $ alter (Just . u . fromMaybe defSettings) did
-        respond m "*Successfully updated!*"
-    _ -> respond m wrongSyntaxMessage
+        hModify discordSettings $ alter (Just . u . fromMaybe defSettings) did
+        hRespond "*Successfully updated!*"
+    _ -> hRespond wrongSyntaxMessage

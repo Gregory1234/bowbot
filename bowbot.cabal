@@ -45,6 +45,7 @@ library
       BowBot.Command.Snipe
       BowBot.Command.Stats
       BowBot.Command.Watchlist
+      BowBot.CommandHandler
       BowBot.DiscordNFData
       BowBot.Minecraft
       BowBot.Settings

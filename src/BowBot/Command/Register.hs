@@ -9,7 +9,7 @@ import BowBot.Command
 import BowBot.Minecraft
 import BowBot.Stats
 import BowBot.API
-import Data.Char (isSpace, isDigit)
+import Data.Char (isDigit)
 import Data.List (intercalate)
 import BowBot.Background
 
@@ -33,59 +33,61 @@ addAltAccount manager gid uuid = do
   return ()
 
 registerCommand :: String -> [BotData -> ApiRequestCounter] -> Bool -> Bool -> (Manager -> String -> IO ()) -> Command
-registerCommand name apis isalt isself onComplete = Command name (if isself then DefaultLevel else ModLevel) 12 $ \m man bdt -> do
-  tryApiRequestsMulti (map (\x -> (x bdt, 2)) apis) (\sec -> respond m $ "**Too many requests! Wait another " ++ show sec ++ " seconds!**") $ do
-    let args = words $ dropWhile isSpace $ dropWhile (not . isSpace) $ unpack (messageText m)
-    when (null args) $ respond m wrongSyntaxMessage
-    let (did, mcname) = if isself then (userId $ messageAuthor m, head args) else (read . filter isDigit $ head args, args !! 1)
+registerCommand name apis isalt isself onComplete = Command name (if isself then DefaultLevel else ModLevel) 12 $ do
+  bdt <- hData
+  man <- hManager
+  tryApiRequestsMulti (map (\x -> (x bdt, 2)) apis) (\sec -> hRespond $ "**Too many requests! Wait another " ++ show sec ++ " seconds!**") $ do
+    args <- hArgs
+    caller <- hCaller
+    when (null args) $ hRespond wrongSyntaxMessage
+    let (did, mcname) = if isself then (userId caller, head args) else (read . filter isDigit $ head args, args !! 1)
     discords <- liftIO $ getDiscordIds man
     if did `notElem` discords
-    then do
-      respond m "*The discord id doesn't exist!*"
+    then hRespond "*The discord id doesn't exist!*"
     else do
       maybeUUID <- liftIO $ mcNameToUUID man bdt mcname
       case maybeUUID of
-        Nothing -> respond m playerNotFoundMessage
+        Nothing -> hRespond playerNotFoundMessage
         Just uuid -> do
-          nicks <- readProp minecraftAccounts bdt
-          taken <- (>>=accountMinecrafts) <$> readProp bowBotAccounts bdt
+          nicks <- hRead minecraftAccounts
+          taken <- (>>=accountMinecrafts) <$> hRead bowBotAccounts
           if uuid `elem` taken
           then do
-            pns <- (>>=(\x -> (, x) <$> accountDiscords x)) <$> readProp bowBotAccounts bdt
+            pns <- (>>=(\x -> (, x) <$> accountDiscords x)) <$> hRead bowBotAccounts
             case lookup did pns of
-              Nothing -> respond m "*That account already belongs to someone else!*"
-              Just bac -> respond m $ if uuid `elem` accountMinecrafts bac
+              Nothing -> hRespond "*That account already belongs to someone else!*"
+              Just bac -> hRespond $ if uuid `elem` accountMinecrafts bac
                 then (if isself then "*That account already belongs to you!*" else "*That account already belongs to this user!*")
                 else "*That account already belongs to someone else!*"
           else do
             names <- liftIO $ fromMaybe [] <$> mcUUIDToNames man bdt uuid
             unless (uuid `elem` map mcUUID nicks) $ do
               newMc <- liftIO $ addMinecraftAccount man uuid names
-              for_ newMc $ \x -> writeProp minecraftAccounts bdt (x:nicks)
+              for_ newMc $ \x -> hWrite minecraftAccounts (x:nicks)
             if isalt
             then do
-              pns <- (>>=(\BowBotAccount {..} -> (, accountId) <$> accountDiscords)) <$> readProp bowBotAccounts bdt
+              pns <- (>>=(\BowBotAccount {..} -> (, accountId) <$> accountDiscords)) <$> hRead bowBotAccounts
               case lookup did pns of
-                Nothing -> respond m (if isself then "*You are not registered!*" else "*That person is not registered!*")
+                Nothing -> hRespond (if isself then "*You are not registered!*" else "*That person is not registered!*")
                 Just gid -> do
                   liftIO $ addAltAccount man gid uuid
-                  psa <- readProp bowBotAccounts bdt
+                  psa <- hRead bowBotAccounts
                   let oldAcc = head $ filter ((==gid) . accountId) psa
-                  writeProp bowBotAccounts bdt (oldAcc { accountMinecrafts = uuid:accountMinecrafts oldAcc } : filter ((/= gid) . accountId) psa)
+                  hWrite bowBotAccounts (oldAcc { accountMinecrafts = uuid:accountMinecrafts oldAcc } : filter ((/= gid) . accountId) psa)
                   liftIO $ onComplete man uuid
-                  updateDiscordRolesSingleId bdt man did
-                  respond m "*Registered successfully*"
+                  hDiscord $ updateDiscordRolesSingleId bdt man did
+                  hRespond "*Registered successfully*"
             else do
-              pns <- (>>=(\BowBotAccount {..} -> (, accountId) <$> accountDiscords)) <$> readProp bowBotAccounts bdt
+              pns <- (>>=(\BowBotAccount {..} -> (, accountId) <$> accountDiscords)) <$> hRead bowBotAccounts
               case lookup did pns of
                 Nothing -> do
                   newAcc <- liftIO $ addAccount man (head names) did uuid
                   case newAcc of
-                    Nothing -> respond m somethingWrongMessage
+                    Nothing -> hRespond somethingWrongMessage
                     Just newAcc' -> do
-                      psa <- readProp bowBotAccounts bdt
-                      writeProp bowBotAccounts bdt (newAcc':psa)
+                      psa <- hRead bowBotAccounts
+                      hWrite bowBotAccounts (newAcc':psa)
                       liftIO $ onComplete man uuid
-                      updateDiscordRolesSingleId bdt man did
-                      respond m "*Registered successfully*"
-                Just _ -> respond m (if isself then "*You are already registered!*" else "*That person is already registered!*")
+                      hDiscord $ updateDiscordRolesSingleId bdt man did
+                      hRespond "*Registered successfully*"
+                Just _ -> hRespond (if isself then "*You are already registered!*" else "*That person is already registered!*")

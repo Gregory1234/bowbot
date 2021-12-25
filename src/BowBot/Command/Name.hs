@@ -5,13 +5,16 @@ import BowBot.Minecraft
 
 
 nameCommand :: String -> Bool -> Command
-nameCommand name ac = Command name DefaultLevel 2 $ \m man bdt -> do -- TODO: add times when changed and lengths
-  let args = tail $ words (unpack $ messageText m)
+nameCommand name ac = Command name DefaultLevel 2 $ do -- TODO: add times when changed and lengths
+  args <- hArgs
+  man <- hManager
+  bdt <- hData
+  caller <- hCaller
   let player = case args of
-        [] -> Right $ userId $ messageAuthor m
+        [] -> Right $ userId caller
         _ -> Left $ unwords args
   names <- liftIO $ withMinecraft man bdt ac player $ \_ names -> return $ if null names then Left () else Right names
-  respond m $ case names of
+  hRespond $ case names of
     PlayerNotFound -> playerNotFoundMessage
     DiscordUserNotFound -> discordNotFoundMessage
     (UserError ()) -> somethingWrongMessage

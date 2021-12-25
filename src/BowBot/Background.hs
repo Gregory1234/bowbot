@@ -31,7 +31,6 @@ announceBirthdays :: Manager -> BotData -> DiscordHandler ()
 announceBirthdays man bdt = do
   currentDay <- liftIO currentBirthdayDate
   maybeBirthdays <- liftIO $ getBirthdayPeople man currentDay
-  liftIO $ print maybeBirthdays
   case maybeBirthdays of
     Nothing -> logError man "Birthday parsing failed!"
     Just birthdays -> do
@@ -226,29 +225,37 @@ backgroundMinutely bdt@BotData {..} mint = do
 
 adminCommands :: [Command]
 adminCommands = 
-  [ Command "mcrefresh" AdminLevel 120 $ \m _ bdt -> do
+  [ Command "mcrefresh" AdminLevel 120 $ do
           manager <- liftIO $ newManager managerSettings
+          bdt <- hData
           liftIO $ updateMinecraftAccounts bdt manager
-          respond m "Done"
-  , Command "datarefresh" AdminLevel 120 $ \m _ bdt -> do
+          hRespond "Done"
+  , Command "datarefresh" AdminLevel 120 $ do
+          bdt <- hData
           liftIO $ downloadData bdt
-          respond m "Done"
-  , Command "discordrefresh" AdminLevel 120 $ \m _ bdt -> do
-          addDiscords bdt
-          respond m "Done"
-  , Command "rolesrefresh" AdminLevel 120 $ \m man bdt -> do
-          updateRolesAll bdt man
-          respond m "Done"
-  , Command "lbrefresh" AdminLevel 1200 $ \m _ bdt -> do
+          hRespond "Done"
+  , Command "discordrefresh" AdminLevel 120 $ do
+          bdt <- hData
+          hDiscord $ addDiscords bdt
+          hRespond "Done"
+  , Command "rolesrefresh" AdminLevel 120 $ do
+          bdt <- hData
+          man <- hManager
+          hDiscord $ updateRolesAll bdt man
+          hRespond "Done"
+  , Command "lbrefresh" AdminLevel 1200 $ do
+          bdt <- hData
           liftIO $ completeLeaderboardUpdate (Proxy @HypixelBowStats) bdt (hypixelRequestCounter bdt) $ \MinecraftAccount {..} -> mcHypixelBow /= Banned
-          respond m "Done"
-  , Command "clearlogs" AdminLevel 120 $ \m man _ -> do
+          hRespond "Done"
+  , Command "clearlogs" AdminLevel 120 $ do
+          man <- hManager
           liftIO $ clearLogs man
-          respond m "Done"
-  , Command "statusrefresh" AdminLevel 120 $ \m man _ -> do
-          updateDiscordStatus man
-          respond m "Done"
-  , Command "time" AdminLevel 120 $ \m _ _ -> do
+          hRespond "Done"
+  , Command "statusrefresh" AdminLevel 120 $ do
+          man <- hManager
+          hDiscord $ updateDiscordStatus man
+          hRespond "Done"
+  , Command "time" AdminLevel 120 $ do
           t <- liftIO $ getTime "Month: %m, Day: %d, Weekday: %u, Hour: %k, Minute: %M, Second %S"
-          respond m t
+          hRespond t
   ]
