@@ -6,54 +6,51 @@ module BowBot.Command.Watchlist where
 import BowBot.Command
 import BowBot.Minecraft
 import Data.Maybe (catMaybes)
-import BowBot.API
 import Control.Monad (filterM)
 import Control.Concurrent.STM.TVar (newTVar)
 import BowBot.API.Hypixel
 
 listCommand :: Command
 listCommand = Command "list" DefaultLevel 2 $ do -- TODO: add other lists
-  man <- hManager
   bdt <- hData
-  st <- liftIO $ fromMaybe [] <$> getWatchlist man
-  people <- map head . catMaybes <$> traverse (liftIO . mcUUIDToNames man bdt) st
+  st <- fromMaybe [] <$> getWatchlist
+  people <- map head . catMaybes <$> traverse (mcUUIDToNames bdt) st
   hRespond $ "**Players in watchList:**\n```\n" ++ unwords people ++ "```"
   pure ()
 
 onlineCommand :: Command
 onlineCommand = Command "online" DefaultLevel 30 $ do
-  man <- hManager
   bdt <- hData
   maybeOnlinePlayers <- getOrCalculateCache (hypixelBowOnlineList bdt) $ do
-    st <- liftIO $ fromMaybe [] <$> getWatchlist man
+    st <- fromMaybe [] <$> getWatchlist
     ret <- stm $ newTVar Nothing
     tryApiRequests (hypixelRequestCounter bdt) (length st) (\sec -> hRespond $ "**Too many requests! Wait another " ++ show sec ++ " seconds!**") $ do
-      values <- filterM (\uuid -> fromMaybe False <$> liftIO (isInBowDuels man uuid)) st
+      values <- filterM (fmap (fromMaybe False) . isInBowDuels) st
       stm $ writeTVar ret (Just values)
     stm $ readTVar ret
   case maybeOnlinePlayers of
     CacheFailed -> pure ()
     CacheBusy -> hRespond "**Processing list of online players. Please send command again later.**"
     CacheFresh v -> do
-      online <- showOnline man bdt v
+      online <- showOnline bdt v
       hRespond $ "**Players in watchList currently in bow duels:**```\n" ++ online ++ "```"
     CacheOld v ->  do
-      online <- showOnline man bdt v
+      online <- showOnline bdt v
       hRespond $ "**Players in watchList currently in bow duels:** (cached response)```\n" ++ online ++ "```"
   where
-    showOnline _ _ [] = return "None of the watchListed players are currently in bow duels."
-    showOnline man bdt uuids = do
-      names <- map head . catMaybes <$> traverse (liftIO . mcUUIDToNames man bdt) uuids
+    showOnline _ [] = return "None of the watchListed players are currently in bow duels."
+    showOnline bdt uuids = do
+      names <- map head . catMaybes <$> traverse (mcUUIDToNames bdt) uuids
       return $ unlines . map (" - " ++) $ names
 
-isInBowDuels :: Manager -> String -> IO (Maybe Bool)
-isInBowDuels manager uuid = hypixelWithPlayerStatus manager uuid $ \o -> do
+isInBowDuels :: APIMonad m => String -> m (Maybe Bool)
+isInBowDuels uuid = hypixelWithPlayerStatus uuid $ \o -> do
     session <- o .: "session"
     mode :: String <- session .: "mode"
     return $ mode == "DUELS_BOW_DUEL"
 
 
-getWatchlist :: Manager -> IO (Maybe [String])
-getWatchlist manager = do
-  res <- sendDB manager "minecraft/watchlist.php" []
+getWatchlist :: APIMonad m => m (Maybe [String])
+getWatchlist = do
+  res <- hSendDB "minecraft/watchlist.php" []
   decodeParse res $ \o -> o .: "data"

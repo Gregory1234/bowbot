@@ -12,16 +12,15 @@ data StatsCommandMode = AlwaysDefault | AlwaysAll | UserSettings
 statsCommand :: StatType s => Proxy s -> String -> (BotData -> ApiRequestCounter) -> StatsCommandMode -> Command
 statsCommand pr name rc mode = Command name DefaultLevel 15 $ do
   bdt <- hData
-  man <- hManager
   args <- hArgs
   caller <- hCaller
   let player = case args of
         [] -> Right (userId caller)
         mcname -> Left (unwords mcname)
   tryApiRequests (rc bdt) 2 (\sec -> hRespond $ "**Too many requests! Wait another " ++ show sec ++ " seconds!**") $ do
-    res <- withMinecraft man bdt False player $ \uuid names -> do
-      st <- liftIO $ requestStats pr man uuid
-      for_ st (liftIO . tryRegister bdt man uuid names)
+    res <- withMinecraft bdt False player $ \uuid names -> do
+      st <- requestStats pr uuid
+      for_ st (tryRegister bdt uuid names)
       return $ maybe (Left ()) Right st
     settings <- case mode of
       AlwaysDefault -> pure defSettings
@@ -30,7 +29,7 @@ statsCommand pr name rc mode = Command name DefaultLevel 15 $ do
         settings <- readProp discordSettings bdt
         pure $ fromMaybe defSettings $ settings !? userId caller
     hRespond $ statsMessage settings res
-    hDiscord $ updateDiscordRolesSingleId bdt man (userId caller)
+    hMDiscord $ updateDiscordRolesSingleId bdt (userId caller)
 
 statsMessage :: StatType s => Settings -> MinecraftResponse () s -> String
 statsMessage _ PlayerNotFound = playerNotFoundMessage
@@ -42,11 +41,11 @@ statsMessage settings (OldResponse o n s) = "**" ++ o ++ " (" ++ n ++ "):**\n" +
 statsMessage settings (DidYouMeanResponse n s) = "*Did you mean* **" ++ n ++ ":**\n" ++ showStats settings s
 statsMessage settings (DidYouMeanOldResponse o n s) = "*Did you mean* **" ++ o ++ " (" ++ n ++ "):**\n" ++ showStats settings s
 
-tryRegister :: StatType s => BotData -> Manager -> String -> [String] -> s -> IO ()
-tryRegister bdt manager uuid names s | statsNotable s = do
-  registeredPlayers <- atomically $ map mcUUID <$> readTVar (minecraftAccounts bdt)
+tryRegister :: (StatType s, APIMonad m) => BotData -> String -> [String] -> s -> m ()
+tryRegister bdt uuid names s | statsNotable s = do
+  registeredPlayers <- map mcUUID <$> readProp minecraftAccounts bdt
   unless (uuid `elem` registeredPlayers) $ do
-    acc <- addMinecraftAccount manager uuid names
-    atomically $ for_ acc $ \x -> modifyTVar (minecraftAccounts bdt) (x:)
-  updateLeaderboard manager (fromList [(uuid, toLeaderboard s)])
-tryRegister _ _ _ _ _ = pure ()
+    acc <- addMinecraftAccount uuid names
+    for_ acc $ \x -> modifyProp minecraftAccounts bdt (x:)
+  updateLeaderboard (fromList [(uuid, toLeaderboard s)])
+tryRegister _ _ _ _ = pure ()

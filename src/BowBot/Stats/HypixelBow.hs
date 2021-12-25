@@ -90,7 +90,7 @@ data HypixelBowStats = HypixelBowStats
 instance StatType HypixelBowStats where
   data Leaderboards HypixelBowStats = HypixelBowLeaderboards
     { bowLbWins :: Integer, bowLbLosses :: Integer, bowLbWinstreak :: Integer } deriving (Show)
-  requestStats Proxy manager uuid = hypixelWithPlayerData manager uuid $ \o -> do
+  requestStats Proxy uuid = hypixelWithPlayerData uuid $ \o -> do
       pl <- o .: "player"
       stats <- pl .: "stats"
       duelsStats <- stats .:? "Duels"
@@ -169,8 +169,8 @@ instance StatType HypixelBowStats where
 
   toLeaderboard HypixelBowStats {..} = HypixelBowLeaderboards 
     { bowLbWins = bowWins, bowLbLosses = bowLosses, bowLbWinstreak = bestWinstreak }
-  getLeaderboard Proxy manager = do
-    res <- sendDB manager "stats/hypixel/leaderboard.php" []
+  getLeaderboard Proxy = do
+    res <- hSendDB "stats/hypixel/leaderboard.php" []
     decodeParse res $ \o -> do
       dt <- o .: "data"
       fmap fromList $ for dt $ \s -> do
@@ -179,12 +179,12 @@ instance StatType HypixelBowStats where
         (readMaybe -> Just bowLbLosses) <- s .: "bowLosses"
         (readMaybe -> Just bowLbWinstreak) <- s .: "bowWinstreak"
         return (uuid, HypixelBowLeaderboards {..})
-  updateLeaderboard manager lb = sendPostDB manager "stats/hypixel/update.php" (object $ helper <$> toList lb)
+  updateLeaderboard lb = hPostDB "stats/hypixel/update.php" (object $ helper <$> toList lb)
     where
       helper (uuid, HypixelBowLeaderboards {..}) = pack uuid .= object ["bowWins" .= bowLbWins, "bowLosses" .= bowLbLosses, "bowWinstreak" .= bowLbWinstreak]
       
-  banLeaderboard _ man uuid = do
-    res <- sendDB man "stats/hypixel/ban.php" ["uuid="++uuid]
+  banLeaderboard _ uuid = do
+    res <- hSendDB "stats/hypixel/ban.php" ["uuid="++uuid]
     decodeParse res $ \o -> o .: "success"
 
 hypixelBowWinsLeaderboard :: Leaderboards HypixelBowStats -> Maybe (Integer, String)

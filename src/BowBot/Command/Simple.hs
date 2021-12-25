@@ -6,14 +6,13 @@ import Data.Void (absurd)
 
 urlCommand :: String -> Bool -> (String -> String) -> Command
 urlCommand name ac mkurl = Command name DefaultLevel 8 $ do
-  man <- hManager
   bdt <- hData
   pName <- hArg 1
   caller <- hCaller
   let player = case pName of
         Nothing -> Right (userId caller)
         Just mcname -> Left mcname
-  url <- liftIO $ withMinecraft man bdt ac player $ \u _ -> do
+  url <- withMinecraft bdt ac player $ \u _ -> do
     return (Right $ mkurl u)
   void $ case url of
     PlayerNotFound -> hRespond playerNotFoundMessage

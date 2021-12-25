@@ -26,30 +26,31 @@ import Data.List ((\\), intercalate)
 import BowBot.Command
 import BowBot.Birthday
 import Control.Exception.Base (SomeException, try)
+import Control.Monad.Trans (lift)
 
-announceBirthdays :: Manager -> BotData -> DiscordHandler ()
-announceBirthdays man bdt = do
+announceBirthdays :: BotData -> ManagerT DiscordHandler ()
+announceBirthdays bdt = do
   currentDay <- liftIO currentBirthdayDate
-  maybeBirthdays <- liftIO $ getBirthdayPeople man currentDay
+  maybeBirthdays <- getBirthdayPeople currentDay
   case maybeBirthdays of
-    Nothing -> logError man "Birthday parsing failed!"
+    Nothing -> hLogError "Birthday parsing failed!"
     Just birthdays -> do
       dgid <- readProp discordGuildId bdt
-      people <- fmap (filter ((`elem` birthdays) . userId . memberUser)) <$> call (R.ListGuildMembers dgid R.GuildMembersTiming {R.guildMembersTimingLimit = Just 500, R.guildMembersTimingAfter = Nothing})
+      people <- lift $ fmap (filter ((`elem` birthdays) . userId . memberUser)) <$> call (R.ListGuildMembers dgid R.GuildMembersTiming {R.guildMembersTimingLimit = Just 500, R.guildMembersTimingAfter = Nothing})
       case people of
-        Left err -> logError man $ show err
+        Left err -> hLogError $ show err
         Right ppl -> unless (null ppl) $ do
           birthdayChannel <- readProp discordBirthdayChannel bdt
-          logInfo man $ "Announcing birthdays: " ++ intercalate ", " (map (showMemberOrUser True . Right) ppl)
-          call_ $ R.CreateMessage birthdayChannel $ pack $
+          hLogInfo $ "Announcing birthdays: " ++ intercalate ", " (map (showMemberOrUser True . Right) ppl)
+          lift $ call_ $ R.CreateMessage birthdayChannel $ pack $
             if length ppl == 1
             then "**Happy birthday** to " ++ showMemberOrUser True (Right $ head ppl) ++ "!"
             else "**Happy birthday** to: " ++ intercalate ", " (map (showMemberOrUser True . Right) ppl) ++ "!"
 
-updateDiscordStatus :: Manager -> DiscordHandler ()
-updateDiscordStatus man = do
-  status <- liftIO $ getInfoDB man "discord_status"
-  sendCommand (UpdateStatus $ UpdateStatusOpts {
+updateDiscordStatus :: ManagerT DiscordHandler ()
+updateDiscordStatus = do
+  status <- hInfoDB "discord_status"
+  lift $ sendCommand (UpdateStatus $ UpdateStatusOpts {
       updateStatusOptsSince = Nothing,
       updateStatusOptsGame = case status of
          Nothing -> Nothing
@@ -103,35 +104,35 @@ updateDiscordRolesSingle bdt _ _ gid m Nothing = do
   when (memberRole `notElem` memberRoles m && visitorRole `notElem` memberRoles m) $ do
     call_ $ R.AddGuildMemberRole gid (userId $ memberUser m) visitorRole
 
-updateDiscordRolesSingleId :: BotData -> Manager -> UserId -> DiscordHandler ()
-updateDiscordRolesSingleId bdt man did = do
+updateDiscordRolesSingleId :: BotData -> UserId -> ManagerT DiscordHandler ()
+updateDiscordRolesSingleId bdt did = do
   gid <- readProp discordGuildId bdt
-  maybeMem <- call $ R.GetGuildMember gid did
+  maybeMem <- lift $ call $ R.GetGuildMember gid did
   case maybeMem of
     Left _ -> pure ()
     Right m -> do
       members <- readProp hypixelGuildMembers bdt
-      lb <- liftIO $ getLeaderboard (Proxy @HypixelBowStats) man
+      lb <- getLeaderboard (Proxy @HypixelBowStats)
       accs <- (>>=(\u -> (, u) <$> accountDiscords u)) <$> readProp bowBotAccounts bdt
       let bac = lookup did accs
-      updateDiscordRolesSingle bdt lb (if null members then Nothing else Just members) gid m bac
+      lift $ updateDiscordRolesSingle bdt lb (if null members then Nothing else Just members) gid m bac
 
-updateRolesAll :: BotData -> Manager -> DiscordHandler ()
-updateRolesAll bdt man = do
+updateRolesAll :: BotData -> ManagerT DiscordHandler ()
+updateRolesAll bdt = do
   gid <- readProp discordGuildId bdt
   members <- readProp hypixelGuildMembers bdt
-  maybeGmembs <- fmap (filter (not . userIsBot . memberUser)) <$> call (R.ListGuildMembers gid R.GuildMembersTiming {R.guildMembersTimingLimit = Just 500, R.guildMembersTimingAfter = Nothing})
-  lb <- liftIO $ getLeaderboard (Proxy @HypixelBowStats) man
+  maybeGmembs <- lift $ fmap (filter (not . userIsBot . memberUser)) <$> call (R.ListGuildMembers gid R.GuildMembersTiming {R.guildMembersTimingLimit = Just 500, R.guildMembersTimingAfter = Nothing})
+  lb <- getLeaderboard (Proxy @HypixelBowStats)
   case maybeGmembs of
     Left _ -> pure ()
     Right gmembs -> for_ gmembs $ \m -> do
       accs <- (>>=(\u -> (, u) <$> accountDiscords u)) <$> readProp bowBotAccounts bdt
       let bac = lookup (userId (memberUser m)) accs
-      updateDiscordRolesSingle bdt lb (if null members then Nothing else Just members) gid m bac
+      lift $ updateDiscordRolesSingle bdt lb (if null members then Nothing else Just members) gid m bac
 
-getDiscordIds :: Manager -> IO [UserId]
-getDiscordIds manager = do
-  res <- sendDB manager "discord/all.php" []
+getDiscordIds :: APIMonad m => m [UserId]
+getDiscordIds = do
+  res <- hSendDB "discord/all.php" []
   fmap (fromMaybe []) $ decodeParse res $ \o -> do
     dt <- o .: "data"
     for dt $ \s -> do
@@ -141,21 +142,21 @@ getDiscordIds manager = do
 addDiscords :: BotData -> DiscordHandler ()
 addDiscords bdt = do
   manager <- liftIO $ newManager managerSettings
-  uids <- liftIO $ getDiscordIds manager
+  uids <- runManagerT getDiscordIds manager
   dgid <- readProp discordGuildId bdt
   v <- fmap (filter (not . userIsBot . memberUser)) <$> call (R.ListGuildMembers dgid R.GuildMembersTiming {R.guildMembersTimingLimit = Just 500, R.guildMembersTimingAfter = Nothing})
   case v of
     Right x -> do
       let uids' = filter (\u -> all (\m -> userId (memberUser m) /= u) x) uids
       y <- traverse helper uids'
-      liftIO $ updateDiscords manager x y
+      runManagerT (updateDiscords x y) manager
     Left x -> logError manager $ show x
   where
     helper :: UserId -> DiscordHandler User
     helper u = do
       y <- call (R.GetUser u)
       return $ fromRight undefined y
-    updateDiscords manager mem usr = sendPostDB manager "discord/update.php" (object $ map memToObject mem ++ map usrToObject usr)
+    updateDiscords mem usr = hPostDB "discord/update.php" (object $ map memToObject mem ++ map usrToObject usr)
        where
          memToObject GuildMember {memberUser = memberUser@User {..}, ..} = case memberNick of
            Nothing -> usrToObject memberUser
@@ -167,10 +168,10 @@ discordBackgroundMinutely bdt mint = do
   when (mint == 1) $ do
     manager <- liftIO $ newManager managerSettings
     hour <- liftIO $ read @Integer <$> getTime "%k"
-    when (hour == 5) $ announceBirthdays manager bdt
+    when (hour == 5) $ runManagerT (announceBirthdays bdt) manager
     addDiscords bdt
-    updateDiscordStatus manager
-    updateRolesAll bdt manager
+    runManagerT updateDiscordStatus manager
+    runManagerT (updateRolesAll bdt) manager
 
 -- TODO: frequency updates
 
@@ -184,9 +185,9 @@ completeLeaderboardUpdate pr bdt api filt = do
       helper manager lst = do
         tryApiRequests api 25 (\x -> do { threadDelay ((x+10) * 1000000); helper manager lst }) $ do
           let chunked = chunksOf 10 lst
-          dt <- fmap (fromList . catMaybes . zipWith (\a b -> (a,) <$> b) lst . concat) $ for chunked $ mapConcurrently $ fmap (fmap toLeaderboard) . requestStats pr manager
+          dt <- fmap (fromList . catMaybes . zipWith (\a b -> (a,) <$> b) lst . concat) $ for chunked $ mapConcurrently $ fmap (fmap toLeaderboard) . flip runManagerT manager . requestStats pr
           logInfo' $ show dt
-          updateLeaderboard manager dt
+          runManagerT (updateLeaderboard dt) manager
 
 clearLogs :: Manager -> IO ()
 clearLogs man = do
@@ -209,7 +210,7 @@ backgroundMinutely bdt@BotData {..} mint = do
     unless dev $ do
       hour <- read @Int <$> getTime "%k"
       when (hour `mod` 8 == 0) $ clearLogs manager
-    updateMinecraftAccounts bdt manager
+    runManagerT (updateMinecraftAccounts bdt) manager
     logInfo' "finished update"
   when (mint == 30) $ do
     logInfo' "started update"
@@ -226,9 +227,8 @@ backgroundMinutely bdt@BotData {..} mint = do
 adminCommands :: [Command]
 adminCommands = 
   [ Command "mcrefresh" AdminLevel 120 $ do
-          manager <- liftIO $ newManager managerSettings
           bdt <- hData
-          liftIO $ updateMinecraftAccounts bdt manager
+          updateMinecraftAccounts bdt
           hRespond "Done"
   , Command "datarefresh" AdminLevel 120 $ do
           bdt <- hData
@@ -240,8 +240,7 @@ adminCommands =
           hRespond "Done"
   , Command "rolesrefresh" AdminLevel 120 $ do
           bdt <- hData
-          man <- hManager
-          hDiscord $ updateRolesAll bdt man
+          hMDiscord $ updateRolesAll bdt
           hRespond "Done"
   , Command "lbrefresh" AdminLevel 1200 $ do
           bdt <- hData
@@ -253,7 +252,7 @@ adminCommands =
           hRespond "Done"
   , Command "statusrefresh" AdminLevel 120 $ do
           man <- hManager
-          hDiscord $ updateDiscordStatus man
+          hDiscord $ runManagerT updateDiscordStatus man
           hRespond "Done"
   , Command "time" AdminLevel 120 $ do
           t <- liftIO $ getTime "Month: %m, Day: %d, Weekday: %u, Hour: %k, Minute: %M, Second %S"

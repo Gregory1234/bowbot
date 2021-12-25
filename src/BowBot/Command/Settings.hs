@@ -4,7 +4,6 @@ module BowBot.Command.Settings where
 
 import BowBot.Command
 import BowBot.Settings
-import BowBot.API
 import Data.Map (alter)
 
 boolArg :: String -> Maybe Bool
@@ -36,8 +35,8 @@ fromSense Always = "always"
 fromSense Never = "never"
 fromSense WhenSensible = "sensibly"
 
-unsafeUpdateSettings :: Manager -> UserId -> String -> String -> IO ()
-unsafeUpdateSettings man did key val = void $ sendDB man "discord/settings/update.php" ["discord=" ++ show did, "setting=" ++ key, "value=" ++ val]
+unsafeUpdateSettings :: APIMonad m => UserId -> String -> String -> m ()
+unsafeUpdateSettings did key val = void $ hSendDB "discord/settings/update.php" ["discord=" ++ show did, "setting=" ++ key, "value=" ++ val]
 
 boolFromEither :: Either (Bool, BoolSense) String -> Maybe Bool
 boolFromEither (Left (b, _)) = Just b
@@ -62,20 +61,19 @@ getSettingToSet _ _ = Left "*Wrong command argument!*"
 
 settingsCommand :: String -> Maybe (Bool, BoolSense) -> Command
 settingsCommand name values = Command name DefaultLevel 2 $ do
-  man <- hManager
   args <- hArgs
   did <- userId <$> hCaller
   case (values, args) of
     (Nothing, [setting, value]) -> case getSettingToSet setting (Right value) of
       Left err -> hRespond err
       Right (k, v, u) -> do
-        liftIO $ unsafeUpdateSettings man did k v
+        unsafeUpdateSettings did k v
         hModify discordSettings $ alter (Just . u . fromMaybe defSettings) did
         hRespond "*Successfully updated!*"
     (Just bs, [setting]) -> case getSettingToSet setting (Left bs) of
       Left err -> hRespond err
       Right (k, v, u) -> do
-        liftIO $ unsafeUpdateSettings man did k v
+        unsafeUpdateSettings did k v
         hModify discordSettings $ alter (Just . u . fromMaybe defSettings) did
         hRespond "*Successfully updated!*"
     _ -> hRespond wrongSyntaxMessage

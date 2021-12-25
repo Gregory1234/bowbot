@@ -159,9 +159,9 @@ data BotData = BotData
   , discordBirthdayChannel :: TVar ChannelId
   }
 
-downloadMinecraftAccounts :: Manager -> IO (Maybe [MinecraftAccount])
-downloadMinecraftAccounts manager = do
-  res <- sendDB manager "minecraft/all.php" []
+downloadMinecraftAccounts :: APIMonad m => m (Maybe [MinecraftAccount])
+downloadMinecraftAccounts = do
+  res <- hSendDB "minecraft/all.php" []
   decodeParse res $ \o -> do
     dt <- o .: "data"
     for dt $ \acc -> do
@@ -171,9 +171,9 @@ downloadMinecraftAccounts manager = do
       return MinecraftAccount {..}
 
 
-downloadBowBotAccounts :: Manager -> IO (Maybe [BowBotAccount])
-downloadBowBotAccounts manager = do
-  res <- sendDB manager "people/all.php" []
+downloadBowBotAccounts :: APIMonad m => m (Maybe [BowBotAccount])
+downloadBowBotAccounts = do
+  res <- hSendDB "people/all.php" []
   decodeParse res $ \o -> do
     dt <- o .: "data"
     for (toList dt) $ \(accountId, acc) -> do
@@ -182,9 +182,9 @@ downloadBowBotAccounts manager = do
       accountMinecrafts <- acc .: "minecraft"
       return BowBotAccount {..}
 
-downloadDiscordPerms :: Manager -> IO (Maybe (Map UserId PermissionLevel))
-downloadDiscordPerms manager = do
-  res <- sendDB manager "discord/perms.php" []
+downloadDiscordPerms :: APIMonad m => m (Maybe (Map UserId PermissionLevel))
+downloadDiscordPerms = do
+  res <- hSendDB "discord/perms.php" []
   decodeParse res $ \o -> do
     dt <- o .: "data"
     fmap fromList . for dt $ \dp -> do
@@ -195,10 +195,10 @@ downloadDiscordPerms manager = do
 downloadData :: BotData -> IO ()
 downloadData bdt = do
   manager <- newManager managerSettings
-  newMinecraftAccounts <- downloadMinecraftAccounts manager
-  newDiscordSettings <- getSettings manager
-  newBowBotAccounts <- downloadBowBotAccounts manager
-  newDiscordPerms <- downloadDiscordPerms manager
+  newMinecraftAccounts <- runManagerT downloadMinecraftAccounts manager
+  newDiscordSettings <- runManagerT getSettings manager
+  newBowBotAccounts <- runManagerT downloadBowBotAccounts manager
+  newDiscordPerms <- runManagerT downloadDiscordPerms manager
   atomically $ do
     for_ newMinecraftAccounts (writeTVar (minecraftAccounts bdt))
     for_ newDiscordSettings (writeTVar (discordSettings bdt))
@@ -207,24 +207,25 @@ downloadData bdt = do
   updateDiscordConstants bdt manager
   tryApiRequests (hypixelRequestCounter bdt) 1 (\_ -> pure ()) $ do
     gid <- readProp hypixelGuildId bdt
-    newGuildMembers <- hypixelGuildMemberList manager gid
+    newGuildMembers <- runManagerT (hypixelGuildMemberList gid) manager
     atomically $ for_ newGuildMembers (writeTVar (hypixelGuildMembers bdt))
     
 
-updateMinecraftAccounts :: BotData -> Manager -> IO ()
-updateMinecraftAccounts bdt manager = do
+updateMinecraftAccounts :: APIMonad m => BotData -> m ()
+updateMinecraftAccounts bdt = do
+  manager <- hManager
   nickList <- readProp minecraftAccounts bdt
   let chunked = chunksOf 10 nickList
-  updatedNicks <- fmap concat $ for chunked $ mapConcurrently helper
+  updatedNicks <- liftIO $ fmap concat $ for chunked $ mapConcurrently (fmap (`runManagerT` manager) helper)
   writeProp minecraftAccounts bdt updatedNicks
   where
     helper MinecraftAccount {..} = do
-      newNames <- mojangUUIDToNames manager mcUUID
+      newNames <- mojangUUIDToNames mcUUID
       for_ newNames $ \names ->
         unless (mcNames == names) $ updateMinecraftNames mcUUID names
       return MinecraftAccount {mcNames = fromMaybe mcNames newNames, ..}
     updateMinecraftNames uuid names = 
-      void $ sendDB manager "minecraft/setnames.php" ["uuid=" ++ uuid, "names=" ++ intercalate "," names]
+      void $ hSendDB "minecraft/setnames.php" ["uuid=" ++ uuid, "names=" ++ intercalate "," names]
 
 updateDiscordConstants :: BotData -> Manager -> IO ()
 updateDiscordConstants bdt manager = do

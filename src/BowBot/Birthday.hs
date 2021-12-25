@@ -23,9 +23,9 @@ birthdayFromString str = case splitOn "." str of
 currentBirthdayDate :: IO BirthdayDate
 currentBirthdayDate = fromJust . birthdayFromString <$> getTime "%d.%m"
 
-getBirthdayPeople :: Manager -> BirthdayDate -> IO (Maybe [UserId])
-getBirthdayPeople manager bd = do
-  res <- sendDB manager "discord/birthday/get.php" ["date=" ++ birthdayString bd]
+getBirthdayPeople :: APIMonad m => BirthdayDate -> m (Maybe [UserId])
+getBirthdayPeople bd = do
+  res <- hSendDB "discord/birthday/get.php" ["date=" ++ birthdayString bd]
   decodeParse res $ \o -> do
       dt <- o .: "data"
       for dt $ \s -> do

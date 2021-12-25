@@ -12,6 +12,7 @@ import BowBot.API.Mojang
 import BowBot.Utils
 import Data.Char (toLower, isDigit)
 import Data.List (sortOn, isPrefixOf, isSuffixOf)
+import BowBot.API (APIMonad)
 
 
 data MinecraftResponse e a
@@ -24,62 +25,62 @@ data MinecraftResponse e a
   | DidYouMeanResponse String a
   | DidYouMeanOldResponse String String a
 
-mcNameToUUID :: Manager -> BotData -> String -> IO (Maybe String)
-mcNameToUUID manager bdt name = do
+mcNameToUUID :: APIMonad m => BotData -> String -> m (Maybe String)
+mcNameToUUID bdt name = do
   mcAcc <- readProp minecraftAccounts bdt
   let goodAcc = filter ((==name) . head . mcNames) mcAcc
   case goodAcc of
     [MinecraftAccount {mcUUID}] -> return (Just mcUUID)
-    _ -> mojangNameToUUID manager name
+    _ -> mojangNameToUUID name
 
-mcUUIDToNames :: Manager -> BotData -> String -> IO (Maybe [String])
-mcUUIDToNames manager bdt uuid = do
+mcUUIDToNames :: APIMonad m => BotData -> String -> m (Maybe [String])
+mcUUIDToNames bdt uuid = do
   mcAcc <- readProp minecraftAccounts bdt
   let goodAcc = filter ((==uuid) . mcUUID) mcAcc
   case goodAcc of
     [MinecraftAccount {mcNames}] -> return (Just mcNames)
-    _ -> mojangUUIDToNames manager uuid
+    _ -> mojangUUIDToNames uuid
 
 fromPingDiscordUser :: String -> Maybe UserId
 fromPingDiscordUser str | "<@" `isPrefixOf` str && ">" `isSuffixOf` str = readMaybe $ filter isDigit str
 fromPingDiscordUser _ = Nothing
 
-withMinecraft :: MonadIO m => Manager -> BotData -> Bool -> Either String UserId -> (String -> [String] -> m (Either e a)) -> m (MinecraftResponse e a)
-withMinecraft manager bdt _ (Right author) fun = withMinecraftDiscord manager bdt author fun
-withMinecraft manager bdt _ (Left (fromPingDiscordUser -> Just did)) fun = do
-  ret <- withMinecraftDiscord manager bdt did fun
+withMinecraft :: APIMonad m => BotData -> Bool -> Either String UserId -> (String -> [String] -> m (Either e a)) -> m (MinecraftResponse e a)
+withMinecraft bdt _ (Right author) fun = withMinecraftDiscord bdt author fun
+withMinecraft bdt _ (Left (fromPingDiscordUser -> Just did)) fun = do
+  ret <- withMinecraftDiscord bdt did fun
   return $ case ret of
     NotOnList -> DiscordUserNotFound
     _ -> ret
-withMinecraft manager bdt ac (Left mcname) fun = 
-  if ac then withMinecraftAutocorrect manager bdt True mcname fun else withMinecraftNormal manager bdt True mcname fun
+withMinecraft bdt ac (Left mcname) fun = 
+  if ac then withMinecraftAutocorrect bdt True mcname fun else withMinecraftNormal bdt True mcname fun
 
-withMinecraftDiscord :: MonadIO m => Manager -> BotData -> UserId -> (String -> [String] -> m (Either e a)) -> m (MinecraftResponse e a)
-withMinecraftDiscord manager bdt did fun = do
+withMinecraftDiscord :: APIMonad m => BotData -> UserId -> (String -> [String] -> m (Either e a)) -> m (MinecraftResponse e a)
+withMinecraftDiscord bdt did fun = do
   pns <- fmap (>>=(\BowBotAccount {..} -> (,accountSelectedMinecraft) <$> accountDiscords)) $ readProp bowBotAccounts bdt
   case lookup did pns of
     Nothing -> pure NotOnList
     Just uuid -> do
-      names <- liftIO $ fromMaybe [] <$> mcUUIDToNames manager bdt uuid
+      names <- fromMaybe [] <$> mcUUIDToNames bdt uuid
       res <- fun uuid names
       case res of
         Left e -> pure (UserError e)
         Right r -> pure (JustResponse (head names) r)
 
-withMinecraftNormal :: MonadIO m => Manager -> BotData -> Bool -> String -> (String -> [String] -> m (Either e a)) -> m (MinecraftResponse e a)
-withMinecraftNormal manager bdt cont mcname fun = do
-  maybeUUID <- liftIO $ mcNameToUUID manager bdt mcname
+withMinecraftNormal :: APIMonad m => BotData -> Bool -> String -> (String -> [String] -> m (Either e a)) -> m (MinecraftResponse e a)
+withMinecraftNormal bdt cont mcname fun = do
+  maybeUUID <- mcNameToUUID bdt mcname
   case maybeUUID of
-    Nothing -> if cont then withMinecraftAutocorrect manager bdt False mcname fun else pure PlayerNotFound
+    Nothing -> if cont then withMinecraftAutocorrect bdt False mcname fun else pure PlayerNotFound
     Just uuid -> do
-      names <- liftIO $ fromMaybe [] <$> mcUUIDToNames manager bdt uuid
+      names <- fromMaybe [] <$> mcUUIDToNames bdt uuid
       res <- fun uuid names
       case res of
-        Left e -> if cont then withMinecraftAutocorrect manager bdt False mcname fun else pure (UserError e)
+        Left e -> if cont then withMinecraftAutocorrect bdt False mcname fun else pure (UserError e)
         Right r -> pure (JustResponse (head names) r)
 
-withMinecraftAutocorrect :: MonadIO m => Manager -> BotData -> Bool -> String -> (String -> [String] -> m (Either e a)) -> m (MinecraftResponse e a)
-withMinecraftAutocorrect manager bdt cont mcname fun = do
+withMinecraftAutocorrect :: APIMonad m => BotData -> Bool -> String -> (String -> [String] -> m (Either e a)) -> m (MinecraftResponse e a)
+withMinecraftAutocorrect bdt cont mcname fun = do
   people <- readProp minecraftAccounts bdt
   let process f = let 
         nicks = [(mcUUID,u) | MinecraftAccount {..} <- people, u <- f mcNames]
@@ -87,9 +88,9 @@ withMinecraftAutocorrect manager bdt cont mcname fun = do
           in map fst . sortOn snd . filter (\(_,d) -> d <= 2) $ dists
   let filtered = process (take 1) ++ process (drop 1)
   case filtered of
-    [] -> if cont then withMinecraftNormal manager bdt False mcname fun else pure PlayerNotFound
+    [] -> if cont then withMinecraftNormal bdt False mcname fun else pure PlayerNotFound
     ((uuid, rn):_) -> do
-      names <- liftIO $ fromMaybe [] <$> mcUUIDToNames manager bdt uuid
+      names <- fromMaybe [] <$> mcUUIDToNames bdt uuid
       res <- fun uuid names
       case res of
         Left e -> pure (UserError e)

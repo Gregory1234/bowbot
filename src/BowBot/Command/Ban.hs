@@ -9,14 +9,13 @@ import BowBot.Stats
 
 banCommand :: StatType s => Proxy s -> String -> (MinecraftAccount -> MinecraftAccount) -> Command
 banCommand p name f = Command name ModLevel 10 $ do
-  man <- hManager
   bdt <- hData
   pName <- hArg 1
-  uuid' <- liftIO $ mcNameToUUID man bdt (fromMaybe "" pName)
+  uuid' <- mcNameToUUID bdt (fromMaybe "" pName)
   case uuid' of
     Nothing -> hRespond "Player not found! For safety reasons this command does not have autocorrect enabled."
     Just uuid -> do
-      r <- liftIO $ banLeaderboard p man uuid
+      r <- banLeaderboard p uuid
       case r of
         Just True -> do
           hModify minecraftAccounts $ map $ \mc@MinecraftAccount {..} -> if mcUUID == uuid then f mc else mc

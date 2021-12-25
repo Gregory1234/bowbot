@@ -17,16 +17,15 @@ data LeaderboardPage = LeaderboardPage Int | LeaderboardAll | LeaderboardSearch 
 
 leaderboardCommand :: StatType s => Proxy s -> String -> String -> String -> (Leaderboards s -> Maybe (Integer, String)) -> Command
 leaderboardCommand pr name lbname statname lbfun = Command name DefaultLevel 10 $ do
-  man <- hManager
   bdt <- hData
   caller <- hCaller
-  maybedat <- liftIO $ getLeaderboard pr man
+  maybedat <- getLeaderboard pr
   case maybedat of
     Nothing -> hRespond somethingWrongMessage
     Just dat -> do
       let lb = [(val, (uuid, str)) | (uuid, lbv) <- toList dat, Just (val, str) <- [lbfun lbv]]
-      sortedlb <- liftIO $ for (sortOn (negate . fst) lb) $ \(_, (uuid, str)) -> do
-        names <- fromMaybe [] <$> mcUUIDToNames man bdt uuid
+      sortedlb <- for (sortOn (negate . fst) lb) $ \(_, (uuid, str)) -> do
+        names <- fromMaybe [] <$> mcUUIDToNames bdt uuid
         return (head names, str, uuid)
       let elems = zipWith (\lbPos (lbName, lbVal, lbUUID) -> LeaderboardElement {..}) [1..] sortedlb
       args <- hArgs
@@ -35,7 +34,7 @@ leaderboardCommand pr name lbname statname lbfun = Command name DefaultLevel 10 
         ["all"] -> stm $ Right . (,Nothing, LeaderboardAll) <$> getAuthorNicks bdt (userId caller)
         [readMaybe -> Just page] -> stm $ Right . (,Nothing, LeaderboardPage (page - 1)) <$> getAuthorNicks bdt (userId caller)
         [mcName] -> do
-          res <- withMinecraftAutocorrect man bdt False mcName $ \uuid _ ->
+          res <- withMinecraftAutocorrect bdt False mcName $ \uuid _ ->
             return $ if uuid `elem` map lbUUID elems then Right uuid else Left ()
           return $ case res of
             PlayerNotFound -> Left playerNotFoundMessage

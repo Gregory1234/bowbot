@@ -68,7 +68,7 @@ runBowBot discordKey = do
 onStartup :: BotData -> DiscordHandler ()
 onStartup bdt = do
   manager <- liftIO $ newManager managerSettings
-  updateDiscordStatus manager
+  runManagerT updateDiscordStatus manager
   mkBackgroundDiscord
  where
   mkBackgroundDiscord = do
@@ -92,8 +92,8 @@ commands =
   [ statsCommand (Proxy @HypixelBowStats) "s" hypixelRequestCounter UserSettings
   , statsCommand (Proxy @HypixelBowStats) "sd" hypixelRequestCounter AlwaysDefault
   , statsCommand (Proxy @HypixelBowStats) "sa" hypixelRequestCounter AlwaysAll
-  , registerCommand "register" [hypixelRequestCounter] False True $ \man uuid -> do
-      fullUpdateStats (Proxy @HypixelBowStats) man uuid
+  , registerCommand "register" [hypixelRequestCounter] False True $ \uuid -> do
+      fullUpdateStats (Proxy @HypixelBowStats) uuid
   , urlCommand "head" True (\s -> "https://crafatar.com/avatars/" ++ s ++ "?overlay")
   , urlCommand "heada" False (\s -> "https://crafatar.com/avatars/" ++ s ++ "?overlay")
   , urlCommand "skin" True (\s -> "https://crafatar.com/renders/body/" ++ s ++ "?overlay")
@@ -102,10 +102,10 @@ commands =
   , leaderboardCommand (Proxy @HypixelBowStats) "lbl" "Hypixel Bow Duels Losses Leaderboard" "Losses" hypixelBowLossesLeaderboard
   , leaderboardCommand (Proxy @HypixelBowStats) "lbs" "Hypixel Bow Duels Winstreak Leaderboard" "Winstreak" hypixelBowWinstreakLeaderboard
   , leaderboardCommand (Proxy @HypixelBowStats) "lbr" "Hypixel Bow Duels WLR Leaderboard" "WLR" hypixelBowWLRLeaderboard
-  , registerCommand "add" [hypixelRequestCounter] False False $ \man uuid -> do
-      fullUpdateStats (Proxy @HypixelBowStats) man uuid
-  , registerCommand "addalt" [hypixelRequestCounter] True False $ \man uuid -> do
-      fullUpdateStats (Proxy @HypixelBowStats) man uuid
+  , registerCommand "add" [hypixelRequestCounter] False False $ \uuid -> do
+      fullUpdateStats (Proxy @HypixelBowStats) uuid
+  , registerCommand "addalt" [hypixelRequestCounter] True False $ \uuid -> do
+      fullUpdateStats (Proxy @HypixelBowStats) uuid
   , minecraftCommand
   , listCommand
   , onlineCommand
@@ -188,7 +188,7 @@ eventHandler bdt man (MessageCreate m) = do
 eventHandler bdt man (GuildMemberAdd gid mem) = do
   trueId <- readProp discordGuildId bdt
   when (gid == trueId) $
-    updateDiscordRolesSingleId bdt man (userId $ memberUser mem)
+    runManagerT (updateDiscordRolesSingleId bdt (userId $ memberUser mem)) man
   liftIO $ sendPostDB man "discord/update.php" $
     object [pack (show (userId (memberUser mem))) .= object ["name" .= userName (memberUser mem), "discriminator" .= userDiscrim (memberUser mem), "nickname" .= memberNick mem]]
 

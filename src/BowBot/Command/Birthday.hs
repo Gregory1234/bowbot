@@ -5,15 +5,13 @@ module BowBot.Command.Birthday where
 import BowBot.Command
 import BowBot.Birthday
 import qualified Discord.Requests as R
-import BowBot.API
 import Data.List (intercalate)
 import Data.Char (isDigit)
 
 birthdayAnnounceCommand :: Command
 birthdayAnnounceCommand = Command "bdsay" ModLevel 10 $ do
   currentDay <- liftIO currentBirthdayDate
-  man <- hManager
-  maybeBirthdays <- liftIO $ getBirthdayPeople man currentDay
+  maybeBirthdays <- getBirthdayPeople currentDay
   case maybeBirthdays of
     Nothing -> hRespond somethingWrongMessage
     Just birthdays -> do
@@ -21,7 +19,7 @@ birthdayAnnounceCommand = Command "bdsay" ModLevel 10 $ do
       people <- hDiscord $ fmap (filter ((`elem` birthdays) . userId . memberUser)) <$> call (R.ListGuildMembers dgid R.GuildMembersTiming {R.guildMembersTimingLimit = Just 500, R.guildMembersTimingAfter = Nothing})
       case people of
         Left err -> do
-          logError man $ show err
+          hLogError $ show err
           hRespond somethingWrongMessage
         Right ppl -> if null ppl
           then hRespond "*Noone has a birthday today!*"
@@ -38,10 +36,9 @@ birthdaySetCommand = Command "bdset" ModLevel 10 $ do
   args <- hArgs
   case args of
     [readMaybe . filter isDigit -> Just did, birthdayFromString -> Just bd] -> do
-      man <- hManager
-      liftIO $ setBirthday man did bd
+      setBirthday did bd
       hRespond "*Birthday set!*"
     _ -> hRespond wrongSyntaxMessage
 
-setBirthday :: Manager -> UserId -> BirthdayDate -> IO ()
-setBirthday man did bd = void $ sendDB man "discord/birthday/set.php" ["discord=" ++ show did, "date=" ++ birthdayString bd]
+setBirthday :: APIMonad m => UserId -> BirthdayDate -> m ()
+setBirthday did bd = void $ hSendDB "discord/birthday/set.php" ["discord=" ++ show did, "date=" ++ birthdayString bd]

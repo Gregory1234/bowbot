@@ -28,9 +28,9 @@ parseSense "never" = Just Never
 parseSense "sensibly" = Just WhenSensible
 parseSense _ = Nothing
 
-getSettings :: Manager -> IO (Maybe (Map UserId Settings))
-getSettings manager = do
-  res <- sendDB manager "discord/settings/all.php" []
+getSettings :: APIMonad m => m (Maybe (Map UserId Settings))
+getSettings = do
+  res <- hSendDB "discord/settings/all.php" []
   decodeParse res $ \o -> do
     dt <- o .: "data"
     fmap fromList $ for dt $ \settings -> do

@@ -1,4 +1,6 @@
-module BowBot.CommandHandler where
+module BowBot.CommandHandler(
+  module BowBot.CommandHandler, module BowBot.API
+) where
 
 import Discord
 import BowBot.Utils
@@ -33,6 +35,9 @@ instance Monad CommandHandler where
 instance MonadIO CommandHandler where
   liftIO m = CommandHandler $ \_ _ _ -> liftIO m
 
+instance APIMonad CommandHandler where
+  hManager = CommandHandler $ \_ man _ -> return man
+
 hRespond :: String -> CommandHandler ()
 hRespond msg = CommandHandler $ \m _ _ -> respond m msg
 
@@ -41,9 +46,6 @@ hRespondFile n s = CommandHandler $ \m _ _ -> respondFile m n s
 
 hCaller :: CommandHandler User
 hCaller = CommandHandler $ \m _ _ -> return $ messageAuthor m
-
-hManager :: CommandHandler Manager
-hManager = CommandHandler $ \_ man _ -> return man
 
 hRead :: (BotData -> TVar a) -> CommandHandler a
 hRead p = CommandHandler $ \_ _ dt -> readProp p dt
@@ -66,11 +68,11 @@ hData = CommandHandler $ \_ _ dt -> return dt
 hDiscord :: DiscordHandler a -> CommandHandler a
 hDiscord d = CommandHandler $ \_ _ _ -> d
 
-hLogError :: String -> CommandHandler ()
-hLogError msg = CommandHandler $ \_ man _ -> logError man msg
+hMDiscord :: ManagerT DiscordHandler a -> CommandHandler a
+hMDiscord d = CommandHandler $ \_ man _ -> runManagerT d man
 
-hLogInfo :: String -> CommandHandler ()
-hLogInfo msg = CommandHandler $ \_ man _ -> logInfo man msg
+hMIO :: ManagerT IO a -> CommandHandler a
+hMIO d = CommandHandler $ \_ man _ -> liftIO $ runManagerT d man
 
 call :: (FromJSON a, R.Request (r a), NFData (r a)) => r a -> DiscordHandler (Either RestCallErrorCode a)
 call r = liftIO (evaluate (force r)) >>= restCall
