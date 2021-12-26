@@ -5,20 +5,20 @@ module BowBot.Command.Ban where
 
 import BowBot.Command
 import BowBot.Minecraft
-import BowBot.Stats
+import BowBot.Stats.HypixelBow
 
-banCommand :: StatType s => Proxy s -> String -> (MinecraftAccount -> MinecraftAccount) -> Command
-banCommand p name f = Command name ModLevel 10 $ do
+hypixelBowLeaderboardBanCommand :: String -> Command
+hypixelBowLeaderboardBanCommand name = Command name ModLevel 10 $ do
   bdt <- hData
   pName <- hArg 1
   uuid' <- mcNameToUUID bdt (fromMaybe "" pName)
   case uuid' of
     Nothing -> hRespond "Player not found! For safety reasons this command does not have autocorrect enabled."
     Just uuid -> do
-      r <- banLeaderboard p uuid
+      r <- banHypixelBowLeaderboard uuid
       case r of
         Just True -> do
-          hModify minecraftAccounts $ map $ \mc@MinecraftAccount {..} -> if mcUUID == uuid then f mc else mc
+          hModify minecraftAccounts $ map $ \mc@MinecraftAccount {..} -> if mcUUID == uuid then mc { mcHypixelBow = Banned } else mc
           hRespond "Success, player got banned!"
         Just False -> hRespond "Player not found! For safety reasons this command does not have autocorrect enabled."
         Nothing -> hRespond somethingWrongMessage

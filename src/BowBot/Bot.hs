@@ -18,9 +18,7 @@ import BowBot.Command.Snipe
 import BowBot.Command.Ban
 import BowBot.Command.Role
 import BowBot.Command.Birthday
-import BowBot.Stats
 import BowBot.Stats.HypixelBow
-import BowBot.API
 import BowBot.Background
 import BowBot.Snipe
 import qualified Data.Text as T
@@ -89,23 +87,20 @@ onStartup bdt = do
 
 commands :: [Command]
 commands =
-  [ statsCommand (Proxy @HypixelBowStats) "s" hypixelRequestCounter UserSettings
-  , statsCommand (Proxy @HypixelBowStats) "sd" hypixelRequestCounter AlwaysDefault
-  , statsCommand (Proxy @HypixelBowStats) "sa" hypixelRequestCounter AlwaysAll
-  , registerCommand "register" [hypixelRequestCounter] False True $ \uuid -> do
-      fullUpdateStats (Proxy @HypixelBowStats) uuid
+  [ hypixelBowStatsCommand "s" UserSettings
+  , hypixelBowStatsCommand "sd" AlwaysDefault
+  , hypixelBowStatsCommand "sa" AlwaysAll
+  , registerCommand "register" False True
   , urlCommand "head" True (\s -> "https://crafatar.com/avatars/" ++ s ++ "?overlay")
   , urlCommand "heada" False (\s -> "https://crafatar.com/avatars/" ++ s ++ "?overlay")
   , urlCommand "skin" True (\s -> "https://crafatar.com/renders/body/" ++ s ++ "?overlay")
   , urlCommand "skina" False (\s -> "https://crafatar.com/renders/body/" ++ s ++ "?overlay")
-  , leaderboardCommand (Proxy @HypixelBowStats) "lb" "Hypixel Bow Duels Wins Leaderboard" "Wins" hypixelBowWinsLeaderboard
-  , leaderboardCommand (Proxy @HypixelBowStats) "lbl" "Hypixel Bow Duels Losses Leaderboard" "Losses" hypixelBowLossesLeaderboard
-  , leaderboardCommand (Proxy @HypixelBowStats) "lbs" "Hypixel Bow Duels Winstreak Leaderboard" "Winstreak" hypixelBowWinstreakLeaderboard
-  , leaderboardCommand (Proxy @HypixelBowStats) "lbr" "Hypixel Bow Duels WLR Leaderboard" "WLR" hypixelBowWLRLeaderboard
-  , registerCommand "add" [hypixelRequestCounter] False False $ \uuid -> do
-      fullUpdateStats (Proxy @HypixelBowStats) uuid
-  , registerCommand "addalt" [hypixelRequestCounter] True False $ \uuid -> do
-      fullUpdateStats (Proxy @HypixelBowStats) uuid
+  , hypixelBowLeaderboardCommand "lb" "Hypixel Bow Duels Wins Leaderboard" "Wins" hypixelBowWinsLeaderboard
+  , hypixelBowLeaderboardCommand "lbl" "Hypixel Bow Duels Losses Leaderboard" "Losses" hypixelBowLossesLeaderboard
+  , hypixelBowLeaderboardCommand "lbs" "Hypixel Bow Duels Winstreak Leaderboard" "Winstreak" hypixelBowWinstreakLeaderboard
+  , hypixelBowLeaderboardCommand "lbr" "Hypixel Bow Duels WLR Leaderboard" "WLR" hypixelBowWLRLeaderboard
+  , registerCommand "add" False False
+  , registerCommand "addalt" True False
   , minecraftCommand
   , listCommand
   , onlineCommand
@@ -117,7 +112,7 @@ commands =
   , birthdayAnnounceCommand
   , birthdaySetCommand
   , snipeCommand
-  , banCommand (Proxy @HypixelBowStats) "sban" (\x -> x { mcHypixelBow = Banned })
+  , hypixelBowLeaderboardBanCommand "sban"
   , roleCommand
   , constStringCommand "throw" AdminLevel $ show @Integer (1 `div` 0)
   , helpCommand "help" DefaultLevel

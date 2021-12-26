@@ -10,8 +10,6 @@ import Discord
 import qualified Discord.Requests as R
 import BowBot.BotData
 import BowBot.Stats.HypixelBow
-import Data.Proxy
-import BowBot.Stats
 import BowBot.API
 import Network.HTTP.Conduit (newManager, httpLbs, parseRequest)
 import Data.List.Split (chunksOf)
@@ -59,7 +57,7 @@ updateDiscordStatus = do
       updateStatusOptsAFK = False
     })
 
-updateDivisionRolesSingle :: BotData -> Map String (Leaderboards HypixelBowStats) -> GuildMember -> BowBotAccount -> DiscordHandler ()
+updateDivisionRolesSingle :: BotData -> Map String HypixelBowLeaderboards -> GuildMember -> BowBotAccount -> DiscordHandler ()
 updateDivisionRolesSingle bdt lb memb BowBotAccount { accountMinecrafts = mc } = do
   gid <- readProp discordGuildId bdt
   let did = userId . memberUser $ memb
@@ -84,7 +82,7 @@ updateGuildMemberRolesSingle bdt members memb BowBotAccount { accountMinecrafts 
 
 -- TODO: remove BotData from here - take it out to a new type
 updateDiscordRolesSingle
-  :: BotData -> Maybe (Map String (Leaderboards HypixelBowStats)) -> Maybe [String] -> GuildId
+  :: BotData -> Maybe (Map String HypixelBowLeaderboards) -> Maybe [String] -> GuildId
   -> GuildMember -> Maybe BowBotAccount -> DiscordHandler ()
 updateDiscordRolesSingle bdt lb members gid m (Just bac) = do
   for_ lb $ \x -> updateDivisionRolesSingle bdt x m bac
@@ -112,7 +110,7 @@ updateDiscordRolesSingleId bdt did = do
     Left _ -> pure ()
     Right m -> do
       members <- readProp hypixelGuildMembers bdt
-      lb <- getLeaderboard (Proxy @HypixelBowStats)
+      lb <- getHypixelBowLeaderboard
       accs <- (>>=(\u -> (, u) <$> accountDiscords u)) <$> readProp bowBotAccounts bdt
       let bac = lookup did accs
       lift $ updateDiscordRolesSingle bdt lb (if null members then Nothing else Just members) gid m bac
@@ -122,7 +120,7 @@ updateRolesAll bdt = do
   gid <- readProp discordGuildId bdt
   members <- readProp hypixelGuildMembers bdt
   maybeGmembs <- lift $ fmap (filter (not . userIsBot . memberUser)) <$> call (R.ListGuildMembers gid R.GuildMembersTiming {R.guildMembersTimingLimit = Just 500, R.guildMembersTimingAfter = Nothing})
-  lb <- getLeaderboard (Proxy @HypixelBowStats)
+  lb <- getHypixelBowLeaderboard
   case maybeGmembs of
     Left _ -> pure ()
     Right gmembs -> for_ gmembs $ \m -> do
@@ -175,19 +173,19 @@ discordBackgroundMinutely bdt mint = do
 
 -- TODO: frequency updates
 
-completeLeaderboardUpdate :: StatType s => Proxy s -> BotData -> ApiRequestCounter -> (MinecraftAccount -> Bool) -> IO ()
-completeLeaderboardUpdate pr bdt api filt = do
+completeHypixelBowLeaderboardUpdate :: BotData -> (MinecraftAccount -> Bool) -> IO ()
+completeHypixelBowLeaderboardUpdate bdt filt = do
   manager <- newManager managerSettings
   mcs <- readProp minecraftAccounts bdt
   let chunked = chunksOf 25 (map mcUUID $ filter filt mcs)
   for_ chunked $ helper manager
     where
       helper manager lst = do
-        tryApiRequests api 25 (\x -> do { threadDelay ((x+10) * 1000000); helper manager lst }) $ do
+        tryApiRequests (hypixelRequestCounter bdt) 25 (\x -> do { threadDelay ((x+10) * 1000000); helper manager lst }) $ do
           let chunked = chunksOf 10 lst
-          dt <- fmap (fromList . catMaybes . zipWith (\a b -> (a,) <$> b) lst . concat) $ for chunked $ mapConcurrently $ fmap (fmap toLeaderboard) . flip runManagerT manager . requestStats pr
+          dt <- fmap (fromList . catMaybes . zipWith (\a b -> (a,) <$> b) lst . concat) $ for chunked $ mapConcurrently $ fmap (fmap hypixelBowStatsToLeaderboards) . flip runManagerT manager . requestHypixelBowStats
           logInfo' $ show dt
-          runManagerT (updateLeaderboard dt) manager
+          runManagerT (updateHypixelBowLeaderboard dt) manager
 
 clearLogs :: Manager -> IO ()
 clearLogs man = do
@@ -217,11 +215,11 @@ backgroundMinutely bdt@BotData {..} mint = do
     hour <- read @Int <$> getTime "%k"
     weekday <- read @Int <$> getTime "%u"
     when (even hour) $
-      completeLeaderboardUpdate (Proxy @HypixelBowStats) bdt hypixelRequestCounter $ \MinecraftAccount {..} -> mcHypixelBow == BiHourly
+      completeHypixelBowLeaderboardUpdate bdt $ \MinecraftAccount {..} -> mcHypixelBow == BiHourly
     when (hour == 0) $
-      completeLeaderboardUpdate (Proxy @HypixelBowStats) bdt hypixelRequestCounter $ \MinecraftAccount {..} -> mcHypixelBow == Daily
+      completeHypixelBowLeaderboardUpdate bdt $ \MinecraftAccount {..} -> mcHypixelBow == Daily
     when (weekday == 1) $
-      completeLeaderboardUpdate (Proxy @HypixelBowStats) bdt hypixelRequestCounter $ \MinecraftAccount {..} -> mcHypixelBow == Weekly
+      completeHypixelBowLeaderboardUpdate bdt $ \MinecraftAccount {..} -> mcHypixelBow == Weekly
     logInfo' "finished update"
 
 adminCommands :: [Command]
@@ -244,7 +242,7 @@ adminCommands =
           hRespond "Done"
   , Command "lbrefresh" AdminLevel 1200 $ do
           bdt <- hData
-          liftIO $ completeLeaderboardUpdate (Proxy @HypixelBowStats) bdt (hypixelRequestCounter bdt) $ \MinecraftAccount {..} -> mcHypixelBow /= Banned
+          liftIO $ completeHypixelBowLeaderboardUpdate bdt $ \MinecraftAccount {..} -> mcHypixelBow /= Banned
           hRespond "Done"
   , Command "clearlogs" AdminLevel 120 $ do
           man <- hManager

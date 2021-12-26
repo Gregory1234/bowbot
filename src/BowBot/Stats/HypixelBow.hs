@@ -4,16 +4,17 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE ViewPatterns #-}
 
-module BowBot.Stats.HypixelBow where
+module BowBot.Stats.HypixelBow(
+  module BowBot.Stats.HypixelBow, module BowBot.Settings, module Data.Map
+) where
 
 import BowBot.Utils
-import Data.Proxy
-import BowBot.Stats
+import BowBot.Settings
 import BowBot.API
 import Data.Maybe (catMaybes)
 import Data.Ratio ((%))
 import Data.Aeson.Types (object, (.=))
-import Data.Map (toList)
+import Data.Map (toList, Map, fromList)
 import BowBot.API.Hypixel
 
 data HypixelDivisionRankName
@@ -87,118 +88,129 @@ data HypixelBowStats = HypixelBowStats
     bowShots :: Integer
   } deriving (Show)
 
-instance StatType HypixelBowStats where
-  data Leaderboards HypixelBowStats = HypixelBowLeaderboards
-    { bowLbWins :: Integer, bowLbLosses :: Integer, bowLbWinstreak :: Integer } deriving (Show)
-  requestStats Proxy uuid = hypixelWithPlayerData uuid $ \o -> do
-      pl <- o .: "player"
-      stats <- pl .: "stats"
-      duelsStats <- stats .:? "Duels"
-      bowWins <- fromMaybe 0 <$> for duelsStats (\x -> x .:? "bow_duel_wins" .!= 0)
-      bowLosses <- fromMaybe 0 <$> for duelsStats (\x -> x .:? "bow_duel_losses" .!= 0)
-      currentWinstreak <- fromMaybe 0 <$> for duelsStats (\x -> x .:? "current_bow_winstreak" .!= 0)
-      bestWinstreak <- fromMaybe 0 <$> for duelsStats (\x -> x .:? "best_bow_winstreak" .!= 0)
-      bestDailyWinstreak <- fromMaybe 0 <$> for duelsStats (\x -> x .:? "duels_winstreak_best_bow_duel" .!= 0)
-      bowHits <- fromMaybe 0 <$> for duelsStats (\x -> x .:? "bow_duel_bow_hits" .!= 0)
-      bowShots <- fromMaybe 0 <$> for duelsStats (\x -> x .:? "bow_duel_bow_shots" .!= 0)
-      return HypixelBowStats {..}
+data HypixelBowLeaderboards = HypixelBowLeaderboards
+  { bowLbWins :: Integer, bowLbLosses :: Integer, bowLbWinstreak :: Integer } deriving (Show)
 
-  showStats Settings {..} HypixelBowStats {..} = unlines $ catMaybes
-    [ onlyIf sWins
-    $ " - *Bow Duels Wins:* **"
-    ++ show bowWins
-    ++ "**" ++ maybe "" (\x -> " (**Bow " ++ divisionRankName x ++ "**)") (divisionRankFromWins bowWins)
-    , onlyIf sLosses
-    $ " - *Bow Duels Losses:* **"
-    ++ show bowLosses
-    ++ "**"
-    , onlyIf (sense sWLR (bowWins + bowLosses /= 0))
-    $ " - *Bow Duels Win/Loss Ratio:* **"
-    ++ winLossRatio
-    ++ "**"
-    , onlyIf (sense sWinsUntil (bowLosses /= 0))
-    $ " - *Bow Duels Wins until "
-    ++ nextWinLossRatio
-    ++ " WLR:* **"
-    ++ winsRemaining
-    ++ "**"
-    , onlyIf sBestStreak
-    $ " - *Best Bow Duels Winstreak:* **"
-    ++ show bestWinstreak
-    ++ "**"
-    , onlyIf sCurrentStreak
-    $ " - *Current Bow Duels Winstreak:* **"
-    ++ show currentWinstreak
-    ++ "**"
-    , onlyIf sBestDailyStreak
-    $ " - *Best Daily Bow Duels Winstreak(?):* **"
-    ++ show bestDailyWinstreak
-    ++ "**"
-    , onlyIf sBowHits
-    $ " - *Bow Hits in Bow Duels:* **"
-    ++ show bowHits
-    ++ "**"
-    , onlyIf sBowShots
-    $ " - *Bow Shots in Bow Duels:* **"
-    ++ show bowShots
-    ++ "**"
-    , onlyIf (sense sAccuracy (bowShots /= 0))
-    $ " - *Bow Accuracy:* **"
-    ++ accuracy
-    ++ "**"
-    ]
-    where
-      sense Always _ = True
-      sense Never _ = False
-      sense WhenSensible x = x
-      onlyIf True a = Just a
-      onlyIf False _ = Nothing
-      winLossRatio = showWLR bowWins bowLosses
-      nextWinLossRatio
-        | bowLosses == 0 = "∞"
-        | otherwise = show $ (bowWins `div` bowLosses) + 1
-      winsRemaining
-        | bowWins == 0, bowLosses == 0 = "1"
-        | bowLosses == 0 = "N/A"
-        | otherwise = show (bowLosses - (bowWins `mod` bowLosses))
-      accuracy
-        | bowShots == 0 = "N/A"
-        | otherwise = show (round ((bowHits*100) % bowShots) :: Integer) ++ "%"
+requestHypixelBowStats :: APIMonad m => String -> m (Maybe HypixelBowStats)
+requestHypixelBowStats uuid = hypixelWithPlayerData uuid $ \o -> do
+    pl <- o .: "player"
+    stats <- pl .: "stats"
+    duelsStats <- stats .:? "Duels"
+    bowWins <- fromMaybe 0 <$> for duelsStats (\x -> x .:? "bow_duel_wins" .!= 0)
+    bowLosses <- fromMaybe 0 <$> for duelsStats (\x -> x .:? "bow_duel_losses" .!= 0)
+    currentWinstreak <- fromMaybe 0 <$> for duelsStats (\x -> x .:? "current_bow_winstreak" .!= 0)
+    bestWinstreak <- fromMaybe 0 <$> for duelsStats (\x -> x .:? "best_bow_winstreak" .!= 0)
+    bestDailyWinstreak <- fromMaybe 0 <$> for duelsStats (\x -> x .:? "duels_winstreak_best_bow_duel" .!= 0)
+    bowHits <- fromMaybe 0 <$> for duelsStats (\x -> x .:? "bow_duel_bow_hits" .!= 0)
+    bowShots <- fromMaybe 0 <$> for duelsStats (\x -> x .:? "bow_duel_bow_shots" .!= 0)
+    return HypixelBowStats {..}
 
-  statsNotable HypixelBowStats {..} = bowWins >= 50
+showHypixelBowStats :: Settings -> HypixelBowStats -> String
+showHypixelBowStats Settings {..} HypixelBowStats {..} = unlines $ catMaybes
+  [ onlyIf sWins
+  $ " - *Bow Duels Wins:* **"
+  ++ show bowWins
+  ++ "**" ++ maybe "" (\x -> " (**Bow " ++ divisionRankName x ++ "**)") (divisionRankFromWins bowWins)
+  , onlyIf sLosses
+  $ " - *Bow Duels Losses:* **"
+  ++ show bowLosses
+  ++ "**"
+  , onlyIf (sense sWLR (bowWins + bowLosses /= 0))
+  $ " - *Bow Duels Win/Loss Ratio:* **"
+  ++ winLossRatio
+  ++ "**"
+  , onlyIf (sense sWinsUntil (bowLosses /= 0))
+  $ " - *Bow Duels Wins until "
+  ++ nextWinLossRatio
+  ++ " WLR:* **"
+  ++ winsRemaining
+  ++ "**"
+  , onlyIf sBestStreak
+  $ " - *Best Bow Duels Winstreak:* **"
+  ++ show bestWinstreak
+  ++ "**"
+  , onlyIf sCurrentStreak
+  $ " - *Current Bow Duels Winstreak:* **"
+  ++ show currentWinstreak
+  ++ "**"
+  , onlyIf sBestDailyStreak
+  $ " - *Best Daily Bow Duels Winstreak(?):* **"
+  ++ show bestDailyWinstreak
+  ++ "**"
+  , onlyIf sBowHits
+  $ " - *Bow Hits in Bow Duels:* **"
+  ++ show bowHits
+  ++ "**"
+  , onlyIf sBowShots
+  $ " - *Bow Shots in Bow Duels:* **"
+  ++ show bowShots
+  ++ "**"
+  , onlyIf (sense sAccuracy (bowShots /= 0))
+  $ " - *Bow Accuracy:* **"
+  ++ accuracy
+  ++ "**"
+  ]
+  where
+    sense Always _ = True
+    sense Never _ = False
+    sense WhenSensible x = x
+    onlyIf True a = Just a
+    onlyIf False _ = Nothing
+    winLossRatio = showWLR bowWins bowLosses
+    nextWinLossRatio
+      | bowLosses == 0 = "∞"
+      | otherwise = show $ (bowWins `div` bowLosses) + 1
+    winsRemaining
+      | bowWins == 0, bowLosses == 0 = "1"
+      | bowLosses == 0 = "N/A"
+      | otherwise = show (bowLosses - (bowWins `mod` bowLosses))
+    accuracy
+      | bowShots == 0 = "N/A"
+      | otherwise = show (round ((bowHits*100) % bowShots) :: Integer) ++ "%"
 
-  toLeaderboard HypixelBowStats {..} = HypixelBowLeaderboards 
-    { bowLbWins = bowWins, bowLbLosses = bowLosses, bowLbWinstreak = bestWinstreak }
-  getLeaderboard Proxy = do
-    res <- hSendDB "stats/hypixel/leaderboard.php" []
-    decodeParse res $ \o -> do
-      dt <- o .: "data"
-      fmap fromList $ for dt $ \s -> do
-        uuid <- s .: "uuid"
-        (readMaybe -> Just bowLbWins) <- s .: "bowWins"
-        (readMaybe -> Just bowLbLosses) <- s .: "bowLosses"
-        (readMaybe -> Just bowLbWinstreak) <- s .: "bowWinstreak"
-        return (uuid, HypixelBowLeaderboards {..})
-  updateLeaderboard lb = hPostDB "stats/hypixel/update.php" (object $ helper <$> toList lb)
-    where
-      helper (uuid, HypixelBowLeaderboards {..}) = pack uuid .= object ["bowWins" .= bowLbWins, "bowLosses" .= bowLbLosses, "bowWinstreak" .= bowLbWinstreak]
-      
-  banLeaderboard _ uuid = do
-    res <- hSendDB "stats/hypixel/ban.php" ["uuid="++uuid]
-    decodeParse res $ \o -> o .: "success"
+hypixelBowStatsToLeaderboards :: HypixelBowStats -> HypixelBowLeaderboards
+hypixelBowStatsToLeaderboards HypixelBowStats {..} = HypixelBowLeaderboards
+  { bowLbWins = bowWins, bowLbLosses = bowLosses, bowLbWinstreak = bestWinstreak }
 
-hypixelBowWinsLeaderboard :: Leaderboards HypixelBowStats -> Maybe (Integer, String)
+getHypixelBowLeaderboard :: APIMonad m => m (Maybe (Map String HypixelBowLeaderboards))
+getHypixelBowLeaderboard = do
+  res <- hSendDB "stats/hypixel/leaderboard.php" []
+  decodeParse res $ \o -> do
+    dt <- o .: "data"
+    fmap fromList $ for dt $ \s -> do
+      uuid <- s .: "uuid"
+      (readMaybe -> Just bowLbWins) <- s .: "bowWins"
+      (readMaybe -> Just bowLbLosses) <- s .: "bowLosses"
+      (readMaybe -> Just bowLbWinstreak) <- s .: "bowWinstreak"
+      return (uuid, HypixelBowLeaderboards {..})
+
+updateHypixelBowLeaderboard :: APIMonad m => Map String HypixelBowLeaderboards -> m ()
+updateHypixelBowLeaderboard lb = hPostDB "stats/hypixel/update.php" (object $ helper <$> toList lb)
+  where
+    helper (uuid, HypixelBowLeaderboards {..}) = pack uuid .= object ["bowWins" .= bowLbWins, "bowLosses" .= bowLbLosses, "bowWinstreak" .= bowLbWinstreak]
+
+banHypixelBowLeaderboard :: APIMonad m => String -> m (Maybe Bool)
+banHypixelBowLeaderboard uuid = do
+  res <- hSendDB "stats/hypixel/ban.php" ["uuid="++uuid]
+  decodeParse res $ \o -> o .: "success"
+
+fullUpdateHypixelBowStats :: APIMonad m => String -> m ()
+fullUpdateHypixelBowStats uuid = do
+  stats <- requestHypixelBowStats uuid
+  for_ stats $ \x -> updateHypixelBowLeaderboard $ fromList [(uuid, hypixelBowStatsToLeaderboards x)]
+
+hypixelBowWinsLeaderboard :: HypixelBowLeaderboards -> Maybe (Integer, String)
 hypixelBowWinsLeaderboard HypixelBowLeaderboards {..} | bowLbWins >= 500 = Just (bowLbWins, show bowLbWins)
 hypixelBowWinsLeaderboard _ = Nothing
 
-hypixelBowLossesLeaderboard :: Leaderboards HypixelBowStats -> Maybe (Integer, String)
+hypixelBowLossesLeaderboard :: HypixelBowLeaderboards -> Maybe (Integer, String)
 hypixelBowLossesLeaderboard HypixelBowLeaderboards {..} | bowLbWins >= 500 = Just (bowLbLosses, show bowLbLosses)
 hypixelBowLossesLeaderboard _ = Nothing
 
-hypixelBowWinstreakLeaderboard :: Leaderboards HypixelBowStats -> Maybe (Integer, String)
+hypixelBowWinstreakLeaderboard :: HypixelBowLeaderboards -> Maybe (Integer, String)
 hypixelBowWinstreakLeaderboard HypixelBowLeaderboards {..} | bowLbWinstreak >= 50 = Just (bowLbWinstreak, show bowLbWinstreak)
 hypixelBowWinstreakLeaderboard _ = Nothing
 
-hypixelBowWLRLeaderboard :: Leaderboards HypixelBowStats -> Maybe (Integer, String)
+hypixelBowWLRLeaderboard :: HypixelBowLeaderboards -> Maybe (Integer, String)
 hypixelBowWLRLeaderboard HypixelBowLeaderboards {..} | bowLbWins >= bowLbLosses, bowLbWins >= 150 = Just (if bowLbLosses == 0 then bowLbWins*100000000 else (bowLbWins*10000) `div` bowLbLosses, showWLR bowLbWins bowLbLosses)
 hypixelBowWLRLeaderboard _ = Nothing

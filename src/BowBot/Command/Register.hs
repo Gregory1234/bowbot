@@ -10,6 +10,7 @@ import BowBot.Minecraft
 import Data.Char (isDigit)
 import Data.List (intercalate)
 import BowBot.Background
+import BowBot.Stats.HypixelBow
 
 -- TODO: check if creation was successful
 
@@ -30,10 +31,10 @@ addAltAccount gid uuid = do
   _ <- hSendDB "people/alt.php" ["id=" ++ show gid, "verified=0", "minecraft=" ++ uuid]
   return ()
 
-registerCommand :: String -> [BotData -> ApiRequestCounter] -> Bool -> Bool -> (String -> ManagerT IO ()) -> Command
-registerCommand name apis isalt isself onComplete = Command name (if isself then DefaultLevel else ModLevel) 12 $ do
+registerCommand :: String -> Bool -> Bool -> Command
+registerCommand name isalt isself = Command name (if isself then DefaultLevel else ModLevel) 12 $ do
   bdt <- hData
-  tryApiRequestsMulti (map (\x -> (x bdt, 2)) apis) (\sec -> hRespond $ "**Too many requests! Wait another " ++ show sec ++ " seconds!**") $ do
+  tryApiRequestsMulti [(hypixelRequestCounter bdt, 2)] (\sec -> hRespond $ "**Too many requests! Wait another " ++ show sec ++ " seconds!**") $ do
     args <- hArgs
     caller <- hCaller
     when (null args) $ hRespond wrongSyntaxMessage
@@ -71,7 +72,7 @@ registerCommand name apis isalt isself onComplete = Command name (if isself then
                   psa <- hRead bowBotAccounts
                   let oldAcc = head $ filter ((==gid) . accountId) psa
                   hWrite bowBotAccounts (oldAcc { accountMinecrafts = uuid:accountMinecrafts oldAcc } : filter ((/= gid) . accountId) psa)
-                  hMIO $ onComplete uuid
+                  fullUpdateHypixelBowStats uuid
                   hMDiscord $ updateDiscordRolesSingleId bdt did
                   hRespond "*Registered successfully*"
             else do
@@ -84,7 +85,7 @@ registerCommand name apis isalt isself onComplete = Command name (if isself then
                     Just newAcc' -> do
                       psa <- hRead bowBotAccounts
                       hWrite bowBotAccounts (newAcc':psa)
-                      hMIO $ onComplete uuid
+                      fullUpdateHypixelBowStats uuid
                       hMDiscord $ updateDiscordRolesSingleId bdt did
                       hRespond "*Registered successfully*"
                 Just _ -> hRespond (if isself then "*You are already registered!*" else "*That person is already registered!*")

@@ -50,7 +50,6 @@ library
       BowBot.Minecraft
       BowBot.Settings
       BowBot.Snipe
-      BowBot.Stats
       BowBot.Stats.HypixelBow
       BowBot.Utils
   other-modules:

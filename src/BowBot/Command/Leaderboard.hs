@@ -4,10 +4,9 @@
 
 module BowBot.Command.Leaderboard where
 
-import BowBot.Stats
+import BowBot.Stats.HypixelBow
 import BowBot.Command
 import BowBot.Minecraft
-import Data.Map (toList)
 import Data.List (sortOn)
 import Data.List.Split (chunksOf)
 
@@ -15,11 +14,11 @@ data LeaderboardElement = LeaderboardElement { lbPos :: Integer, lbName :: Strin
 
 data LeaderboardPage = LeaderboardPage Int | LeaderboardAll | LeaderboardSearch String deriving Show
 
-leaderboardCommand :: StatType s => Proxy s -> String -> String -> String -> (Leaderboards s -> Maybe (Integer, String)) -> Command
-leaderboardCommand pr name lbname statname lbfun = Command name DefaultLevel 10 $ do
+hypixelBowLeaderboardCommand :: String -> String -> String -> (HypixelBowLeaderboards -> Maybe (Integer, String)) -> Command
+hypixelBowLeaderboardCommand name lbname statname lbfun = Command name DefaultLevel 10 $ do
   bdt <- hData
   caller <- hCaller
-  maybedat <- getLeaderboard pr
+  maybedat <- getHypixelBowLeaderboard
   case maybedat of
     Nothing -> hRespond somethingWrongMessage
     Just dat -> do
