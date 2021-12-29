@@ -184,10 +184,10 @@ getHypixelBowLeaderboard = do
       (readMaybe -> Just bowLbWinstreak) <- s .: "bowWinstreak"
       return (uuid, HypixelBowLeaderboards {..})
 
-updateHypixelBowLeaderboard :: APIMonad m => Map String HypixelBowLeaderboards -> m ()
-updateHypixelBowLeaderboard lb = hPostDB "stats/hypixel/update.php" (object $ helper <$> toList lb)
-  where
-    helper (uuid, HypixelBowLeaderboards {..}) = pack uuid .= object ["bowWins" .= bowLbWins, "bowLosses" .= bowLbLosses, "bowWinstreak" .= bowLbWinstreak]
+updateHypixelBowLeaderboard :: APIMonad m => String -> Map String HypixelBowLeaderboards -> m ()
+updateHypixelBowLeaderboard extraModes lb = hPostDB "stats/hypixel/update.php" ["extra=" ++ extraModes] (object $ helper <$> toList lb)
+    where
+      helper (uuid, HypixelBowLeaderboards {..}) = pack uuid .= object ["bowWins" .= bowLbWins, "bowLosses" .= bowLbLosses, "bowWinstreak" .= bowLbWinstreak]
 
 banHypixelBowLeaderboard :: APIMonad m => String -> m (Maybe Bool)
 banHypixelBowLeaderboard uuid = do
@@ -197,7 +197,7 @@ banHypixelBowLeaderboard uuid = do
 fullUpdateHypixelBowStats :: APIMonad m => String -> m ()
 fullUpdateHypixelBowStats uuid = do
   stats <- requestHypixelBowStats uuid
-  for_ stats $ \x -> updateHypixelBowLeaderboard $ fromList [(uuid, hypixelBowStatsToLeaderboards x)]
+  for_ stats $ \x -> updateHypixelBowLeaderboard "none" $ fromList [(uuid, hypixelBowStatsToLeaderboards x)]
 
 hypixelBowWinsLeaderboard :: HypixelBowLeaderboards -> Maybe (Integer, String)
 hypixelBowWinsLeaderboard HypixelBowLeaderboards {..} | bowLbWins >= 500 = Just (bowLbWins, show bowLbWins)

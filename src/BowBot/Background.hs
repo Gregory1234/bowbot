@@ -154,7 +154,7 @@ addDiscords bdt = do
     helper u = do
       y <- call (R.GetUser u)
       return $ fromRight undefined y
-    updateDiscords mem usr = hPostDB "discord/update.php" (object $ map memToObject mem ++ map usrToObject usr)
+    updateDiscords mem usr = hPostDB "discord/update.php" [] (object $ map memToObject mem ++ map usrToObject usr)
        where
          memToObject GuildMember {memberUser = memberUser@User {..}, ..} = case memberNick of
            Nothing -> usrToObject memberUser
@@ -173,8 +173,8 @@ discordBackgroundMinutely bdt mint = do
 
 -- TODO: frequency updates
 
-completeHypixelBowLeaderboardUpdate :: BotData -> (MinecraftAccount -> Bool) -> IO ()
-completeHypixelBowLeaderboardUpdate bdt filt = do
+completeHypixelBowLeaderboardUpdate :: BotData -> String ->(MinecraftAccount -> Bool) -> IO ()
+completeHypixelBowLeaderboardUpdate bdt extra filt = do
   manager <- newManager managerSettings
   mcs <- readProp minecraftAccounts bdt
   let chunked = chunksOf 25 (map mcUUID $ filter filt mcs)
@@ -185,7 +185,7 @@ completeHypixelBowLeaderboardUpdate bdt filt = do
           let chunked = chunksOf 10 lst
           dt <- fmap (fromList . catMaybes . zipWith (\a b -> (a,) <$> b) lst . concat) $ for chunked $ mapConcurrently $ fmap (fmap hypixelBowStatsToLeaderboards) . flip runManagerT manager . requestHypixelBowStats
           logInfo' $ show dt
-          runManagerT (updateHypixelBowLeaderboard dt) manager
+          runManagerT (updateHypixelBowLeaderboard extra dt) manager
 
 clearLogs :: Manager -> IO ()
 clearLogs man = do
@@ -214,12 +214,19 @@ backgroundMinutely bdt@BotData {..} mint = do
     logInfo' "started update"
     hour <- read @Int <$> getTime "%k"
     weekday <- read @Int <$> getTime "%u"
+    monthday <- read @Int <$> getTime "%d"
+    let extra = case (hour, weekday, monthday) of
+          (0, 1, 1) -> "day,week,month"
+          (0, 1, _) -> "day,week"
+          (0, _, 1) -> "day,month"
+          (0, _, _) -> "day"
+          _ -> "none"
     when (even hour) $
-      completeHypixelBowLeaderboardUpdate bdt $ \MinecraftAccount {..} -> mcHypixelBow == BiHourly
+      completeHypixelBowLeaderboardUpdate bdt extra $ \MinecraftAccount {..} -> mcHypixelBow == BiHourly
     when (hour == 0) $
-      completeHypixelBowLeaderboardUpdate bdt $ \MinecraftAccount {..} -> mcHypixelBow == Daily
+      completeHypixelBowLeaderboardUpdate bdt extra $ \MinecraftAccount {..} -> mcHypixelBow == Daily
     when (weekday == 1) $
-      completeHypixelBowLeaderboardUpdate bdt $ \MinecraftAccount {..} -> mcHypixelBow == Weekly
+      completeHypixelBowLeaderboardUpdate bdt extra $ \MinecraftAccount {..} -> mcHypixelBow == Weekly -- TODO: this is actually unused, remove it
     logInfo' "finished update"
 
 adminCommands :: [Command]
@@ -242,7 +249,23 @@ adminCommands =
           hRespond "Done"
   , Command "lbrefresh" AdminLevel 1200 $ do
           bdt <- hData
-          liftIO $ completeHypixelBowLeaderboardUpdate bdt $ \MinecraftAccount {..} -> mcHypixelBow /= Banned
+          liftIO $ completeHypixelBowLeaderboardUpdate bdt "none" $ \MinecraftAccount {..} -> mcHypixelBow /= Banned
+          hRespond "Done"
+  , Command "lbrefreshday" AdminLevel 1200 $ do
+          bdt <- hData
+          liftIO $ completeHypixelBowLeaderboardUpdate bdt "day" $ \MinecraftAccount {..} -> mcHypixelBow /= Banned
+          hRespond "Done"
+  , Command "lbrefreshweek" AdminLevel 1200 $ do
+          bdt <- hData
+          liftIO $ completeHypixelBowLeaderboardUpdate bdt "day,week" $ \MinecraftAccount {..} -> mcHypixelBow /= Banned
+          hRespond "Done"
+  , Command "lbrefreshmonth" AdminLevel 1200 $ do
+          bdt <- hData
+          liftIO $ completeHypixelBowLeaderboardUpdate bdt "day,month" $ \MinecraftAccount {..} -> mcHypixelBow /= Banned
+          hRespond "Done"
+  , Command "lbrefreshweekmonth" AdminLevel 1200 $ do
+          bdt <- hData
+          liftIO $ completeHypixelBowLeaderboardUpdate bdt "day,week,month" $ \MinecraftAccount {..} -> mcHypixelBow /= Banned
           hRespond "Done"
   , Command "clearlogs" AdminLevel 120 $ do
           man <- hManager

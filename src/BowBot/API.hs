@@ -120,24 +120,24 @@ hSendDB p a = do
   man <- hManager
   liftIO $ sendDB man p a
 
-sendPostDB :: Manager -> String -> Value -> IO ()
-sendPostDB manager path dat = do
+sendPostDB :: Manager -> String -> [String] -> Value -> IO ()
+sendPostDB manager path args dat = do
   _ <- evaluate $ force path
   _ <- evaluate $ force dat
   website <- fromMaybe "" <$> getEnv "DB_SITE"
   apiKey <- fromMaybe "" <$> getEnv "DB_KEY"
   dev <- ifDev "" (return "&dev")
-  let url = "http://" ++ website ++ "/api/" ++ path ++ "?key=" ++ apiKey ++ dev
-  let cleanUrl = "http://[REDACTED]/api/" ++ path ++ "?key=[REDACTED]" ++ dev
+  let url = "http://" ++ website ++ "/api/" ++ path ++ "?key=" ++ apiKey ++ (('&':) =<< args) ++ dev
+  let cleanUrl = "http://[REDACTED]/api/" ++ path ++ "?key=[REDACTED]" ++ (('&':) =<< args) ++ dev
   logInfo manager cleanUrl
   initRequest <- parseRequest url
   let request = initRequest { method = "POST", requestBody = RequestBodyLBS (encode dat) }
   void $ try @SomeException $ httpLbs request manager
 
-hPostDB :: APIMonad m => String -> Value -> m ()
-hPostDB p v = do
+hPostDB :: APIMonad m => String -> [String] -> Value -> m ()
+hPostDB p a v = do
   man <- hManager
-  liftIO $ sendPostDB man p v
+  liftIO $ sendPostDB man p a v
 
 decodeParse :: (FromJSON o, MonadIO m) => ByteString -> (o -> Parser a) -> m (Maybe a)
 decodeParse (decode -> Just str) parser = case parseEither parser str of

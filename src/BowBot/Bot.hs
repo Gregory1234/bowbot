@@ -184,7 +184,7 @@ eventHandler bdt man (GuildMemberAdd gid mem) = do
   trueId <- readProp discordGuildId bdt
   when (gid == trueId) $
     runManagerT (updateDiscordRolesSingleId bdt (userId $ memberUser mem)) man
-  liftIO $ sendPostDB man "discord/update.php" $
+  liftIO $ sendPostDB man "discord/update.php" [] $
     object [pack (show (userId (memberUser mem))) .= object ["name" .= userName (memberUser mem), "discriminator" .= userDiscrim (memberUser mem), "nickname" .= memberNick mem]]
 
 eventHandler _ _ _ = pure ()

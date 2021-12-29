@@ -47,5 +47,5 @@ hypixelBowTryRegister bdt uuid names s | bowWins s >= 50 = do
   unless (uuid `elem` registeredPlayers) $ do
     acc <- addMinecraftAccount uuid names
     for_ acc $ \x -> modifyProp minecraftAccounts bdt (x:)
-  updateHypixelBowLeaderboard (fromList [(uuid, hypixelBowStatsToLeaderboards s)])
+  updateHypixelBowLeaderboard "none" (fromList [(uuid, hypixelBowStatsToLeaderboards s)])
 hypixelBowTryRegister _ _ _ _ = pure ()
