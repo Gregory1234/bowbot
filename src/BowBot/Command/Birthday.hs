@@ -26,10 +26,7 @@ birthdayAnnounceCommand = Command "bdsay" ModLevel 10 $ do
           else do
             hRespond $ "Today's birthdays: ```\n" ++ unlines (map (showMemberOrUser False . Right) ppl) ++ "```"
             birthdayChannel <- hRead discordBirthdayChannel
-            hDiscord $ call_ $ R.CreateMessage birthdayChannel $ pack $ 
-              if length ppl == 1 
-              then "**Happy birthday** to " ++ showMemberOrUser True (Right $ head ppl) ++ "!" 
-              else "**Happy birthday** to: " ++ intercalate ", " (map (showMemberOrUser True . Right) ppl) ++ "!"
+            hDiscord $ for_ ppl $ \p -> call $ R.CreateMessage birthdayChannel $ pack $ "**Happy birthday** to " ++ showMemberOrUser True (Right p) ++ "!"
 
 birthdaySetCommand :: Command
 birthdaySetCommand = Command "bdset" ModLevel 10 $ do

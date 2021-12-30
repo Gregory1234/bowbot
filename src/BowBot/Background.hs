@@ -40,10 +40,7 @@ announceBirthdays bdt = do
         Right ppl -> unless (null ppl) $ do
           birthdayChannel <- readProp discordBirthdayChannel bdt
           hLogInfo $ "Announcing birthdays: " ++ intercalate ", " (map (showMemberOrUser True . Right) ppl)
-          lift $ call_ $ R.CreateMessage birthdayChannel $ pack $
-            if length ppl == 1
-            then "**Happy birthday** to " ++ showMemberOrUser True (Right $ head ppl) ++ "!"
-            else "**Happy birthday** to: " ++ intercalate ", " (map (showMemberOrUser True . Right) ppl) ++ "!"
+          lift $ for_ ppl $ \p -> call $ R.CreateMessage birthdayChannel $ pack $ "**Happy birthday** to " ++ showMemberOrUser True (Right p) ++ "!"
 
 updateDiscordStatus :: ManagerT DiscordHandler ()
 updateDiscordStatus = do
