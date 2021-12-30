@@ -90,16 +90,12 @@ getOrCalculateCache CachedData {..} exec = do
       return (maybe CacheFailed CacheFresh val)
 
 data UpdateFreq
-  = BiHourly
-  | Daily
-  | Weekly
+  = Normal
   | Banned
   deriving (Eq, Ord, Enum, Bounded, Show)
 
 stringToUpdateFreq :: String -> Maybe UpdateFreq
-stringToUpdateFreq "bihour" = Just BiHourly
-stringToUpdateFreq "day" = Just Daily
-stringToUpdateFreq "week" = Just Weekly
+stringToUpdateFreq "normal" = Just Normal
 stringToUpdateFreq "ban" = Just Banned
 stringToUpdateFreq _ = Nothing
 

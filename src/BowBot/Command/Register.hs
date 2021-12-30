@@ -17,7 +17,7 @@ import BowBot.Stats.HypixelBow
 addMinecraftAccount :: APIMonad m => String -> [String] -> m (Maybe MinecraftAccount)
 addMinecraftAccount uuid names = do
   _ <- hSendDB "minecraft/new.php" ["uuid=" ++ uuid, "names=" ++ intercalate "," names]
-  return $ Just MinecraftAccount { mcUUID = uuid, mcNames = names, mcHypixelBow = Daily }
+  return $ Just MinecraftAccount { mcUUID = uuid, mcNames = names, mcHypixelBow = Normal }
 
 addAccount :: APIMonad m => String -> UserId -> String -> m (Maybe BowBotAccount)
 addAccount name did uuid = do

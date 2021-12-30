@@ -218,12 +218,8 @@ backgroundMinutely bdt@BotData {..} mint = do
           (0, _, 1) -> "day,month"
           (0, _, _) -> "day"
           _ -> "none"
-    when (even hour) $
-      completeHypixelBowLeaderboardUpdate bdt extra $ \MinecraftAccount {..} -> mcHypixelBow == BiHourly
-    when (hour == 0) $
-      completeHypixelBowLeaderboardUpdate bdt extra $ \MinecraftAccount {..} -> mcHypixelBow == Daily
-    when (weekday == 1) $
-      completeHypixelBowLeaderboardUpdate bdt extra $ \MinecraftAccount {..} -> mcHypixelBow == Weekly -- TODO: this is actually unused, remove it
+    when ((hour `mod` 4) == 0) $
+      completeHypixelBowLeaderboardUpdate bdt extra $ \MinecraftAccount {..} -> mcHypixelBow == Normal
     logInfo' "finished update"
 
 adminCommands :: [Command]
