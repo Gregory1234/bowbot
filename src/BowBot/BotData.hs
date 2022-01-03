@@ -18,6 +18,7 @@ import Control.Concurrent.Async (mapConcurrently)
 import BowBot.API.Mojang (mojangUUIDToNames)
 import Data.List (intercalate)
 import BowBot.API.Hypixel
+import BowBot.DB
 
 data ApiRequestCounter = ApiRequestCounter { mainCounter :: TVar Int, borderCounter :: TVar Int, counterLimit :: Int }
 
@@ -200,7 +201,8 @@ downloadData bdt = do
     for_ newDiscordSettings (writeTVar (discordSettings bdt))
     for_ newBowBotAccounts (writeTVar (bowBotAccounts bdt))
     for_ newDiscordPerms (writeTVar (discordPerms bdt))
-  updateDiscordConstants bdt manager
+  conn <- dbConnect
+  updateDiscordConstants bdt conn
   tryApiRequests (hypixelRequestCounter bdt) 1 (\_ -> pure ()) $ do
     gid <- readProp hypixelGuildId bdt
     newGuildMembers <- runManagerT (hypixelGuildMemberList gid) manager
@@ -223,10 +225,10 @@ updateMinecraftAccounts bdt = do
     updateMinecraftNames uuid names = 
       void $ hSendDB "minecraft/setnames.php" ["uuid=" ++ uuid, "names=" ++ intercalate "," names]
 
-updateDiscordConstants :: BotData -> Manager -> IO ()
-updateDiscordConstants bdt manager = do
-  let getSnowflake name = (>>= readMaybe @Snowflake) <$> getInfoDB manager name
-  newHypixelGuildId <- getInfoDB manager "hypixel_guild_id"
+updateDiscordConstants :: BotData -> Connection -> IO ()
+updateDiscordConstants bdt conn = do
+  let getSnowflake name = (>>= readMaybe @Snowflake) <$> getInfoDB' conn name
+  newHypixelGuildId <- getInfoDB' conn "hypixel_guild_id"
   newDiscordGuildId <- getSnowflake "discord_guild_id"
   newDiscordIllegalRole <- getSnowflake "illegal_role"
   newDiscordMemberRole <- getSnowflake "member_role"
@@ -235,13 +237,13 @@ updateDiscordConstants bdt manager = do
         [readMaybe -> Just wins, readMaybe -> Just role] -> Just (wins, role)
         _ -> Nothing
   let parseDivisionRoles s = traverse parseDivisionRole $ lines s
-  newDiscordDivisionRoles <- (>>= parseDivisionRoles) <$> getInfoDB manager "division_title_roles"
+  newDiscordDivisionRoles <- (>>= parseDivisionRoles) <$> getInfoDB' conn "division_title_roles"
   let parseToggleableRole s = case splitOn "->" s of
         [name, readMaybe -> Just role] -> Just (name, role)
         _ -> Nothing
   let parseToggleableRoles s = traverse parseToggleableRole $ lines s
-  newDiscordToggleableRoles <- (>>= parseToggleableRoles) <$> getInfoDB manager "toggleable_roles"
-  newDiscordCommandPrefix <- getInfoDB manager "command_prefix"
+  newDiscordToggleableRoles <- (>>= parseToggleableRoles) <$> getInfoDB' conn "toggleable_roles"
+  newDiscordCommandPrefix <- getInfoDB' conn "command_prefix"
   newDiscordBirthdayChannel <- getSnowflake "birthday_channel"
   atomically $ do
     for_ newHypixelGuildId (writeTVar (hypixelGuildId bdt))

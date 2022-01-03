@@ -46,6 +46,7 @@ library
       BowBot.Command.Stats
       BowBot.Command.Watchlist
       BowBot.CommandHandler
+      BowBot.DB
       BowBot.DiscordNFData
       BowBot.Minecraft
       BowBot.Settings
@@ -68,6 +69,7 @@ library
     , http-client-tls
     , http-conduit
     , mtl
+    , mysql-simple
     , split
     , stm
     , text
@@ -97,6 +99,7 @@ executable bowbot-exe
     , http-client-tls
     , http-conduit
     , mtl
+    , mysql-simple
     , split
     , stm
     , text
@@ -127,6 +130,7 @@ test-suite bowbot-test
     , http-client-tls
     , http-conduit
     , mtl
+    , mysql-simple
     , split
     , stm
     , text

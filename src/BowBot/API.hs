@@ -14,6 +14,7 @@ import Data.ByteString.Base64.URL (encodeBase64)
 import Control.Exception.Base (try, SomeException, evaluate)
 import Data.ByteString.Lazy (ByteString)
 import BowBot.Utils
+import BowBot.DB
 import Data.Aeson
 import Data.Aeson.Types
 import Control.Concurrent (forkIO, threadDelay)
@@ -95,6 +96,17 @@ hSendRequestTo :: APIMonad m => String -> String -> m ByteString
 hSendRequestTo u c = do
   man <- hManager
   liftIO $ sendRequestTo man u c
+
+getInfoDB' :: Connection -> String -> IO (Maybe String)
+getInfoDB' conn name = do
+  putStrLn "Getting info from db!"
+  dev <- ifDev False (return True)
+  xs :: [Only String] <- query conn (if dev then "SELECT `value` FROM `botInfoDev` WHERE `name` = ?" else "SELECT `value` FROM `botInfo` WHERE `name` = ?") (Only name)
+  case xs of
+    [Only r] -> return $ Just r
+    _ -> do
+      logError' $ "Info not found: " ++ name
+      return Nothing
 
 getInfoDB :: Manager -> String -> IO (Maybe String)
 getInfoDB man name = do

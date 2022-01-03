@@ -138,5 +138,10 @@
     <orderEntry type="library" name="base64-0.4.2.3" level="project" />
     <orderEntry type="library" name="ghc-byteorder-4.11.0.0.10" level="project" />
     <orderEntry type="library" name="text-short-0.1.3" level="project" />
+    <orderEntry type="library" name="mysql-simple-0.4.5" level="project" />
+    <orderEntry type="library" name="base16-bytestring-0.1.1.7" level="project" />
+    <orderEntry type="library" name="blaze-textual-0.2.1.0" level="project" />
+    <orderEntry type="library" name="mysql-0.1.7.3" level="project" />
+    <orderEntry type="library" name="pcre-light-0.4.1.0" level="project" />
   </component>
 </module>

@@ -38,6 +38,7 @@ dependencies:
 - mtl
 - base64
 - deepseq
+- mysql-simple
 
 library:
   source-dirs: src
