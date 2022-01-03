@@ -11,6 +11,7 @@ import qualified Discord.Requests as R
 import BowBot.BotData
 import BowBot.Stats.HypixelBow
 import BowBot.API
+import BowBot.DB
 import Network.HTTP.Conduit (newManager, httpLbs, parseRequest)
 import Data.List.Split (chunksOf)
 import Control.Concurrent (threadDelay)
@@ -42,10 +43,10 @@ announceBirthdays bdt = do
           hLogInfo $ "Announcing birthdays: " ++ intercalate ", " (map (showMemberOrUser True . Right) ppl)
           lift $ for_ ppl $ \p -> call $ R.CreateMessage birthdayChannel $ pack $ "**Happy birthday** to " ++ showMemberOrUser True (Right p) ++ "!"
 
-updateDiscordStatus :: ManagerT DiscordHandler ()
+updateDiscordStatus :: DiscordHandler ()
 updateDiscordStatus = do
-  status <- hInfoDB "discord_status"
-  lift $ sendCommand (UpdateStatus $ UpdateStatusOpts {
+  status <- withDB $ flip getInfoDB "discord_status"
+  sendCommand (UpdateStatus $ UpdateStatusOpts {
       updateStatusOptsSince = Nothing,
       updateStatusOptsGame = case status of
          Nothing -> Nothing
@@ -165,7 +166,7 @@ discordBackgroundMinutely bdt mint = do
     hour <- liftIO $ read @Integer <$> getTime "%k"
     when (hour == 5) $ runManagerT (announceBirthdays bdt) manager
     addDiscords bdt
-    runManagerT updateDiscordStatus manager
+    updateDiscordStatus
     runManagerT (updateRolesAll bdt) manager
 
 -- TODO: frequency updates
@@ -265,8 +266,7 @@ adminCommands =
           liftIO $ clearLogs man
           hRespond "Done"
   , Command "statusrefresh" AdminLevel 120 $ do
-          man <- hManager
-          hDiscord $ runManagerT updateDiscordStatus man
+          hDiscord updateDiscordStatus
           hRespond "Done"
   , Command "time" AdminLevel 120 $ do
           t <- liftIO $ getTime "Month: %m, Day: %d, Weekday: %u, Hour: %k, Minute: %M, Second %S"

@@ -72,6 +72,7 @@ library
     , mysql-simple
     , split
     , stm
+    , stringsearch
     , text
     , time
     , transformers
@@ -102,6 +103,7 @@ executable bowbot-exe
     , mysql-simple
     , split
     , stm
+    , stringsearch
     , text
     , time
     , transformers
@@ -133,6 +135,7 @@ test-suite bowbot-test
     , mysql-simple
     , split
     , stm
+    , stringsearch
     , text
     , time
     , transformers

@@ -201,8 +201,7 @@ downloadData bdt = do
     for_ newDiscordSettings (writeTVar (discordSettings bdt))
     for_ newBowBotAccounts (writeTVar (bowBotAccounts bdt))
     for_ newDiscordPerms (writeTVar (discordPerms bdt))
-  conn <- dbConnect
-  updateDiscordConstants bdt conn
+  withDB $ updateDiscordConstants bdt
   tryApiRequests (hypixelRequestCounter bdt) 1 (\_ -> pure ()) $ do
     gid <- readProp hypixelGuildId bdt
     newGuildMembers <- runManagerT (hypixelGuildMemberList gid) manager
@@ -227,8 +226,8 @@ updateMinecraftAccounts bdt = do
 
 updateDiscordConstants :: BotData -> Connection -> IO ()
 updateDiscordConstants bdt conn = do
-  let getSnowflake name = (>>= readMaybe @Snowflake) <$> getInfoDB' conn name
-  newHypixelGuildId <- getInfoDB' conn "hypixel_guild_id"
+  let getSnowflake name = (>>= readMaybe @Snowflake) <$> getInfoDB conn name
+  newHypixelGuildId <- getInfoDB conn "hypixel_guild_id"
   newDiscordGuildId <- getSnowflake "discord_guild_id"
   newDiscordIllegalRole <- getSnowflake "illegal_role"
   newDiscordMemberRole <- getSnowflake "member_role"
@@ -237,13 +236,13 @@ updateDiscordConstants bdt conn = do
         [readMaybe -> Just wins, readMaybe -> Just role] -> Just (wins, role)
         _ -> Nothing
   let parseDivisionRoles s = traverse parseDivisionRole $ lines s
-  newDiscordDivisionRoles <- (>>= parseDivisionRoles) <$> getInfoDB' conn "division_title_roles"
+  newDiscordDivisionRoles <- (>>= parseDivisionRoles) <$> getInfoDB conn "division_title_roles"
   let parseToggleableRole s = case splitOn "->" s of
         [name, readMaybe -> Just role] -> Just (name, role)
         _ -> Nothing
   let parseToggleableRoles s = traverse parseToggleableRole $ lines s
-  newDiscordToggleableRoles <- (>>= parseToggleableRoles) <$> getInfoDB' conn "toggleable_roles"
-  newDiscordCommandPrefix <- getInfoDB' conn "command_prefix"
+  newDiscordToggleableRoles <- (>>= parseToggleableRoles) <$> getInfoDB conn "toggleable_roles"
+  newDiscordCommandPrefix <- getInfoDB conn "command_prefix"
   newDiscordBirthdayChannel <- getSnowflake "birthday_channel"
   atomically $ do
     for_ newHypixelGuildId (writeTVar (hypixelGuildId bdt))

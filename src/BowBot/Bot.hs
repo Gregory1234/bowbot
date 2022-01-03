@@ -65,8 +65,7 @@ runBowBot discordKey = do
 
 onStartup :: BotData -> DiscordHandler ()
 onStartup bdt = do
-  manager <- liftIO $ newManager managerSettings
-  runManagerT updateDiscordStatus manager
+  updateDiscordStatus
   mkBackgroundDiscord
  where
   mkBackgroundDiscord = do

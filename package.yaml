@@ -39,6 +39,7 @@ dependencies:
 - base64
 - deepseq
 - mysql-simple
+- stringsearch
 
 library:
   source-dirs: src
