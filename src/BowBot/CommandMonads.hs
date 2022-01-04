@@ -6,8 +6,9 @@ import Network.HTTP.Conduit hiding (path)
 import BowBot.Utils
 import Control.Monad.Reader (ReaderT(..), MonadTrans(..))
 import Database.MySQL.Simple (Connection)
-import BowBot.BotData.Core (BotData)
+import BowBot.BotData.Core
 import Discord (DiscordHandler)
+import Control.Concurrent.STM.TVar (TVar)
 
 class MonadIO m => APIMonad m where
   hManager :: m Manager
@@ -35,18 +36,32 @@ instance MonadIO m => DBMonad (ConnectionT m) where
 instance DBMonad m => DBMonad (ReaderT r m) where
   hConnection = lift hConnection
 
-class Monad m => BotDataMonad m where
+class MonadIO m => BotDataMonad m where
   hData :: m BotData
 
 newtype BotDataT m a = BotDataT { runBotDataT :: BotData -> m a }
   deriving (Functor, Applicative, Monad, MonadIO, APIMonad, DBMonad) via (ReaderT BotData m)
   deriving (MonadTrans) via (ReaderT BotData)
 
-instance Monad m => BotDataMonad (BotDataT m) where
+instance MonadIO m => BotDataMonad (BotDataT m) where
   hData = BotDataT return
 
 instance BotDataMonad m => BotDataMonad (ReaderT r m) where
   hData = lift hData
+
+hRead :: BotDataMonad m => (BotData -> TVar a) -> m a
+hRead p = hData >>= readProp p
+
+hModify :: BotDataMonad m => (BotData -> TVar a) -> (a -> a) -> m ()
+hModify p f = hData >>= flip (modifyProp p) f
+
+hWrite :: BotDataMonad m => (BotData -> TVar a) -> a -> m ()
+hWrite p v = hData >>= flip (writeProp p) v
+
+hTryApiRequests :: BotDataMonad m => (BotData -> ApiRequestCounter) -> Int -> (Int -> m ()) -> m () -> m ()
+hTryApiRequests counter extra onFail onSuccess = do
+  dt <- hData
+  tryApiRequests (counter dt) extra onFail onSuccess
 
 class MonadIO m => DiscordMonad m where
   hDiscord :: DiscordHandler a -> m a

@@ -200,8 +200,8 @@ backgroundMinutely bdt@BotData {..} mint = do
     clearCache hypixelBowOnlineList
   when (mint == 0) $ do
     logInfo' "started update"
-    downloadData bdt
     manager <- newManager managerSettings
+    runManagerT (runBotDataT downloadData bdt) manager
     dev <- ifDev False $ return True
     unless dev $ do
       hour <- read @Int <$> getTime "%k"
@@ -230,8 +230,7 @@ adminCommands =
           updateMinecraftAccounts bdt
           hRespond "Done"
   , Command "datarefresh" AdminLevel 120 $ do
-          bdt <- hData
-          liftIO $ downloadData bdt
+          downloadData
           hRespond "Done"
   , Command "discordrefresh" AdminLevel 120 $ do
           bdt <- hData

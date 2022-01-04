@@ -22,6 +22,7 @@ import Data.List (intercalate)
 import BowBot.API.Hypixel
 import BowBot.DB
 import BowBot.BotData.Core
+import BowBot.CommandMonads
 
 downloadMinecraftAccounts :: APIMonad m => m (Maybe [MinecraftAccount])
 downloadMinecraftAccounts = do
@@ -56,23 +57,21 @@ downloadDiscordPerms = do
       (stringToPermissionLevel -> Just level) <- dp .: "level"
       return (did, level)
 
-downloadData :: BotData -> IO ()
-downloadData bdt = do
-  manager <- newManager managerSettings
-  newMinecraftAccounts <- runManagerT downloadMinecraftAccounts manager
-  newDiscordSettings <- runManagerT getSettings manager
-  newBowBotAccounts <- runManagerT downloadBowBotAccounts manager
-  newDiscordPerms <- runManagerT downloadDiscordPerms manager
-  atomically $ do
-    for_ newMinecraftAccounts (writeTVar (minecraftAccounts bdt))
-    for_ newDiscordSettings (writeTVar (discordSettings bdt))
-    for_ newBowBotAccounts (writeTVar (bowBotAccounts bdt))
-    for_ newDiscordPerms (writeTVar (discordPerms bdt))
-  withDB $ updateDiscordConstants bdt
-  tryApiRequests (hypixelRequestCounter bdt) 1 (\_ -> pure ()) $ do
-    gid <- readProp hypixelGuildId bdt
-    newGuildMembers <- runManagerT (hypixelGuildMemberList gid) manager
-    atomically $ for_ newGuildMembers (writeTVar (hypixelGuildMembers bdt))
+downloadData :: (BotDataMonad m, APIMonad m) => m ()
+downloadData = do
+  newMinecraftAccounts <- downloadMinecraftAccounts
+  newDiscordSettings <- getSettings
+  newBowBotAccounts <- downloadBowBotAccounts
+  newDiscordPerms <- downloadDiscordPerms
+  for_ newMinecraftAccounts (hWrite minecraftAccounts)
+  for_ newDiscordSettings (hWrite discordSettings)
+  for_ newBowBotAccounts (hWrite bowBotAccounts)
+  for_ newDiscordPerms (hWrite discordPerms)
+  withDB $ runConnectionT updateDiscordConstants
+  hTryApiRequests hypixelRequestCounter 1 (\_ -> pure ()) $ do
+    gid <- hRead hypixelGuildId
+    newGuildMembers <- hypixelGuildMemberList gid
+    for_ newGuildMembers (hWrite hypixelGuildMembers)
     
 
 updateMinecraftAccounts :: APIMonad m => BotData -> m ()
@@ -91,10 +90,10 @@ updateMinecraftAccounts bdt = do
     updateMinecraftNames uuid names = 
       void $ hSendDB "minecraft/setnames.php" ["uuid=" ++ uuid, "names=" ++ intercalate "," names]
 
-updateDiscordConstants :: BotData -> Connection -> IO ()
-updateDiscordConstants bdt conn = do
-  let getSnowflake name = (>>= readMaybe @Snowflake) <$> getInfoDB conn name
-  newHypixelGuildId <- getInfoDB conn "hypixel_guild_id"
+updateDiscordConstants :: (BotDataMonad m, DBMonad m) => m ()
+updateDiscordConstants = do
+  let getSnowflake name = (>>= readMaybe @Snowflake) <$> hInfoDB name
+  newHypixelGuildId <- hInfoDB "hypixel_guild_id"
   newDiscordGuildId <- getSnowflake "discord_guild_id"
   newDiscordIllegalRole <- getSnowflake "illegal_role"
   newDiscordMemberRole <- getSnowflake "member_role"
@@ -103,24 +102,23 @@ updateDiscordConstants bdt conn = do
         [readMaybe -> Just wins, readMaybe -> Just role] -> Just (wins, role)
         _ -> Nothing
   let parseDivisionRoles s = traverse parseDivisionRole $ lines s
-  newDiscordDivisionRoles <- (>>= parseDivisionRoles) <$> getInfoDB conn "division_title_roles"
+  newDiscordDivisionRoles <- (>>= parseDivisionRoles) <$> hInfoDB "division_title_roles"
   let parseToggleableRole s = case splitOn "->" s of
         [name, readMaybe -> Just role] -> Just (name, role)
         _ -> Nothing
   let parseToggleableRoles s = traverse parseToggleableRole $ lines s
-  newDiscordToggleableRoles <- (>>= parseToggleableRoles) <$> getInfoDB conn "toggleable_roles"
-  newDiscordCommandPrefix <- getInfoDB conn "command_prefix"
+  newDiscordToggleableRoles <- (>>= parseToggleableRoles) <$> hInfoDB "toggleable_roles"
+  newDiscordCommandPrefix <- hInfoDB "command_prefix"
   newDiscordBirthdayChannel <- getSnowflake "birthday_channel"
-  atomically $ do
-    for_ newHypixelGuildId (writeTVar (hypixelGuildId bdt))
-    for_ newDiscordGuildId (writeTVar (discordGuildId bdt))
-    for_ newDiscordIllegalRole (writeTVar (discordIllegalRole bdt))
-    for_ newDiscordMemberRole (writeTVar (discordMemberRole bdt))
-    for_ newDiscordVisitorRole (writeTVar (discordVisitorRole bdt))
-    for_ newDiscordDivisionRoles (writeTVar (discordDivisionRoles bdt))
-    for_ newDiscordToggleableRoles (writeTVar (discordToggleableRoles bdt))
-    for_ newDiscordCommandPrefix (writeTVar (discordCommandPrefix bdt))
-    for_ newDiscordBirthdayChannel (writeTVar (discordBirthdayChannel bdt))
+  for_ newHypixelGuildId (hWrite hypixelGuildId)
+  for_ newDiscordGuildId (hWrite discordGuildId)
+  for_ newDiscordIllegalRole (hWrite discordIllegalRole)
+  for_ newDiscordMemberRole (hWrite discordMemberRole)
+  for_ newDiscordVisitorRole (hWrite discordVisitorRole)
+  for_ newDiscordDivisionRoles (hWrite discordDivisionRoles)
+  for_ newDiscordToggleableRoles (hWrite discordToggleableRoles)
+  for_ newDiscordCommandPrefix (hWrite discordCommandPrefix)
+  for_ newDiscordBirthdayChannel (hWrite discordBirthdayChannel)
 
 
 newRequestCounter :: Int -> STM ApiRequestCounter
@@ -160,5 +158,6 @@ emptyData = do
 createData :: IO BotData
 createData = do
   bdt <- atomically emptyData
-  downloadData bdt
+  man <- newManager managerSettings
+  runManagerT (runBotDataT downloadData bdt) man
   return bdt

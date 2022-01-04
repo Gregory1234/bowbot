@@ -13,6 +13,7 @@ import BowBot.API
 import qualified Data.ByteString.Lazy as BS
 import qualified Data.ByteString.Search as BS
 import Database.MySQL.Simple.Types (Query(..))
+import BowBot.CommandMonads
 
 withDB :: MonadIO m => (Connection -> m a) -> m a
 withDB f = do
@@ -41,3 +42,8 @@ getInfoDB conn name = do
     _ -> do
       logError' $ "Info not found: " ++ name
       return Nothing
+
+hInfoDB :: DBMonad m => String -> m (Maybe String)
+hInfoDB name = do
+  conn <- hConnection
+  getInfoDB conn name

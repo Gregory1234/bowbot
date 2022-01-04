@@ -54,15 +54,6 @@ hRespondFile n s = CommandHandler $ \m _ _ -> respondFile m n s
 hCaller :: CommandHandler User
 hCaller = CommandHandler $ \m _ _ -> return $ messageAuthor m
 
-hRead :: (BotData -> TVar a) -> CommandHandler a
-hRead p = CommandHandler $ \_ _ dt -> readProp p dt
-
-hModify :: (BotData -> TVar a) -> (a -> a) -> CommandHandler ()
-hModify p f = CommandHandler $ \_ _ dt -> modifyProp p dt f
-
-hWrite :: (BotData -> TVar a) -> a -> CommandHandler ()
-hWrite p v = CommandHandler $ \_ _ dt -> writeProp p dt v
-
 hArg :: Int -> CommandHandler (Maybe String)
 hArg n = CommandHandler $ \m _ _ -> pure $ let args = words (unpack (messageText m)) in if length args > n then Just (args !! n) else Nothing
 
