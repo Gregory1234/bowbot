@@ -33,8 +33,7 @@ addAltAccount gid uuid = do
 
 registerCommand :: String -> Bool -> Bool -> Command
 registerCommand name isalt isself = Command name (if isself then DefaultLevel else ModLevel) 12 $ do
-  bdt <- hData
-  tryApiRequestsMulti [(hypixelRequestCounter bdt, 2)] (\sec -> hRespond $ "**Too many requests! Wait another " ++ show sec ++ " seconds!**") $ do
+  hTryApiRequestsMulti [(hypixelRequestCounter, 2)] (\sec -> hRespond $ "**Too many requests! Wait another " ++ show sec ++ " seconds!**") $ do
     args <- hArgs
     caller <- hCaller
     when (null args) $ hRespond wrongSyntaxMessage
@@ -43,7 +42,7 @@ registerCommand name isalt isself = Command name (if isself then DefaultLevel el
     if did `notElem` discords
     then hRespond "*The discord id doesn't exist!*"
     else do
-      maybeUUID <- mcNameToUUID bdt mcname
+      maybeUUID <- mcNameToUUID mcname
       case maybeUUID of
         Nothing -> hRespond playerNotFoundMessage
         Just uuid -> do
@@ -58,7 +57,7 @@ registerCommand name isalt isself = Command name (if isself then DefaultLevel el
                 then (if isself then "*That account already belongs to you!*" else "*That account already belongs to this user!*")
                 else "*That account already belongs to someone else!*"
           else do
-            names <- fromMaybe [] <$> mcUUIDToNames bdt uuid
+            names <- fromMaybe [] <$> mcUUIDToNames uuid
             unless (uuid `elem` map mcUUID nicks) $ do
               newMc <- addMinecraftAccount uuid names
               for_ newMc $ \x -> hWrite minecraftAccounts (x:nicks)
@@ -73,7 +72,7 @@ registerCommand name isalt isself = Command name (if isself then DefaultLevel el
                   let oldAcc = head $ filter ((==gid) . accountId) psa
                   hWrite bowBotAccounts (oldAcc { accountMinecrafts = uuid:accountMinecrafts oldAcc } : filter ((/= gid) . accountId) psa)
                   fullUpdateHypixelBowStats uuid
-                  hMDiscord $ updateDiscordRolesSingleId bdt did
+                  updateDiscordRolesSingleId did
                   hRespond "*Registered successfully*"
             else do
               pns <- (>>=(\BowBotAccount {..} -> (, accountId) <$> accountDiscords)) <$> hRead bowBotAccounts
@@ -86,6 +85,6 @@ registerCommand name isalt isself = Command name (if isself then DefaultLevel el
                       psa <- hRead bowBotAccounts
                       hWrite bowBotAccounts (newAcc':psa)
                       fullUpdateHypixelBowStats uuid
-                      hMDiscord $ updateDiscordRolesSingleId bdt did
+                      updateDiscordRolesSingleId did
                       hRespond "*Registered successfully*"
                 Just _ -> hRespond (if isself then "*You are already registered!*" else "*That person is already registered!*")

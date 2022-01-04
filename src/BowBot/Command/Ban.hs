@@ -9,9 +9,8 @@ import BowBot.Stats.HypixelBow
 
 hypixelBowLeaderboardBanCommand :: String -> Command
 hypixelBowLeaderboardBanCommand name = Command name ModLevel 10 $ do
-  bdt <- hData
   pName <- hArg 1
-  uuid' <- mcNameToUUID bdt (fromMaybe "" pName)
+  uuid' <- mcNameToUUID (fromMaybe "" pName)
   case uuid' of
     Nothing -> hRespond "Player not found! For safety reasons this command does not have autocorrect enabled."
     Just uuid -> do

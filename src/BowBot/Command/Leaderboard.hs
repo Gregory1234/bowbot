@@ -16,7 +16,6 @@ data LeaderboardPage = LeaderboardPage Int | LeaderboardAll | LeaderboardSearch 
 
 hypixelBowLeaderboardCommand :: String -> String -> String -> (HypixelBowLeaderboards -> Maybe (Integer, String)) -> Command
 hypixelBowLeaderboardCommand name lbname statname lbfun = Command name DefaultLevel 10 $ do
-  bdt <- hData
   caller <- hCaller
   maybedat <- getHypixelBowLeaderboard
   case maybedat of
@@ -24,16 +23,16 @@ hypixelBowLeaderboardCommand name lbname statname lbfun = Command name DefaultLe
     Just dat -> do
       let lb = [(val, (uuid, str)) | (uuid, lbv) <- toList dat, Just (val, str) <- [lbfun lbv]]
       sortedlb <- for (sortOn (negate . fst) lb) $ \(_, (uuid, str)) -> do
-        names <- fromMaybe [] <$> mcUUIDToNames bdt uuid
+        names <- fromMaybe [] <$> mcUUIDToNames uuid
         return (head names, str, uuid)
       let elems = zipWith (\lbPos (lbName, lbVal, lbUUID) -> LeaderboardElement {..}) [1..] sortedlb
       args <- hArgs
       selectedOrMsg <- case args of
-        [] -> stm $ (\x -> Right (x ,Nothing, LeaderboardSearch (head $ filter (`elem` x) $ map lbUUID elems))) <$> getAuthorNicks bdt (userId caller)
-        ["all"] -> stm $ Right . (,Nothing, LeaderboardAll) <$> getAuthorNicks bdt (userId caller)
-        [readMaybe -> Just page] -> stm $ Right . (,Nothing, LeaderboardPage (page - 1)) <$> getAuthorNicks bdt (userId caller)
+        [] -> (\x -> Right (x ,Nothing, LeaderboardSearch (head $ filter (`elem` x) $ map lbUUID elems))) <$> getAuthorNicks (userId caller)
+        ["all"] -> Right . (,Nothing, LeaderboardAll) <$> getAuthorNicks (userId caller)
+        [readMaybe -> Just page] -> Right . (,Nothing, LeaderboardPage (page - 1)) <$> getAuthorNicks (userId caller)
         [mcName] -> do
-          res <- withMinecraftAutocorrect bdt False mcName $ \uuid _ ->
+          res <- withMinecraftAutocorrect False mcName $ \uuid _ ->
             return $ if uuid `elem` map lbUUID elems then Right uuid else Left ()
           return $ case res of
             PlayerNotFound -> Left playerNotFoundMessage
@@ -63,8 +62,8 @@ hypixelBowLeaderboardCommand name lbname statname lbfun = Command name DefaultLe
               for_ msg hRespond
               hRespondFile (pack $ statname ++ ".txt") $ unlines lbFull
  where
-   getAuthorNicks bdt did = do
-     accounts <- readTVar $ bowBotAccounts bdt
+   getAuthorNicks did = do
+     accounts <- hRead bowBotAccounts
      return $ [mc | BowBotAccount {..} <- accounts, did `elem` accountDiscords, mc <- accountMinecrafts]
 
 

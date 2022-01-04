@@ -55,76 +55,76 @@ updateDiscordStatus = do
       updateStatusOptsAFK = False
     })
 
-updateDivisionRolesSingle :: BotData -> Map String HypixelBowLeaderboards -> GuildMember -> BowBotAccount -> DiscordHandler ()
-updateDivisionRolesSingle bdt lb memb BowBotAccount { accountMinecrafts = mc } = do
-  gid <- readProp discordGuildId bdt
+updateDivisionRolesSingle :: (DiscordMonad m, BotDataMonad m) => Map String HypixelBowLeaderboards -> GuildMember -> BowBotAccount -> m ()
+updateDivisionRolesSingle lb memb BowBotAccount { accountMinecrafts = mc } = do
+  gid <- hRead discordGuildId
   let did = userId . memberUser $ memb
   let wins = maximum $ mapMaybe (fmap bowLbWins . (lb !?)) mc
-  divisionRoles <- readProp discordDivisionRoles bdt
+  divisionRoles <- hRead discordDivisionRoles
   let currentDivisionRoles = filter (`elem` map snd divisionRoles) (memberRoles memb)
   let targetDivisionRoles = take 1 $ map snd $ filter ((<= wins) . fst) $ reverse divisionRoles
-  for_ (currentDivisionRoles \\ targetDivisionRoles) $ call . R.RemoveGuildMemberRole gid did
-  for_ (targetDivisionRoles \\ currentDivisionRoles) $ call . R.AddGuildMemberRole gid did
+  hDiscord $ for_ (currentDivisionRoles \\ targetDivisionRoles) $ call . R.RemoveGuildMemberRole gid did
+  hDiscord $ for_ (targetDivisionRoles \\ currentDivisionRoles) $ call . R.AddGuildMemberRole gid did
 
-updateGuildMemberRolesSingle :: BotData -> [String] -> GuildMember -> BowBotAccount -> DiscordHandler ()
-updateGuildMemberRolesSingle bdt members memb BowBotAccount { accountMinecrafts = mc } = do
-  gid <- readProp discordGuildId bdt
+updateGuildMemberRolesSingle :: (DiscordMonad m, BotDataMonad m) => [String] -> GuildMember -> BowBotAccount -> m ()
+updateGuildMemberRolesSingle members memb BowBotAccount { accountMinecrafts = mc } = do
+  gid <- hRead discordGuildId
   let did = userId . memberUser $ memb
   let isMember = any (`elem` members) mc
-  memberRole <- readProp discordMemberRole bdt
-  visitorRole <- readProp discordVisitorRole bdt
+  memberRole <- hRead discordMemberRole
+  visitorRole <- hRead discordVisitorRole
   let currentRoles = filter (\x -> x == memberRole || x == visitorRole) (memberRoles memb)
   let targetRoles = [if isMember then memberRole else visitorRole]
-  for_ (currentRoles \\ targetRoles) $ call . R.RemoveGuildMemberRole gid did -- TODO: remove repetition
-  for_ (targetRoles \\ currentRoles) $ call . R.AddGuildMemberRole gid did
+  hDiscord $ for_ (currentRoles \\ targetRoles) $ call . R.RemoveGuildMemberRole gid did -- TODO: remove repetition
+  hDiscord $ for_ (targetRoles \\ currentRoles) $ call . R.AddGuildMemberRole gid did
 
 -- TODO: remove BotData from here - take it out to a new type
 updateDiscordRolesSingle
-  :: BotData -> Maybe (Map String HypixelBowLeaderboards) -> Maybe [String] -> GuildId
-  -> GuildMember -> Maybe BowBotAccount -> DiscordHandler ()
-updateDiscordRolesSingle bdt lb members gid m (Just bac) = do
-  for_ lb $ \x -> updateDivisionRolesSingle bdt x m bac
-  for_ members $ \x -> updateGuildMemberRolesSingle bdt x m bac
-  illegalRole <- readProp discordIllegalRole bdt
+  :: (DiscordMonad m, BotDataMonad m) => Maybe (Map String HypixelBowLeaderboards) -> Maybe [String] -> GuildId
+  -> GuildMember -> Maybe BowBotAccount -> m ()
+updateDiscordRolesSingle lb members gid m (Just bac) = do
+  for_ lb $ \x -> updateDivisionRolesSingle x m bac
+  for_ members $ \x -> updateGuildMemberRolesSingle x m bac
+  illegalRole <- hRead discordIllegalRole
   when (illegalRole `elem` memberRoles m) $ do
-    call_ $ R.RemoveGuildMemberRole gid (userId $ memberUser m) illegalRole
-updateDiscordRolesSingle bdt _ _ gid m Nothing = do
-  memberRole <- readProp discordMemberRole bdt
-  visitorRole <- readProp discordVisitorRole bdt
-  divisionRoles <- map snd <$> readProp discordDivisionRoles bdt
-  illegalRole <- readProp discordIllegalRole bdt
+    hDiscord $ call_ $ R.RemoveGuildMemberRole gid (userId $ memberUser m) illegalRole
+updateDiscordRolesSingle _ _ gid m Nothing = do
+  memberRole <- hRead discordMemberRole
+  visitorRole <- hRead discordVisitorRole
+  divisionRoles <- map snd <$> hRead discordDivisionRoles
+  illegalRole <- hRead discordIllegalRole
   when (illegalRole `notElem` memberRoles m && any (`elem` (memberRole:divisionRoles)) (memberRoles m)) $ do
-    call_ $ R.AddGuildMemberRole gid (userId $ memberUser m) illegalRole
+    hDiscord $ call_ $ R.AddGuildMemberRole gid (userId $ memberUser m) illegalRole
   when (illegalRole `elem` memberRoles m && all (`notElem` (memberRole:divisionRoles)) (memberRoles m)) $ do
-    call_ $ R.RemoveGuildMemberRole gid (userId $ memberUser m) illegalRole
+    hDiscord $ call_ $ R.RemoveGuildMemberRole gid (userId $ memberUser m) illegalRole
   when (memberRole `notElem` memberRoles m && visitorRole `notElem` memberRoles m) $ do
-    call_ $ R.AddGuildMemberRole gid (userId $ memberUser m) visitorRole
+    hDiscord $ call_ $ R.AddGuildMemberRole gid (userId $ memberUser m) visitorRole
 
-updateDiscordRolesSingleId :: BotData -> UserId -> ManagerT DiscordHandler ()
-updateDiscordRolesSingleId bdt did = do
-  gid <- readProp discordGuildId bdt
-  maybeMem <- lift $ call $ R.GetGuildMember gid did
+updateDiscordRolesSingleId :: (DiscordMonad m, APIMonad m, BotDataMonad m) => UserId -> m ()
+updateDiscordRolesSingleId did = do
+  gid <- hRead discordGuildId
+  maybeMem <- hDiscord $ call $ R.GetGuildMember gid did
   case maybeMem of
     Left _ -> pure ()
     Right m -> do
-      members <- readProp hypixelGuildMembers bdt
+      members <- hRead hypixelGuildMembers
       lb <- getHypixelBowLeaderboard
-      accs <- (>>=(\u -> (, u) <$> accountDiscords u)) <$> readProp bowBotAccounts bdt
+      accs <- (>>=(\u -> (, u) <$> accountDiscords u)) <$> hRead bowBotAccounts
       let bac = lookup did accs
-      lift $ updateDiscordRolesSingle bdt lb (if null members then Nothing else Just members) gid m bac
+      updateDiscordRolesSingle lb (if null members then Nothing else Just members) gid m bac
 
-updateRolesAll :: BotData -> ManagerT DiscordHandler ()
-updateRolesAll bdt = do
-  gid <- readProp discordGuildId bdt
-  members <- readProp hypixelGuildMembers bdt
-  maybeGmembs <- lift $ fmap (filter (not . userIsBot . memberUser)) <$> call (R.ListGuildMembers gid R.GuildMembersTiming {R.guildMembersTimingLimit = Just 500, R.guildMembersTimingAfter = Nothing})
+updateRolesAll :: (DiscordMonad m, APIMonad m, BotDataMonad m) => m ()
+updateRolesAll = do
+  gid <- hRead discordGuildId
+  members <- hRead hypixelGuildMembers
+  maybeGmembs <- hDiscord $ fmap (filter (not . userIsBot . memberUser)) <$> call (R.ListGuildMembers gid R.GuildMembersTiming {R.guildMembersTimingLimit = Just 500, R.guildMembersTimingAfter = Nothing})
   lb <- getHypixelBowLeaderboard
   case maybeGmembs of
     Left _ -> pure ()
     Right gmembs -> for_ gmembs $ \m -> do
-      accs <- (>>=(\u -> (, u) <$> accountDiscords u)) <$> readProp bowBotAccounts bdt
+      accs <- (>>=(\u -> (, u) <$> accountDiscords u)) <$> hRead bowBotAccounts
       let bac = lookup (userId (memberUser m)) accs
-      lift $ updateDiscordRolesSingle bdt lb (if null members then Nothing else Just members) gid m bac
+      updateDiscordRolesSingle lb (if null members then Nothing else Just members) gid m bac
 
 getDiscordIds :: APIMonad m => m [UserId]
 getDiscordIds = do
@@ -167,7 +167,7 @@ discordBackgroundMinutely bdt mint = do
     when (hour == 5) $ runManagerT (announceBirthdays bdt) manager
     addDiscords bdt
     updateDiscordStatus
-    runManagerT (updateRolesAll bdt) manager
+    runDiscordHandler' $ runManagerT (runBotDataT updateRolesAll bdt) manager
 
 -- TODO: frequency updates
 
@@ -237,8 +237,7 @@ adminCommands =
           hDiscord $ addDiscords bdt
           hRespond "Done"
   , Command "rolesrefresh" AdminLevel 120 $ do
-          bdt <- hData
-          hMDiscord $ updateRolesAll bdt
+          updateRolesAll
           hRespond "Done"
   , Command "lbrefresh" AdminLevel 1200 $ do
           bdt <- hData

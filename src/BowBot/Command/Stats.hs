@@ -11,25 +11,24 @@ data StatsCommandMode = AlwaysDefault | AlwaysAll | UserSettings
 
 hypixelBowStatsCommand :: String -> StatsCommandMode -> Command
 hypixelBowStatsCommand name mode = Command name DefaultLevel 15 $ do
-  bdt <- hData
   args <- hArgs
   caller <- hCaller
   let player = case args of
         [] -> Right (userId caller)
         mcname -> Left (unwords mcname)
-  tryApiRequests (hypixelRequestCounter bdt) 2 (\sec -> hRespond $ "**Too many requests! Wait another " ++ show sec ++ " seconds!**") $ do
-    res <- withMinecraft bdt False player $ \uuid names -> do
+  hTryApiRequests hypixelRequestCounter 2 (\sec -> hRespond $ "**Too many requests! Wait another " ++ show sec ++ " seconds!**") $ do
+    res <- withMinecraft False player $ \uuid names -> do
       st <- requestHypixelBowStats uuid
-      for_ st (hypixelBowTryRegister bdt uuid names)
+      for_ st (hypixelBowTryRegister uuid names)
       return $ maybe (Left ()) Right st
     settings <- case mode of
       AlwaysDefault -> pure defSettings
       AlwaysAll -> pure allSettings
       UserSettings -> do
-        settings <- readProp discordSettings bdt
+        settings <- hRead discordSettings
         pure $ fromMaybe defSettings $ settings !? userId caller
     hRespond $ hypixelBowStatsMessage settings res
-    hMDiscord $ updateDiscordRolesSingleId bdt (userId caller)
+    updateDiscordRolesSingleId (userId caller)
 
 hypixelBowStatsMessage :: Settings -> MinecraftResponse () HypixelBowStats -> String
 hypixelBowStatsMessage _ PlayerNotFound = playerNotFoundMessage
@@ -41,11 +40,11 @@ hypixelBowStatsMessage settings (OldResponse o n s) = "**" ++ o ++ " (" ++ n ++ 
 hypixelBowStatsMessage settings (DidYouMeanResponse n s) = "*Did you mean* **" ++ n ++ ":**\n" ++ showHypixelBowStats settings s
 hypixelBowStatsMessage settings (DidYouMeanOldResponse o n s) = "*Did you mean* **" ++ o ++ " (" ++ n ++ "):**\n" ++ showHypixelBowStats settings s
 
-hypixelBowTryRegister :: APIMonad m => BotData -> String -> [String] -> HypixelBowStats -> m ()
-hypixelBowTryRegister bdt uuid names s | bowWins s >= 50 = do
-  registeredPlayers <- map mcUUID <$> readProp minecraftAccounts bdt
+hypixelBowTryRegister :: (APIMonad m, BotDataMonad m) => String -> [String] -> HypixelBowStats -> m ()
+hypixelBowTryRegister uuid names s | bowWins s >= 50 = do
+  registeredPlayers <- map mcUUID <$> hRead minecraftAccounts
   unless (uuid `elem` registeredPlayers) $ do
     acc <- addMinecraftAccount uuid names
-    for_ acc $ \x -> modifyProp minecraftAccounts bdt (x:)
+    for_ acc $ \x -> hModify minecraftAccounts (x:)
   updateHypixelBowLeaderboard "none" (fromList [(uuid, hypixelBowStatsToLeaderboards s)])
-hypixelBowTryRegister _ _ _ _ = pure ()
+hypixelBowTryRegister _ _ _ = pure ()

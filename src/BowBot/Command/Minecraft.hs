@@ -10,7 +10,6 @@ import BowBot.Minecraft
 minecraftCommand :: Command
 minecraftCommand = Command "mc" DefaultLevel 2 $ do
   caller <- hCaller
-  bdt <- hData
   args <- hArgs
   pns <- fmap (>>=(\account@BowBotAccount {..} -> (,account) <$> accountDiscords)) $ hRead bowBotAccounts
   case lookup (userId caller) pns of
@@ -19,7 +18,7 @@ minecraftCommand = Command "mc" DefaultLevel 2 $ do
         Nothing -> hRespond discordNotFoundMessage
         Just bac -> do
           mcList <- for (accountMinecrafts bac) $ \x -> do
-            name <- maybe undefined head <$> mcUUIDToNames bdt x
+            name <- maybe undefined head <$> mcUUIDToNames x
             return $ (if accountSelectedMinecraft bac == x then "*" else "") ++ name
           hRespond $ "**List of minecraft nicks:**\n```\n" ++ unlines mcList ++ "```"
       [_] -> hRespond discordNotFoundMessage
@@ -27,18 +26,18 @@ minecraftCommand = Command "mc" DefaultLevel 2 $ do
     Just bac -> case args of
       [] -> do
         mcList <- for (accountMinecrafts bac) $ \x -> do
-          name <- maybe undefined head <$> mcUUIDToNames bdt x
+          name <- maybe undefined head <$> mcUUIDToNames x
           return $ (if accountSelectedMinecraft bac == x then "*" else "") ++ name
         hRespond $ "**List of your minecraft nicks linked:**\n```\n" ++ unlines mcList ++ "```"
       [readMaybe . filter (`notElem` "<@!>") -> Just did] -> case lookup did pns of
         Nothing -> hRespond discordNotFoundMessage
         Just bac' -> do -- TODO: remove repetition
           mcList <- for (accountMinecrafts bac') $ \x -> do
-            name <- maybe undefined head <$> mcUUIDToNames bdt x
+            name <- maybe undefined head <$> mcUUIDToNames x
             return $ (if accountSelectedMinecraft bac' == x then "*" else "") ++ name
           hRespond $ "**List of minecraft nicks:**\n```\n" ++ unlines mcList ++ "```"
       [mc] -> do -- TODO: add autocorrect for ?mc
-        maybeUUID <- mcNameToUUID bdt mc
+        maybeUUID <- mcNameToUUID mc
         case maybeUUID of
           Nothing -> hRespond playerNotFoundMessage
           Just mcUUID -> if mcUUID `elem` accountMinecrafts bac

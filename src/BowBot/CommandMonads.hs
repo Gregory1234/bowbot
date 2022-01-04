@@ -14,7 +14,7 @@ class MonadIO m => APIMonad m where
   hManager :: m Manager
 
 newtype ManagerT m a = ManagerT { runManagerT :: Manager -> m a }
-  deriving (Functor, Applicative, Monad, MonadIO, DBMonad, BotDataMonad) via (ReaderT Manager m)
+  deriving (Functor, Applicative, Monad, MonadIO, DBMonad, BotDataMonad, DiscordMonad) via (ReaderT Manager m)
   deriving (MonadTrans) via (ReaderT Manager)
 
 instance MonadIO m => APIMonad (ManagerT m) where
@@ -27,7 +27,7 @@ class MonadIO m => DBMonad m where
   hConnection :: m Connection
 
 newtype ConnectionT m a = ConnectionT { runConnectionT :: Connection -> m a }
-  deriving (Functor, Applicative, Monad, MonadIO, APIMonad, BotDataMonad) via (ReaderT Connection m)
+  deriving (Functor, Applicative, Monad, MonadIO, APIMonad, BotDataMonad, DiscordMonad) via (ReaderT Connection m)
   deriving (MonadTrans) via (ReaderT Connection)
 
 instance MonadIO m => DBMonad (ConnectionT m) where
@@ -40,7 +40,7 @@ class MonadIO m => BotDataMonad m where
   hData :: m BotData
 
 newtype BotDataT m a = BotDataT { runBotDataT :: BotData -> m a }
-  deriving (Functor, Applicative, Monad, MonadIO, APIMonad, DBMonad) via (ReaderT BotData m)
+  deriving (Functor, Applicative, Monad, MonadIO, APIMonad, DBMonad, DiscordMonad) via (ReaderT BotData m)
   deriving (MonadTrans) via (ReaderT BotData)
 
 instance MonadIO m => BotDataMonad (BotDataT m) where
@@ -62,6 +62,16 @@ hTryApiRequests :: BotDataMonad m => (BotData -> ApiRequestCounter) -> Int -> (I
 hTryApiRequests counter extra onFail onSuccess = do
   dt <- hData
   tryApiRequests (counter dt) extra onFail onSuccess
+
+hTryApiRequestsMulti :: BotDataMonad m => [(BotData -> ApiRequestCounter, Int)] -> (Int -> m ()) -> m () -> m ()
+hTryApiRequestsMulti apis onFail onSuccess = do
+  dt <- hData
+  tryApiRequestsMulti (map (\(a,b) -> (a dt, b)) apis) onFail onSuccess
+  
+hCache :: BotDataMonad m => (BotData -> CachedData a) -> m (Maybe a) -> m (CacheResponse a)
+hCache cache exec = do
+  dt <- hData
+  getOrCalculateCache (cache dt) exec
 
 class MonadIO m => DiscordMonad m where
   hDiscord :: DiscordHandler a -> m a

@@ -5,7 +5,6 @@ module BowBot.Command.Birthday where
 import BowBot.Command
 import BowBot.Birthday
 import qualified Discord.Requests as R
-import Data.List (intercalate)
 import Data.Char (isDigit)
 
 birthdayAnnounceCommand :: Command

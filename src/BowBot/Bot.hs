@@ -159,7 +159,7 @@ commands =
 
 eventHandler :: BotData -> Manager -> Event -> DiscordHandler ()
 eventHandler bdt man (MessageCreate m) = do
-  detectDeleteMessage bdt m
+  liftIO $ runBotDataT (detectDeleteMessage m) bdt
   prefix <- readProp discordCommandPrefix bdt
   when (not (fromBot m) && pack prefix `isPrefixOf` messageText m) $ do
     let n = unpack $ T.toLower . T.drop (length prefix) . T.takeWhile (/= ' ') $ messageText m
@@ -182,7 +182,7 @@ eventHandler bdt man (MessageCreate m) = do
 eventHandler bdt man (GuildMemberAdd gid mem) = do
   trueId <- readProp discordGuildId bdt
   when (gid == trueId) $
-    runManagerT (updateDiscordRolesSingleId bdt (userId $ memberUser mem)) man
+    runDiscordHandler' $ runManagerT (runBotDataT (updateDiscordRolesSingleId (userId $ memberUser mem)) bdt) man
   liftIO $ sendPostDB man "discord/update.php" [] $
     object [pack (show (userId (memberUser mem))) .= object ["name" .= userName (memberUser mem), "discriminator" .= userDiscrim (memberUser mem), "nickname" .= memberNick mem]]
 

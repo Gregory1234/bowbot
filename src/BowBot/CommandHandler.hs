@@ -60,12 +60,6 @@ hArg n = CommandHandler $ \m _ _ -> pure $ let args = words (unpack (messageText
 hArgs :: CommandHandler [String]
 hArgs = CommandHandler $ \m _ _ -> pure $ tail $ words (unpack (messageText m))
 
-hMDiscord :: ManagerT DiscordHandler a -> CommandHandler a
-hMDiscord d = CommandHandler $ \_ man _ -> runManagerT d man
-
-hMIO :: ManagerT IO a -> CommandHandler a
-hMIO d = CommandHandler $ \_ man _ -> liftIO $ runManagerT d man
-
 call :: (FromJSON a, R.Request (r a), NFData (r a)) => r a -> DiscordHandler (Either RestCallErrorCode a)
 call r = liftIO (evaluate (force r)) >>= restCall
 
