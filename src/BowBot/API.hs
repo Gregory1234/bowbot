@@ -5,7 +5,7 @@
 {-# LANGUAGE DerivingVia #-}
 
 module BowBot.API(
-  module BowBot.API, module BowBot.Utils, (.:), (.:?), (.!=), Object, Parser, Manager
+  module BowBot.API, module BowBot.Utils, (.:), (.:?), (.!=), Object, Parser, Manager, module BowBot.CommandMonads
 ) where
 
 import Network.HTTP.Conduit hiding (path)
@@ -18,20 +18,10 @@ import Data.Aeson
 import Data.Aeson.Types
 import Control.Concurrent (forkIO, threadDelay)
 import Control.DeepSeq (force)
-import Control.Monad.Reader (ReaderT(..), MonadTrans)
+import BowBot.CommandMonads (APIMonad(..), ManagerT(..))
 
 managerSettings :: ManagerSettings
 managerSettings = tlsManagerSettings { managerResponseTimeout = responseTimeoutMicro 15000000 }
-
-class MonadIO m => APIMonad m where
-  hManager :: m Manager
-
-newtype ManagerT m a = ManagerT { runManagerT :: Manager -> m a }
-  deriving (Functor, Applicative, Monad, MonadIO) via (ReaderT Manager m)
-  deriving (MonadTrans) via (ReaderT Manager)
-
-instance MonadIO m => APIMonad (ManagerT m) where
-  hManager = ManagerT return
 
 -- TODO: create a logger monad
 

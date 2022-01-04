@@ -32,6 +32,7 @@ library
       BowBot.Birthday
       BowBot.Bot
       BowBot.BotData
+      BowBot.BotData.Core
       BowBot.Command
       BowBot.Command.Ban
       BowBot.Command.Birthday
@@ -46,6 +47,7 @@ library
       BowBot.Command.Stats
       BowBot.Command.Watchlist
       BowBot.CommandHandler
+      BowBot.CommandMonads
       BowBot.DB
       BowBot.DiscordNFData
       BowBot.Minecraft

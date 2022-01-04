@@ -1,19 +1,15 @@
 module BowBot.Command(
-  module BowBot.Command, module BowBot.CommandHandler, module Discord, module Discord.Types, module BowBot.BotData, module BowBot.Utils
+  module BowBot.Command, module BowBot.CommandHandler, module BowBot.CommandMonads, module BowBot.API,
+  module Discord, module Discord.Types, module BowBot.BotData, module BowBot.Utils
 ) where
 
 import Discord
 import BowBot.Utils
-import qualified Discord.Requests as R
-import qualified Discord.Internal.Rest as R
 import Discord.Types hiding (accountId)
 import BowBot.BotData
-import qualified Data.Text as T
-import Data.Text.Encoding (encodeUtf8)
-import Control.Exception.Base (evaluate)
-import Control.DeepSeq (force, NFData(..))
-import BowBot.DiscordNFData()
+import BowBot.CommandMonads
 import BowBot.CommandHandler
+import BowBot.API
 
 data Command = Command { commandName :: String, commandPerms :: PermissionLevel, commandTimeout :: Int, commandHandler :: CommandHandler () }
 

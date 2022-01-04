@@ -4,9 +4,11 @@
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE ViewPatterns #-}
 
-module BowBot.BotData where
+module BowBot.BotData(
+  module BowBot.BotData, module BowBot.BotData.Core
+) where
 
-import Control.Concurrent.STM.TVar (TVar, newTVar)
+import Control.Concurrent.STM.TVar (newTVar)
 import Data.Map (Map, empty, toList, fromList)
 import Discord.Types
 import BowBot.API
@@ -19,142 +21,7 @@ import BowBot.API.Mojang (mojangUUIDToNames)
 import Data.List (intercalate)
 import BowBot.API.Hypixel
 import BowBot.DB
-
-data ApiRequestCounter = ApiRequestCounter { mainCounter :: TVar Int, borderCounter :: TVar Int, counterLimit :: Int }
-
-clearApiRequestCounter :: ApiRequestCounter -> STM ()
-clearApiRequestCounter ApiRequestCounter {..} = do
-  border <- readTVar borderCounter
-  writeTVar mainCounter border
-  writeTVar borderCounter 0
-
--- TODO: create a version with a return value
-tryApiRequests :: MonadIO m => ApiRequestCounter -> Int -> (Int -> m ()) -> m () -> m ()
-tryApiRequests ApiRequestCounter {..} extra onFail onSuccess = do
-  t <- liftIO $ read @Int <$> getTime "%S"
-  cv <- stm $ do
-    c1 <- readTVar mainCounter
-    c2 <- readTVar borderCounter
-    let c = c1 + c2 + extra
-    when (c < counterLimit) $ modifyTVar (if t <= 5 || t >= 55 then borderCounter else mainCounter) (+ extra)
-    return $ c < counterLimit
-  if cv then onSuccess else onFail ((65 - t) `mod` 60)
-
-tryApiRequestsMulti :: MonadIO m => [(ApiRequestCounter, Int)] -> (Int -> m ()) -> m () -> m ()
-tryApiRequestsMulti apis onFail onSuccess = do
-  t <- liftIO $ read @Int <$> getTime "%S"
-  cv <- stm $ do
-    res <- fmap and . for apis $ \(ApiRequestCounter {..}, extra) -> do
-      c1 <- readTVar mainCounter
-      c2 <- readTVar borderCounter
-      let c = c1 + c2 + extra
-      return $ c < counterLimit
-    when res $ for_ apis $ \(ApiRequestCounter {..}, extra) -> do
-      modifyTVar (if t <= 5 || t >= 55 then borderCounter else mainCounter) (+ extra)
-    return res
-  if cv then onSuccess else onFail ((65 - t) `mod` 60)
-
-data CachedData a = CachedData { mainCache :: TVar (Maybe a), borderCache :: TVar (Maybe a), currentlyBusyCache :: TVar Bool }
-
-clearCache :: CachedData a -> STM ()
-clearCache CachedData {..} = do
-  border <- readTVar borderCache
-  writeTVar mainCache border
-
-data CacheResponse a
-  = CacheBusy
-  | CacheFailed
-  | CacheFresh a
-  | CacheOld a
-
-getOrCalculateCache :: MonadIO m => CachedData a -> m (Maybe a) -> m (CacheResponse a)
-getOrCalculateCache CachedData {..} exec = do
-  (ret, busy) <- stm $ do
-    busy <- readTVar currentlyBusyCache
-    mainVal <- readTVar mainCache
-    borderVal <- readTVar borderCache
-    case (mainVal, borderVal) of
-      (Nothing, Nothing) -> do
-        unless busy $ writeTVar currentlyBusyCache True
-        return (Nothing, busy)
-      (Nothing, _) -> return (borderVal, busy)
-      (Just _,_) -> return (mainVal, busy)
-  case (ret, busy) of
-    (Nothing, True) -> return CacheBusy
-    (Just a, _) -> return (CacheOld a)
-    (Nothing, False) -> do
-      val <- exec
-      t <- liftIO $ read @Int <$> getTime "%S"
-      stm $ do
-        writeTVar currentlyBusyCache False
-        writeTVar (if t <= 5 || t >= 55 then borderCache else mainCache) val
-      return (maybe CacheFailed CacheFresh val)
-
-data UpdateFreq
-  = Normal
-  | Banned
-  deriving (Eq, Ord, Enum, Bounded, Show)
-
-stringToUpdateFreq :: String -> Maybe UpdateFreq
-stringToUpdateFreq "normal" = Just Normal
-stringToUpdateFreq "ban" = Just Banned
-stringToUpdateFreq _ = Nothing
-
-data MinecraftAccount = MinecraftAccount
-  { mcUUID :: String
-  , mcNames :: [String]
-  , mcHypixelBow :: UpdateFreq
-  } deriving (Show)
-
-data PermissionLevel
-  = BanLevel
-  | DefaultLevel
-  | ModLevel
-  | AdminLevel
-  deriving (Eq, Ord, Enum, Bounded, Show)
-
-stringToPermissionLevel :: String -> Maybe PermissionLevel
-stringToPermissionLevel "ban" = Just BanLevel
-stringToPermissionLevel "default" = Just DefaultLevel
-stringToPermissionLevel "mod" = Just ModLevel
-stringToPermissionLevel "admin" = Just AdminLevel
-stringToPermissionLevel _ = Nothing
-
-data BowBotAccount = BowBotAccount
-  { accountId :: Integer
-  , accountDiscords :: [UserId]
-  , accountSelectedMinecraft :: String
-  , accountMinecrafts :: [String]
-  } deriving (Show, Eq)
-
-data SnipeMessage = SnipeMessage
-  { snipeMessageAuthor :: UserId
-  , snipeMessageContent :: String
-  , snipeMessageWasEdited :: Bool
-  , snipeMessageTimestamp :: UTCTime
-  } deriving Show
-
--- TODO: add manager to BotData
-
-data BotData = BotData
-  { hypixelRequestCounter :: ApiRequestCounter
-  , minecraftAccounts :: TVar [MinecraftAccount]
-  , hypixelBowOnlineList :: CachedData [String]
-  , discordPerms :: TVar (Map UserId PermissionLevel)
-  , discordSettings :: TVar (Map UserId Settings)
-  , bowBotAccounts :: TVar [BowBotAccount]
-  , hypixelGuildMembers :: TVar [String]
-  , snipeMessage :: TVar (Map ChannelId SnipeMessage)
-  , hypixelGuildId :: TVar String
-  , discordGuildId :: TVar GuildId
-  , discordIllegalRole :: TVar RoleId
-  , discordMemberRole :: TVar RoleId
-  , discordVisitorRole :: TVar RoleId
-  , discordDivisionRoles :: TVar [(Integer, RoleId)]
-  , discordToggleableRoles :: TVar [(String, RoleId)]
-  , discordCommandPrefix :: TVar String
-  , discordBirthdayChannel :: TVar ChannelId
-  }
+import BowBot.BotData.Core
 
 downloadMinecraftAccounts :: APIMonad m => m (Maybe [MinecraftAccount])
 downloadMinecraftAccounts = do

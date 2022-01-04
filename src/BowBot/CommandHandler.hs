@@ -1,5 +1,5 @@
 module BowBot.CommandHandler(
-  module BowBot.CommandHandler, module BowBot.API
+  module BowBot.CommandHandler, module BowBot.CommandMonads
 ) where
 
 import Discord
@@ -14,8 +14,9 @@ import Control.Exception.Base (evaluate)
 import Control.DeepSeq (force, NFData(..))
 import BowBot.DiscordNFData()
 import Control.Monad (ap, liftM)
-import BowBot.API
+import BowBot.CommandMonads
 import Control.Concurrent.STM.TVar (TVar)
+import Network.HTTP.Conduit (Manager)
 
 newtype CommandHandler a = CommandHandler { runCommandHandler :: Message -> Manager -> BotData -> DiscordHandler a }
 
@@ -37,6 +38,12 @@ instance MonadIO CommandHandler where
 
 instance APIMonad CommandHandler where
   hManager = CommandHandler $ \_ man _ -> return man
+
+instance BotDataMonad CommandHandler where
+  hData = CommandHandler $ \_ _ dt -> return dt
+  
+instance DiscordMonad CommandHandler where
+  hDiscord d = CommandHandler $ \_ _ _ -> d
 
 hRespond :: String -> CommandHandler ()
 hRespond msg = CommandHandler $ \m _ _ -> respond m msg
@@ -61,12 +68,6 @@ hArg n = CommandHandler $ \m _ _ -> pure $ let args = words (unpack (messageText
 
 hArgs :: CommandHandler [String]
 hArgs = CommandHandler $ \m _ _ -> pure $ tail $ words (unpack (messageText m))
-
-hData :: CommandHandler BotData
-hData = CommandHandler $ \_ _ dt -> return dt
-
-hDiscord :: DiscordHandler a -> CommandHandler a
-hDiscord d = CommandHandler $ \_ _ _ -> d
 
 hMDiscord :: ManagerT DiscordHandler a -> CommandHandler a
 hMDiscord d = CommandHandler $ \_ man _ -> runManagerT d man

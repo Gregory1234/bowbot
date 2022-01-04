@@ -2,20 +2,14 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ViewPatterns #-}
 
-module BowBot.Settings where
+module BowBot.Settings(
+  module BowBot.Settings, module BowBot.BotData.Core
+) where
 
 import Discord.Types
 import Data.Map (Map, fromList)
 import BowBot.API
-
-
-data BoolSense = Never | WhenSensible | Always deriving (Show, Eq, Ord, Enum)
-
-data Settings = Settings
-  { sWins :: Bool, sLosses :: Bool, sWLR :: BoolSense, sWinsUntil :: BoolSense
-  , sBestStreak :: Bool, sCurrentStreak :: Bool, sBestDailyStreak :: Bool
-  , sBowHits :: Bool, sBowShots :: Bool, sAccuracy :: BoolSense
-  } deriving (Show, Eq)
+import BowBot.BotData.Core
 
 parseBool :: String -> Maybe Bool
 parseBool "yes" = Just True
