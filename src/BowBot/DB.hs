@@ -74,6 +74,11 @@ hExecuteLog q d = do
   executeLog conn q d
 
 executeManyLog :: (QueryParams q, MonadIO m) => Connection -> Query -> [q] -> m Int64
+executeManyLog conn q [] = do
+  dev <- ifDev "" (return "Dev")
+  let nq = replaceQuery "DEV" dev q
+  logInfoDB conn $ "Tried executing query with no data: " ++ show nq
+  return 0
 executeManyLog conn q d = do
   dev <- ifDev "" (return "Dev")
   let nq = replaceQuery "DEV" dev q
