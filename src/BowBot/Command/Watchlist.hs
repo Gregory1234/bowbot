@@ -12,7 +12,7 @@ import BowBot.API.Hypixel
 
 listCommand :: Command
 listCommand = Command "list" DefaultLevel 2 $ do -- TODO: add other lists
-  st <- fromMaybe [] <$> getWatchlist
+  st <- getWatchlist
   people <- map head . catMaybes <$> traverse mcUUIDToNames st
   hRespond $ "**Players in watchList:**\n```\n" ++ unwords people ++ "```"
   pure ()
@@ -20,7 +20,7 @@ listCommand = Command "list" DefaultLevel 2 $ do -- TODO: add other lists
 onlineCommand :: Command
 onlineCommand = Command "online" DefaultLevel 30 $ do
   maybeOnlinePlayers <- hCache hypixelBowOnlineList $ do
-    st <- fromMaybe [] <$> getWatchlist
+    st <- getWatchlist
     ret <- stm $ newTVar Nothing
     hTryApiRequests hypixelRequestCounter (length st) (\sec -> hRespond $ "**Too many requests! Wait another " ++ show sec ++ " seconds!**") $ do
       values <- filterM (fmap (fromMaybe False) . isInBowDuels) st
@@ -48,7 +48,7 @@ isInBowDuels uuid = hypixelWithPlayerStatus uuid $ \o -> do
     return $ mode == "DUELS_BOW_DUEL"
 
 
-getWatchlist :: APIMonad m => m (Maybe [UUID])
+getWatchlist :: DBMonad m => m [UUID]
 getWatchlist = do
-  res <- hSendDB "minecraft/watchlist.php" []
-  decodeParse res $ \o -> fmap UUID <$> o .: "data"
+  res :: [Only String] <- hQueryLog "SELECT `uuid` FROM `minecraftDEV` WHERE `watchlist`=1" ()
+  return $ flip fmap res $ \(Only uuid) -> UUID uuid
