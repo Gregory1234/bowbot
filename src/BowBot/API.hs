@@ -76,20 +76,6 @@ hSendRequestTo u c = do
   man <- hManager
   liftIO $ sendRequestTo man u c
 
-sendDB :: Manager -> String -> [String] -> IO ByteString
-sendDB manager path args = do
-  website <- fromMaybe "" <$> getEnv "DB_SITE"
-  apiKey <- fromMaybe "" <$> getEnv "DB_KEY"
-  dev <- ifDev "" (return "&dev")
-  let url = "http://" ++ website ++ "/api/" ++ path ++ "?key=" ++ apiKey ++ (('&':) =<< args) ++ dev
-  let cleanUrl = "http://[REDACTED]/api/" ++ path ++ "?key=[REDACTED]" ++ (('&':) =<< args) ++ dev
-  sendRequestTo manager url cleanUrl
-
-hSendDB :: APIMonad m => String -> [String] -> m ByteString
-hSendDB p a = do
-  man <- hManager
-  liftIO $ sendDB man p a
-
 decodeParse :: (FromJSON o, MonadIO m) => ByteString -> (o -> Parser a) -> m (Maybe a)
 decodeParse (decode -> Just str) parser = case parseEither parser str of
   Left e -> do

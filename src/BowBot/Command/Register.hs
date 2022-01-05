@@ -1,7 +1,7 @@
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE ViewPatterns #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
 module BowBot.Command.Register where
 
@@ -14,22 +14,33 @@ import BowBot.Stats.HypixelBow
 
 -- TODO: check if creation was successful
 
-addMinecraftAccount :: APIMonad m => UUID -> [String] -> m (Maybe MinecraftAccount)
+addMinecraftAccount :: DBMonad m => UUID -> [String] -> m (Maybe MinecraftAccount)
 addMinecraftAccount uuid names = do
-  _ <- hSendDB "minecraft/new.php" ["uuid=" ++ uuidString uuid, "names=" ++ intercalate "," names]
-  return $ Just MinecraftAccount { mcUUID = uuid, mcNames = names, mcHypixelBow = Normal }
+  count <- hExecuteLog "INSERT INTO `minecraftDEV`(`uuid`, `name`, `names`) VALUES (?,?,?)" (uuidString uuid, head names, intercalate "," names)
+  return $ if count == 1
+    then Just MinecraftAccount { mcUUID = uuid, mcNames = names, mcHypixelBow = Normal }
+    else Nothing
 
-addAccount :: APIMonad m => String -> UserId -> UUID -> m (Maybe BowBotAccount)
+addAccount :: DBMonad m => String -> UserId -> UUID -> m (Maybe BowBotAccount)
 addAccount name did uuid = do
-  res <- hSendDB "people/new.php" ["name=" ++ name, "discord=" ++ show did, "verified=0", "minecraft=" ++ uuidString uuid]
-  decodeParse res $ \o -> do
-    (readMaybe -> Just aid) <- o .: "id"
-    return BowBotAccount { accountId = aid, accountDiscords = [did], accountMinecrafts = [uuid], accountSelectedMinecraft = uuid}
+  res :: [Only Integer] <- hQueryLog "SELECT `id` FROM `discordDEV` WHERE `id`=?" (Only $ show did)
+  if length res == 1
+  then do
+    _ <- hExecuteLog "INSERT INTO `peopleDEV`(`name`) VALUES (?)" (Only name)
+    ids :: [Only Integer] <- hQueryLog "SELECT MAX(`id`) AS a FROM `peopleDEV`" ()
+    case ids of
+      [Only aid] -> do
+        c1 <- hExecuteLog "INSERT INTO `peopleMinecraftDEV`(`id`, `minecraft`,`status`, `selected`, `verified`) VALUES (?,?, 'main', 1, ?)" (aid, uuidString uuid)
+        c2 <- hExecuteLog "INSERT INTO `peopleDiscordDEV`(`id`, `discord`) VALUES (?,?)" (aid, show did)
+        if c1 + c2 == 2
+        then return $ Just BowBotAccount { accountId = aid, accountDiscords = [did], accountMinecrafts = [uuid], accountSelectedMinecraft = uuid}
+        else return Nothing -- TODO: big problem here... transactions?
+      _ -> return Nothing
+  else
+    return Nothing
 
-addAltAccount :: APIMonad m => Integer -> UUID -> m ()
-addAltAccount gid uuid = do
-  _ <- hSendDB "people/alt.php" ["id=" ++ show gid, "verified=0", "minecraft=" ++ uuidString uuid]
-  return ()
+addAltAccount :: DBMonad m => Integer -> UUID -> m ()
+addAltAccount gid (UUID uuid) = void $ hExecuteLog "INSERT INTO `peopleMinecraft$devornot`(`id`, `minecraft`,`status`, `selected`, `verified`) VALUES (?,?, 'alt', 0, 0)" (gid, uuid)
 
 registerCommand :: String -> Bool -> Bool -> Command
 registerCommand name isalt isself = Command name (if isself then DefaultLevel else ModLevel) 12 $ do

@@ -1,6 +1,7 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE ViewPatterns #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 module BowBot.Command.Minecraft where
 
@@ -14,7 +15,7 @@ minecraftCommand = Command "mc" DefaultLevel 2 $ do
   pns <- fmap (>>=(\account@BowBotAccount {..} -> (,account) <$> accountDiscords)) $ hRead bowBotAccounts
   case lookup (userId caller) pns of
     Nothing -> case args of
-      [readMaybe . filter (`notElem` "<@!>") -> Just did] -> case lookup did pns of
+      [readMaybe . filter (`notElem` ("<@!>" :: [Char])) -> Just did] -> case lookup did pns of
         Nothing -> hRespond discordNotFoundMessage
         Just bac -> do
           mcList <- for (accountMinecrafts bac) $ \x -> do
@@ -29,7 +30,7 @@ minecraftCommand = Command "mc" DefaultLevel 2 $ do
           name <- maybe undefined head <$> mcUUIDToNames x
           return $ (if accountSelectedMinecraft bac == x then "*" else "") ++ name
         hRespond $ "**List of your minecraft nicks linked:**\n```\n" ++ unlines mcList ++ "```"
-      [readMaybe . filter (`notElem` "<@!>") -> Just did] -> case lookup did pns of
+      [readMaybe . filter (`notElem` ("<@!>" :: [Char])) -> Just did] -> case lookup did pns of
         Nothing -> hRespond discordNotFoundMessage
         Just bac' -> do -- TODO: remove repetition
           mcList <- for (accountMinecrafts bac') $ \x -> do
@@ -42,7 +43,7 @@ minecraftCommand = Command "mc" DefaultLevel 2 $ do
           Nothing -> hRespond playerNotFoundMessage
           Just mcUUID -> if mcUUID `elem` accountMinecrafts bac
             then do
-              _ <- hSendDB "people/select.php" ["id=" ++ show (accountId bac), "minecraft=" ++ uuidString mcUUID]
+              _ <- hExecuteLog "UPDATE `peopleMinecraftDEV` SET `selected`=(`minecraft`=?) WHERE `id`=?" (uuidString mcUUID, show (accountId bac))
               hModify bowBotAccounts $ map (\u -> if accountId bac == accountId u then u { accountSelectedMinecraft = mcUUID } else u)
               hRespond "*Success!*"
             else
