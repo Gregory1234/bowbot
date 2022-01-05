@@ -36,7 +36,7 @@ runBowBot discordKey = do
   ifDev () $ putStrLn "this is dev version of the bot"
   botData <- createData
   manager <- newManager managerSettings
-  logInfo manager "bot started"
+  withDB $ \conn -> logInfoDB conn "bot started"
   mkBackground botData
   forever $ do
     userFacingError <-
@@ -46,10 +46,10 @@ runBowBot discordKey = do
             discordOnStart = onStartup botData,
             discordOnEvent = eventHandler botData manager
           }
-    logError manager $ unpack userFacingError
+    withDB $ flip logErrorDB $ unpack userFacingError
  where
   mkBackground bdt = void $ forkFinally (background bdt) $ \e -> do
-    logError' $ show e
+    withDB $ flip logErrorDB $ show e
     mkBackground bdt
   background bdt = do
      sec <- read @Int <$> getTime "%S"
@@ -70,7 +70,7 @@ onStartup bdt = do
   mkBackgroundDiscord = do
     ReaderT $ \x -> void $
       forkFinally (runReaderT backgroundDiscord x) $ \e -> do
-        logError' $ show e
+        withDB $ flip logErrorDB $ show e
         runReaderT mkBackgroundDiscord x
   backgroundDiscord = do
     sec <- liftIO $ read @Int <$> getTime "%S"
@@ -164,7 +164,7 @@ eventHandler bdt man (MessageCreate m) = do
     let n = unpack $ T.toLower . T.drop (length prefix) . T.takeWhile (/= ' ') $ messageText m
     for_ (filter ((==n) . commandName) commands) $ \c ->
       withDB $ \conn ->
-        commandTimeoutRun (commandTimeout c) m $ do
+        commandTimeoutRun conn (commandTimeout c) m $ do
           logInfoDB conn $ "recieved " ++ unpack (messageText m)
           ifDev () $ do
             testDiscordId <- readProp discordGuildId bdt
@@ -196,37 +196,37 @@ tryDiscord :: Exception e => DiscordHandler a -> DiscordHandler (Either e a)
 tryDiscord x = ReaderT (try . runReaderT x)
 
 backgroundTimeoutRun :: Int -> IO () -> IO ()
-backgroundTimeoutRun n x = do
+backgroundTimeoutRun n x = withDB $ \conn -> do
   tm <- try @SomeException (timeout (n * 1000000) x)
   case tm of
     Left e -> do
-      logError' $ "Exception happened in background: " ++ show e
+      logErrorDB conn $ "Exception happened in background: " ++ show e
       throw e
     Right Nothing -> do
-      logError' $ "Timed out in background: " ++ show n ++ "s"
+      logErrorDB conn $ "Timed out in background: " ++ show n ++ "s"
     Right (Just ()) -> pure ()
 
 backgroundDiscordTimeoutRun :: Int -> DiscordHandler () -> DiscordHandler ()
-backgroundDiscordTimeoutRun n x = do
+backgroundDiscordTimeoutRun n x = withDB $ \conn -> do
   tm <- tryDiscord @SomeException (timeoutDiscord (n * 1000000) x)
   case tm of
     Left e -> do
-      logError' $ "Exception happened in discord background: " ++ show e
+      logErrorDB conn $ "Exception happened in discord background: " ++ show e
       throw e
     Right Nothing -> do
-      logError' $ "Timed out in discord background: " ++ show n ++ "s"
+      logErrorDB conn $ "Timed out in discord background: " ++ show n ++ "s"
     Right (Just ()) -> pure ()
 
-commandTimeoutRun :: Int -> Message -> DiscordHandler () -> DiscordHandler ()
-commandTimeoutRun n msg x = do
+commandTimeoutRun :: Connection -> Int -> Message -> DiscordHandler () -> DiscordHandler ()
+commandTimeoutRun conn n msg x = do
   tm <- tryDiscord @SomeException (timeoutDiscord (n * 1000000) x)
   case tm of
     Left e -> do
-      logError' $ "Exception happened in command: " ++ show e
+      logErrorDB conn $ "Exception happened in command: " ++ show e
       respond msg "Something went horribly wrong! Please report this!"
       throw e
     Right Nothing -> do
-      logError' $ "Timed out: " ++ show n ++ "s"
+      logErrorDB conn $ "Timed out: " ++ show n ++ "s"
       respond msg "Timed out! Please report this!"
     Right (Just ()) -> pure ()
 

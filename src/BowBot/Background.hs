@@ -186,18 +186,18 @@ backgroundMinutely bdt@BotData {..} mint = do
   atomically $ do
     clearApiRequestCounter hypixelRequestCounter
     clearCache hypixelBowOnlineList
-  when (mint == 0) $ do
-    logInfo' "started update"
+  when (mint == 0) $ withDB $ \conn -> do
+    logInfoDB conn "started update"
     manager <- newManager managerSettings
-    withDB $ runConnectionT $ runManagerT (runBotDataT downloadData bdt) manager
+    runConnectionT (runManagerT (runBotDataT downloadData bdt) manager) conn
     dev <- ifDev False $ return True
     unless dev $ do
       hour <- read @Int <$> getTime "%k"
       when (hour `mod` 8 == 0) $ clearLogs manager
-    withDB $ runConnectionT $ runManagerT (updateMinecraftAccounts bdt) manager
-    logInfo' "finished update"
-  when (mint == 30) $ do
-    logInfo' "started update"
+    runConnectionT (runManagerT (updateMinecraftAccounts bdt) manager) conn
+    logInfoDB conn "finished update"
+  when (mint == 30) $ withDB $ \conn -> do
+    logInfoDB conn "started update"
     hour <- read @Int <$> getTime "%k"
     weekday <- read @Int <$> getTime "%u"
     monthday <- read @Int <$> getTime "%d"
@@ -209,7 +209,7 @@ backgroundMinutely bdt@BotData {..} mint = do
           _ -> []
     when ((hour `mod` 4) == 0) $
       completeHypixelBowLeaderboardUpdate bdt extra $ \MinecraftAccount {..} -> mcHypixelBow == Normal
-    logInfo' "finished update"
+    logInfoDB conn "finished update"
 
 adminCommands :: [Command]
 adminCommands = 

@@ -24,7 +24,7 @@ withDB f = do
   connectPassword <- liftIO $ fromMaybe "" <$> getEnv "DB_PASS"
   connectDatabase <- liftIO $ fromMaybe "" <$> getEnv "DB_NAME"
   conn <- liftIO $ connect $ defaultConnectInfo { connectHost, connectUser, connectPassword, connectDatabase }
-  r <- f conn
+  r <- f conn -- TODO: handle exceptions safely
   liftIO $ close conn
   return r
 

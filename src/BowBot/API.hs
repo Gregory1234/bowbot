@@ -1,5 +1,4 @@
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE DerivingVia #-}
@@ -9,79 +8,46 @@ module BowBot.API(
 ) where
 
 import Network.HTTP.Conduit hiding (path)
-import qualified Data.ByteString.Char8 as BS
-import Data.ByteString.Base64.URL (encodeBase64)
 import Control.Exception.Base (try, SomeException, evaluate)
 import Data.ByteString.Lazy (ByteString)
 import BowBot.Utils
 import Data.Aeson
 import Data.Aeson.Types
-import Control.Concurrent (forkIO, threadDelay)
+import Control.Concurrent (threadDelay)
 import Control.DeepSeq (force)
 import BowBot.CommandMonads (APIMonad(..), ManagerT(..))
+import BowBot.DB
 
 managerSettings :: ManagerSettings
 managerSettings = tlsManagerSettings { managerResponseTimeout = responseTimeoutMicro 15000000 }
 
--- TODO: create a logger monad
-
-logInfo :: MonadIO m => Manager -> String -> m ()
-logInfo man msg = liftIO $ void $ forkIO $ do
-  _ <- evaluate $ force msg
-  putStrLn msg
-  website <- fromMaybe "" <$> getEnv "DB_SITE"
-  apiKey <- fromMaybe "" <$> getEnv "DB_KEY"
-  let url = "http://" ++ website ++ "/api/log/info.php?key=" ++ apiKey ++ "&msg=" ++ unpack (encodeBase64 (BS.pack msg))
-  request <- parseRequest url
-  void $ try @SomeException $ httpLbs request man
-
-logInfo' :: MonadIO m => String -> m ()
-logInfo' msg = do
-  man <- liftIO $ newManager managerSettings
-  logInfo man msg
-
-logError :: MonadIO m => Manager -> String -> m ()
-logError man msg = liftIO $ void $ forkIO $ do
-  _ <- evaluate $ force msg
-  putStrLn msg
-  website <- fromMaybe "" <$> getEnv "DB_SITE"
-  apiKey <- fromMaybe "" <$> getEnv "DB_KEY"
-  let url = "http://" ++ website ++ "/api/log/err.php?key=" ++ apiKey ++ "&msg=" ++ unpack (encodeBase64 (BS.pack msg))
-  request <- parseRequest url
-  void $ try @SomeException $ httpLbs request man
-
-logError' :: MonadIO m => String -> m ()
-logError' msg = do
-  man <- liftIO $ newManager managerSettings
-  logError man msg
-
-sendRequestTo :: Manager -> String -> String -> IO ByteString
-sendRequestTo manager url cleanUrl = do
+sendRequestTo :: Connection -> Manager -> String -> String -> IO ByteString
+sendRequestTo conn manager url cleanUrl = do
   _ <- evaluate $ force url
   _ <- evaluate $ force cleanUrl
-  logInfo manager cleanUrl
+  logInfoDB conn cleanUrl
   request <- parseRequest url
   res <- try $ httpLbs request manager
   case res of
     (Left (e :: SomeException)) -> do
-      logError manager $ show e
+      logErrorDB conn $ show e
       threadDelay 3000000
-      sendRequestTo manager url cleanUrl
+      sendRequestTo conn manager url cleanUrl
     (Right v) -> do
-      logInfo manager $ "Received response from: " ++ cleanUrl
+      logInfoDB conn $ "Received response from: " ++ cleanUrl
       return $ responseBody v
 
 hSendRequestTo :: APIMonad m => String -> String -> m ByteString
 hSendRequestTo u c = do
   man <- hManager
-  liftIO $ sendRequestTo man u c
+  liftIO $ withDB $ \conn -> sendRequestTo conn man u c
 
 decodeParse :: (FromJSON o, MonadIO m) => ByteString -> (o -> Parser a) -> m (Maybe a)
 decodeParse (decode -> Just str) parser = case parseEither parser str of
   Left e -> do
-    logError' $ show e
+    withDB $ flip logErrorDB $ show e
     return Nothing
   Right a -> return $ Just a
 decodeParse str _ = do
-  logError' $ "Decoding failed in " ++ show str ++ "!"
+  withDB $ flip logErrorDB $ "Decoding failed in " ++ show str ++ "!"
   return Nothing
