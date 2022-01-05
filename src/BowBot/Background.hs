@@ -75,10 +75,10 @@ updateGuildMemberRolesSingle members memb BowBotAccount { accountMinecrafts = mc
 
 -- TODO: remove BotData from here - take it out to a new type
 updateDiscordRolesSingle
-  :: (DiscordMonad m, BotDataMonad m) => Maybe (Map UUID HypixelBowLeaderboards) -> Maybe [UUID] -> GuildId
+  :: (DiscordMonad m, BotDataMonad m) => Map UUID HypixelBowLeaderboards -> Maybe [UUID] -> GuildId
   -> GuildMember -> Maybe BowBotAccount -> m ()
 updateDiscordRolesSingle lb members gid m (Just bac) = do
-  for_ lb $ \x -> updateDivisionRolesSingle x m bac
+  updateDivisionRolesSingle lb m bac
   for_ members $ \x -> updateGuildMemberRolesSingle x m bac
   illegalRole <- hRead discordIllegalRole
   when (illegalRole `elem` memberRoles m) $ do
@@ -95,7 +95,7 @@ updateDiscordRolesSingle _ _ gid m Nothing = do
   when (memberRole `notElem` memberRoles m && visitorRole `notElem` memberRoles m) $ do
     hDiscord $ call_ $ R.AddGuildMemberRole gid (userId $ memberUser m) visitorRole
 
-updateDiscordRolesSingleId :: (DiscordMonad m, APIMonad m, BotDataMonad m) => UserId -> m ()
+updateDiscordRolesSingleId :: (DiscordMonad m, DBMonad m, BotDataMonad m) => UserId -> m ()
 updateDiscordRolesSingleId did = do
   gid <- hRead discordGuildId
   maybeMem <- hDiscord $ call $ R.GetGuildMember gid did
@@ -108,7 +108,7 @@ updateDiscordRolesSingleId did = do
       let bac = lookup did accs
       updateDiscordRolesSingle lb (if null members then Nothing else Just members) gid m bac
 
-updateRolesAll :: (DiscordMonad m, APIMonad m, BotDataMonad m) => m ()
+updateRolesAll :: (DiscordMonad m, BotDataMonad m, DBMonad m) => m ()
 updateRolesAll = do
   gid <- hRead discordGuildId
   members <- hRead hypixelGuildMembers
@@ -151,29 +151,27 @@ addDiscords bdt = withDB $ \conn -> do
 
 discordBackgroundMinutely :: BotData -> Int -> DiscordHandler ()
 discordBackgroundMinutely bdt mint = do
-  when (mint == 1) $ do
-    manager <- liftIO $ newManager managerSettings
+  when (mint == 1) $ withDB $ \conn -> do
     hour <- liftIO $ read @Integer <$> getTime "%k"
-    when (hour == 5) $ runDiscordHandler' $ withDB $ runConnectionT $ runBotDataT announceBirthdays bdt
+    when (hour == 5) $ runDiscordHandler' $ runConnectionT (runBotDataT announceBirthdays bdt) conn
     addDiscords bdt
     updateDiscordStatus
-    runDiscordHandler' $ runManagerT (runBotDataT updateRolesAll bdt) manager
+    runDiscordHandler' $ runConnectionT (runBotDataT updateRolesAll bdt) conn
 
 -- TODO: frequency updates
 
-completeHypixelBowLeaderboardUpdate :: BotData -> String -> (MinecraftAccount -> Bool) -> IO ()
+completeHypixelBowLeaderboardUpdate :: BotData -> [TimeStatsType] -> (MinecraftAccount -> Bool) -> IO ()
 completeHypixelBowLeaderboardUpdate bdt extra filt = do
   manager <- newManager managerSettings
   mcs <- readProp minecraftAccounts bdt
   let chunked = chunksOf 25 (map mcUUID $ filter filt mcs)
-  for_ chunked $ helper manager
+  withDB $ \conn -> for_ chunked $ helper manager conn
     where
-      helper manager lst = do
-        tryApiRequests (hypixelRequestCounter bdt) 25 (\x -> do { threadDelay ((x+10) * 1000000); helper manager lst }) $ do
+      helper manager conn lst = do
+        tryApiRequests (hypixelRequestCounter bdt) 25 (\x -> do { threadDelay ((x+10) * 1000000); helper manager conn lst }) $ do
           let chunked = chunksOf 10 lst
           dt <- fmap (fromList . catMaybes . zipWith (\a b -> (a,) <$> b) lst . concat) $ for chunked $ mapConcurrently $ fmap (fmap hypixelBowStatsToLeaderboards) . flip runManagerT manager . requestHypixelBowStats
-          logInfo' $ show dt
-          runManagerT (updateHypixelBowLeaderboard extra dt) manager
+          runConnectionT (updateHypixelBowLeaderboard extra dt) conn
 
 clearLogs :: Manager -> IO ()
 clearLogs man = do
@@ -204,11 +202,11 @@ backgroundMinutely bdt@BotData {..} mint = do
     weekday <- read @Int <$> getTime "%u"
     monthday <- read @Int <$> getTime "%d"
     let extra = case (hour, weekday, monthday) of
-          (0, 1, 1) -> "day,week,month"
-          (0, 1, _) -> "day,week"
-          (0, _, 1) -> "day,month"
-          (0, _, _) -> "day"
-          _ -> "none"
+          (0, 1, 1) -> [DailyStats, WeeklyStats, MonthlyStats]
+          (0, 1, _) -> [DailyStats, WeeklyStats]
+          (0, _, 1) -> [DailyStats, MonthlyStats]
+          (0, _, _) -> [DailyStats]
+          _ -> []
     when ((hour `mod` 4) == 0) $
       completeHypixelBowLeaderboardUpdate bdt extra $ \MinecraftAccount {..} -> mcHypixelBow == Normal
     logInfo' "finished update"
@@ -231,23 +229,23 @@ adminCommands =
           hRespond "Done"
   , Command "lbrefresh" AdminLevel 1200 $ do
           bdt <- hData
-          liftIO $ completeHypixelBowLeaderboardUpdate bdt "none" $ \MinecraftAccount {..} -> mcHypixelBow /= Banned
+          liftIO $ completeHypixelBowLeaderboardUpdate bdt [] $ \MinecraftAccount {..} -> mcHypixelBow /= Banned
           hRespond "Done"
   , Command "lbrefreshday" AdminLevel 1200 $ do
           bdt <- hData
-          liftIO $ completeHypixelBowLeaderboardUpdate bdt "day" $ \MinecraftAccount {..} -> mcHypixelBow /= Banned
+          liftIO $ completeHypixelBowLeaderboardUpdate bdt [DailyStats] $ \MinecraftAccount {..} -> mcHypixelBow /= Banned
           hRespond "Done"
   , Command "lbrefreshweek" AdminLevel 1200 $ do
           bdt <- hData
-          liftIO $ completeHypixelBowLeaderboardUpdate bdt "day,week" $ \MinecraftAccount {..} -> mcHypixelBow /= Banned
+          liftIO $ completeHypixelBowLeaderboardUpdate bdt [DailyStats, WeeklyStats] $ \MinecraftAccount {..} -> mcHypixelBow /= Banned
           hRespond "Done"
   , Command "lbrefreshmonth" AdminLevel 1200 $ do
           bdt <- hData
-          liftIO $ completeHypixelBowLeaderboardUpdate bdt "day,month" $ \MinecraftAccount {..} -> mcHypixelBow /= Banned
+          liftIO $ completeHypixelBowLeaderboardUpdate bdt [DailyStats, MonthlyStats] $ \MinecraftAccount {..} -> mcHypixelBow /= Banned
           hRespond "Done"
   , Command "lbrefreshweekmonth" AdminLevel 1200 $ do
           bdt <- hData
-          liftIO $ completeHypixelBowLeaderboardUpdate bdt "day,week,month" $ \MinecraftAccount {..} -> mcHypixelBow /= Banned
+          liftIO $ completeHypixelBowLeaderboardUpdate bdt [DailyStats, WeeklyStats, MonthlyStats] $ \MinecraftAccount {..} -> mcHypixelBow /= Banned
           hRespond "Done"
   , Command "clearlogs" AdminLevel 120 $ do
           man <- hManager

@@ -3,6 +3,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE ViewPatterns #-}
+{-# LANGUAGE LambdaCase #-}
 
 module BowBot.Stats.HypixelBow(
   module BowBot.Stats.HypixelBow, module BowBot.Settings, module Data.Map
@@ -11,9 +12,9 @@ module BowBot.Stats.HypixelBow(
 import BowBot.Utils
 import BowBot.Settings
 import BowBot.API
-import Data.Maybe (catMaybes)
+import BowBot.DB
+import Data.Maybe (catMaybes, mapMaybe)
 import Data.Ratio ((%))
-import Data.Aeson.Types (object, (.=))
 import Data.Map (toList, Map, fromList)
 import BowBot.API.Hypixel
 
@@ -172,32 +173,46 @@ hypixelBowStatsToLeaderboards :: HypixelBowStats -> HypixelBowLeaderboards
 hypixelBowStatsToLeaderboards HypixelBowStats {..} = HypixelBowLeaderboards
   { bowLbWins = bowWins, bowLbLosses = bowLosses, bowLbWinstreak = bestWinstreak }
 
-getHypixelBowLeaderboard :: APIMonad m => m (Maybe (Map UUID HypixelBowLeaderboards))
+getHypixelBowLeaderboard :: DBMonad m => m (Map UUID HypixelBowLeaderboards)
 getHypixelBowLeaderboard = do
-  res <- hSendDB "stats/hypixel/leaderboard.php" []
-  decodeParse res $ \o -> do
-    dt <- o .: "data"
-    fmap fromList $ for dt $ \s -> do
-      uuid <- UUID <$> s .: "uuid"
-      (readMaybe -> Just bowLbWins) <- s .: "bowWins"
-      (readMaybe -> Just bowLbLosses) <- s .: "bowLosses"
-      (readMaybe -> Just bowLbWinstreak) <- s .: "bowWinstreak"
-      return (uuid, HypixelBowLeaderboards {..})
+  res :: [(String, Integer, Integer, Integer)] <- hQueryLog "SELECT `minecraft`, `bowWins`, `bowLosses`, `bowWinstreak` FROM `statsDEV`" ()
+  return $ fromList $ flip fmap res $ \case
+    (UUID -> uuid, bowLbWins, bowLbLosses, bowLbWinstreak) -> (uuid, HypixelBowLeaderboards {..})
 
-updateHypixelBowLeaderboard :: APIMonad m => String -> Map UUID HypixelBowLeaderboards -> m ()
-updateHypixelBowLeaderboard extraModes lb = hPostDB "stats/hypixel/update.php" ["extra=" ++ extraModes] (object $ helper <$> toList lb)
+data TimeStatsType = DailyStats | WeeklyStats | MonthlyStats deriving (Show, Eq)
+
+timeStatsTypeName :: TimeStatsType -> String
+timeStatsTypeName DailyStats = "Day"
+timeStatsTypeName WeeklyStats = "Week"
+timeStatsTypeName MonthlyStats = "Month"
+
+updateHypixelBowLeaderboard :: DBMonad m => [TimeStatsType] -> Map UUID HypixelBowLeaderboards -> m ()
+updateHypixelBowLeaderboard extraModes lb = do
+  let wslb = mapMaybe helperWS $ toList lb
+  let nowslb = mapMaybe helperNoWS $ toList lb
+  let extralb = helperExtra <$> toList lb
+  _ <- hExecuteManyLog "INSERT INTO `statsDEV` (`minecraft`, `bowWins`, `bowLosses`, `bowWinstreak`) VALUES (?,?,?,?) ON DUPLICATE KEY UPDATE `bowWins`=VALUES(`bowWins`), `bowLosses`=VALUES(`bowLosses`), `bowWinstreak`=VALUES(`bowWinstreak`)" wslb
+  _ <- hExecuteManyLog "INSERT INTO `statsDEV` (`minecraft`, `bowWins`, `bowLosses`) VALUES (?,?,?) ON DUPLICATE KEY UPDATE `bowWins`=VALUES(`bowWins`), `bowLosses`=VALUES(`bowLosses`)" nowslb
+  for_ extraModes $ \t -> hExecuteManyLog (replaceQuery "TIME" (timeStatsTypeName t) "INSERT INTO `statsDEV` (`minecraft`, `lastTIMEWins`, `lastTIMELosses`) VALUES (?,?,?) ON DUPLICATE KEY UPDATE `lastTIMEWins`=VALUES(`lastTIMEWins`), `lastTIMELosses`=VALUES(`lastTIMELosses`)") extralb
     where
-      helper (UUID uuid, HypixelBowLeaderboards {..}) = pack uuid .= object ["bowWins" .= bowLbWins, "bowLosses" .= bowLbLosses, "bowWinstreak" .= bowLbWinstreak]
+      helperNoWS (UUID uuid, HypixelBowLeaderboards {..})
+        | bowLbWinstreak == 0 = Just (uuid, bowLbWins, bowLbLosses)
+        | otherwise = Nothing
+      helperWS (UUID uuid, HypixelBowLeaderboards {..})
+        | bowLbWinstreak /= 0 = Just (uuid, bowLbWins, bowLbLosses, bowLbWinstreak)
+        | otherwise = Nothing
+      helperExtra (UUID uuid, HypixelBowLeaderboards {..}) = (uuid, bowLbWins, bowLbLosses)
 
-banHypixelBowLeaderboard :: APIMonad m => UUID -> m (Maybe Bool)
+banHypixelBowLeaderboard :: DBMonad m => UUID -> m Bool
 banHypixelBowLeaderboard (UUID uuid) = do
-  res <- hSendDB "stats/hypixel/ban.php" ["uuid="++uuid]
-  decodeParse res $ \o -> o .: "success"
+  changed <- hExecuteLog "UPDATE `minecraftDEV` SET `hypixel`='ban' WHERE `uuid`=?" (Only uuid)
+  when (changed > 0) $ void $ hExecuteLog "DELETE FROM `statsDEV` WHERE `minecraft`=?" (Only uuid)
+  return (changed > 0)
 
-fullUpdateHypixelBowStats :: APIMonad m => UUID -> m ()
+fullUpdateHypixelBowStats :: (APIMonad m, DBMonad m) => UUID -> m ()
 fullUpdateHypixelBowStats uuid = do
   stats <- requestHypixelBowStats uuid
-  for_ stats $ \x -> updateHypixelBowLeaderboard "none" $ fromList [(uuid, hypixelBowStatsToLeaderboards x)]
+  for_ stats $ \x -> updateHypixelBowLeaderboard [] $ fromList [(uuid, hypixelBowStatsToLeaderboards x)]
 
 hypixelBowWinsLeaderboard :: HypixelBowLeaderboards -> Maybe (Integer, String)
 hypixelBowWinsLeaderboard HypixelBowLeaderboards {..} | bowLbWins >= 500 = Just (bowLbWins, show bowLbWins)

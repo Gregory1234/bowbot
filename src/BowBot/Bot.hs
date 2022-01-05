@@ -179,13 +179,13 @@ eventHandler bdt man (MessageCreate m) = do
             else respond m "You don't have the permission to do that!"
           logInfoDB conn $ "finished " ++ unpack (messageText m)
 
-eventHandler bdt man (GuildMemberAdd gid mem) = do
+eventHandler bdt _ (GuildMemberAdd gid mem) = withDB $ \conn -> do
   trueId <- readProp discordGuildId bdt
   when (gid == trueId) $
-    runDiscordHandler' $ runManagerT (runBotDataT (updateDiscordRolesSingleId (userId $ memberUser mem)) bdt) man
-  withDB $ \conn -> void $ executeLog conn
-      "INSERT INTO `discordDEV` (`id`, `name`, `discriminator`, `nickname`) VALUES (?,?,?,?) ON DUPLICATE KEY UPDATE `name`=VALUES(`name`), `discriminator`=VALUES(`discriminator`), `nickname`=VALUES(`nickname`)"
-      (show (userId (memberUser mem)), userName (memberUser mem), userDiscrim (memberUser mem), memberNick mem)
+    runDiscordHandler' $ runConnectionT (runBotDataT (updateDiscordRolesSingleId (userId $ memberUser mem)) bdt) conn
+  void $ executeLog conn
+    "INSERT INTO `discordDEV` (`id`, `name`, `discriminator`, `nickname`) VALUES (?,?,?,?) ON DUPLICATE KEY UPDATE `name`=VALUES(`name`), `discriminator`=VALUES(`discriminator`), `nickname`=VALUES(`nickname`)"
+    (show (userId (memberUser mem)), userName (memberUser mem), userDiscrim (memberUser mem), memberNick mem)
 
 eventHandler _ _ _ = pure ()
 

@@ -41,9 +41,8 @@ fromSense Never = "never"
 fromSense WhenSensible = "sensibly"
 
 unsafeUpdateSettings :: DBMonad m => UserId -> String -> String -> m ()
-unsafeUpdateSettings did key val = do
-  let nq = Query $ BS.toStrict $ BS.replace "SETTING" (fromString key :: BS.ByteString) "INSERT INTO `settingsDEV` (`discord`, `SETTING`) VALUES (?, ?) ON DUPLICATE KEY UPDATE `SETTING` = VALUES(`SETTING`)"
-  void $ hExecuteLog nq (show did, val)
+unsafeUpdateSettings did key val = 
+  void $ hExecuteLog (replaceQuery "SETTING" key "INSERT INTO `settingsDEV` (`discord`, `SETTING`) VALUES (?, ?) ON DUPLICATE KEY UPDATE `SETTING` = VALUES(`SETTING`)") (show did, val)
 
 boolFromEither :: Either (Bool, BoolSense) String -> Maybe Bool
 boolFromEither (Left (b, _)) = Just b

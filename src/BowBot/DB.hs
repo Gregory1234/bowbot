@@ -15,6 +15,7 @@ import Database.MySQL.Simple.Types (Query(..))
 import BowBot.CommandMonads (DBMonad(..))
 import BowBot.Utils
 import Data.Int (Int64)
+import Data.String (fromString)
 
 withDB :: MonadIO m => (Connection -> m a) -> m a -- TODO: report connection errors
 withDB f = do
@@ -43,10 +44,13 @@ logErrorDB conn msg = liftIO $ void $ do
 hLogErrorDB :: DBMonad m => String -> m ()
 hLogErrorDB str = hConnection >>= flip logErrorDB str
 
+replaceQuery :: String -> String -> Query -> Query
+replaceQuery from to q = Query $ BS.toStrict $ BS.replace (fromString from) (fromString to :: BS.ByteString) (fromQuery q)
+
 queryLog :: (QueryParams q, QueryResults r, MonadIO m) => Connection -> Query -> q -> m [r]
 queryLog conn q d = do
-  dev :: BS.ByteString <- ifDev "" (return "Dev")
-  let nq = Query $ BS.toStrict $ BS.replace "DEV" dev (fromQuery q)
+  dev <- ifDev "" (return "Dev")
+  let nq = replaceQuery "DEV" dev q
   trueQuery <- liftIO $ formatQuery conn nq d
   logInfoDB conn $ "Executing query: " ++ show trueQuery
   liftIO $ query conn nq d
@@ -58,8 +62,8 @@ hQueryLog q d = do
 
 executeLog :: (QueryParams q, MonadIO m) => Connection -> Query -> q -> m Int64
 executeLog conn q d = do
-  dev :: BS.ByteString <- ifDev "" (return "Dev")
-  let nq = Query $ BS.toStrict $ BS.replace "DEV" dev (fromQuery q)
+  dev <- ifDev "" (return "Dev")
+  let nq = replaceQuery "DEV" dev q
   trueQuery <- liftIO $ formatQuery conn nq d
   logInfoDB conn $ "Executing query: " ++ show trueQuery
   liftIO $ execute conn nq d
@@ -71,8 +75,8 @@ hExecuteLog q d = do
 
 executeManyLog :: (QueryParams q, MonadIO m) => Connection -> Query -> [q] -> m Int64
 executeManyLog conn q d = do
-  dev :: BS.ByteString <- ifDev "" (return "Dev")
-  let nq = Query $ BS.toStrict $ BS.replace "DEV" dev (fromQuery q)
+  dev <- ifDev "" (return "Dev")
+  let nq = replaceQuery "DEV" dev q
   trueQuery <- liftIO $ formatMany conn nq d
   logInfoDB conn $ "Executing query: " ++ show trueQuery
   liftIO $ executeMany conn nq d

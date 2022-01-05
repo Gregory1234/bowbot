@@ -17,50 +17,47 @@ data LeaderboardPage = LeaderboardPage Int | LeaderboardAll | LeaderboardSearch 
 hypixelBowLeaderboardCommand :: String -> String -> String -> (HypixelBowLeaderboards -> Maybe (Integer, String)) -> Command
 hypixelBowLeaderboardCommand name lbname statname lbfun = Command name DefaultLevel 10 $ do
   caller <- hCaller
-  maybedat <- getHypixelBowLeaderboard
-  case maybedat of
-    Nothing -> hRespond somethingWrongMessage
-    Just dat -> do
-      let lb = [(val, (uuid, str)) | (uuid, lbv) <- toList dat, Just (val, str) <- [lbfun lbv]]
-      sortedlb <- for (sortOn (negate . fst) lb) $ \(_, (uuid, str)) -> do
-        names <- fromMaybe [] <$> mcUUIDToNames uuid
-        return (head names, str, uuid)
-      let elems = zipWith (\lbPos (lbName, lbVal, lbUUID) -> LeaderboardElement {..}) [1..] sortedlb
-      args <- hArgs
-      selectedOrMsg <- case args of
-        [] -> (\x -> Right (x ,Nothing, LeaderboardSearch (head $ filter (`elem` x) $ map lbUUID elems))) <$> getAuthorNicks (userId caller)
-        ["all"] -> Right . (,Nothing, LeaderboardAll) <$> getAuthorNicks (userId caller)
-        [readMaybe -> Just page] -> Right . (,Nothing, LeaderboardPage (page - 1)) <$> getAuthorNicks (userId caller)
-        [mcName] -> do
-          res <- withMinecraftAutocorrect False mcName $ \uuid _ ->
-            return $ if uuid `elem` map lbUUID elems then Right uuid else Left ()
-          return $ case res of
-            PlayerNotFound -> Left playerNotFoundMessage
-            DiscordUserNotFound -> Left discordNotFoundMessage
-            (UserError ()) -> Left "*The player isn't on this leaderboard!*"
-            NotOnList -> Left registerMessage
-            JustResponse _ u -> Right ([u], Nothing, LeaderboardSearch u)
-            OldResponse _ _ u -> Right ([u], Nothing, LeaderboardSearch u)
-            DidYouMeanResponse n u -> Right ([u], Just $ "*Did you mean* **" ++ n ++ "**:\n", LeaderboardSearch u)
-            DidYouMeanOldResponse o n u -> Right ([u], Just $ "*Did you mean* **" ++ o ++ " (" ++ n ++ "):**\n", LeaderboardSearch u)
-        _ -> return $ Left wrongSyntaxMessage
-      case selectedOrMsg of
-        Left msg -> hRespond msg
-        Right (selected, msg, lbPage) -> do
-          let lbFull = generateLeaderboard statname elems selected
-          let pages = chunksOf 20 lbFull
-          case lbPage of
-            LeaderboardPage page ->
-              if page < 0 || page >= length pages
-              then hRespond $ "*Wrong page number, it has to be between **1** and **" ++ show (length pages) ++ "**.*"
-              else hRespond $ lbname ++ " (page **" ++ show (page + 1) ++ "/" ++ show (length pages) ++ "**):\n" ++ fromMaybe "" msg ++ "```\n" ++ unlines (pages !! page) ++ "```"
-            LeaderboardSearch uuid -> do
-              let searched = head $ filter ((==uuid) . lbUUID) elems
-              let page = fromIntegral $ (lbPos searched - 1) `div` 20
-              hRespond $ lbname ++ " (page **" ++ show (page + 1) ++ "/" ++ show (length pages) ++ "**):\n" ++ fromMaybe "" msg ++ "```\n" ++ unlines (pages !! page) ++ "```"
-            LeaderboardAll -> do
-              for_ msg hRespond
-              hRespondFile (pack $ statname ++ ".txt") $ unlines lbFull
+  dat <- getHypixelBowLeaderboard
+  let lb = [(val, (uuid, str)) | (uuid, lbv) <- toList dat, Just (val, str) <- [lbfun lbv]]
+  sortedlb <- for (sortOn (negate . fst) lb) $ \(_, (uuid, str)) -> do
+    names <- fromMaybe [] <$> mcUUIDToNames uuid
+    return (head names, str, uuid)
+  let elems = zipWith (\lbPos (lbName, lbVal, lbUUID) -> LeaderboardElement {..}) [1..] sortedlb
+  args <- hArgs
+  selectedOrMsg <- case args of
+    [] -> (\x -> Right (x ,Nothing, LeaderboardSearch (head $ filter (`elem` x) $ map lbUUID elems))) <$> getAuthorNicks (userId caller)
+    ["all"] -> Right . (,Nothing, LeaderboardAll) <$> getAuthorNicks (userId caller)
+    [readMaybe -> Just page] -> Right . (,Nothing, LeaderboardPage (page - 1)) <$> getAuthorNicks (userId caller)
+    [mcName] -> do
+      res <- withMinecraftAutocorrect False mcName $ \uuid _ ->
+        return $ if uuid `elem` map lbUUID elems then Right uuid else Left ()
+      return $ case res of
+        PlayerNotFound -> Left playerNotFoundMessage
+        DiscordUserNotFound -> Left discordNotFoundMessage
+        (UserError ()) -> Left "*The player isn't on this leaderboard!*"
+        NotOnList -> Left registerMessage
+        JustResponse _ u -> Right ([u], Nothing, LeaderboardSearch u)
+        OldResponse _ _ u -> Right ([u], Nothing, LeaderboardSearch u)
+        DidYouMeanResponse n u -> Right ([u], Just $ "*Did you mean* **" ++ n ++ "**:\n", LeaderboardSearch u)
+        DidYouMeanOldResponse o n u -> Right ([u], Just $ "*Did you mean* **" ++ o ++ " (" ++ n ++ "):**\n", LeaderboardSearch u)
+    _ -> return $ Left wrongSyntaxMessage
+  case selectedOrMsg of
+    Left msg -> hRespond msg
+    Right (selected, msg, lbPage) -> do
+      let lbFull = generateLeaderboard statname elems selected
+      let pages = chunksOf 20 lbFull
+      case lbPage of
+        LeaderboardPage page ->
+          if page < 0 || page >= length pages
+          then hRespond $ "*Wrong page number, it has to be between **1** and **" ++ show (length pages) ++ "**.*"
+          else hRespond $ lbname ++ " (page **" ++ show (page + 1) ++ "/" ++ show (length pages) ++ "**):\n" ++ fromMaybe "" msg ++ "```\n" ++ unlines (pages !! page) ++ "```"
+        LeaderboardSearch uuid -> do
+          let searched = head $ filter ((==uuid) . lbUUID) elems
+          let page = fromIntegral $ (lbPos searched - 1) `div` 20
+          hRespond $ lbname ++ " (page **" ++ show (page + 1) ++ "/" ++ show (length pages) ++ "**):\n" ++ fromMaybe "" msg ++ "```\n" ++ unlines (pages !! page) ++ "```"
+        LeaderboardAll -> do
+          for_ msg hRespond
+          hRespondFile (pack $ statname ++ ".txt") $ unlines lbFull
  where
    getAuthorNicks did = do
      accounts <- hRead bowBotAccounts

@@ -40,11 +40,11 @@ hypixelBowStatsMessage settings (OldResponse o n s) = "**" ++ o ++ " (" ++ n ++ 
 hypixelBowStatsMessage settings (DidYouMeanResponse n s) = "*Did you mean* **" ++ n ++ ":**\n" ++ showHypixelBowStats settings s
 hypixelBowStatsMessage settings (DidYouMeanOldResponse o n s) = "*Did you mean* **" ++ o ++ " (" ++ n ++ "):**\n" ++ showHypixelBowStats settings s
 
-hypixelBowTryRegister :: (APIMonad m, BotDataMonad m) => UUID -> [String] -> HypixelBowStats -> m ()
+hypixelBowTryRegister :: (APIMonad m, DBMonad m, BotDataMonad m) => UUID -> [String] -> HypixelBowStats -> m ()
 hypixelBowTryRegister uuid names s | bowWins s >= 50 = do
   registeredPlayers <- map mcUUID <$> hRead minecraftAccounts
   unless (uuid `elem` registeredPlayers) $ do
     acc <- addMinecraftAccount uuid names
     for_ acc $ \x -> hModify minecraftAccounts (x:)
-  updateHypixelBowLeaderboard "none" (fromList [(uuid, hypixelBowStatsToLeaderboards s)])
+  updateHypixelBowLeaderboard [] (fromList [(uuid, hypixelBowStatsToLeaderboards s)])
 hypixelBowTryRegister _ _ _ = pure ()
