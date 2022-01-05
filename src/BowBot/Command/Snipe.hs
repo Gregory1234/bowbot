@@ -28,4 +28,4 @@ snipeCommand = Command "snipe" DefaultLevel 2 $ do
           Right u -> return $ Just $ Right u
       case memoruser of
         Nothing -> hRespond somethingWrongMessage
-        Just mor -> hRespond $ "**" ++ showMemberOrUser True mor ++ "** *wrote:* \n" ++ snipeMessageContent
+        Just mor -> hRespond $ showMemberOrUser True mor ++ " *wrote:* \n" ++ snipeMessageContent
