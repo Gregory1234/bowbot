@@ -9,11 +9,11 @@ module BowBot.DB(
 import Database.MySQL.Simple
 import Database.MySQL.Simple.QueryParams
 import Database.MySQL.Simple.QueryResults
-import BowBot.API
 import qualified Data.ByteString.Lazy as BS
 import qualified Data.ByteString.Search as BS
 import Database.MySQL.Simple.Types (Query(..))
 import BowBot.CommandMonads
+import BowBot.Utils
 
 withDB :: MonadIO m => (Connection -> m a) -> m a
 withDB f = do
@@ -26,12 +26,28 @@ withDB f = do
   liftIO $ close conn
   return r
 
+logInfoDB :: MonadIO m => Connection -> String -> m ()
+logInfoDB conn msg = liftIO $ void $ do
+  putStrLn msg
+  execute conn "INSERT INTO `logs`(`message`) VALUES (?)" (Only msg)
+
+hLogInfoDB :: DBMonad m => String -> m ()
+hLogInfoDB str = hConnection >>= flip logInfoDB str
+
+logErrorDB :: MonadIO m => Connection -> String -> m ()
+logErrorDB conn msg = liftIO $ void $ do
+  putStrLn msg
+  execute conn "INSERT INTO `logs`(`message`,`type`) VALUES (?,'error')" (Only msg)
+
+hLogErrorDB :: DBMonad m => String -> m ()
+hLogErrorDB str = hConnection >>= flip logErrorDB str
+
 queryLog :: (QueryParams q, QueryResults r, MonadIO m) => Connection -> Query -> q -> m [r]
 queryLog conn q d = do
   dev :: BS.ByteString <- ifDev "" (return "Dev")
   let nq = Query $ BS.toStrict $ BS.replace "DEV" dev (fromQuery q)
   trueQuery <- liftIO $ formatQuery conn nq d
-  logInfo' $ "Executing query: " ++ show trueQuery
+  logInfoDB conn $ "Executing query: " ++ show trueQuery
   liftIO $ query conn nq d
 
 getInfoDB :: MonadIO m => Connection -> String -> m (Maybe String)
@@ -40,7 +56,7 @@ getInfoDB conn name = do
   case xs of
     [Only r] -> return $ Just r
     _ -> do
-      logError' $ "Info not found: " ++ name
+      logErrorDB conn $ "Info not found: " ++ name
       return Nothing
 
 hInfoDB :: DBMonad m => String -> m (Maybe String)

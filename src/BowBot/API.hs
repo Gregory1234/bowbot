@@ -40,11 +40,6 @@ logInfo' msg = do
   man <- liftIO $ newManager managerSettings
   logInfo man msg
 
-hLogInfo :: APIMonad m => String -> m ()
-hLogInfo msg = do
-  man <- hManager
-  logInfo man msg
-
 logError :: MonadIO m => Manager -> String -> m ()
 logError man msg = liftIO $ void $ forkIO $ do
   _ <- evaluate $ force msg
@@ -58,11 +53,6 @@ logError man msg = liftIO $ void $ forkIO $ do
 logError' :: MonadIO m => String -> m ()
 logError' msg = do
   man <- liftIO $ newManager managerSettings
-  logError man msg
-
-hLogError :: APIMonad m => String -> m ()
-hLogError msg = do
-  man <- hManager
   logError man msg
 
 sendRequestTo :: Manager -> String -> String -> IO ByteString

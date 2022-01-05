@@ -8,7 +8,7 @@ import Data.Map ((!?))
 
 snipeCommand :: Command
 snipeCommand = Command "snipe" DefaultLevel 2 $ do
-  channel <- CommandHandler $ \m _ _ -> return $ messageChannel m
+  channel <- CommandHandler $ \m _ _ _ -> return $ messageChannel m
   msgs <- hRead snipeMessage
   case msgs !? channel of
     Nothing -> hRespond "*Nothing to snipe!*"
@@ -21,8 +21,8 @@ snipeCommand = Command "snipe" DefaultLevel 2 $ do
             users <- hDiscord $ call $ R.GetUser snipeMessageAuthor
             case users of
               Left err2 -> do
-                hLogError $ show err1
-                hLogError $ show err2
+                hLogErrorDB $ show err1
+                hLogErrorDB $ show err2
                 return Nothing
               Right u -> return $ Just $ Left u
           Right u -> return $ Just $ Right u

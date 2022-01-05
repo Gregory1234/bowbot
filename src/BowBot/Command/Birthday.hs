@@ -18,7 +18,7 @@ birthdayAnnounceCommand = Command "bdsay" ModLevel 10 $ do
       people <- hDiscord $ fmap (filter ((`elem` birthdays) . userId . memberUser)) <$> call (R.ListGuildMembers dgid R.GuildMembersTiming {R.guildMembersTimingLimit = Just 500, R.guildMembersTimingAfter = Nothing})
       case people of
         Left err -> do
-          hLogError $ show err
+          hLogErrorDB $ show err
           hRespond somethingWrongMessage
         Right ppl -> if null ppl
           then hRespond "*Noone has a birthday today!*"

@@ -1,5 +1,5 @@
 module BowBot.Command(
-  module BowBot.Command, module BowBot.CommandHandler, module BowBot.CommandMonads, module BowBot.API,
+  module BowBot.Command, module BowBot.CommandHandler, module BowBot.CommandMonads, module BowBot.API, module BowBot.DB,
   module Discord, module Discord.Types, module BowBot.BotData, module BowBot.Utils
 ) where
 
@@ -10,6 +10,7 @@ import BowBot.BotData
 import BowBot.CommandMonads
 import BowBot.CommandHandler
 import BowBot.API
+import BowBot.DB
 
 data Command = Command { commandName :: String, commandPerms :: PermissionLevel, commandTimeout :: Int, commandHandler :: CommandHandler () }
 

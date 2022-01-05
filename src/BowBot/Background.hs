@@ -25,23 +25,22 @@ import Data.List ((\\), intercalate)
 import BowBot.Command
 import BowBot.Birthday
 import Control.Exception.Base (SomeException, try)
-import Control.Monad.Trans (lift)
 
-announceBirthdays :: BotData -> ManagerT DiscordHandler ()
-announceBirthdays bdt = do
+announceBirthdays :: (DBMonad m, APIMonad m, BotDataMonad m, DiscordMonad m) => m ()
+announceBirthdays = do
   currentDay <- liftIO currentBirthdayDate
   maybeBirthdays <- getBirthdayPeople currentDay
   case maybeBirthdays of
-    Nothing -> hLogError "Birthday parsing failed!"
+    Nothing -> hLogErrorDB "Birthday parsing failed!"
     Just birthdays -> do
-      dgid <- readProp discordGuildId bdt
-      people <- lift $ fmap (filter ((`elem` birthdays) . userId . memberUser)) <$> call (R.ListGuildMembers dgid R.GuildMembersTiming {R.guildMembersTimingLimit = Just 500, R.guildMembersTimingAfter = Nothing})
+      dgid <- hRead discordGuildId
+      people <- hDiscord $ fmap (filter ((`elem` birthdays) . userId . memberUser)) <$> call (R.ListGuildMembers dgid R.GuildMembersTiming {R.guildMembersTimingLimit = Just 500, R.guildMembersTimingAfter = Nothing})
       case people of
-        Left err -> hLogError $ show err
+        Left err -> hLogErrorDB $ show err
         Right ppl -> unless (null ppl) $ do
-          birthdayChannel <- readProp discordBirthdayChannel bdt
-          hLogInfo $ "Announcing birthdays: " ++ intercalate ", " (map (showMemberOrUser True . Right) ppl)
-          lift $ for_ ppl $ \p -> call $ R.CreateMessage birthdayChannel $ pack $ "**Happy birthday** to " ++ showMemberOrUser True (Right p) ++ "!"
+          birthdayChannel <- hRead discordBirthdayChannel
+          hLogInfoDB $ "Announcing birthdays: " ++ intercalate ", " (map (showMemberOrUser True . Right) ppl)
+          hDiscord $ for_ ppl $ \p -> call $ R.CreateMessage birthdayChannel $ pack $ "**Happy birthday** to " ++ showMemberOrUser True (Right p) ++ "!"
 
 updateDiscordStatus :: DiscordHandler ()
 updateDiscordStatus = do
@@ -164,14 +163,14 @@ discordBackgroundMinutely bdt mint = do
   when (mint == 1) $ do
     manager <- liftIO $ newManager managerSettings
     hour <- liftIO $ read @Integer <$> getTime "%k"
-    when (hour == 5) $ runManagerT (announceBirthdays bdt) manager
+    when (hour == 5) $ runDiscordHandler' $ withDB $ runConnectionT $ runManagerT (runBotDataT announceBirthdays bdt) manager
     addDiscords bdt
     updateDiscordStatus
     runDiscordHandler' $ runManagerT (runBotDataT updateRolesAll bdt) manager
 
 -- TODO: frequency updates
 
-completeHypixelBowLeaderboardUpdate :: BotData -> String ->(MinecraftAccount -> Bool) -> IO ()
+completeHypixelBowLeaderboardUpdate :: BotData -> String -> (MinecraftAccount -> Bool) -> IO ()
 completeHypixelBowLeaderboardUpdate bdt extra filt = do
   manager <- newManager managerSettings
   mcs <- readProp minecraftAccounts bdt

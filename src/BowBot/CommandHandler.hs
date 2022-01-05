@@ -15,10 +15,10 @@ import Control.DeepSeq (force, NFData(..))
 import BowBot.DiscordNFData()
 import Control.Monad (ap, liftM)
 import BowBot.CommandMonads
-import Control.Concurrent.STM.TVar (TVar)
 import Network.HTTP.Conduit (Manager)
+import BowBot.DB
 
-newtype CommandHandler a = CommandHandler { runCommandHandler :: Message -> Manager -> BotData -> DiscordHandler a }
+newtype CommandHandler a = CommandHandler { runCommandHandler :: Message -> Manager -> Connection -> BotData -> DiscordHandler a }
 
 instance Functor CommandHandler where
   fmap = liftM
@@ -28,37 +28,40 @@ instance Applicative CommandHandler where
   (<*>) = ap
 
 instance Monad CommandHandler where
-  return x = CommandHandler $ \_ _ _ -> pure x
-  (CommandHandler f) >>= g = CommandHandler $ \a b c -> do
-    v <- f a b c
-    runCommandHandler (g v) a b c
+  return x = CommandHandler $ \_ _ _ _ -> pure x
+  (CommandHandler f) >>= g = CommandHandler $ \a b c d -> do
+    v <- f a b c d
+    runCommandHandler (g v) a b c d
 
 instance MonadIO CommandHandler where
-  liftIO m = CommandHandler $ \_ _ _ -> liftIO m
+  liftIO m = CommandHandler $ \_ _ _ _ -> liftIO m
 
 instance APIMonad CommandHandler where
-  hManager = CommandHandler $ \_ man _ -> return man
+  hManager = CommandHandler $ \_ man _ _ -> return man
+  
+instance DBMonad CommandHandler where
+  hConnection = CommandHandler $ \_ _ conn _ -> return conn
 
 instance BotDataMonad CommandHandler where
-  hData = CommandHandler $ \_ _ dt -> return dt
+  hData = CommandHandler $ \_ _ _ dt -> return dt
   
 instance DiscordMonad CommandHandler where
-  hDiscord d = CommandHandler $ \_ _ _ -> d
+  hDiscord d = CommandHandler $ \_ _ _ _ -> d
 
 hRespond :: String -> CommandHandler ()
-hRespond msg = CommandHandler $ \m _ _ -> respond m msg
+hRespond msg = CommandHandler $ \m _ _ _ -> respond m msg
 
 hRespondFile :: T.Text -> String -> CommandHandler ()
-hRespondFile n s = CommandHandler $ \m _ _ -> respondFile m n s
+hRespondFile n s = CommandHandler $ \m _ _ _ -> respondFile m n s
 
 hCaller :: CommandHandler User
-hCaller = CommandHandler $ \m _ _ -> return $ messageAuthor m
+hCaller = CommandHandler $ \m _ _ _ -> return $ messageAuthor m
 
 hArg :: Int -> CommandHandler (Maybe String)
-hArg n = CommandHandler $ \m _ _ -> pure $ let args = words (unpack (messageText m)) in if length args > n then Just (args !! n) else Nothing
+hArg n = CommandHandler $ \m _ _ _ -> pure $ let args = words (unpack (messageText m)) in if length args > n then Just (args !! n) else Nothing
 
 hArgs :: CommandHandler [String]
-hArgs = CommandHandler $ \m _ _ -> pure $ tail $ words (unpack (messageText m))
+hArgs = CommandHandler $ \m _ _ _ -> pure $ tail $ words (unpack (messageText m))
 
 call :: (FromJSON a, R.Request (r a), NFData (r a)) => r a -> DiscordHandler (Either RestCallErrorCode a)
 call r = liftIO (evaluate (force r)) >>= restCall
