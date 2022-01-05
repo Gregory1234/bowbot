@@ -194,7 +194,7 @@ backgroundMinutely bdt@BotData {..} mint = do
     unless dev $ do
       hour <- read @Int <$> getTime "%k"
       when (hour `mod` 8 == 0) $ clearLogs manager
-    runManagerT (updateMinecraftAccounts bdt) manager
+    withDB $ runConnectionT $ runManagerT (updateMinecraftAccounts bdt) manager
     logInfo' "finished update"
   when (mint == 30) $ do
     logInfo' "started update"

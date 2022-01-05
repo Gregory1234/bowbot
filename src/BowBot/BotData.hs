@@ -25,28 +25,26 @@ import BowBot.DB
 import BowBot.BotData.Core
 import BowBot.CommandMonads
 
-downloadMinecraftAccounts :: APIMonad m => m (Maybe [MinecraftAccount])
+downloadMinecraftAccounts :: DBMonad m => m [MinecraftAccount]
 downloadMinecraftAccounts = do
-  res <- hSendDB "minecraft/all.php" []
-  decodeParse res $ \o -> do
-    dt <- o .: "data"
-    for dt $ \acc -> do
-      mcUUID <- UUID <$> acc .: "uuid"
-      mcNames <- acc .: "names"
-      (stringToUpdateFreq -> Just mcHypixelBow) <- acc .: "hypixel"
-      return MinecraftAccount {..}
+  res :: [(String, String, String)] <- hQueryLog "SELECT `uuid`, `names`, `hypixel` FROM `minecraftDEV`" ()
+  return $ flip fmap res $ \case
+    (UUID -> mcUUID, splitOn "," -> mcNames, stringToUpdateFreq -> Just mcHypixelBow) -> MinecraftAccount {..}
+    (UUID -> mcUUID, splitOn "," -> mcNames, _) -> MinecraftAccount {mcHypixelBow = Normal, ..}
 
 
-downloadBowBotAccounts :: APIMonad m => m (Maybe [BowBotAccount])
+downloadBowBotAccounts :: DBMonad m => m [BowBotAccount]
 downloadBowBotAccounts = do
-  res <- hSendDB "people/all.php" []
-  decodeParse res $ \o -> do
-    dt <- o .: "data"
-    for (toList dt) $ \(accountId, acc) -> do
-      accountDiscords <- acc .: "discord"
-      accountSelectedMinecraft <- UUID <$> acc .: "selected"
-      accountMinecrafts <- fmap UUID <$> acc .: "minecraft"
-      return BowBotAccount {..}
+  minecrafts :: [(Integer, String, Bool)] <- hQueryLog "SELECT `id`, `minecraft`, `selected` FROM `peopleMinecraftDEV`" ()
+  discords :: [(Integer, Integer)] <- hQueryLog "SELECT `id`, `discord` FROM `peopleDiscordDEV`" ()
+  return $ map helper $ toList $ zipMapWith join (groupToMap $ fmap (\(a,b,c) -> (a,(b,c))) minecrafts) (groupToMap discords) -- TODO: probably exists a better way
+    where
+      helper (accountId,(minecrafts, discords)) = 
+        let accountMinecrafts = map (UUID . fst) minecrafts
+            accountSelectedMinecraft = UUID . fst . head $ filter snd minecrafts
+            accountDiscords = map fromInteger discords
+        in BowBotAccount {..}
+      join (fromMaybe [] -> mcs) (fromMaybe [] -> ds) = (mcs, ds)
 
 downloadDiscordPerms :: DBMonad m => m (Map UserId PermissionLevel)
 downloadDiscordPerms = do
@@ -61,9 +59,10 @@ downloadData = do
   newDiscordSettings <- getSettings
   newBowBotAccounts <- downloadBowBotAccounts
   newDiscordPerms <- downloadDiscordPerms
-  for_ newMinecraftAccounts (hWrite minecraftAccounts)
+  liftIO $ print newBowBotAccounts
+  hWrite minecraftAccounts newMinecraftAccounts
   hWrite discordSettings newDiscordSettings
-  for_ newBowBotAccounts (hWrite bowBotAccounts)
+  hWrite bowBotAccounts newBowBotAccounts
   hWrite discordPerms newDiscordPerms
   withDB $ runConnectionT updateDiscordConstants
   hTryApiRequests hypixelRequestCounter 1 (\_ -> pure ()) $ do
@@ -72,12 +71,13 @@ downloadData = do
     for_ newGuildMembers (hWrite hypixelGuildMembers)
     
 
-updateMinecraftAccounts :: APIMonad m => BotData -> m ()
+updateMinecraftAccounts :: (DBMonad m, APIMonad m) => BotData -> m ()
 updateMinecraftAccounts bdt = do
   manager <- hManager
+  conn <- hConnection
   nickList <- readProp minecraftAccounts bdt
   let chunked = chunksOf 10 nickList
-  updatedNicks <- liftIO $ fmap concat $ for chunked $ mapConcurrently (fmap (`runManagerT` manager) helper)
+  updatedNicks <- liftIO $ fmap concat $ for chunked $ mapConcurrently (fmap ((`runConnectionT` conn) . (`runManagerT` manager)) helper)
   writeProp minecraftAccounts bdt updatedNicks
   where
     helper MinecraftAccount {..} = do
@@ -86,7 +86,7 @@ updateMinecraftAccounts bdt = do
         unless (mcNames == names) $ updateMinecraftNames mcUUID names
       return MinecraftAccount {mcNames = fromMaybe mcNames newNames, ..}
     updateMinecraftNames (UUID uuid) names = 
-      void $ hSendDB "minecraft/setnames.php" ["uuid=" ++ uuid, "names=" ++ intercalate "," names]
+      void $ hExecuteLog "UPDATE `minecraftDEV` SET `names`=?, `name`=? WHERE `uuid`=?" (intercalate "," names, head names, uuid)
 
 updateDiscordConstants :: (BotDataMonad m, DBMonad m) => m ()
 updateDiscordConstants = do

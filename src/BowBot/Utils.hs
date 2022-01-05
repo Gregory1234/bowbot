@@ -21,6 +21,8 @@ import Control.Concurrent.STM.TVar (readTVar, writeTVar, modifyTVar, TVar)
 import Data.Text (pack, unpack)
 import Control.Monad (when, unless, void)
 import Discord.Types
+import qualified Data.Map as M
+import qualified Data.Map.Internal as M
 
 dist :: Eq a => [a] -> [a] -> Int
 dist a b =
@@ -98,5 +100,15 @@ showWLR (fromIntegral -> bowWins) (fromIntegral -> bowLosses)
   | bowWins == 0, bowLosses == 0 = "NaN"
   | bowLosses == 0 = "∞"
   | otherwise = printf "%.04f" (fromRational (bowWins % bowLosses) :: Double)
+
+groupByToMap :: Ord k => (v -> k) -> [v] -> M.Map k [v]
+groupByToMap _ [] = M.empty
+groupByToMap f (x:xs) = M.insertWith (++) (f x) [x] $ groupByToMap f xs
+
+groupToMap :: Ord k => [(k,v)] -> M.Map k [v]
+groupToMap = M.map (map snd) . groupByToMap fst
+
+zipMapWith :: Ord k => (Maybe a -> Maybe b -> c) -> M.Map k a -> M.Map k b -> M.Map k c
+zipMapWith f = M.merge (M.mapMissing $ \_ x -> f (Just x) Nothing) (M.mapMissing $ \_ y -> f Nothing (Just y)) (M.zipWithMatched $ \_ x y -> f (Just x) (Just y))
 
 newtype UUID = UUID { uuidString :: String } deriving (Show, Eq, Ord)
