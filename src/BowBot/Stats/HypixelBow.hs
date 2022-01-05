@@ -91,7 +91,7 @@ data HypixelBowStats = HypixelBowStats
 data HypixelBowLeaderboards = HypixelBowLeaderboards
   { bowLbWins :: Integer, bowLbLosses :: Integer, bowLbWinstreak :: Integer } deriving (Show)
 
-requestHypixelBowStats :: APIMonad m => String -> m (Maybe HypixelBowStats)
+requestHypixelBowStats :: APIMonad m => UUID -> m (Maybe HypixelBowStats)
 requestHypixelBowStats uuid = hypixelWithPlayerData uuid $ \o -> do
     pl <- o .: "player"
     stats <- pl .: "stats"
@@ -172,29 +172,29 @@ hypixelBowStatsToLeaderboards :: HypixelBowStats -> HypixelBowLeaderboards
 hypixelBowStatsToLeaderboards HypixelBowStats {..} = HypixelBowLeaderboards
   { bowLbWins = bowWins, bowLbLosses = bowLosses, bowLbWinstreak = bestWinstreak }
 
-getHypixelBowLeaderboard :: APIMonad m => m (Maybe (Map String HypixelBowLeaderboards))
+getHypixelBowLeaderboard :: APIMonad m => m (Maybe (Map UUID HypixelBowLeaderboards))
 getHypixelBowLeaderboard = do
   res <- hSendDB "stats/hypixel/leaderboard.php" []
   decodeParse res $ \o -> do
     dt <- o .: "data"
     fmap fromList $ for dt $ \s -> do
-      uuid <- s .: "uuid"
+      uuid <- UUID <$> s .: "uuid"
       (readMaybe -> Just bowLbWins) <- s .: "bowWins"
       (readMaybe -> Just bowLbLosses) <- s .: "bowLosses"
       (readMaybe -> Just bowLbWinstreak) <- s .: "bowWinstreak"
       return (uuid, HypixelBowLeaderboards {..})
 
-updateHypixelBowLeaderboard :: APIMonad m => String -> Map String HypixelBowLeaderboards -> m ()
+updateHypixelBowLeaderboard :: APIMonad m => String -> Map UUID HypixelBowLeaderboards -> m ()
 updateHypixelBowLeaderboard extraModes lb = hPostDB "stats/hypixel/update.php" ["extra=" ++ extraModes] (object $ helper <$> toList lb)
     where
-      helper (uuid, HypixelBowLeaderboards {..}) = pack uuid .= object ["bowWins" .= bowLbWins, "bowLosses" .= bowLbLosses, "bowWinstreak" .= bowLbWinstreak]
+      helper (UUID uuid, HypixelBowLeaderboards {..}) = pack uuid .= object ["bowWins" .= bowLbWins, "bowLosses" .= bowLbLosses, "bowWinstreak" .= bowLbWinstreak]
 
-banHypixelBowLeaderboard :: APIMonad m => String -> m (Maybe Bool)
-banHypixelBowLeaderboard uuid = do
+banHypixelBowLeaderboard :: APIMonad m => UUID -> m (Maybe Bool)
+banHypixelBowLeaderboard (UUID uuid) = do
   res <- hSendDB "stats/hypixel/ban.php" ["uuid="++uuid]
   decodeParse res $ \o -> o .: "success"
 
-fullUpdateHypixelBowStats :: APIMonad m => String -> m ()
+fullUpdateHypixelBowStats :: APIMonad m => UUID -> m ()
 fullUpdateHypixelBowStats uuid = do
   stats <- requestHypixelBowStats uuid
   for_ stats $ \x -> updateHypixelBowLeaderboard "none" $ fromList [(uuid, hypixelBowStatsToLeaderboards x)]

@@ -14,21 +14,21 @@ import BowBot.Stats.HypixelBow
 
 -- TODO: check if creation was successful
 
-addMinecraftAccount :: APIMonad m => String -> [String] -> m (Maybe MinecraftAccount)
+addMinecraftAccount :: APIMonad m => UUID -> [String] -> m (Maybe MinecraftAccount)
 addMinecraftAccount uuid names = do
-  _ <- hSendDB "minecraft/new.php" ["uuid=" ++ uuid, "names=" ++ intercalate "," names]
+  _ <- hSendDB "minecraft/new.php" ["uuid=" ++ uuidString uuid, "names=" ++ intercalate "," names]
   return $ Just MinecraftAccount { mcUUID = uuid, mcNames = names, mcHypixelBow = Normal }
 
-addAccount :: APIMonad m => String -> UserId -> String -> m (Maybe BowBotAccount)
+addAccount :: APIMonad m => String -> UserId -> UUID -> m (Maybe BowBotAccount)
 addAccount name did uuid = do
-  res <- hSendDB "people/new.php" ["name=" ++ name, "discord=" ++ show did, "verified=0", "minecraft=" ++ uuid]
+  res <- hSendDB "people/new.php" ["name=" ++ name, "discord=" ++ show did, "verified=0", "minecraft=" ++ uuidString uuid]
   decodeParse res $ \o -> do
     (readMaybe -> Just aid) <- o .: "id"
     return BowBotAccount { accountId = aid, accountDiscords = [did], accountMinecrafts = [uuid], accountSelectedMinecraft = uuid}
 
-addAltAccount :: APIMonad m => Integer -> String -> m ()
+addAltAccount :: APIMonad m => Integer -> UUID -> m ()
 addAltAccount gid uuid = do
-  _ <- hSendDB "people/alt.php" ["id=" ++ show gid, "verified=0", "minecraft=" ++ uuid]
+  _ <- hSendDB "people/alt.php" ["id=" ++ show gid, "verified=0", "minecraft=" ++ uuidString uuid]
   return ()
 
 registerCommand :: String -> Bool -> Bool -> Command

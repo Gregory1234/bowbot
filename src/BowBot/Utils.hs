@@ -98,3 +98,5 @@ showWLR (fromIntegral -> bowWins) (fromIntegral -> bowLosses)
   | bowWins == 0, bowLosses == 0 = "NaN"
   | bowLosses == 0 = "∞"
   | otherwise = printf "%.04f" (fromRational (bowWins % bowLosses) :: Double)
+
+newtype UUID = UUID { uuidString :: String } deriving (Show, Eq, Ord)

@@ -90,7 +90,7 @@ stringToUpdateFreq "ban" = Just Banned
 stringToUpdateFreq _ = Nothing
 
 data MinecraftAccount = MinecraftAccount
-  { mcUUID :: String
+  { mcUUID :: UUID
   , mcNames :: [String]
   , mcHypixelBow :: UpdateFreq
   } deriving (Show)
@@ -112,8 +112,8 @@ stringToPermissionLevel _ = Nothing
 data BowBotAccount = BowBotAccount
   { accountId :: Integer
   , accountDiscords :: [UserId]
-  , accountSelectedMinecraft :: String
-  , accountMinecrafts :: [String]
+  , accountSelectedMinecraft :: UUID
+  , accountMinecrafts :: [UUID]
   } deriving (Show, Eq)
 
 data SnipeMessage = SnipeMessage
@@ -134,11 +134,11 @@ data Settings = Settings
 data BotData = BotData
   { hypixelRequestCounter :: ApiRequestCounter
   , minecraftAccounts :: TVar [MinecraftAccount]
-  , hypixelBowOnlineList :: CachedData [String]
+  , hypixelBowOnlineList :: CachedData [UUID]
   , discordPerms :: TVar (Map UserId PermissionLevel)
   , discordSettings :: TVar (Map UserId Settings)
   , bowBotAccounts :: TVar [BowBotAccount]
-  , hypixelGuildMembers :: TVar [String]
+  , hypixelGuildMembers :: TVar [UUID]
   , snipeMessage :: TVar (Map ChannelId SnipeMessage)
   , hypixelGuildId :: TVar String
   , discordGuildId :: TVar GuildId

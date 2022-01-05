@@ -50,7 +50,7 @@ updateDiscordStatus = do
       updateStatusOptsAFK = False
     })
 
-updateDivisionRolesSingle :: (DiscordMonad m, BotDataMonad m) => Map String HypixelBowLeaderboards -> GuildMember -> BowBotAccount -> m ()
+updateDivisionRolesSingle :: (DiscordMonad m, BotDataMonad m) => Map UUID HypixelBowLeaderboards -> GuildMember -> BowBotAccount -> m ()
 updateDivisionRolesSingle lb memb BowBotAccount { accountMinecrafts = mc } = do
   gid <- hRead discordGuildId
   let did = userId . memberUser $ memb
@@ -61,7 +61,7 @@ updateDivisionRolesSingle lb memb BowBotAccount { accountMinecrafts = mc } = do
   hDiscord $ for_ (currentDivisionRoles \\ targetDivisionRoles) $ call . R.RemoveGuildMemberRole gid did
   hDiscord $ for_ (targetDivisionRoles \\ currentDivisionRoles) $ call . R.AddGuildMemberRole gid did
 
-updateGuildMemberRolesSingle :: (DiscordMonad m, BotDataMonad m) => [String] -> GuildMember -> BowBotAccount -> m ()
+updateGuildMemberRolesSingle :: (DiscordMonad m, BotDataMonad m) => [UUID] -> GuildMember -> BowBotAccount -> m ()
 updateGuildMemberRolesSingle members memb BowBotAccount { accountMinecrafts = mc } = do
   gid <- hRead discordGuildId
   let did = userId . memberUser $ memb
@@ -75,7 +75,7 @@ updateGuildMemberRolesSingle members memb BowBotAccount { accountMinecrafts = mc
 
 -- TODO: remove BotData from here - take it out to a new type
 updateDiscordRolesSingle
-  :: (DiscordMonad m, BotDataMonad m) => Maybe (Map String HypixelBowLeaderboards) -> Maybe [String] -> GuildId
+  :: (DiscordMonad m, BotDataMonad m) => Maybe (Map UUID HypixelBowLeaderboards) -> Maybe [UUID] -> GuildId
   -> GuildMember -> Maybe BowBotAccount -> m ()
 updateDiscordRolesSingle lb members gid m (Just bac) = do
   for_ lb $ \x -> updateDivisionRolesSingle x m bac

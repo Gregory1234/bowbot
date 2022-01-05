@@ -31,7 +31,7 @@ downloadMinecraftAccounts = do
   decodeParse res $ \o -> do
     dt <- o .: "data"
     for dt $ \acc -> do
-      mcUUID <- acc .: "uuid"
+      mcUUID <- UUID <$> acc .: "uuid"
       mcNames <- acc .: "names"
       (stringToUpdateFreq -> Just mcHypixelBow) <- acc .: "hypixel"
       return MinecraftAccount {..}
@@ -44,8 +44,8 @@ downloadBowBotAccounts = do
     dt <- o .: "data"
     for (toList dt) $ \(accountId, acc) -> do
       accountDiscords <- acc .: "discord"
-      accountSelectedMinecraft <- acc .: "selected"
-      accountMinecrafts <- acc .: "minecraft"
+      accountSelectedMinecraft <- UUID <$> acc .: "selected"
+      accountMinecrafts <- fmap UUID <$> acc .: "minecraft"
       return BowBotAccount {..}
 
 downloadDiscordPerms :: DBMonad m => m (Map UserId PermissionLevel)
@@ -85,7 +85,7 @@ updateMinecraftAccounts bdt = do
       for_ newNames $ \names ->
         unless (mcNames == names) $ updateMinecraftNames mcUUID names
       return MinecraftAccount {mcNames = fromMaybe mcNames newNames, ..}
-    updateMinecraftNames uuid names = 
+    updateMinecraftNames (UUID uuid) names = 
       void $ hSendDB "minecraft/setnames.php" ["uuid=" ++ uuid, "names=" ++ intercalate "," names]
 
 updateDiscordConstants :: (BotDataMonad m, DBMonad m) => m ()

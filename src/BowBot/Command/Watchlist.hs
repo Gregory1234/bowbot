@@ -41,14 +41,14 @@ onlineCommand = Command "online" DefaultLevel 30 $ do
       names <- map head . catMaybes <$> traverse mcUUIDToNames uuids
       return $ unlines . map (" - " ++) $ names
 
-isInBowDuels :: APIMonad m => String -> m (Maybe Bool)
+isInBowDuels :: APIMonad m => UUID -> m (Maybe Bool)
 isInBowDuels uuid = hypixelWithPlayerStatus uuid $ \o -> do
     session <- o .: "session"
     mode :: String <- session .: "mode"
     return $ mode == "DUELS_BOW_DUEL"
 
 
-getWatchlist :: APIMonad m => m (Maybe [String])
+getWatchlist :: APIMonad m => m (Maybe [UUID])
 getWatchlist = do
   res <- hSendDB "minecraft/watchlist.php" []
-  decodeParse res $ \o -> o .: "data"
+  decodeParse res $ \o -> fmap UUID <$> o .: "data"

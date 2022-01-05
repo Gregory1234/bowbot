@@ -10,9 +10,9 @@ import BowBot.Minecraft
 import Data.List (sortOn)
 import Data.List.Split (chunksOf)
 
-data LeaderboardElement = LeaderboardElement { lbPos :: Integer, lbName :: String, lbVal :: String, lbUUID :: String } deriving Show
+data LeaderboardElement = LeaderboardElement { lbPos :: Integer, lbName :: String, lbVal :: String, lbUUID :: UUID } deriving Show
 
-data LeaderboardPage = LeaderboardPage Int | LeaderboardAll | LeaderboardSearch String deriving Show
+data LeaderboardPage = LeaderboardPage Int | LeaderboardAll | LeaderboardSearch UUID deriving Show
 
 hypixelBowLeaderboardCommand :: String -> String -> String -> (HypixelBowLeaderboards -> Maybe (Integer, String)) -> Command
 hypixelBowLeaderboardCommand name lbname statname lbfun = Command name DefaultLevel 10 $ do
@@ -67,7 +67,7 @@ hypixelBowLeaderboardCommand name lbname statname lbfun = Command name DefaultLe
      return $ [mc | BowBotAccount {..} <- accounts, did `elem` accountDiscords, mc <- accountMinecrafts]
 
 
-generateLeaderboard :: String -> [LeaderboardElement] -> [String] -> [String]
+generateLeaderboard :: String -> [LeaderboardElement] -> [UUID] -> [String]
 generateLeaderboard statname lb selected = map helper lb
   where
     helper LeaderboardElement {..}

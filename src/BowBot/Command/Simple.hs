@@ -4,7 +4,7 @@ import BowBot.Command
 import BowBot.Minecraft
 import Data.Void (absurd)
 
-urlCommand :: String -> Bool -> (String -> String) -> Command
+urlCommand :: String -> Bool -> (UUID -> String) -> Command
 urlCommand name ac mkurl = Command name DefaultLevel 8 $ do
   pName <- hArg 1
   caller <- hCaller

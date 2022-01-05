@@ -24,7 +24,7 @@ data MinecraftResponse e a
   | DidYouMeanResponse String a
   | DidYouMeanOldResponse String String a
 
-mcNameToUUID :: (BotDataMonad m, APIMonad m) => String -> m (Maybe String)
+mcNameToUUID :: (BotDataMonad m, APIMonad m) => String -> m (Maybe UUID)
 mcNameToUUID name = do
   mcAcc <- hRead minecraftAccounts
   let goodAcc = filter ((==name) . head . mcNames) mcAcc
@@ -32,7 +32,7 @@ mcNameToUUID name = do
     [MinecraftAccount {mcUUID}] -> return (Just mcUUID)
     _ -> mojangNameToUUID name
 
-mcUUIDToNames :: (BotDataMonad m, APIMonad m) => String -> m (Maybe [String])
+mcUUIDToNames :: (BotDataMonad m, APIMonad m) => UUID -> m (Maybe [String])
 mcUUIDToNames uuid = do
   mcAcc <- hRead minecraftAccounts
   let goodAcc = filter ((==uuid) . mcUUID) mcAcc
@@ -44,7 +44,7 @@ fromPingDiscordUser :: String -> Maybe UserId
 fromPingDiscordUser str | "<@" `isPrefixOf` str && ">" `isSuffixOf` str = readMaybe $ filter isDigit str
 fromPingDiscordUser _ = Nothing
 
-withMinecraft :: (BotDataMonad m, APIMonad m) => Bool -> Either String UserId -> (String -> [String] -> m (Either e a)) -> m (MinecraftResponse e a)
+withMinecraft :: (BotDataMonad m, APIMonad m) => Bool -> Either String UserId -> (UUID -> [String] -> m (Either e a)) -> m (MinecraftResponse e a)
 withMinecraft _ (Right author) fun = withMinecraftDiscord author fun
 withMinecraft _ (Left (fromPingDiscordUser -> Just did)) fun = do
   ret <- withMinecraftDiscord did fun
@@ -54,7 +54,7 @@ withMinecraft _ (Left (fromPingDiscordUser -> Just did)) fun = do
 withMinecraft ac (Left mcname) fun = 
   if ac then withMinecraftAutocorrect True mcname fun else withMinecraftNormal True mcname fun
 
-withMinecraftDiscord :: (BotDataMonad m, APIMonad m) => UserId -> (String -> [String] -> m (Either e a)) -> m (MinecraftResponse e a)
+withMinecraftDiscord :: (BotDataMonad m, APIMonad m) => UserId -> (UUID -> [String] -> m (Either e a)) -> m (MinecraftResponse e a)
 withMinecraftDiscord did fun = do
   pns <- fmap (>>=(\BowBotAccount {..} -> (,accountSelectedMinecraft) <$> accountDiscords)) $ hRead bowBotAccounts
   case lookup did pns of
@@ -66,7 +66,7 @@ withMinecraftDiscord did fun = do
         Left e -> pure (UserError e)
         Right r -> pure (JustResponse (head names) r)
 
-withMinecraftNormal :: (BotDataMonad m, APIMonad m) => Bool -> String -> (String -> [String] -> m (Either e a)) -> m (MinecraftResponse e a)
+withMinecraftNormal :: (BotDataMonad m, APIMonad m) => Bool -> String -> (UUID -> [String] -> m (Either e a)) -> m (MinecraftResponse e a)
 withMinecraftNormal cont mcname fun = do
   maybeUUID <- mcNameToUUID mcname
   case maybeUUID of
@@ -78,7 +78,7 @@ withMinecraftNormal cont mcname fun = do
         Left e -> if cont then withMinecraftAutocorrect False mcname fun else pure (UserError e)
         Right r -> pure (JustResponse (head names) r)
 
-withMinecraftAutocorrect :: (BotDataMonad m, APIMonad m) => Bool -> String -> (String -> [String] -> m (Either e a)) -> m (MinecraftResponse e a)
+withMinecraftAutocorrect :: (BotDataMonad m, APIMonad m) => Bool -> String -> (UUID -> [String] -> m (Either e a)) -> m (MinecraftResponse e a)
 withMinecraftAutocorrect cont mcname fun = do
   people <- hRead minecraftAccounts
   let process f = let 

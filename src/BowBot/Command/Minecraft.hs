@@ -42,7 +42,7 @@ minecraftCommand = Command "mc" DefaultLevel 2 $ do
           Nothing -> hRespond playerNotFoundMessage
           Just mcUUID -> if mcUUID `elem` accountMinecrafts bac
             then do
-              _ <- hSendDB "people/select.php" ["id=" ++ show (accountId bac), "minecraft=" ++ mcUUID]
+              _ <- hSendDB "people/select.php" ["id=" ++ show (accountId bac), "minecraft=" ++ uuidString mcUUID]
               hModify bowBotAccounts $ map (\u -> if accountId bac == accountId u then u { accountSelectedMinecraft = mcUUID } else u)
               hRespond "*Success!*"
             else

@@ -89,10 +89,10 @@ commands =
   , hypixelBowStatsCommand "sd" AlwaysDefault
   , hypixelBowStatsCommand "sa" AlwaysAll
   , registerCommand "register" False True
-  , urlCommand "head" True (\s -> "https://crafatar.com/avatars/" ++ s ++ "?overlay")
-  , urlCommand "heada" False (\s -> "https://crafatar.com/avatars/" ++ s ++ "?overlay")
-  , urlCommand "skin" True (\s -> "https://crafatar.com/renders/body/" ++ s ++ "?overlay")
-  , urlCommand "skina" False (\s -> "https://crafatar.com/renders/body/" ++ s ++ "?overlay")
+  , urlCommand "head" True (\s -> "https://crafatar.com/avatars/" ++ uuidString s ++ "?overlay")
+  , urlCommand "heada" False (\s -> "https://crafatar.com/avatars/" ++ uuidString s ++ "?overlay")
+  , urlCommand "skin" True (\s -> "https://crafatar.com/renders/body/" ++ uuidString s ++ "?overlay")
+  , urlCommand "skina" False (\s -> "https://crafatar.com/renders/body/" ++ uuidString s ++ "?overlay")
   , hypixelBowLeaderboardCommand "lb" "Hypixel Bow Duels Wins Leaderboard" "Wins" hypixelBowWinsLeaderboard
   , hypixelBowLeaderboardCommand "lbl" "Hypixel Bow Duels Losses Leaderboard" "Losses" hypixelBowLossesLeaderboard
   , hypixelBowLeaderboardCommand "lbs" "Hypixel Bow Duels Winstreak Leaderboard" "Winstreak" hypixelBowWinstreakLeaderboard
@@ -183,8 +183,8 @@ eventHandler bdt man (GuildMemberAdd gid mem) = do
   trueId <- readProp discordGuildId bdt
   when (gid == trueId) $
     runDiscordHandler' $ runManagerT (runBotDataT (updateDiscordRolesSingleId (userId $ memberUser mem)) bdt) man
-  withDB $ \conn -> void $ executeLog conn 
-      "INSERT INTO `discordDEV` (`id`, `name`, `discriminator`, `nickname`) VALUES (?,?,?,?) ON DUPLICATE KEY UPDATE `name`=VALUES(`name`), `discriminator`=VALUES(`discriminator`), `nickname`=VALUES(`nickname`)" 
+  withDB $ \conn -> void $ executeLog conn
+      "INSERT INTO `discordDEV` (`id`, `name`, `discriminator`, `nickname`) VALUES (?,?,?,?) ON DUPLICATE KEY UPDATE `name`=VALUES(`name`), `discriminator`=VALUES(`discriminator`), `nickname`=VALUES(`nickname`)"
       (show (userId (memberUser mem)), userName (memberUser mem), userDiscrim (memberUser mem), memberNick mem)
 
 eventHandler _ _ _ = pure ()
