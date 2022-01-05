@@ -31,7 +31,6 @@ import Data.Map ((!?))
 import Control.Monad (forever)
 import Control.Exception.Base (SomeException, try, Exception, throw)
 import Data.Aeson.Types (object, (.=))
-import BowBot.DB
 
 runBowBot :: String -> IO ()
 runBowBot discordKey = do

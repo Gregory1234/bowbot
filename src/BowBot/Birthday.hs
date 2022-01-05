@@ -1,13 +1,14 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
 module BowBot.Birthday where
 
 import BowBot.Utils
 import Data.List.Split (splitOn)
 import Data.Maybe (fromJust)
-import BowBot.API
+import BowBot.DB
 import Discord.Types
 
 data BirthdayDate = BirthdayDate { birthdayDay :: Int, birthdayMonth :: Int }
@@ -23,11 +24,7 @@ birthdayFromString str = case splitOn "." str of
 currentBirthdayDate :: IO BirthdayDate
 currentBirthdayDate = fromJust . birthdayFromString <$> getTime "%d.%m"
 
-getBirthdayPeople :: APIMonad m => BirthdayDate -> m (Maybe [UserId])
+getBirthdayPeople :: DBMonad m => BirthdayDate -> m [UserId]
 getBirthdayPeople bd = do
-  res <- hSendDB "discord/birthday/get.php" ["date=" ++ birthdayString bd]
-  decodeParse res $ \o -> do
-      dt <- o .: "data"
-      for dt $ \s -> do
-        (readMaybe -> Just x) <- pure s
-        return x
+  res :: [Only Integer] <- hQueryLog "SELECT (`id`) FROM `discordDEV` WHERE `birthday` = ?" (Only (birthdayString bd))
+  return $ fmap (fromInteger . fromOnly) res

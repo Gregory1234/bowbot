@@ -3,7 +3,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 
 module BowBot.DB(
-  module BowBot.DB, module Database.MySQL.Simple
+  module BowBot.DB, module Database.MySQL.Simple, module BowBot.CommandMonads
 ) where
 
 import Database.MySQL.Simple
@@ -12,10 +12,11 @@ import Database.MySQL.Simple.QueryResults
 import qualified Data.ByteString.Lazy as BS
 import qualified Data.ByteString.Search as BS
 import Database.MySQL.Simple.Types (Query(..))
-import BowBot.CommandMonads
+import BowBot.CommandMonads (DBMonad(..))
 import BowBot.Utils
+import Data.Int (Int64)
 
-withDB :: MonadIO m => (Connection -> m a) -> m a
+withDB :: MonadIO m => (Connection -> m a) -> m a -- TODO: report connection errors
 withDB f = do
   connectHost <- liftIO $ fromMaybe "" <$> getEnv "DB_HOST"
   connectUser <- liftIO $ fromMaybe "" <$> getEnv "DB_USER"
@@ -49,6 +50,24 @@ queryLog conn q d = do
   trueQuery <- liftIO $ formatQuery conn nq d
   logInfoDB conn $ "Executing query: " ++ show trueQuery
   liftIO $ query conn nq d
+
+hQueryLog :: (QueryParams q, QueryResults r, DBMonad m) => Query -> q -> m [r]
+hQueryLog q d = do
+  conn <- hConnection
+  queryLog conn q d
+
+executeLog :: (QueryParams q, MonadIO m) => Connection -> Query -> q -> m Int64
+executeLog conn q d = do
+  dev :: BS.ByteString <- ifDev "" (return "Dev")
+  let nq = Query $ BS.toStrict $ BS.replace "DEV" dev (fromQuery q)
+  trueQuery <- liftIO $ formatQuery conn nq d
+  logInfoDB conn $ "Executing query: " ++ show trueQuery
+  liftIO $ execute conn nq d
+
+hExecuteLog :: (QueryParams q, DBMonad m) => Query -> q -> m Int64
+hExecuteLog q d = do
+  conn <- hConnection
+  executeLog conn q d
 
 getInfoDB :: MonadIO m => Connection -> String -> m (Maybe String)
 getInfoDB conn name = do

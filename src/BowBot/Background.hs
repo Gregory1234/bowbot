@@ -26,21 +26,18 @@ import BowBot.Command
 import BowBot.Birthday
 import Control.Exception.Base (SomeException, try)
 
-announceBirthdays :: (DBMonad m, APIMonad m, BotDataMonad m, DiscordMonad m) => m ()
+announceBirthdays :: (DBMonad m, BotDataMonad m, DiscordMonad m) => m ()
 announceBirthdays = do
   currentDay <- liftIO currentBirthdayDate
-  maybeBirthdays <- getBirthdayPeople currentDay
-  case maybeBirthdays of
-    Nothing -> hLogErrorDB "Birthday parsing failed!"
-    Just birthdays -> do
-      dgid <- hRead discordGuildId
-      people <- hDiscord $ fmap (filter ((`elem` birthdays) . userId . memberUser)) <$> call (R.ListGuildMembers dgid R.GuildMembersTiming {R.guildMembersTimingLimit = Just 500, R.guildMembersTimingAfter = Nothing})
-      case people of
-        Left err -> hLogErrorDB $ show err
-        Right ppl -> unless (null ppl) $ do
-          birthdayChannel <- hRead discordBirthdayChannel
-          hLogInfoDB $ "Announcing birthdays: " ++ intercalate ", " (map (showMemberOrUser True . Right) ppl)
-          hDiscord $ for_ ppl $ \p -> call $ R.CreateMessage birthdayChannel $ pack $ "**Happy birthday** to " ++ showMemberOrUser True (Right p) ++ "!"
+  birthdays <- getBirthdayPeople currentDay
+  dgid <- hRead discordGuildId
+  people <- hDiscord $ fmap (filter ((`elem` birthdays) . userId . memberUser)) <$> call (R.ListGuildMembers dgid R.GuildMembersTiming {R.guildMembersTimingLimit = Just 500, R.guildMembersTimingAfter = Nothing})
+  case people of
+    Left err -> hLogErrorDB $ show err
+    Right ppl -> unless (null ppl) $ do
+      birthdayChannel <- hRead discordBirthdayChannel
+      hLogInfoDB $ "Announcing birthdays: " ++ intercalate ", " (map (showMemberOrUser True . Right) ppl)
+      hDiscord $ for_ ppl $ \p -> call $ R.CreateMessage birthdayChannel $ pack $ "**Happy birthday** to " ++ showMemberOrUser True (Right p) ++ "!"
 
 updateDiscordStatus :: DiscordHandler ()
 updateDiscordStatus = do
@@ -163,7 +160,7 @@ discordBackgroundMinutely bdt mint = do
   when (mint == 1) $ do
     manager <- liftIO $ newManager managerSettings
     hour <- liftIO $ read @Integer <$> getTime "%k"
-    when (hour == 5) $ runDiscordHandler' $ withDB $ runConnectionT $ runManagerT (runBotDataT announceBirthdays bdt) manager
+    when (hour == 5) $ runDiscordHandler' $ withDB $ runConnectionT $ runBotDataT announceBirthdays bdt
     addDiscords bdt
     updateDiscordStatus
     runDiscordHandler' $ runManagerT (runBotDataT updateRolesAll bdt) manager
