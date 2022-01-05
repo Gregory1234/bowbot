@@ -69,6 +69,19 @@ hExecuteLog q d = do
   conn <- hConnection
   executeLog conn q d
 
+executeManyLog :: (QueryParams q, MonadIO m) => Connection -> Query -> [q] -> m Int64
+executeManyLog conn q d = do
+  dev :: BS.ByteString <- ifDev "" (return "Dev")
+  let nq = Query $ BS.toStrict $ BS.replace "DEV" dev (fromQuery q)
+  trueQuery <- liftIO $ formatMany conn nq d
+  logInfoDB conn $ "Executing query: " ++ show trueQuery
+  liftIO $ executeMany conn nq d
+
+hExecuteManyLog :: (QueryParams q, DBMonad m) => Query -> [q] -> m Int64
+hExecuteManyLog q d = do
+  conn <- hConnection
+  executeManyLog conn q d
+
 getInfoDB :: MonadIO m => Connection -> String -> m (Maybe String)
 getInfoDB conn name = do
   xs :: [Only String] <- queryLog conn "SELECT `value` FROM `botInfoDEV` WHERE `name` = ?" (Only name)

@@ -30,7 +30,6 @@ import Network.HTTP.Conduit (newManager)
 import Data.Map ((!?))
 import Control.Monad (forever)
 import Control.Exception.Base (SomeException, try, Exception, throw)
-import Data.Aeson.Types (object, (.=))
 
 runBowBot :: String -> IO ()
 runBowBot discordKey = do
@@ -184,8 +183,9 @@ eventHandler bdt man (GuildMemberAdd gid mem) = do
   trueId <- readProp discordGuildId bdt
   when (gid == trueId) $
     runDiscordHandler' $ runManagerT (runBotDataT (updateDiscordRolesSingleId (userId $ memberUser mem)) bdt) man
-  liftIO $ sendPostDB man "discord/update.php" [] $
-    object [pack (show (userId (memberUser mem))) .= object ["name" .= userName (memberUser mem), "discriminator" .= userDiscrim (memberUser mem), "nickname" .= memberNick mem]]
+  withDB $ \conn -> void $ executeLog conn 
+      "INSERT INTO `discordDEV` (`id`, `name`, `discriminator`, `nickname`) VALUES (?,?,?,?) ON DUPLICATE KEY UPDATE `name`=VALUES(`name`), `discriminator`=VALUES(`discriminator`), `nickname`=VALUES(`nickname`)" 
+      (show (userId (memberUser mem)), userName (memberUser mem), userDiscrim (memberUser mem), memberNick mem)
 
 eventHandler _ _ _ = pure ()
 

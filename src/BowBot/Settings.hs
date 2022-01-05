@@ -1,6 +1,8 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ViewPatterns #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE LambdaCase #-}
 
 module BowBot.Settings(
   module BowBot.Settings, module BowBot.BotData.Core
@@ -8,7 +10,7 @@ module BowBot.Settings(
 
 import Discord.Types
 import Data.Map (Map, fromList)
-import BowBot.API
+import BowBot.DB
 import BowBot.BotData.Core
 
 parseBool :: String -> Maybe Bool
@@ -22,24 +24,16 @@ parseSense "never" = Just Never
 parseSense "sensibly" = Just WhenSensible
 parseSense _ = Nothing
 
-getSettings :: APIMonad m => m (Maybe (Map UserId Settings))
+getSettings :: DBMonad m => m (Map UserId Settings)
 getSettings = do
-  res <- hSendDB "discord/settings/all.php" []
-  decodeParse res $ \o -> do
-    dt <- o .: "data"
-    fmap fromList $ for dt $ \settings -> do
-      (readMaybe -> Just discord) <- settings .: "discord"
-      (parseBool -> Just sWins) <- settings .: "wins"
-      (parseBool -> Just sLosses) <- settings .: "losses"
-      (parseSense -> Just sWLR) <- settings .: "wlr"
-      (parseSense -> Just sWinsUntil) <- settings .: "winsUntil"
-      (parseBool -> Just sBestStreak) <- settings .: "bestStreak"
-      (parseBool -> Just sCurrentStreak) <- settings .: "currentStreak"
-      (parseBool -> Just sBestDailyStreak) <- settings .: "bestDailyStreak"
-      (parseBool -> Just sBowHits) <- settings .: "bowHits"
-      (parseBool -> Just sBowShots) <- settings .: "bowShots"
-      (parseSense -> Just sAccuracy) <- settings .: "accuracy"
-      pure (discord, Settings {..})
+  res :: [(Integer, String, String, String, String, String, String, String, String, String, String)] <- 
+    hQueryLog "SELECT `discord`, `wins`, `losses`, `wlr`, `winsUntil`, `bestStreak`, `currentStreak`, `bestDailyStreak`, `bowHits`, `bowShots`, `accuracy` FROM `settingsDEV`" ()
+  return $ fromList $ flip fmap res $ \case
+    (fromInteger -> discord, 
+      parseBool -> Just sWins, parseBool -> Just sLosses, parseSense -> Just sWLR, parseSense -> Just sWinsUntil, 
+      parseBool -> Just sBestStreak, parseBool -> Just sCurrentStreak, parseBool -> Just sBestDailyStreak, 
+      parseBool -> Just sBowHits, parseBool -> Just sBowShots, parseSense -> Just sAccuracy) -> (discord, Settings {..})
+    (fromInteger -> discord, _, _, _, _, _, _, _, _, _, _) -> (discord, defSettings)
 
 defSettings :: Settings
 defSettings = Settings

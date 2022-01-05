@@ -1,10 +1,15 @@
 {-# LANGUAGE ViewPatterns #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 module BowBot.Command.Settings where
 
 import BowBot.Command
 import BowBot.Settings
 import Data.Map (alter)
+import qualified Data.ByteString.Lazy as BS
+import qualified Data.ByteString.Search as BS
+import Database.MySQL.Simple.Types (Query(..))
+import Data.String (fromString)
 
 boolArg :: String -> Maybe Bool
 boolArg "yes" = Just True
@@ -35,8 +40,10 @@ fromSense Always = "always"
 fromSense Never = "never"
 fromSense WhenSensible = "sensibly"
 
-unsafeUpdateSettings :: APIMonad m => UserId -> String -> String -> m ()
-unsafeUpdateSettings did key val = void $ hSendDB "discord/settings/update.php" ["discord=" ++ show did, "setting=" ++ key, "value=" ++ val]
+unsafeUpdateSettings :: DBMonad m => UserId -> String -> String -> m ()
+unsafeUpdateSettings did key val = do
+  let nq = Query $ BS.toStrict $ BS.replace "SETTING" (fromString key :: BS.ByteString) "INSERT INTO `settingsDEV` (`discord`, `SETTING`) VALUES (?, ?) ON DUPLICATE KEY UPDATE `SETTING` = VALUES(`SETTING`)"
+  void $ hExecuteLog nq (show did, val)
 
 boolFromEither :: Either (Bool, BoolSense) String -> Maybe Bool
 boolFromEither (Left (b, _)) = Just b

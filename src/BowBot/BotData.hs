@@ -3,6 +3,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE ViewPatterns #-}
+{-# LANGUAGE LambdaCase #-}
 
 module BowBot.BotData(
   module BowBot.BotData, module BowBot.BotData.Core
@@ -47,26 +48,23 @@ downloadBowBotAccounts = do
       accountMinecrafts <- acc .: "minecraft"
       return BowBotAccount {..}
 
-downloadDiscordPerms :: APIMonad m => m (Maybe (Map UserId PermissionLevel))
+downloadDiscordPerms :: DBMonad m => m (Map UserId PermissionLevel)
 downloadDiscordPerms = do
-  res <- hSendDB "discord/perms.php" []
-  decodeParse res $ \o -> do
-    dt <- o .: "data"
-    fmap fromList . for dt $ \dp -> do
-      did <- dp .: "id"
-      (stringToPermissionLevel -> Just level) <- dp .: "level"
-      return (did, level)
+  res :: [(Integer, String)] <- hQueryLog "SELECT `id`, `level` FROM `permissionsDEV`" ()
+  return $ fromList $ flip fmap res $ \case
+    (fromInteger -> discord, stringToPermissionLevel -> Just level) -> (discord, level)
+    (fromInteger -> discord, _) -> (discord, DefaultLevel)
 
-downloadData :: (BotDataMonad m, APIMonad m) => m ()
+downloadData :: (BotDataMonad m, APIMonad m, DBMonad m) => m ()
 downloadData = do
   newMinecraftAccounts <- downloadMinecraftAccounts
   newDiscordSettings <- getSettings
   newBowBotAccounts <- downloadBowBotAccounts
   newDiscordPerms <- downloadDiscordPerms
   for_ newMinecraftAccounts (hWrite minecraftAccounts)
-  for_ newDiscordSettings (hWrite discordSettings)
+  hWrite discordSettings newDiscordSettings
   for_ newBowBotAccounts (hWrite bowBotAccounts)
-  for_ newDiscordPerms (hWrite discordPerms)
+  hWrite discordPerms newDiscordPerms
   withDB $ runConnectionT updateDiscordConstants
   hTryApiRequests hypixelRequestCounter 1 (\_ -> pure ()) $ do
     gid <- hRead hypixelGuildId
@@ -159,5 +157,5 @@ createData :: IO BotData
 createData = do
   bdt <- atomically emptyData
   man <- newManager managerSettings
-  runManagerT (runBotDataT downloadData bdt) man
+  withDB $ runConnectionT $ runManagerT (runBotDataT downloadData bdt) man
   return bdt

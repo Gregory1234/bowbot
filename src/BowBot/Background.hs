@@ -1,8 +1,8 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE TupleSections #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
 module BowBot.Background where
 
@@ -19,7 +19,6 @@ import Data.Map ((!?))
 import Control.Concurrent.Async (mapConcurrently)
 import Data.Maybe (catMaybes, mapMaybe)
 import Discord.Types hiding (accountId)
-import Data.Aeson.Types (object, (.=))
 import Data.Either (fromRight)
 import Data.List ((\\), intercalate)
 import BowBot.Command
@@ -122,38 +121,33 @@ updateRolesAll = do
       let bac = lookup (userId (memberUser m)) accs
       updateDiscordRolesSingle lb (if null members then Nothing else Just members) gid m bac
 
-getDiscordIds :: APIMonad m => m [UserId]
+getDiscordIds :: DBMonad m => m [UserId]
 getDiscordIds = do
-  res <- hSendDB "discord/all.php" []
-  fmap (fromMaybe []) $ decodeParse res $ \o -> do
-    dt <- o .: "data"
-    for dt $ \s -> do
-      (readMaybe -> Just x) <- pure s
-      return x
+  res :: [Only Integer] <- hQueryLog "SELECT `id` FROM `discordDEV`" ()
+  return $ fmap (fromInteger . fromOnly) res
 
 addDiscords :: BotData -> DiscordHandler ()
-addDiscords bdt = do
-  manager <- liftIO $ newManager managerSettings
-  uids <- runManagerT getDiscordIds manager
+addDiscords bdt = withDB $ \conn -> do
+  uids <- withDB $ runConnectionT getDiscordIds
   dgid <- readProp discordGuildId bdt
   v <- fmap (filter (not . userIsBot . memberUser)) <$> call (R.ListGuildMembers dgid R.GuildMembersTiming {R.guildMembersTimingLimit = Just 500, R.guildMembersTimingAfter = Nothing})
   case v of
     Right x -> do
       let uids' = filter (\u -> all (\m -> userId (memberUser m) /= u) x) uids
       y <- traverse helper uids'
-      runManagerT (updateDiscords x y) manager
-    Left x -> logError manager $ show x
+      runConnectionT (updateDiscords x y) conn
+    Left x -> logErrorDB conn $ show x
   where
     helper :: UserId -> DiscordHandler User
     helper u = do
       y <- call (R.GetUser u)
       return $ fromRight undefined y
-    updateDiscords mem usr = hPostDB "discord/update.php" [] (object $ map memToObject mem ++ map usrToObject usr)
+    updateDiscords mem usr = void $ hExecuteManyLog
+        "INSERT INTO `discordDEV` (`id`, `name`, `discriminator`, `nickname`) VALUES (?,?,?,?) ON DUPLICATE KEY UPDATE `name`=VALUES(`name`), `discriminator`=VALUES(`discriminator`), `nickname`=VALUES(`nickname`)"
+        (map memToObject mem ++ map usrToObject usr)
        where
-         memToObject GuildMember {memberUser = memberUser@User {..}, ..} = case memberNick of
-           Nothing -> usrToObject memberUser
-           Just nick -> pack (show userId) .= object ["name" .= userName, "discriminator" .= userDiscrim, "nickname" .= nick]
-         usrToObject User {..} = pack (show userId) .= object ["name" .= userName, "discriminator" .= userDiscrim]
+         memToObject GuildMember {memberUser = User {..}, ..} = (show userId, userName, userDiscrim, memberNick)
+         usrToObject User {..} = (show userId, userName, userDiscrim, Nothing)
 
 discordBackgroundMinutely :: BotData -> Int -> DiscordHandler ()
 discordBackgroundMinutely bdt mint = do
@@ -197,7 +191,7 @@ backgroundMinutely bdt@BotData {..} mint = do
   when (mint == 0) $ do
     logInfo' "started update"
     manager <- newManager managerSettings
-    runManagerT (runBotDataT downloadData bdt) manager
+    withDB $ runConnectionT $ runManagerT (runBotDataT downloadData bdt) manager
     dev <- ifDev False $ return True
     unless dev $ do
       hour <- read @Int <$> getTime "%k"
