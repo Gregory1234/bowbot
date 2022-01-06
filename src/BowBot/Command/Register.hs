@@ -2,6 +2,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE ViewPatterns #-}
 
 module BowBot.Command.Register where
 
@@ -21,21 +22,17 @@ addMinecraftAccount uuid names = do
     then Just MinecraftAccount { mcUUID = uuid, mcNames = names, mcHypixelBow = Normal }
     else Nothing
 
-addAccount :: DBMonad m => String -> UserId -> UUID -> m (Maybe BowBotAccount)
+addAccount :: (DBMonad m, MonadHoistIO m) => String -> UserId -> UUID -> m (Maybe BowBotAccount)
 addAccount name did uuid = do
   res :: [Only Integer] <- hQueryLog "SELECT `id` FROM `discordDEV` WHERE `id`=?" (Only $ show did)
   if length res == 1
-  then do
-    _ <- hExecuteLog "INSERT INTO `peopleDEV`(`name`) VALUES (?)" (Only name)
-    ids :: [Only Integer] <- hQueryLog "SELECT MAX(`id`) AS a FROM `peopleDEV`" ()
-    case ids of
-      [Only aid] -> do
-        c1 <- hExecuteLog "INSERT INTO `peopleMinecraftDEV`(`id`, `minecraft`,`status`, `selected`, `verified`) VALUES (?,?, 'main', 1, 0)" (aid, uuidString uuid)
-        c2 <- hExecuteLog "INSERT INTO `peopleDiscordDEV`(`id`, `discord`) VALUES (?,?)" (aid, show did)
-        if c1 + c2 == 2
-        then return $ Just BowBotAccount { accountId = aid, accountDiscords = [did], accountMinecrafts = [uuid], accountSelectedMinecraft = uuid}
-        else return Nothing -- TODO: big problem here... transactions?
-      _ -> return Nothing
+  then hTransaction $ do
+    c1 <- hExecuteLog "INSERT INTO `peopleDEV`(`name`) VALUES (?)" (Only name)
+    (fromIntegral -> aid) <- hInsertID
+    c2 <- hExecuteLog "INSERT INTO `peopleMinecraftDEV`(`id`, `minecraft`,`status`, `selected`, `verified`) VALUES (?,?, 'main', 1, 0)" (aid, uuidString uuid)
+    c3 <- hExecuteLog "INSERT INTO `peopleDiscordDEV`(`id`, `discord`) VALUES (?,?)" (aid, show did)
+    assertIO (c1 == 1 && c2 == 1 && c3 == 1)
+    return $ Just BowBotAccount { accountId = aid, accountDiscords = [did], accountMinecrafts = [uuid], accountSelectedMinecraft = uuid}
   else
     return Nothing
 

@@ -12,10 +12,11 @@ import Database.MySQL.Simple.QueryResults
 import qualified Data.ByteString.Lazy as BS
 import qualified Data.ByteString.Search as BS
 import Database.MySQL.Simple.Types (Query(..))
-import BowBot.CommandMonads (DBMonad(..))
+import BowBot.CommandMonads (DBMonad(..), MonadHoistIO(..))
 import BowBot.Utils
 import Data.Int (Int64)
 import Data.String (fromString)
+import Data.Word (Word64)
 
 withDB :: MonadIO m => (Connection -> m a) -> m a -- TODO: report connection errors
 withDB f = do
@@ -90,6 +91,14 @@ hExecuteManyLog :: (QueryParams q, DBMonad m) => Query -> [q] -> m Int64
 hExecuteManyLog q d = do
   conn <- hConnection
   executeManyLog conn q d
+
+hInsertID :: DBMonad m => m Word64
+hInsertID = hConnection >>= liftIO . insertID
+
+hTransaction :: (DBMonad m, MonadHoistIO m) => m a -> m a
+hTransaction act = do
+  conn <- hConnection
+  hoistIO (withTransaction conn) act
 
 getInfoDB :: MonadIO m => Connection -> String -> m (Maybe String)
 getInfoDB conn name = do

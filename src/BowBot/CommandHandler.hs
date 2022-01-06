@@ -48,6 +48,9 @@ instance BotDataMonad CommandHandler where
 instance DiscordMonad CommandHandler where
   hDiscord d = CommandHandler $ \_ _ _ _ -> d
 
+instance MonadHoistIO CommandHandler where
+  hoistIO f (CommandHandler x) = CommandHandler $ \a b c d -> hoistIO f (x a b c d)
+
 hRespond :: String -> CommandHandler ()
 hRespond msg = CommandHandler $ \m _ _ _ -> respond m msg
 

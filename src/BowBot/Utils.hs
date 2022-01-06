@@ -23,6 +23,7 @@ import Control.Monad (when, unless, void)
 import Discord.Types
 import qualified Data.Map as M
 import qualified Data.Map.Internal as M
+import Control.Exception (evaluate, assert)
 
 dist :: Eq a => [a] -> [a] -> Int
 dist a b =
@@ -110,5 +111,8 @@ groupToMap = M.map (map snd) . groupByToMap fst
 
 zipMapWith :: Ord k => (Maybe a -> Maybe b -> c) -> M.Map k a -> M.Map k b -> M.Map k c
 zipMapWith f = M.merge (M.mapMissing $ \_ x -> f (Just x) Nothing) (M.mapMissing $ \_ y -> f Nothing (Just y)) (M.zipWithMatched $ \_ x y -> f (Just x) (Just y))
+
+assertIO :: MonadIO m => Bool -> m ()
+assertIO x = liftIO . evaluate $ assert x ()
 
 newtype UUID = UUID { uuidString :: String } deriving (Show, Eq, Ord)
