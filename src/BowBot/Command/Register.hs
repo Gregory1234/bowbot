@@ -30,7 +30,7 @@ addAccount name did uuid = do
     ids :: [Only Integer] <- hQueryLog "SELECT MAX(`id`) AS a FROM `peopleDEV`" ()
     case ids of
       [Only aid] -> do
-        c1 <- hExecuteLog "INSERT INTO `peopleMinecraftDEV`(`id`, `minecraft`,`status`, `selected`, `verified`) VALUES (?,?, 'main', 1, ?)" (aid, uuidString uuid)
+        c1 <- hExecuteLog "INSERT INTO `peopleMinecraftDEV`(`id`, `minecraft`,`status`, `selected`, `verified`) VALUES (?,?, 'main', 1, 0)" (aid, uuidString uuid)
         c2 <- hExecuteLog "INSERT INTO `peopleDiscordDEV`(`id`, `discord`) VALUES (?,?)" (aid, show did)
         if c1 + c2 == 2
         then return $ Just BowBotAccount { accountId = aid, accountDiscords = [did], accountMinecrafts = [uuid], accountSelectedMinecraft = uuid}
