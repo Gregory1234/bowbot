@@ -88,6 +88,7 @@ commands =
   [ hypixelBowStatsCommand "s" UserSettings
   , hypixelBowStatsCommand "sd" AlwaysDefault
   , hypixelBowStatsCommand "sa" AlwaysAll
+  , hypixelBowTimeStatsCommand "st" [DailyStats, WeeklyStats, MonthlyStats] UserSettings
   , registerCommand "register" False True
   , urlCommand "head" True (\s -> "https://crafatar.com/avatars/" ++ uuidString s ++ "?overlay")
   , urlCommand "heada" False (\s -> "https://crafatar.com/avatars/" ++ uuidString s ++ "?overlay")
@@ -122,6 +123,7 @@ commands =
     ++ " - **" ++ pr ++ "s [name]** - *show player's Bow Duels stats*\n"
     ++ " - **" ++ pr ++ "sa [name]** - *show all Bow Duels stats*\n"
     ++ " - **" ++ pr ++ "sd [name]** - *show a default set of Bow Duels stats*\n"
+    ++ " - **" ++ pr ++ "st [name]** - *show daily weekly and monthly Bow Duels stats*\n"
     ++ " - **" ++ pr ++ "n(a) [name]** - *show player's past nicks*\n"
     ++ " - **" ++ pr ++ "head(a) [name]** - *show player's head*\n"
     ++ " - **" ++ pr ++ "skin(a) [name]** - *show player's full skin*\n"

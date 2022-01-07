@@ -75,7 +75,7 @@ withMinecraftNormal cont mcname fun = do
       names <- fromMaybe [] <$> mcUUIDToNames uuid
       res <- fun uuid names
       case res of
-        Left e -> if cont then withMinecraftAutocorrect False mcname fun else pure (UserError e)
+        Left e -> if cont then withMinecraftAutocorrect False mcname fun else pure (UserError e) -- TODO: sometimes this is really unnecessary
         Right r -> pure (JustResponse (head names) r)
 
 withMinecraftAutocorrect :: (BotDataMonad m, APIMonad m) => Bool -> String -> (UUID -> [String] -> m (Either e a)) -> m (MinecraftResponse e a)

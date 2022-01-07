@@ -186,8 +186,8 @@ timeStatsTypeName DailyStats = "Day"
 timeStatsTypeName WeeklyStats = "Week"
 timeStatsTypeName MonthlyStats = "Month"
 
-updateHypixelBowLeaderboard :: DBMonad m => [TimeStatsType] -> Map UUID HypixelBowLeaderboards -> m ()
-updateHypixelBowLeaderboard extraModes lb = do
+updateHypixelBowLeaderboard :: (DBMonad m, MonadHoistIO m) => [TimeStatsType] -> Map UUID HypixelBowLeaderboards -> m ()
+updateHypixelBowLeaderboard extraModes lb = hTransaction $ do
   let wslb = mapMaybe helperWS $ toList lb
   let nowslb = mapMaybe helperNoWS $ toList lb
   let extralb = helperExtra <$> toList lb
@@ -203,13 +203,54 @@ updateHypixelBowLeaderboard extraModes lb = do
         | otherwise = Nothing
       helperExtra (UUID uuid, HypixelBowLeaderboards {..}) = (uuid, bowLbWins, bowLbLosses)
 
+data HypixelBowTimeStats = HypixelBowTimeStats
+  { bowTimeType :: TimeStatsType,
+    bowTimeWins :: Integer,
+    bowTimeLosses :: Integer
+  } deriving (Show)
+
+requestHypixelBowTimeStats :: DBMonad m => HypixelBowStats -> UUID -> TimeStatsType -> m (Maybe HypixelBowTimeStats)
+requestHypixelBowTimeStats HypixelBowStats {..} (UUID uuid) t = do
+  res :: [(Integer, Integer)] <- hQueryLog (replaceQuery "TIME" (timeStatsTypeName t) "SELECT `lastTIMEWins`, `lastTIMELosses` FROM `statsDEV` WHERE `minecraft` = ?") (Only uuid)
+  return $ case res of
+    [(-1, -1)] -> Nothing
+    [(lastWins, lastLosses)] -> Just HypixelBowTimeStats {bowTimeType = t, bowTimeWins = bowWins - lastWins, bowTimeLosses = bowLosses - lastLosses}
+    _ -> Nothing
+
+showHypixelBowTimeStats :: Settings -> HypixelBowTimeStats -> String
+showHypixelBowTimeStats Settings {..} HypixelBowTimeStats {..} = unlines $ catMaybes
+  [ onlyIf sWins
+  $ " - *Bow Duels " ++ time ++ " Wins:* **"
+  ++ show bowTimeWins
+  ++ "**"
+  , onlyIf sLosses
+  $ " - *Bow Duels " ++ time ++ " Losses:* **"
+  ++ show bowTimeLosses
+  ++ "**"
+  , onlyIf (sense sWLR (bowTimeWins + bowTimeLosses /= 0))
+  $ " - *Bow Duels " ++ time ++ " Win/Loss Ratio:* **"
+  ++ winLossRatio
+  ++ "**"
+  ]
+  where
+    time = timeStatsTypeShowName bowTimeType
+    timeStatsTypeShowName DailyStats = "Daily"
+    timeStatsTypeShowName WeeklyStats = "Weekly"
+    timeStatsTypeShowName MonthlyStats = "Monthly"
+    sense Always _ = True
+    sense Never _ = False
+    sense WhenSensible x = x
+    onlyIf True a = Just a
+    onlyIf False _ = Nothing
+    winLossRatio = showWLR bowTimeWins bowTimeLosses
+
 banHypixelBowLeaderboard :: (DBMonad m, MonadHoistIO m) => UUID -> m Bool
 banHypixelBowLeaderboard (UUID uuid) = hTransaction $ do
   changed <- hExecuteLog "UPDATE `minecraftDEV` SET `hypixel`='ban' WHERE `uuid`=?" (Only uuid)
   when (changed > 0) $ void $ hExecuteLog "DELETE FROM `statsDEV` WHERE `minecraft`=?" (Only uuid)
   return (changed > 0)
 
-fullUpdateHypixelBowStats :: (APIMonad m, DBMonad m) => UUID -> m ()
+fullUpdateHypixelBowStats :: (APIMonad m, DBMonad m, MonadHoistIO m) => UUID -> m ()
 fullUpdateHypixelBowStats uuid = do
   stats <- requestHypixelBowStats uuid
   for_ stats $ \x -> updateHypixelBowLeaderboard [] $ fromList [(uuid, hypixelBowStatsToLeaderboards x)]
