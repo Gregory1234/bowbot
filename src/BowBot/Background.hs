@@ -13,7 +13,7 @@ import BowBot.Stats.HypixelBow
 import BowBot.API
 import BowBot.DB
 import Network.HTTP.Conduit (newManager, httpLbs, parseRequest)
-import Data.List.Split (chunksOf)
+import Data.List.Split (chunksOf, splitOn)
 import Control.Concurrent (threadDelay)
 import Data.Map ((!?))
 import Control.Concurrent.Async (mapConcurrently)
@@ -24,6 +24,7 @@ import Data.List ((\\), intercalate)
 import BowBot.Command
 import BowBot.Birthday
 import Control.Exception.Base (SomeException, try)
+import Data.Bifunctor (first, bimap)
 
 announceBirthdays :: (DBMonad m, BotDataMonad m, DiscordMonad m) => m ()
 announceBirthdays = do
@@ -75,15 +76,22 @@ updateGuildMemberRolesSingle members memb BowBotAccount { accountMinecrafts = mc
 
 -- TODO: remove BotData from here - take it out to a new type
 updateDiscordRolesSingle
-  :: (DiscordMonad m, BotDataMonad m) => Map UUID HypixelBowLeaderboards -> Maybe [UUID] -> GuildId
+  :: (DiscordMonad m, BotDataMonad m) => Map UUID HypixelBowLeaderboards -> Maybe [UUID] -> Maybe [RoleId] -> GuildId
   -> GuildMember -> Maybe BowBotAccount -> m ()
-updateDiscordRolesSingle lb members gid m (Just bac) = do
+updateDiscordRolesSingle lb members saved gid m (Just bac) = do
   updateDivisionRolesSingle lb m bac
   for_ members $ \x -> updateGuildMemberRolesSingle x m bac
   illegalRole <- hRead discordIllegalRole
   when (illegalRole `elem` memberRoles m) $ do
     hDiscord $ call_ $ R.RemoveGuildMemberRole gid (userId $ memberUser m) illegalRole
-updateDiscordRolesSingle _ _ gid m Nothing = do
+  toggleableRoles <- hRead discordToggleableRoles
+  otherSavedRoles <- hRead discordOtherSavedRoles 
+  for_ (toggleableRoles ++ otherSavedRoles) $ \(_, r) -> do
+    when (r `elem` fromMaybe [] saved && r `notElem` memberRoles m) $ 
+      hDiscord $ call_ $ R.AddGuildMemberRole gid (userId $ memberUser m) r
+    when (r `notElem` fromMaybe [] saved && r `elem` memberRoles m) $ 
+      hDiscord $ call_ $ R.RemoveGuildMemberRole gid (userId $ memberUser m) r
+updateDiscordRolesSingle _ _ saved gid m Nothing = do
   memberRole <- hRead discordMemberRole
   visitorRole <- hRead discordVisitorRole
   divisionRoles <- map snd <$> hRead discordDivisionRoles
@@ -94,6 +102,13 @@ updateDiscordRolesSingle _ _ gid m Nothing = do
     hDiscord $ call_ $ R.RemoveGuildMemberRole gid (userId $ memberUser m) illegalRole
   when (memberRole `notElem` memberRoles m && visitorRole `notElem` memberRoles m) $ do
     hDiscord $ call_ $ R.AddGuildMemberRole gid (userId $ memberUser m) visitorRole
+  toggleableRoles <- hRead discordToggleableRoles
+  otherSavedRoles <- hRead discordOtherSavedRoles 
+  for_ (toggleableRoles ++ otherSavedRoles) $ \(_, r) -> do
+    when (r `elem` fromMaybe [] saved && r `notElem` memberRoles m) $ 
+      hDiscord $ call_ $ R.AddGuildMemberRole gid (userId $ memberUser m) r
+    when (r `notElem` fromMaybe [] saved && r `elem` memberRoles m) $ 
+      hDiscord $ call_ $ R.RemoveGuildMemberRole gid (userId $ memberUser m) r
 
 updateDiscordRolesSingleId :: (DiscordMonad m, DBMonad m, BotDataMonad m) => UserId -> m ()
 updateDiscordRolesSingleId did = do
@@ -105,8 +120,12 @@ updateDiscordRolesSingleId did = do
       members <- hRead hypixelGuildMembers
       lb <- getHypixelBowLeaderboard
       accs <- (>>=(\u -> (, u) <$> accountDiscords u)) <$> hRead bowBotAccounts
+      toggleableRoles <- hRead discordToggleableRoles
+      otherSavedRoles <- hRead discordOtherSavedRoles
+      savedRoles' :: [(Integer, String)] <- hQueryLog "SELECT `id`, `roles` FROM `discordDEV` WHERE `id` = ?" (Only $ show did)
+      let savedRoles = fromList $ map (bimap fromIntegral (\rs -> map snd (filter ((`elem` splitOn "," rs) . fst) (toggleableRoles ++ otherSavedRoles)))) savedRoles'
       let bac = lookup did accs
-      updateDiscordRolesSingle lb (if null members then Nothing else Just members) gid m bac
+      updateDiscordRolesSingle lb (if null members then Nothing else Just members) (savedRoles !? did) gid m bac
 
 updateRolesAll :: (DiscordMonad m, BotDataMonad m, DBMonad m) => m ()
 updateRolesAll = do
@@ -114,12 +133,34 @@ updateRolesAll = do
   members <- hRead hypixelGuildMembers
   maybeGmembs <- hDiscord $ fmap (filter (not . userIsBot . memberUser)) <$> call (R.ListGuildMembers gid R.GuildMembersTiming {R.guildMembersTimingLimit = Just 500, R.guildMembersTimingAfter = Nothing})
   lb <- getHypixelBowLeaderboard
+  toggleableRoles <- hRead discordToggleableRoles
+  otherSavedRoles <- hRead discordOtherSavedRoles
+  savedRoles' :: [(Integer, String)] <- hQueryLog "SELECT `id`, `roles` FROM `discordDEV`" ()
+  let savedRoles = fromList $ map (bimap fromIntegral (\rs -> map snd (filter ((`elem` splitOn "," rs) . fst) (toggleableRoles ++ otherSavedRoles)))) savedRoles'
   case maybeGmembs of
     Left _ -> pure ()
     Right gmembs -> for_ gmembs $ \m -> do
       accs <- (>>=(\u -> (, u) <$> accountDiscords u)) <$> hRead bowBotAccounts
       let bac = lookup (userId (memberUser m)) accs
-      updateDiscordRolesSingle lb (if null members then Nothing else Just members) gid m bac
+      updateDiscordRolesSingle lb (if null members then Nothing else Just members) (savedRoles !? userId (memberUser m)) gid m bac
+
+updateSavedRolesSingle :: (BotDataMonad m, DBMonad m) => UserId -> [RoleId] -> Maybe String -> m ()
+updateSavedRolesSingle uid roles expected = do
+  toggleable <- hRead discordToggleableRoles
+  otherSaved <- hRead discordOtherSavedRoles
+  let toSave = intercalate "," $ map fst $ filter ((`elem` roles) . snd) (toggleable ++ otherSaved)
+  when (Just toSave /= expected) $
+    void $ hExecuteLog "UPDATE `discordDEV` SET `roles` = ? WHERE `id` = ?" ( toSave, show uid)
+
+updateSavedRolesAll :: (DiscordMonad m, BotDataMonad m, DBMonad m) => m ()
+updateSavedRolesAll = do
+  dgid <- hRead discordGuildId
+  v <- hDiscord $ fmap (filter (not . userIsBot . memberUser)) <$> call (R.ListGuildMembers dgid R.GuildMembersTiming {R.guildMembersTimingLimit = Just 500, R.guildMembersTimingAfter = Nothing})
+  expected' :: [(Integer, String)] <- hQueryLog "SELECT `id`, `roles` FROM `discordDEV`" ()
+  let expected = fromList $ map (first fromIntegral) expected'
+  case v of
+    Right x -> for_ x $ \m -> updateSavedRolesSingle (userId $ memberUser m) (memberRoles m) (expected !? userId (memberUser m))
+    Left x -> hLogErrorDB $ show x
 
 getDiscordIds :: DBMonad m => m [UserId]
 getDiscordIds = do
@@ -156,7 +197,7 @@ discordBackgroundMinutely bdt mint = do
     when (hour == 5) $ runDiscordHandler' $ runConnectionT (runBotDataT announceBirthdays bdt) conn
     addDiscords bdt
     updateDiscordStatus
-    runDiscordHandler' $ runConnectionT (runBotDataT updateRolesAll bdt) conn
+    runDiscordHandler' $ runConnectionT (runBotDataT (updateRolesAll >> updateSavedRolesAll) bdt) conn
 
 -- TODO: frequency updates
 
@@ -226,6 +267,9 @@ adminCommands =
           hRespond "Done"
   , Command "rolesrefresh" AdminLevel 120 $ do
           updateRolesAll
+          hRespond "Done"
+  , Command "savedrolesrefresh" AdminLevel 120 $ do
+          updateSavedRolesAll
           hRespond "Done"
   , Command "lbrefresh" AdminLevel 1200 $ do
           bdt <- hData

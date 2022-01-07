@@ -147,6 +147,7 @@ data BotData = BotData
   , discordVisitorRole :: TVar RoleId
   , discordDivisionRoles :: TVar [(Integer, RoleId)]
   , discordToggleableRoles :: TVar [(String, RoleId)]
+  , discordOtherSavedRoles :: TVar [(String, RoleId)]
   , discordCommandPrefix :: TVar String
   , discordBirthdayChannel :: TVar ChannelId
   }

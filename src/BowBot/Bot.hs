@@ -189,6 +189,11 @@ eventHandler bdt _ (GuildMemberAdd gid mem) = withDB $ \conn -> do
     "INSERT INTO `discordDEV` (`id`, `name`, `discriminator`, `nickname`) VALUES (?,?,?,?) ON DUPLICATE KEY UPDATE `name`=VALUES(`name`), `discriminator`=VALUES(`discriminator`), `nickname`=VALUES(`nickname`)"
     (show (userId (memberUser mem)), userName (memberUser mem), userDiscrim (memberUser mem), memberNick mem)
 
+eventHandler bdt _ (GuildMemberUpdate gid roles usr _) = do
+  trueId <- readProp discordGuildId bdt
+  when (not (null roles) && gid == trueId) $ do
+    withDB $ runConnectionT $ runBotDataT (updateSavedRolesSingle (userId usr) roles Nothing) bdt
+
 eventHandler _ _ _ = pure ()
 
 timeoutDiscord :: Int -> DiscordHandler a -> DiscordHandler (Maybe a)
