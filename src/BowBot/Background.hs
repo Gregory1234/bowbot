@@ -211,7 +211,7 @@ discordBackgroundMinutely bdt mint = do
     when (hour == 5) $ runDiscordHandler' $ runConnectionT (runBotDataT announceBirthdays bdt) conn
     addDiscords bdt
     updateDiscordStatus
-    runDiscordHandler' $ runConnectionT (runBotDataT (updateRolesAll >> updateSavedRolesAll) bdt) conn
+    runDiscordHandler' $ runConnectionT (runBotDataT (updateSavedRolesAll >> updateRolesAll) bdt) conn
 
 -- TODO: frequency updates
 
