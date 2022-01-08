@@ -21,7 +21,7 @@ hypixelWithPlayerStatus (UUID uuid) f = do
   res <- hSendRequestTo url cleanUrl
   decodeParse res f
   
-hypixelGuildMemberList :: APIMonad m => String -> m (Maybe [UUID])
+hypixelGuildMemberList :: APIMonad m => String -> m (Maybe [(UUID, String)])
 hypixelGuildMemberList gid = do
   apiKey <- liftIO $ fromMaybe "" <$> getEnv "HYPIXEL_API"
   let url = "https://api.hypixel.net/guild?key=" ++ apiKey ++ "&id=" ++ gid
@@ -30,4 +30,7 @@ hypixelGuildMemberList gid = do
   decodeParse res $ \o -> do
     guild <- o .: "guild"
     members <- guild .: "members"
-    for members $ \m -> UUID <$> m .: "uuid"
+    for members $ \m -> do
+      uuid <- UUID <$> m .: "uuid"
+      rank <- m .: "rank"
+      return (uuid, rank)

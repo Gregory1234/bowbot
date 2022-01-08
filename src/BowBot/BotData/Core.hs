@@ -138,7 +138,7 @@ data BotData = BotData
   , discordPerms :: TVar (Map UserId PermissionLevel)
   , discordSettings :: TVar (Map UserId Settings)
   , bowBotAccounts :: TVar [BowBotAccount]
-  , hypixelGuildMembers :: TVar [UUID]
+  , hypixelGuildMembers :: TVar [(UUID, String)]
   , snipeMessage :: TVar (Map ChannelId SnipeMessage)
   , hypixelGuildId :: TVar String
   , discordGuildId :: TVar GuildId
@@ -148,6 +148,7 @@ data BotData = BotData
   , discordDivisionRoles :: TVar [(Integer, RoleId)]
   , discordToggleableRoles :: TVar [(String, RoleId)]
   , discordOtherSavedRoles :: TVar [(String, RoleId)]
+  , discordHypixelRoles :: TVar [(String, [String], RoleId)]
   , discordCommandPrefix :: TVar String
   , discordBirthdayChannel :: TVar ChannelId
   }

@@ -107,6 +107,11 @@ updateDiscordConstants = do
   let parseNamedRoles s = traverse parseNamedRole $ lines s
   newDiscordToggleableRoles <- (>>= parseNamedRoles) <$> hInfoDB "toggleable_roles"
   newDiscordOtherSavedRoles <- (>>= parseNamedRoles) <$> hInfoDB "saved_roles"
+  let parseHypixelRole s = case splitOn "->" s of
+        [name, splitOn "|" -> hypixelNames, readMaybe -> Just role] -> Just (name, hypixelNames, role)
+        _ -> Nothing
+  let parseHypixelRoles s = traverse parseHypixelRole $ lines s
+  newDiscordHypixelRoles <- (>>= parseHypixelRoles) <$> hInfoDB "hypixel_roles"
   newDiscordCommandPrefix <- hInfoDB "command_prefix"
   newDiscordBirthdayChannel <- getSnowflake "birthday_channel"
   for_ newHypixelGuildId (hWrite hypixelGuildId)
@@ -117,6 +122,7 @@ updateDiscordConstants = do
   for_ newDiscordDivisionRoles (hWrite discordDivisionRoles)
   for_ newDiscordToggleableRoles (hWrite discordToggleableRoles)
   for_ newDiscordOtherSavedRoles (hWrite discordOtherSavedRoles)
+  for_ newDiscordHypixelRoles (hWrite discordHypixelRoles)
   for_ newDiscordCommandPrefix (hWrite discordCommandPrefix)
   for_ newDiscordBirthdayChannel (hWrite discordBirthdayChannel)
 
@@ -152,6 +158,7 @@ emptyData = do
   discordDivisionRoles <- newTVar []
   discordToggleableRoles <- newTVar []
   discordOtherSavedRoles <- newTVar []
+  discordHypixelRoles <- newTVar []
   discordCommandPrefix <- newTVar "???"
   discordBirthdayChannel <- newTVar 0
   return BotData {..}

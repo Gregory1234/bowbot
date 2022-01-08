@@ -17,10 +17,10 @@ import Data.List.Split (chunksOf, splitOn)
 import Control.Concurrent (threadDelay)
 import Data.Map ((!?))
 import Control.Concurrent.Async (mapConcurrently)
-import Data.Maybe (catMaybes, mapMaybe)
+import Data.Maybe (catMaybes, mapMaybe, isJust)
 import Discord.Types hiding (accountId)
 import Data.Either (fromRight)
-import Data.List ((\\), intercalate)
+import Data.List ((\\), intercalate, intersect)
 import BowBot.Command
 import BowBot.Birthday
 import Control.Exception.Base (SomeException, try)
@@ -76,20 +76,27 @@ updateGuildMemberRolesSingle members memb BowBotAccount { accountMinecrafts = mc
 
 -- TODO: remove BotData from here - take it out to a new type
 updateDiscordRolesSingle
-  :: (DiscordMonad m, BotDataMonad m) => Map UUID HypixelBowLeaderboards -> Maybe [UUID] -> Maybe [RoleId] -> GuildId
+  :: (DiscordMonad m, BotDataMonad m) => Map UUID HypixelBowLeaderboards -> Maybe [(UUID, String)] -> Maybe [RoleId] -> GuildId
   -> GuildMember -> Maybe BowBotAccount -> m ()
 updateDiscordRolesSingle lb members saved gid m (Just bac) = do
   updateDivisionRolesSingle lb m bac
-  for_ members $ \x -> updateGuildMemberRolesSingle x m bac
+  for_ members $ \x -> updateGuildMemberRolesSingle (map fst x) m bac
   illegalRole <- hRead discordIllegalRole
   when (illegalRole `elem` memberRoles m) $ do
     hDiscord $ call_ $ R.RemoveGuildMemberRole gid (userId $ memberUser m) illegalRole
   toggleableRoles <- hRead discordToggleableRoles
-  otherSavedRoles <- hRead discordOtherSavedRoles 
+  otherSavedRoles <- hRead discordOtherSavedRoles
   for_ (toggleableRoles ++ otherSavedRoles) $ \(_, r) -> do
-    when (r `elem` fromMaybe [] saved && r `notElem` memberRoles m) $ 
+    when (r `elem` fromMaybe [] saved && r `notElem` memberRoles m) $
       hDiscord $ call_ $ R.AddGuildMemberRole gid (userId $ memberUser m) r
-    when (r `notElem` fromMaybe [] saved && r `elem` memberRoles m) $ 
+    when (r `notElem` fromMaybe [] saved && r `elem` memberRoles m) $
+      hDiscord $ call_ $ R.RemoveGuildMemberRole gid (userId $ memberUser m) r
+  hypixelSavedRoles <- hRead discordHypixelRoles
+  let ranks = snd <$> filter ((`elem` accountMinecrafts bac) . fst) (fromMaybe [] members)
+  when (isJust members) $ for_ hypixelSavedRoles $ \(_, n, r) -> do
+    when (r `elem` fromMaybe [] saved && not (null (n `intersect` ranks)) && r `notElem` memberRoles m) $
+      hDiscord $ call_ $ R.AddGuildMemberRole gid (userId $ memberUser m) r
+    when ((r `notElem` fromMaybe [] saved || null (n `intersect` ranks)) && r `elem` memberRoles m) $
       hDiscord $ call_ $ R.RemoveGuildMemberRole gid (userId $ memberUser m) r
 updateDiscordRolesSingle _ _ saved gid m Nothing = do
   memberRole <- hRead discordMemberRole
@@ -103,11 +110,15 @@ updateDiscordRolesSingle _ _ saved gid m Nothing = do
   when (memberRole `notElem` memberRoles m && visitorRole `notElem` memberRoles m) $ do
     hDiscord $ call_ $ R.AddGuildMemberRole gid (userId $ memberUser m) visitorRole
   toggleableRoles <- hRead discordToggleableRoles
-  otherSavedRoles <- hRead discordOtherSavedRoles 
+  otherSavedRoles <- hRead discordOtherSavedRoles
   for_ (toggleableRoles ++ otherSavedRoles) $ \(_, r) -> do
-    when (r `elem` fromMaybe [] saved && r `notElem` memberRoles m) $ 
+    when (r `elem` fromMaybe [] saved && r `notElem` memberRoles m) $
       hDiscord $ call_ $ R.AddGuildMemberRole gid (userId $ memberUser m) r
-    when (r `notElem` fromMaybe [] saved && r `elem` memberRoles m) $ 
+    when (r `notElem` fromMaybe [] saved && r `elem` memberRoles m) $
+      hDiscord $ call_ $ R.RemoveGuildMemberRole gid (userId $ memberUser m) r
+  hypixelSavedRoles <- hRead discordHypixelRoles
+  for_ hypixelSavedRoles $ \(_, _, r) -> do
+    when (r `elem` memberRoles m) $
       hDiscord $ call_ $ R.RemoveGuildMemberRole gid (userId $ memberUser m) r
 
 updateDiscordRolesSingleId :: (DiscordMonad m, DBMonad m, BotDataMonad m) => UserId -> m ()
@@ -122,8 +133,9 @@ updateDiscordRolesSingleId did = do
       accs <- (>>=(\u -> (, u) <$> accountDiscords u)) <$> hRead bowBotAccounts
       toggleableRoles <- hRead discordToggleableRoles
       otherSavedRoles <- hRead discordOtherSavedRoles
+      hypixelSavedRoles <- map (\(a, _, b) -> (a,b)) <$> hRead discordHypixelRoles
       savedRoles' :: [(Integer, String)] <- hQueryLog "SELECT `id`, `roles` FROM `discordDEV` WHERE `id` = ?" (Only $ show did)
-      let savedRoles = fromList $ map (bimap fromIntegral (\rs -> map snd (filter ((`elem` splitOn "," rs) . fst) (toggleableRoles ++ otherSavedRoles)))) savedRoles'
+      let savedRoles = fromList $ map (bimap fromIntegral (\rs -> map snd (filter ((`elem` splitOn "," rs) . fst) (toggleableRoles ++ otherSavedRoles ++ hypixelSavedRoles)))) savedRoles'
       let bac = lookup did accs
       updateDiscordRolesSingle lb (if null members then Nothing else Just members) (savedRoles !? did) gid m bac
 
@@ -135,8 +147,9 @@ updateRolesAll = do
   lb <- getHypixelBowLeaderboard
   toggleableRoles <- hRead discordToggleableRoles
   otherSavedRoles <- hRead discordOtherSavedRoles
+  hypixelSavedRoles <- map (\(a, _, b) -> (a,b)) <$> hRead discordHypixelRoles
   savedRoles' :: [(Integer, String)] <- hQueryLog "SELECT `id`, `roles` FROM `discordDEV`" ()
-  let savedRoles = fromList $ map (bimap fromIntegral (\rs -> map snd (filter ((`elem` splitOn "," rs) . fst) (toggleableRoles ++ otherSavedRoles)))) savedRoles'
+  let savedRoles = fromList $ map (bimap fromIntegral (\rs -> map snd (filter ((`elem` splitOn "," rs) . fst) (toggleableRoles ++ otherSavedRoles ++ hypixelSavedRoles)))) savedRoles'
   case maybeGmembs of
     Left _ -> pure ()
     Right gmembs -> for_ gmembs $ \m -> do
@@ -148,7 +161,8 @@ updateSavedRolesSingle :: (BotDataMonad m, DBMonad m) => UserId -> [RoleId] -> M
 updateSavedRolesSingle uid roles expected = do
   toggleable <- hRead discordToggleableRoles
   otherSaved <- hRead discordOtherSavedRoles
-  let toSave = intercalate "," $ map fst $ filter ((`elem` roles) . snd) (toggleable ++ otherSaved)
+  hypixelSavedRoles <- map (\(a, _, b) -> (a,b)) <$> hRead discordHypixelRoles
+  let toSave = intercalate "," $ map fst $ filter ((`elem` roles) . snd) (toggleable ++ otherSaved ++ hypixelSavedRoles)
   when (Just toSave /= expected) $
     void $ hExecuteLog "UPDATE `discordDEV` SET `roles` = ? WHERE `id` = ?" ( toSave, show uid)
 

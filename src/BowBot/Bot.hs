@@ -183,15 +183,16 @@ eventHandler bdt man (MessageCreate m) = do
 
 eventHandler bdt _ (GuildMemberAdd gid mem) = withDB $ \conn -> do
   trueId <- readProp discordGuildId bdt
-  when (gid == trueId) $
-    runDiscordHandler' $ runConnectionT (runBotDataT (updateDiscordRolesSingleId (userId $ memberUser mem)) bdt) conn
-  void $ executeLog conn
-    "INSERT INTO `discordDEV` (`id`, `name`, `discriminator`, `nickname`) VALUES (?,?,?,?) ON DUPLICATE KEY UPDATE `name`=VALUES(`name`), `discriminator`=VALUES(`discriminator`), `nickname`=VALUES(`nickname`)"
-    (show (userId (memberUser mem)), userName (memberUser mem), userDiscrim (memberUser mem), memberNick mem)
+  unless (userIsBot $ memberUser mem) $ do
+    when (gid == trueId) $
+      runDiscordHandler' $ runConnectionT (runBotDataT (updateDiscordRolesSingleId (userId $ memberUser mem)) bdt) conn
+    void $ executeLog conn
+      "INSERT INTO `discordDEV` (`id`, `name`, `discriminator`, `nickname`) VALUES (?,?,?,?) ON DUPLICATE KEY UPDATE `name`=VALUES(`name`), `discriminator`=VALUES(`discriminator`), `nickname`=VALUES(`nickname`)"
+      (show (userId (memberUser mem)), userName (memberUser mem), userDiscrim (memberUser mem), memberNick mem)
 
 eventHandler bdt _ (GuildMemberUpdate gid roles usr _) = do
   trueId <- readProp discordGuildId bdt
-  when (not (null roles) && gid == trueId) $ do
+  when (not (null roles) && gid == trueId && not (userIsBot usr)) $ do
     withDB $ runConnectionT $ runBotDataT (updateSavedRolesSingle (userId usr) roles Nothing) bdt
 
 eventHandler _ _ _ = pure ()
