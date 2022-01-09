@@ -44,8 +44,8 @@ onlineCommand = Command "online" DefaultLevel 30 $ do
 isInBowDuels :: APIMonad m => UUID -> m (Maybe Bool)
 isInBowDuels uuid = hypixelWithPlayerStatus uuid $ \o -> do
     session <- o .: "session"
-    mode :: String <- session .: "mode"
-    return $ mode == "DUELS_BOW_DUEL"
+    mode :: Maybe String <- session .:? "mode"
+    return $ mode == Just "DUELS_BOW_DUEL"
 
 
 getWatchlist :: DBMonad m => m [UUID]

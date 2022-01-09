@@ -57,7 +57,7 @@ runBowBot discordKey = do
      void $ forever go
    where
      go = do
-       _ <- forkIO $ backgroundTimeoutRun 600 $ do
+       _ <- forkIO $ backgroundTimeoutRun 6000 $ do
          mint <- read @Int <$> getTime "%M"
          backgroundMinutely bdt mint
        threadDelay 60000000
@@ -78,7 +78,7 @@ onStartup bdt = do
     void $ forever go
     where
       go = do
-        _ <- ReaderT $ \x -> forkIO $ flip runReaderT x $ backgroundDiscordTimeoutRun 600 $ do
+        _ <- ReaderT $ \x -> forkIO $ flip runReaderT x $ backgroundDiscordTimeoutRun 6000 $ do
           mint <- liftIO $ read @Int <$> getTime "%M"
           discordBackgroundMinutely bdt mint
         liftIO $ threadDelay 60000000
