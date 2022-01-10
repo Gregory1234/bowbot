@@ -49,6 +49,7 @@ clearCache :: CachedData a -> STM ()
 clearCache CachedData {..} = do
   border <- readTVar borderCache
   writeTVar mainCache border
+  writeTVar borderCache Nothing
 
 data CacheResponse a
   = CacheBusy
