@@ -66,10 +66,10 @@ pad = pad' True ' '
 
 showMemberOrUser :: Bool -> Either User GuildMember -> String
 showMemberOrUser False (Left User {..}) = unpack userName ++ "#" ++ unpack userDiscrim
-showMemberOrUser True (Left User {..}) = "**" ++ unpack userName ++ "**#" ++ unpack userDiscrim
+showMemberOrUser True (Left User {..}) = "**" ++ discordEscape (unpack userName) ++ "**#" ++ unpack userDiscrim
 showMemberOrUser b (Right GuildMember {memberNick = Nothing, ..}) = showMemberOrUser b $ Left memberUser
 showMemberOrUser False (Right GuildMember {memberNick = Just nick, ..}) = unpack nick ++ " (" ++ showMemberOrUser False (Left memberUser) ++ ")"
-showMemberOrUser True (Right GuildMember {memberNick = Just nick, ..}) = "**" ++ unpack nick ++ "** (" ++ showMemberOrUser False (Left memberUser) ++ ")"
+showMemberOrUser True (Right GuildMember {memberNick = Just nick, ..}) = "**" ++ discordEscape (unpack nick) ++ "** (" ++ discordEscape (showMemberOrUser False (Left memberUser)) ++ ")"
 
 -- TODO: move ifDev and the ids into BotData
 

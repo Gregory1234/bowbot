@@ -17,7 +17,7 @@ nameCommand name ac = Command name DefaultLevel 2 $ do -- TODO: add times when c
     DiscordUserNotFound -> discordNotFoundMessage
     (UserError ()) -> somethingWrongMessage
     NotOnList -> registerMessage
-    (JustResponse n s) -> "Name history of **" ++ n ++ "**:```\n" ++ unlines s ++ "```"
-    (OldResponse o n s) -> "Name history of **" ++ o ++ " (" ++ n ++ ")**:```\n" ++ unlines s ++ "```"
-    (DidYouMeanResponse n s) -> "*Did you mean* **" ++ n ++ "**:```\n" ++ unlines s ++ "```"
-    (DidYouMeanOldResponse o n s) -> "*Did you mean* **" ++ o ++ " (" ++ n ++ ")**:```\n" ++ unlines s ++ "```"
+    (JustResponse n s) -> "Name history of **" ++ discordEscape n ++ "**:```\n" ++ unlines s ++ "```"
+    (OldResponse o n s) -> "Name history of **" ++ discordEscape o ++ " (" ++ discordEscape n ++ ")**:```\n" ++ unlines s ++ "```"
+    (DidYouMeanResponse n s) -> "*Did you mean* **" ++ discordEscape n ++ "**:```\n" ++ unlines s ++ "```"
+    (DidYouMeanOldResponse o n s) -> "*Did you mean* **" ++ discordEscape o ++ " (" ++ discordEscape n ++ ")**:```\n" ++ unlines s ++ "```"

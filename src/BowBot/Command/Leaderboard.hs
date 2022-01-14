@@ -29,7 +29,7 @@ hypixelBowLeaderboardCommand name lbname statname lbfun = Command name DefaultLe
     ["all"] -> Right . (,Nothing, LeaderboardAll) <$> getAuthorNicks (userId caller)
     [readMaybe -> Just page] -> Right . (,Nothing, LeaderboardPage (page - 1)) <$> getAuthorNicks (userId caller)
     [mcName] -> do
-      res <- withMinecraftAutocorrect False mcName $ \uuid _ ->
+      res <- withMinecraftAutocorrect True mcName $ \uuid _ ->
         return $ if uuid `elem` map lbUUID elems then Right uuid else Left ()
       return $ case res of
         PlayerNotFound -> Left playerNotFoundMessage
