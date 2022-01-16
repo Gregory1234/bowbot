@@ -19,10 +19,10 @@ hypixelBowStatsCommand name mode = Command name DefaultLevel 15 $ do
         [] -> Right (userId caller)
         mcname -> Left (unwords mcname)
   hTryApiRequests hypixelRequestCounter 2 (\sec -> hRespond $ "**Too many requests! Wait another " ++ show sec ++ " seconds!**") $ do
-    res <- withMinecraft True player $ \uuid names -> do
+    res <- withMinecraft False player $ \uuid names -> do
       st <- requestHypixelBowStats uuid
       for_ st (hypixelBowTryRegister uuid names)
-      return $ maybe (Left ()) Right st
+      return $ maybe (Left ()) (\s -> if bowWins s + bowLosses s > 0 then Right s else Left ()) st
     settings <- case mode of
       AlwaysDefault -> pure defSettings
       AlwaysAll -> pure allSettings
@@ -50,7 +50,7 @@ hypixelBowTimeStatsCommand name times mode = Command name DefaultLevel 15 $ do
         [] -> Right (userId caller)
         mcname -> Left (unwords mcname)
   hTryApiRequests hypixelRequestCounter 2 (\sec -> hRespond $ "**Too many requests! Wait another " ++ show sec ++ " seconds!**") $ do
-    res <- withMinecraft True player $ \uuid names -> do
+    res <- withMinecraft False player $ \uuid names -> do
       st <- requestHypixelBowStats uuid
       for_ st (hypixelBowTryRegister uuid names)
       st' <- for st $ \s -> catMaybes <$> for times (requestHypixelBowTimeStats s uuid)
