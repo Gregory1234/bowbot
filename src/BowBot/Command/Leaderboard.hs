@@ -7,8 +7,9 @@ module BowBot.Command.Leaderboard where
 import BowBot.Stats.HypixelBow
 import BowBot.Command
 import BowBot.Minecraft
-import Data.List (sortOn)
+import Data.List (sortOn, find)
 import Data.List.Split (chunksOf)
+import Data.Maybe (listToMaybe)
 
 data LeaderboardElement = LeaderboardElement { lbPos :: Integer, lbName :: String, lbVal :: String, lbUUID :: UUID } deriving Show
 
@@ -25,7 +26,10 @@ hypixelBowLeaderboardCommand name lbname statname lbfun = Command name DefaultLe
   let elems = zipWith (\lbPos (lbName, lbVal, lbUUID) -> LeaderboardElement {..}) [1..] sortedlb
   args <- hArgs
   selectedOrMsg <- case args of
-    [] -> (\x -> Right (x ,Nothing, LeaderboardSearch (head $ filter (`elem` x) $ map lbUUID elems))) <$> getAuthorNicks (userId caller)
+    [] -> (\x -> case find (`elem` x) (map lbUUID elems) of 
+                    Just pl -> Right (x, Nothing, LeaderboardSearch pl)
+                    Nothing -> Right ([], if null x then Nothing else Just "*You are not on this leaderboard:*", LeaderboardPage 0)
+          ) <$> getAuthorNicks (userId caller)
     ["all"] -> Right . (,Nothing, LeaderboardAll) <$> getAuthorNicks (userId caller)
     [readMaybe -> Just page] -> Right . (,Nothing, LeaderboardPage (page - 1)) <$> getAuthorNicks (userId caller)
     [mcName] -> do
