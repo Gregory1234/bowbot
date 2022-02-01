@@ -19,10 +19,10 @@ import Data.Map (toList, Map, fromList)
 import BowBot.API.Hypixel
 
 data HypixelDivisionRankName
-  = HRookie | HIron | HGold | HDiamond | HMaster | HLegend | HGrandmaster | HGodlike | HWorldElite | HWorldMaster | HWorldsBest
+  = HRookie | HIron | HGold | HDiamond | HMaster | HLegend | HGrandmaster | HGodlike | HCelestial | HDivine | HAscended
   deriving (Show, Enum, Eq, Ord, Bounded)
 
-data HypixelDivisionRankLevel = HL1 | HL2 | HL3 | HL4 | HL5 deriving (Show, Enum, Eq, Ord, Bounded)
+data HypixelDivisionRankLevel = HL1 | HL2 | HL3 | HL4 | HL5 deriving (Show, Enum, Eq, Ord, Bounded) -- TODO: allegedly ascended goes to 50
 
 data HypixelDivisionRank = HypixelDivisionRank HypixelDivisionRankName HypixelDivisionRankLevel deriving (Show)
 
@@ -37,9 +37,9 @@ divisionRankName (HypixelDivisionRank n l) = showName n ++ showLevel l
     showName HLegend = "Legend"
     showName HGrandmaster = "Grandmaster"
     showName HGodlike = "Godlike"
-    showName HWorldElite = "World Elite"
-    showName HWorldMaster = "World Master"
-    showName HWorldsBest = "World's Best"
+    showName HCelestial = "Celestial"
+    showName HDivine = "Divine"
+    showName HAscended = "Ascended"
     showLevel HL1 = ""
     showLevel HL2 = " II"
     showLevel HL3 = " III"
@@ -55,9 +55,9 @@ divisionRankBaseWins HMaster = 1000
 divisionRankBaseWins HLegend = 2000
 divisionRankBaseWins HGrandmaster = 5000
 divisionRankBaseWins HGodlike = 10000
-divisionRankBaseWins HWorldElite = 25000
-divisionRankBaseWins HWorldMaster = 50000
-divisionRankBaseWins HWorldsBest = 100000
+divisionRankBaseWins HCelestial = 25000
+divisionRankBaseWins HDivine = 50000
+divisionRankBaseWins HAscended = 100000
 
 divisionRankMinimumWins :: HypixelDivisionRank -> Integer
 divisionRankMinimumWins (HypixelDivisionRank n l) = divisionRankBaseWins n + ((divisionRankBaseWins (succ n) - divisionRankBaseWins n) `div` 5) * fromIntegral (fromEnum l)
@@ -73,9 +73,9 @@ divisionRankFromWins x
   | x < 5000 = Just $ calc HLegend
   | x < 10000 = Just $ calc HGrandmaster
   | x < 25000 = Just $ calc HGodlike
-  | x < 50000 = Just $ calc HWorldElite
-  | x < 100000 = Just $ calc HWorldMaster
-  | otherwise = Just $ HypixelDivisionRank HWorldsBest HL1
+  | x < 50000 = Just $ calc HCelestial
+  | x < 100000 = Just $ calc HDivine
+  | otherwise = Just $ HypixelDivisionRank HAscended HL1
     where
       calc n = HypixelDivisionRank n $ toEnum $ fromIntegral $ (x - divisionRankBaseWins n) `div` ((divisionRankBaseWins (succ n) - divisionRankBaseWins n) `div` 5)
 
