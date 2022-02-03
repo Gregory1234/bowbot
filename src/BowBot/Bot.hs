@@ -199,7 +199,7 @@ eventHandler bdt _ (GuildMemberUpdate gid roles usr _) = do
     pns <- fmap (>>=(\BowBotAccount {..} -> (,accountDiscords) <$> accountDiscords)) $ readProp bowBotAccounts bdt
     case lookup (userId usr) pns of
       Nothing -> pure ()
-      Just discords -> runDiscordHandler' $ withDB $ runConnectionT $ runBotDataT (for_ discords updateDiscordRolesSingleId) bdt
+      Just discords -> runDiscordHandler' $ withDB $ runConnectionT $ runBotDataT (for_ (filter (/=userId usr) discords) updateDiscordRolesSingleId) bdt
 
 
 eventHandler _ _ _ = pure ()
