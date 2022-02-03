@@ -17,6 +17,12 @@ clearApiRequestCounter ApiRequestCounter {..} = do
   writeTVar mainCounter border
   writeTVar borderCounter 0
 
+showApiRequestCounter :: ApiRequestCounter -> STM String
+showApiRequestCounter ApiRequestCounter {..} = do
+  mainCounterVal <- readTVar mainCounter
+  borderCounterVal <- readTVar borderCounter
+  return $ "ApiRequestCounter {mainCounter = " ++ show mainCounterVal ++ ", borderCounter = " ++ show borderCounterVal ++ ", counterLimit = " ++ show counterLimit ++ "}"
+
 -- TODO: create a version with a return value
 tryApiRequests :: MonadIO m => ApiRequestCounter -> Int -> (Int -> m ()) -> m () -> m ()
 tryApiRequests ApiRequestCounter {..} extra onFail onSuccess = do
@@ -50,6 +56,13 @@ clearCache CachedData {..} = do
   border <- readTVar borderCache
   writeTVar mainCache border
   writeTVar borderCache Nothing
+
+showCachedData :: Show a => CachedData a -> STM String
+showCachedData CachedData {..} = do
+  mainCacheVal <- readTVar mainCache
+  borderCacheVal <- readTVar borderCache
+  currentlyBusyCacheVal <- readTVar currentlyBusyCache
+  return $ "CachedData {mainCache = " ++ show mainCacheVal ++ ", borderCacheVal = " ++ show borderCacheVal ++ ", currentlyBusyCache = " ++ show currentlyBusyCacheVal ++ "}"
 
 data CacheResponse a
   = CacheBusy

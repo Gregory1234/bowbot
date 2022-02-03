@@ -25,6 +25,7 @@ import BowBot.Command
 import BowBot.Birthday
 import Control.Exception.Base (SomeException, try)
 import Data.Bifunctor (first, bimap)
+import qualified Data.Map as M
 
 announceBirthdays :: (DBMonad m, BotDataMonad m, DiscordMonad m) => m ()
 announceBirthdays = do
@@ -37,7 +38,9 @@ announceBirthdays = do
     Right ppl -> unless (null ppl) $ do
       birthdayChannel <- hRead discordBirthdayChannel
       hLogInfoDB $ "Announcing birthdays: " ++ intercalate ", " (map (showMemberOrUser True . Right) ppl)
-      hDiscord $ for_ ppl $ \p -> call $ R.CreateMessage birthdayChannel $ pack $ "**Happy birthday** to " ++ showMemberOrUser True (Right p) ++ "!"
+      pns <- fmap (>>=(\BowBotAccount {..} -> (,accountId) <$> accountDiscords)) $ hRead bowBotAccounts
+      let peopleMap = M.toList $ groupByToMap (\x -> maybe (Left (userId $ memberUser x)) Right $ lookup (userId $ memberUser x) pns) ppl
+      hDiscord $ for_ peopleMap $ \(_, p) -> call $ R.CreateMessage birthdayChannel $ pack $ "**Happy birthday** to " ++ intercalate ", " (map (showMemberOrUser True . Right) p) ++ "!"
 
 updateDiscordStatus :: DiscordHandler ()
 updateDiscordStatus = do
@@ -134,7 +137,7 @@ updateDiscordRolesSingleId did = do
       toggleableRoles <- hRead discordToggleableRoles
       otherSavedRoles <- hRead discordOtherSavedRoles
       hypixelSavedRoles <- map (\(a, _, b) -> (a,b)) <$> hRead discordHypixelRoles
-      savedRoles' :: [(Integer, String)] <- hQueryLog "SELECT `id`, `roles` FROM `discordDEV` WHERE `id` = ?" (Only $ show did)
+      savedRoles' :: [(Integer, String)] <- hQueryLog "SELECT `discord`, `roles` FROM `unregisteredDEV` WHERE `discord` = ? UNION SELECT `peopleDiscordDEV`.`discord`, `peopleDEV`.`roles` FROM `peopleDiscordDEV` JOIN `peopleDEV` ON `peopleDEV`.`id`=`peopleDiscordDEV`.`id` WHERE `discord` = ?" (show did, show did)
       let savedRoles = fromList $ map (bimap fromIntegral (\rs -> map snd (filter ((`elem` splitOn "," rs) . fst) (toggleableRoles ++ otherSavedRoles ++ hypixelSavedRoles)))) savedRoles'
       let bac = lookup did accs
       updateDiscordRolesSingle lb (if null members then Nothing else Just members) (savedRoles !? did) gid m bac
@@ -148,7 +151,7 @@ updateRolesAll = do
   toggleableRoles <- hRead discordToggleableRoles
   otherSavedRoles <- hRead discordOtherSavedRoles
   hypixelSavedRoles <- map (\(a, _, b) -> (a,b)) <$> hRead discordHypixelRoles
-  savedRoles' :: [(Integer, String)] <- hQueryLog "SELECT `id`, `roles` FROM `discordDEV`" ()
+  savedRoles' :: [(Integer, String)] <- hQueryLog "SELECT `discord`, `roles` FROM `unregisteredDEV` UNION SELECT `peopleDiscordDEV`.`discord`, `peopleDEV`.`roles` FROM `peopleDiscordDEV` JOIN `peopleDEV` ON `peopleDEV`.`id`=`peopleDiscordDEV`.`id`" ()
   let savedRoles = fromList $ map (bimap fromIntegral (\rs -> map snd (filter ((`elem` splitOn "," rs) . fst) (toggleableRoles ++ otherSavedRoles ++ hypixelSavedRoles)))) savedRoles'
   case maybeGmembs of
     Left _ -> pure ()
@@ -163,14 +166,18 @@ updateSavedRolesSingle uid roles expected = do
   otherSaved <- hRead discordOtherSavedRoles
   hypixelSavedRoles <- map (\(a, _, b) -> (a,b)) <$> hRead discordHypixelRoles
   let toSave = intercalate "," $ map fst $ filter ((`elem` roles) . snd) (toggleable ++ otherSaved ++ hypixelSavedRoles)
-  when (Just toSave /= expected) $
-    void $ hExecuteLog "UPDATE `discordDEV` SET `roles` = ? WHERE `id` = ?" ( toSave, show uid)
+  when (Just toSave /= expected) $ do
+    c :: [Only Integer] <- hQueryLog "SELECT `discord` FROM `peopleDiscordDEV` WHERE `discord` = ?" (Only $ show uid)
+    void $ if null c
+      then hExecuteLog "INSERT INTO `unregisteredDEV`(`discord`, `roles`) VALUES (?, ?) ON DUPLICATE KEY UPDATE `roles` = VALUES(`roles`)" (show uid, toSave)
+      else hExecuteLog "UPDATE `peopleDEV` JOIN `peopleDiscordDEV` ON `peopleDEV`.`id`=`peopleDiscordDEV`.`id` SET `peopleDEV`.`roles` = ? WHERE `peopleDiscordDEV`.`discord` = ?" (toSave, show uid)
+
 
 updateSavedRolesAll :: (DiscordMonad m, BotDataMonad m, DBMonad m) => m ()
 updateSavedRolesAll = do
   dgid <- hRead discordGuildId
   v <- hDiscord $ fmap (filter (not . userIsBot . memberUser)) <$> call (R.ListGuildMembers dgid R.GuildMembersTiming {R.guildMembersTimingLimit = Just 500, R.guildMembersTimingAfter = Nothing})
-  expected' :: [(Integer, String)] <- hQueryLog "SELECT `id`, `roles` FROM `discordDEV`" ()
+  expected' :: [(Integer, String)] <- hQueryLog "SELECT `discord`, `roles` FROM `unregisteredDEV` UNION SELECT `peopleDiscordDEV`.`discord`, `peopleDEV`.`roles` FROM `peopleDiscordDEV` JOIN `peopleDEV` ON `peopleDEV`.`id`=`peopleDiscordDEV`.`id`" ()
   let expected = fromList $ map (first fromIntegral) expected'
   case v of
     Right x -> for_ x $ \m -> updateSavedRolesSingle (userId $ memberUser m) (memberRoles m) (expected !? userId (memberUser m))

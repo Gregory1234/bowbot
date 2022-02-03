@@ -26,5 +26,5 @@ currentBirthdayDate = fromJust . birthdayFromString <$> getTime "%d.%m"
 
 getBirthdayPeople :: DBMonad m => BirthdayDate -> m [UserId]
 getBirthdayPeople bd = do
-  res :: [Only Integer] <- hQueryLog "SELECT `id` FROM `discordDEV` WHERE `birthday` = ?" (Only (birthdayString bd))
+  res :: [Only Integer] <- hQueryLog "SELECT `discord` FROM `unregisteredDEV` WHERE `birthday` = ? UNION SELECT `peopleDiscordDEV`.`discord` FROM `peopleDiscordDEV` JOIN `peopleDEV` ON `peopleDEV`.`id`=`peopleDiscordDEV`.`id` WHERE `birthday` = ?" (birthdayString bd, birthdayString bd)
   return $ fmap (fromInteger . fromOnly) res

@@ -27,7 +27,12 @@ addAccount name did uuid = do
   res :: [Only Integer] <- hQueryLog "SELECT `id` FROM `discordDEV` WHERE `id`=?" (Only $ show did)
   if length res == 1
   then hTransaction $ do
-    c1 <- hExecuteLog "INSERT INTO `peopleDEV`(`name`) VALUES (?)" (Only name)
+    dt :: [(Maybe String, String)] <- hQueryLog "SELECT `birthday`, `roles` FROM `unregisteredDEV` WHERE `discord` = ?" (Only (show did))
+    c1 <- case dt of
+            [] -> hExecuteLog "INSERT INTO `peopleDEV`(`name`) VALUES (?)" (Only name)
+            ((bd, roles):_) -> do
+              _ <- hExecuteLog "DELETE FROM `unregisteredDEV` WHERE `discord` = ?" (Only $ show did)
+              hExecuteLog "INSERT INTO `peopleDEV`(`name`,`birthday`,`roles`) VALUES (?,?,?)" (name, bd, roles)
     (fromIntegral -> aid) <- hInsertID
     c2 <- hExecuteLog "INSERT INTO `peopleMinecraftDEV`(`id`, `minecraft`,`status`, `selected`, `verified`) VALUES (?,?, 'main', 1, 0)" (aid, uuidString uuid)
     c3 <- hExecuteLog "INSERT INTO `peopleDiscordDEV`(`id`, `discord`) VALUES (?,?)" (aid, show did)
