@@ -195,10 +195,11 @@ eventHandler bdt _ (GuildMemberAdd gid mem) = withDB $ \conn -> do
 eventHandler bdt _ (GuildMemberUpdate gid roles usr _) = do
   trueId <- readProp discordGuildId bdt
   when (not (null roles) && gid == trueId && not (userIsBot usr)) $ do
+    withDB $ runConnectionT $ runBotDataT (updateSavedRolesSingle (userId usr) roles Nothing) bdt
     pns <- fmap (>>=(\BowBotAccount {..} -> (,accountDiscords) <$> accountDiscords)) $ readProp bowBotAccounts bdt
     case lookup (userId usr) pns of
-      Nothing -> withDB $ runConnectionT $ runBotDataT (updateSavedRolesSingle (userId usr) roles Nothing) bdt
-      Just discords -> withDB $ runConnectionT $ runBotDataT (for_ discords $ \d -> updateSavedRolesSingle d roles Nothing) bdt
+      Nothing -> pure ()
+      Just discords -> runDiscordHandler' $ withDB $ runConnectionT $ runBotDataT (for_ discords updateDiscordRolesSingleId) bdt
 
 
 eventHandler _ _ _ = pure ()
