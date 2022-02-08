@@ -39,6 +39,7 @@ library
       BowBot.Command.Leaderboard
       BowBot.Command.Minecraft
       BowBot.Command.Name
+      BowBot.Command.RankedTurfWars
       BowBot.Command.Register
       BowBot.Command.Role
       BowBot.Command.Settings
@@ -51,6 +52,7 @@ library
       BowBot.DB
       BowBot.DiscordNFData
       BowBot.Minecraft
+      BowBot.RankedTurfWars
       BowBot.Settings
       BowBot.Snipe
       BowBot.Stats.HypixelBow

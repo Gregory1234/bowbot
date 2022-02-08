@@ -8,7 +8,11 @@ import Control.Concurrent.STM (STM, TVar)
 import Control.Monad.IO.Class
 import BowBot.Utils
 import Data.Map (Map)
-  
+import qualified Discord as D
+import qualified Discord.Types as D
+import Control.Concurrent (threadDelay)
+import Data.Maybe (isJust)
+
 data ApiRequestCounter = ApiRequestCounter { mainCounter :: TVar Int, borderCounter :: TVar Int, counterLimit :: Int }
 
 clearApiRequestCounter :: ApiRequestCounter -> STM ()
@@ -56,6 +60,7 @@ clearCache CachedData {..} = do
   border <- readTVar borderCache
   writeTVar mainCache border
   writeTVar borderCache Nothing
+  writeTVar currentlyBusyCache False
 
 showCachedData :: Show a => CachedData a -> STM String
 showCachedData CachedData {..} = do
@@ -92,6 +97,45 @@ getOrCalculateCache CachedData {..} exec = do
         writeTVar currentlyBusyCache False
         writeTVar (if t <= 5 || t >= 55 then borderCache else mainCache) val
       return (maybe CacheFailed CacheFresh val)
+
+data DiscordCachedData a = DiscordCachedData { discordCache :: TVar (Maybe a), discordCurrentlyBusyCache :: TVar Bool }
+
+getOrCalculateDiscordCache :: MonadIO m => DiscordCachedData a -> m () -> m (CacheResponse a)
+getOrCalculateDiscordCache DiscordCachedData {..} request = do
+  (ret, busy) <- stm $ do
+    busy <- readTVar discordCurrentlyBusyCache
+    val <- readTVar discordCache
+    return (val, busy)
+  case (ret, busy) of
+    (Nothing, True) -> return CacheBusy
+    (Nothing, False) -> do
+      request
+      stm $ writeTVar discordCurrentlyBusyCache True
+      let retTrue = do
+            (ret2, busy2) <- stm $ do
+                busy2 <- readTVar discordCurrentlyBusyCache
+                val <- readTVar discordCache
+                return (val, busy2)
+            case (ret2, busy2) of
+              (Nothing, True) -> do
+                liftIO $ threadDelay 500000
+                retTrue
+              _ -> return ret2
+      rt <- retTrue
+      case rt of
+        Nothing -> return CacheFailed
+        Just a -> return $ CacheFresh a
+    (Just a, _) -> return $ CacheOld a
+
+clearDiscordCache :: DiscordCachedData a -> STM ()
+clearDiscordCache DiscordCachedData {..} = do
+  writeTVar discordCache Nothing
+  writeTVar discordCurrentlyBusyCache False
+
+supplyDiscordCache :: DiscordCachedData a -> Maybe a -> STM ()
+supplyDiscordCache DiscordCachedData {..} val = do
+  when (isJust val) $ writeTVar discordCache val
+  writeTVar discordCurrentlyBusyCache False
 
 data UpdateFreq
   = Normal
@@ -165,4 +209,8 @@ data BotData = BotData
   , discordHypixelRoles :: TVar [(String, [String], RoleId)]
   , discordCommandPrefix :: TVar String
   , discordBirthdayChannel :: TVar ChannelId
+  , discordBotStreamChannel :: TVar ChannelId
+  , rtwDataCommand :: TVar String
+  , rtwBotId :: TVar UserId
+  , rtwData :: DiscordCachedData String
   }

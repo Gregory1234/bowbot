@@ -28,9 +28,9 @@ urlCommand name ac mkurl = Command name DefaultLevel 8 $ do
       hRespond url'
 
 helpCommand :: String -> PermissionLevel -> (String -> String) -> Command
-helpCommand name lvl str = Command name lvl 2 $ do
+helpCommand name lvl str = Command name lvl 5 $ do
   prefix <- hRead discordCommandPrefix
   hRespond (str prefix)
 
 constStringCommand :: String -> PermissionLevel -> String -> Command
-constStringCommand name lvl str = Command name lvl 2 $ hRespond str
+constStringCommand name lvl str = Command name lvl 5 $ hRespond str

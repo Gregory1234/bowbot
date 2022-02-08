@@ -12,6 +12,7 @@ import BowBot.BotData
 import BowBot.Stats.HypixelBow
 import BowBot.API
 import BowBot.DB
+import BowBot.RankedTurfWars
 import Network.HTTP.Conduit (newManager, httpLbs, parseRequest)
 import Data.List.Split (chunksOf, splitOn)
 import Control.Concurrent (threadDelay)
@@ -248,6 +249,7 @@ backgroundMinutely bdt@BotData {..} mint = do
   atomically $ do
     clearApiRequestCounter hypixelRequestCounter
     clearCache hypixelBowOnlineList
+    clearDiscordCache rtwData -- TODO: could get cleared the second it comes...
   when (mint == 0) $ withDB $ \conn -> do
     logInfoDB conn "started update"
     manager <- newManager managerSettings

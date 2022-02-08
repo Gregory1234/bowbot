@@ -20,9 +20,11 @@ import BowBot.Command.Snipe
 import BowBot.Command.Ban
 import BowBot.Command.Role
 import BowBot.Command.Birthday
+import BowBot.Command.RankedTurfWars
 import BowBot.Stats.HypixelBow
 import BowBot.Background
 import BowBot.Snipe
+import BowBot.RankedTurfWars
 import qualified Data.Text as T
 import Data.Text (isPrefixOf)
 import Control.Monad.Reader (ReaderT(..))
@@ -115,6 +117,7 @@ commands =
   , snipeCommand
   , hypixelBowLeaderboardBanCommand "sban"
   , roleCommand
+  , rtwStatsCommand
   , constStringCommand "throw" AdminLevel $ show @Integer (1 `div` 0)
   , helpCommand "help" DefaultLevel
     $ \pr -> "**Bow bot help:**\n\n"
@@ -136,6 +139,7 @@ commands =
     ++ " - **" ++ pr ++ "snipe** - *show the last deleted message from this channel*\n"
     ++ " - **" ++ pr ++ "role** - *show all toggleable roles*\n"
     ++ " - **" ++ pr ++ "role [name]** - *toggle a discord role*\n"
+    ++ " - **" ++ pr ++ "rtws [name]** - *show player's Ranked Turf Wars stats*\n"
     ++ "\nMade by **GregC**#9698"
   , constStringCommand "gregc" DefaultLevel "<:gregc:904127204865228851>"
   , helpCommand "settings" DefaultLevel
@@ -163,6 +167,7 @@ commands =
 eventHandler :: BotData -> Manager -> Event -> DiscordHandler ()
 eventHandler bdt man (MessageCreate m) = do
   liftIO $ runBotDataT (detectDeleteMessage m) bdt
+  liftIO $ detectRTWData man bdt m
   prefix <- readProp discordCommandPrefix bdt
   when (not (fromBot m) && pack prefix `isPrefixOf` messageText m) $ do
     let n = unpack $ T.toLower . T.drop (length prefix) . T.takeWhile (/= ' ') $ messageText m

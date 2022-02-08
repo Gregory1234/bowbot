@@ -82,6 +82,11 @@ hCache cache exec = do
   dt <- hData
   getOrCalculateCache (cache dt) exec
 
+hDiscordCache :: BotDataMonad m => (BotData -> DiscordCachedData a) -> m () -> m (CacheResponse a)
+hDiscordCache cache req = do
+  dt <- hData
+  getOrCalculateDiscordCache (cache dt) req
+
 class MonadIO m => DiscordMonad m where
   hDiscord :: DiscordHandler a -> m a
 

@@ -114,6 +114,9 @@ updateDiscordConstants = do
   newDiscordHypixelRoles <- (>>= parseHypixelRoles) <$> hInfoDB "hypixel_roles"
   newDiscordCommandPrefix <- hInfoDB "command_prefix"
   newDiscordBirthdayChannel <- getSnowflake "birthday_channel"
+  newDiscordBotStreamChannel <- getSnowflake "bot_stream_channel"
+  newRtwDataCommand <- hInfoDB "rtw_data_command"
+  newRtwBotId <- getSnowflake "rtw_bot_id"
   for_ newHypixelGuildId (hWrite hypixelGuildId)
   for_ newDiscordGuildId (hWrite discordGuildId)
   for_ newDiscordIllegalRole (hWrite discordIllegalRole)
@@ -125,6 +128,9 @@ updateDiscordConstants = do
   for_ newDiscordHypixelRoles (hWrite discordHypixelRoles)
   for_ newDiscordCommandPrefix (hWrite discordCommandPrefix)
   for_ newDiscordBirthdayChannel (hWrite discordBirthdayChannel)
+  for_ newDiscordBotStreamChannel (hWrite discordBotStreamChannel)
+  for_ newRtwDataCommand (hWrite rtwDataCommand)
+  for_ newRtwBotId (hWrite rtwBotId)
 
 
 newRequestCounter :: Int -> STM ApiRequestCounter
@@ -139,6 +145,12 @@ newCachedData = do
   borderCache <- newTVar Nothing
   currentlyBusyCache <- newTVar False
   return CachedData {..}
+
+newDiscordCachedData :: STM (DiscordCachedData a)
+newDiscordCachedData = do
+  discordCache <- newTVar Nothing
+  discordCurrentlyBusyCache <- newTVar False
+  return DiscordCachedData {..}
 
 emptyData :: STM BotData
 emptyData = do
@@ -161,6 +173,10 @@ emptyData = do
   discordHypixelRoles <- newTVar []
   discordCommandPrefix <- newTVar "???"
   discordBirthdayChannel <- newTVar 0
+  discordBotStreamChannel <- newTVar 0
+  rtwDataCommand <- newTVar ""
+  rtwBotId <- newTVar 0
+  rtwData <- newDiscordCachedData
   return BotData {..}
 
 createData :: IO BotData
