@@ -204,8 +204,7 @@ updateHypixelBowLeaderboard extraModes lb = hTransaction $ do
       helperExtra (UUID uuid, HypixelBowLeaderboards {..}) = (uuid, bowLbWins, bowLbLosses)
 
 data HypixelBowTimeStats = HypixelBowTimeStats
-  { bowTimeType :: TimeStatsType,
-    bowTimeWins :: Integer,
+  { bowTimeWins :: Integer,
     bowTimeLosses :: Integer
   } deriving (Show)
 
@@ -214,11 +213,17 @@ requestHypixelBowTimeStats HypixelBowStats {..} (UUID uuid) t = do
   res :: [(Integer, Integer)] <- hQueryLog (replaceQuery "TIME" (timeStatsTypeName t) "SELECT `lastTIMEWins`, `lastTIMELosses` FROM `statsDEV` WHERE `minecraft` = ?") (Only uuid)
   return $ case res of
     [(-1, -1)] -> Nothing
-    [(lastWins, lastLosses)] -> Just HypixelBowTimeStats {bowTimeType = t, bowTimeWins = bowWins - lastWins, bowTimeLosses = bowLosses - lastLosses}
+    [(lastWins, lastLosses)] -> Just HypixelBowTimeStats {bowTimeWins = bowWins - lastWins, bowTimeLosses = bowLosses - lastLosses}
     _ -> Nothing
 
-showHypixelBowTimeStats :: Settings -> HypixelBowTimeStats -> String
-showHypixelBowTimeStats Settings {..} HypixelBowTimeStats {..} = unlines $ catMaybes
+showMaybeHypixelBowTimeStats :: Settings -> TimeStatsType -> Maybe HypixelBowTimeStats -> String
+showMaybeHypixelBowTimeStats _ DailyStats Nothing = "**Daily data isn't avaliable yet for this player! Wait until tomorrow!**"
+showMaybeHypixelBowTimeStats _ WeeklyStats Nothing = "**Weekly data isn't avaliable yet for this player! Wait until next week!**"
+showMaybeHypixelBowTimeStats _ MonthlyStats Nothing = "**Monthly data isn't avaliable yet for this player! Wait until next month!**"
+showMaybeHypixelBowTimeStats s t (Just v) = showHypixelBowTimeStats s t v
+
+showHypixelBowTimeStats :: Settings -> TimeStatsType -> HypixelBowTimeStats -> String
+showHypixelBowTimeStats Settings {..} bowTimeType HypixelBowTimeStats {..} = unlines $ catMaybes
   [ onlyIf sWins
   $ " - *Bow Duels " ++ time ++ " Wins:* **"
   ++ show bowTimeWins

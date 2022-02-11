@@ -1,3 +1,5 @@
+{-# LANGUAGE TupleSections #-}
+
 module BowBot.Command.Stats where
 
 import BowBot.Stats.HypixelBow
@@ -7,7 +9,6 @@ import BowBot.Command.Register
 import Data.Map ((!?))
 import BowBot.Background
 import Data.List (intercalate)
-import Data.Maybe (catMaybes)
 
 data StatsCommandMode = AlwaysDefault | AlwaysAll | UserSettings
 
@@ -53,8 +54,8 @@ hypixelBowTimeStatsCommand name times mode = Command name DefaultLevel 15 $ do
     res <- withMinecraft False player $ \uuid names -> do
       st <- requestHypixelBowStats uuid
       for_ st (hypixelBowTryRegister uuid names)
-      st' <- for st $ \s -> catMaybes <$> for times (requestHypixelBowTimeStats s uuid)
-      return $ maybe (Left ()) Right $ st' >>= \s -> if null s then Nothing else Just s
+      st' <- for st $ \s -> for times (\t -> (t, ) <$> requestHypixelBowTimeStats s uuid t)
+      return $ maybe (Left ()) Right st'
     settings <- case mode of
       AlwaysDefault -> pure defSettings
       AlwaysAll -> pure allSettings
@@ -63,15 +64,15 @@ hypixelBowTimeStatsCommand name times mode = Command name DefaultLevel 15 $ do
         pure $ fromMaybe defSettings $ settings !? userId caller
     hRespond $ hypixelBowTimeStatsMessage settings res
 
-hypixelBowTimeStatsMessage :: Settings -> MinecraftResponse () [HypixelBowTimeStats] -> String
+hypixelBowTimeStatsMessage :: Settings -> MinecraftResponse () [(TimeStatsType, Maybe HypixelBowTimeStats)] -> String
 hypixelBowTimeStatsMessage _ PlayerNotFound = playerNotFoundMessage
 hypixelBowTimeStatsMessage _ DiscordUserNotFound = discordNotFoundMessage
 hypixelBowTimeStatsMessage _ (UserError ()) = playerNotFoundMessage -- TODO: add a better message here
 hypixelBowTimeStatsMessage _ NotOnList = registerMessage
-hypixelBowTimeStatsMessage settings (JustResponse n s) = "**" ++ discordEscape n ++ ":**\n" ++ intercalate "\n" (map (showHypixelBowTimeStats settings) s)
-hypixelBowTimeStatsMessage settings (OldResponse o n s) = "**" ++ discordEscape o ++ " (" ++ discordEscape n ++ "):**\n" ++ intercalate "\n" (map (showHypixelBowTimeStats settings) s)
-hypixelBowTimeStatsMessage settings (DidYouMeanResponse n s) = "*Did you mean* **" ++ discordEscape n ++ ":**\n" ++ intercalate "\n" (map (showHypixelBowTimeStats settings) s)
-hypixelBowTimeStatsMessage settings (DidYouMeanOldResponse o n s) = "*Did you mean* **" ++ discordEscape o ++ " (" ++ discordEscape n ++ "):**\n" ++ intercalate "\n" (map (showHypixelBowTimeStats settings) s)
+hypixelBowTimeStatsMessage settings (JustResponse n s) = "**" ++ discordEscape n ++ ":**\n" ++ intercalate "\n" (map (uncurry $ showMaybeHypixelBowTimeStats settings) s)
+hypixelBowTimeStatsMessage settings (OldResponse o n s) = "**" ++ discordEscape o ++ " (" ++ discordEscape n ++ "):**\n" ++ intercalate "\n" (map (uncurry $ showMaybeHypixelBowTimeStats settings) s)
+hypixelBowTimeStatsMessage settings (DidYouMeanResponse n s) = "*Did you mean* **" ++ discordEscape n ++ ":**\n" ++ intercalate "\n" (map (uncurry $ showMaybeHypixelBowTimeStats settings) s)
+hypixelBowTimeStatsMessage settings (DidYouMeanOldResponse o n s) = "*Did you mean* **" ++ discordEscape o ++ " (" ++ discordEscape n ++ "):**\n" ++ intercalate "\n" (map (uncurry $ showMaybeHypixelBowTimeStats settings) s)
 
 hypixelBowTryRegister :: (APIMonad m, DBMonad m, BotDataMonad m, MonadHoistIO m) => UUID -> [String] -> HypixelBowStats -> m ()
 hypixelBowTryRegister uuid names s | bowWins s >= 50 = do
