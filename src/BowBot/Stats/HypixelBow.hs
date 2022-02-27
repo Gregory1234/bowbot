@@ -252,7 +252,7 @@ showHypixelBowTimeStats Settings {..} bowTimeType HypixelBowTimeStats {..} = unl
 banHypixelBowLeaderboard :: (DBMonad m, MonadHoistIO m) => UUID -> m Bool
 banHypixelBowLeaderboard (UUID uuid) = hTransaction $ do
   changed <- hExecuteLog "UPDATE `minecraftDEV` SET `hypixel`='ban' WHERE `uuid`=?" (Only uuid)
-  when (changed > 0) $ void $ hExecuteLog "DELETE FROM `statsDEV` WHERE `minecraft`=?" (Only uuid)
+  void $ hExecuteLog "DELETE FROM `statsDEV` WHERE `minecraft`=?" (Only uuid)
   return (changed > 0)
 
 fullUpdateHypixelBowStats :: (APIMonad m, DBMonad m, MonadHoistIO m) => UUID -> m ()

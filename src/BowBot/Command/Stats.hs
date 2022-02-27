@@ -8,7 +8,7 @@ import BowBot.Minecraft
 import BowBot.Command.Register
 import Data.Map ((!?))
 import BowBot.Background
-import Data.List (intercalate)
+import Data.List (intercalate, find)
 
 data StatsCommandMode = AlwaysDefault | AlwaysAll | UserSettings
 
@@ -76,9 +76,12 @@ hypixelBowTimeStatsMessage settings (DidYouMeanOldResponse o n s) = "*Did you me
 
 hypixelBowTryRegister :: (APIMonad m, DBMonad m, BotDataMonad m, MonadHoistIO m) => UUID -> [String] -> HypixelBowStats -> m ()
 hypixelBowTryRegister uuid names s | bowWins s >= 50 = do
-  registeredPlayers <- map mcUUID <$> hRead minecraftAccounts
-  unless (uuid `elem` registeredPlayers) $ do
-    acc <- addMinecraftAccount uuid names
-    for_ acc $ \x -> hModify minecraftAccounts (x:)
-  updateHypixelBowLeaderboard [] (fromList [(uuid, hypixelBowStatsToLeaderboards s)])
+  registeredPlayers <- find (\x -> mcUUID x == uuid) <$> hRead minecraftAccounts
+  case registeredPlayers of
+    Nothing -> do
+      acc <- addMinecraftAccount uuid names
+      for_ acc $ \x -> hModify minecraftAccounts (x:)
+      updateHypixelBowLeaderboard [] (fromList [(uuid, hypixelBowStatsToLeaderboards s)])
+    Just MinecraftAccount { mcHypixelBow = Banned } -> pure ()
+    _ -> updateHypixelBowLeaderboard [] (fromList [(uuid, hypixelBowStatsToLeaderboards s)])
 hypixelBowTryRegister _ _ _ = pure ()
