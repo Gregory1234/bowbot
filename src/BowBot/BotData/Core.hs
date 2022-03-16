@@ -185,7 +185,7 @@ data BoolSense = Never | WhenSensible | Always deriving (Show, Eq, Ord, Enum)
 
 data Settings = Settings
   { sWins :: Bool, sLosses :: Bool, sWLR :: BoolSense, sWinsUntil :: BoolSense
-  , sBestStreak :: Bool, sCurrentStreak :: Bool, sBestDailyStreak :: Bool
+  , sBestStreak :: BoolSense, sCurrentStreak :: BoolSense, sBestDailyStreak :: BoolSense
   , sBowHits :: Bool, sBowShots :: Bool, sAccuracy :: BoolSense
   } deriving (Show, Eq)
 

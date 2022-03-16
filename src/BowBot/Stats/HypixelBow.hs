@@ -13,7 +13,7 @@ import BowBot.Utils
 import BowBot.Settings
 import BowBot.API
 import BowBot.DB
-import Data.Maybe (catMaybes, mapMaybe)
+import Data.Maybe (catMaybes, mapMaybe, isJust, isNothing)
 import Data.Ratio ((%))
 import Data.Map (toList, Map, fromList)
 import BowBot.API.Hypixel
@@ -82,15 +82,15 @@ divisionRankFromWins x
 data HypixelBowStats = HypixelBowStats
   { bowWins :: Integer,
     bowLosses :: Integer,
-    bestWinstreak :: Integer,
-    currentWinstreak :: Integer,
-    bestDailyWinstreak :: Integer,
+    bestWinstreak :: Maybe Integer,
+    currentWinstreak :: Maybe Integer,
+    bestDailyWinstreak :: Maybe Integer,
     bowHits :: Integer,
     bowShots :: Integer
   } deriving (Show)
 
 data HypixelBowLeaderboards = HypixelBowLeaderboards
-  { bowLbWins :: Integer, bowLbLosses :: Integer, bowLbWinstreak :: Integer } deriving (Show)
+  { bowLbWins :: Integer, bowLbLosses :: Integer, bowLbWinstreak :: Maybe Integer } deriving (Show)
 
 requestHypixelBowStats :: APIMonad m => UUID -> m (Maybe HypixelBowStats)
 requestHypixelBowStats uuid = hypixelWithPlayerData uuid $ \o -> do
@@ -99,9 +99,9 @@ requestHypixelBowStats uuid = hypixelWithPlayerData uuid $ \o -> do
     duelsStats <- stats .:? "Duels"
     bowWins <- fromMaybe 0 <$> for duelsStats (\x -> x .:? "bow_duel_wins" .!= 0)
     bowLosses <- fromMaybe 0 <$> for duelsStats (\x -> x .:? "bow_duel_losses" .!= 0)
-    currentWinstreak <- fromMaybe 0 <$> for duelsStats (\x -> x .:? "current_bow_winstreak" .!= 0)
-    bestWinstreak <- fromMaybe 0 <$> for duelsStats (\x -> x .:? "best_winstreak_mode_bow_duel" .!= 0)
-    bestDailyWinstreak <- fromMaybe 0 <$> for duelsStats (\x -> x .:? "duels_winstreak_best_bow_duel" .!= 0)
+    bestWinstreak <- (\a -> if a == Just 0 then Nothing else a) <$> for duelsStats (\x -> x .:? "best_winstreak_mode_bow_duel" .!= 0)
+    currentWinstreak <- (\a -> if isNothing bestWinstreak then Nothing else a) <$> for duelsStats (\x -> x .:? "current_bow_winstreak" .!= 0)
+    bestDailyWinstreak <- (\a -> if isNothing bestWinstreak then Nothing else a) <$> for duelsStats (\x -> x .:? "duels_winstreak_best_bow_duel" .!= 0)
     bowHits <- fromMaybe 0 <$> for duelsStats (\x -> x .:? "bow_duel_bow_hits" .!= 0)
     bowShots <- fromMaybe 0 <$> for duelsStats (\x -> x .:? "bow_duel_bow_shots" .!= 0)
     return HypixelBowStats {..}
@@ -126,17 +126,17 @@ showHypixelBowStats Settings {..} HypixelBowStats {..} = unlines $ catMaybes
   ++ " WLR:* **"
   ++ winsRemaining
   ++ "**"
-  , onlyIf sBestStreak
+  , onlyIf (sense sBestStreak (isJust bestWinstreak))
   $ " - *Best Bow Duels Winstreak:* **"
-  ++ show bestWinstreak
+  ++ maybe "API DISABLED" show bestWinstreak
   ++ "**"
-  , onlyIf sCurrentStreak
+  , onlyIf (sense sCurrentStreak (isJust currentWinstreak))
   $ " - *Current Bow Duels Winstreak:* **"
-  ++ show currentWinstreak
+  ++ maybe "API DISABLED" show currentWinstreak
   ++ "**"
-  , onlyIf sBestDailyStreak
+  , onlyIf (sense sBestDailyStreak (isJust bestDailyWinstreak))
   $ " - *Best Daily Bow Duels Winstreak(?):* **"
-  ++ show bestDailyWinstreak
+  ++ maybe "API DISABLED" show bestDailyWinstreak
   ++ "**"
   , onlyIf sBowHits
   $ " - *Bow Hits in Bow Duels:* **"
@@ -177,7 +177,7 @@ getHypixelBowLeaderboard :: DBMonad m => m (Map UUID HypixelBowLeaderboards)
 getHypixelBowLeaderboard = do
   res :: [(String, Integer, Integer, Integer)] <- hQueryLog "SELECT `minecraft`, `bowWins`, `bowLosses`, `bowWinstreak` FROM `statsDEV`" ()
   return $ fromList $ flip fmap res $ \case
-    (UUID -> uuid, bowLbWins, bowLbLosses, bowLbWinstreak) -> (uuid, HypixelBowLeaderboards {..})
+    (UUID -> uuid, bowLbWins, bowLbLosses, (\x -> if x == 0 then Nothing else Just x) -> bowLbWinstreak) -> (uuid, HypixelBowLeaderboards {..})
 
 data TimeStatsType = DailyStats | WeeklyStats | MonthlyStats deriving (Show, Eq)
 
@@ -195,12 +195,10 @@ updateHypixelBowLeaderboard extraModes lb = hTransaction $ do
   _ <- hExecuteManyLog "INSERT INTO `statsDEV` (`minecraft`, `bowWins`, `bowLosses`) VALUES (?,?,?) ON DUPLICATE KEY UPDATE `bowWins`=VALUES(`bowWins`), `bowLosses`=VALUES(`bowLosses`)" nowslb
   for_ extraModes $ \t -> hExecuteManyLog (replaceQuery "TIME" (timeStatsTypeName t) "INSERT INTO `statsDEV` (`minecraft`, `lastTIMEWins`, `lastTIMELosses`) VALUES (?,?,?) ON DUPLICATE KEY UPDATE `lastTIMEWins`=VALUES(`lastTIMEWins`), `lastTIMELosses`=VALUES(`lastTIMELosses`)") extralb
     where
-      helperNoWS (UUID uuid, HypixelBowLeaderboards {..})
-        | bowLbWinstreak == 0 = Just (uuid, bowLbWins, bowLbLosses)
-        | otherwise = Nothing
-      helperWS (UUID uuid, HypixelBowLeaderboards {..})
-        | bowLbWinstreak /= 0 = Just (uuid, bowLbWins, bowLbLosses, bowLbWinstreak)
-        | otherwise = Nothing
+      helperNoWS (UUID uuid, HypixelBowLeaderboards {bowLbWinstreak = Nothing, ..}) = Just (uuid, bowLbWins, bowLbLosses)
+      helperNoWS _ = Nothing
+      helperWS (UUID uuid, HypixelBowLeaderboards {bowLbWinstreak = Just ws, ..}) = Just (uuid, bowLbWins, bowLbLosses, ws)
+      helperWS _ = Nothing
       helperExtra (UUID uuid, HypixelBowLeaderboards {..}) = (uuid, bowLbWins, bowLbLosses)
 
 data HypixelBowTimeStats = HypixelBowTimeStats
@@ -269,7 +267,7 @@ hypixelBowLossesLeaderboard HypixelBowLeaderboards {..} | bowLbWins >= 500 = Jus
 hypixelBowLossesLeaderboard _ = Nothing
 
 hypixelBowWinstreakLeaderboard :: HypixelBowLeaderboards -> Maybe (Integer, String)
-hypixelBowWinstreakLeaderboard HypixelBowLeaderboards {..} | bowLbWinstreak >= 50 = Just (bowLbWinstreak, show bowLbWinstreak)
+hypixelBowWinstreakLeaderboard HypixelBowLeaderboards {bowLbWinstreak = (Just ws), ..} | ws >= 50 = Just (ws, show ws)
 hypixelBowWinstreakLeaderboard _ = Nothing
 
 hypixelBowWLRLeaderboard :: HypixelBowLeaderboards -> Maybe (Integer, String)

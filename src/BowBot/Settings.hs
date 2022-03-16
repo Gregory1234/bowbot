@@ -31,7 +31,7 @@ getSettings = do
   return $ fromList $ flip fmap res $ \case
     (fromInteger -> discord, 
       parseBool -> Just sWins, parseBool -> Just sLosses, parseSense -> Just sWLR, parseSense -> Just sWinsUntil, 
-      parseBool -> Just sBestStreak, parseBool -> Just sCurrentStreak, parseBool -> Just sBestDailyStreak, 
+      parseSense -> Just sBestStreak, parseSense -> Just sCurrentStreak, parseSense -> Just sBestDailyStreak, 
       parseBool -> Just sBowHits, parseBool -> Just sBowShots, parseSense -> Just sAccuracy) -> (discord, Settings {..})
     (fromInteger -> discord, _, _, _, _, _, _, _, _, _, _) -> (discord, defSettings)
 
@@ -41,9 +41,9 @@ defSettings = Settings
   , sLosses = True
   , sWLR = Always
   , sWinsUntil = Always
-  , sBestStreak = True
-  , sCurrentStreak = True
-  , sBestDailyStreak = False
+  , sBestStreak = Always
+  , sCurrentStreak = Always
+  , sBestDailyStreak = Never
   , sBowHits = False
   , sBowShots = False
   , sAccuracy = Never
@@ -55,9 +55,9 @@ allSettings = Settings
   , sLosses = True
   , sWLR = Always
   , sWinsUntil = Always
-  , sBestStreak = True
-  , sCurrentStreak = True
-  , sBestDailyStreak = True
+  , sBestStreak = Always
+  , sCurrentStreak = Always
+  , sBestDailyStreak = Always
   , sBowHits = True
   , sBowShots = True
   , sAccuracy = Always
