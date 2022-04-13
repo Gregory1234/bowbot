@@ -18,7 +18,7 @@
 # resolver: ./custom-snapshot.yaml
 # resolver: https://example.com/snapshots/2018-01-01.yaml
 resolver:
-  url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/lts/17/10.yaml
+  url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/lts/19/3.yaml
 
 # User packages to be built.
 # Various formats can be used as shown in the example below.
@@ -44,7 +44,7 @@ packages:
 
 extra-deps:
 - emoji-0.1.0.2
-- discord-haskell-1.8.6
+- discord-haskell-1.12.5
 
 # Override default flag values for local packages and extra-deps
 # flags: {}

@@ -1,257 +1,93 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE DerivingVia #-}
 {-# LANGUAGE TypeApplications #-}
-{-# LANGUAGE TupleSections #-}
-{-# LANGUAGE RecordWildCards #-}
 
 module BowBot.Bot where
 
 import BowBot.Utils
 import Discord
-import BowBot.Command
-import BowBot.Command.Stats
-import BowBot.Command.Register
-import BowBot.Command.Simple
-import BowBot.Command.Leaderboard
-import BowBot.Command.Minecraft
-import BowBot.Command.Watchlist
-import BowBot.Command.Name
-import BowBot.Command.Settings
-import BowBot.Command.Snipe
-import BowBot.Command.Ban
-import BowBot.Command.Role
-import BowBot.Command.Birthday
-import BowBot.Command.RankedTurfWars
-import BowBot.Stats.HypixelBow
-import BowBot.Background
-import BowBot.Snipe
-import BowBot.RankedTurfWars
+import Discord.Requests
+import Discord.Types
+import Control.Monad (forever)
+import BowBot.DB.Basic
+import BowBot.DB.Class
+import BowBot.BotData.Basic
+import Network.HTTP.Conduit (newManager)
+import BowBot.Network.Basic (managerSettings)
+import BowBot.BotMonad
+import BowBot.Network.Monad (NetworkT(..))
+import BowBot.Discord.Monad (DiscordHandler'(..))
 import qualified Data.Text as T
 import Data.Text (isPrefixOf)
-import Control.Monad.Reader (ReaderT(..))
-import Control.Concurrent (forkIO, forkFinally, threadDelay)
+import BowBot.Command
+import BowBot.Hypixel.StatsCommand
+import BowBot.Discord.Class (MonadDiscord, call_)
+import Control.Exception.Base (SomeException, try, throw)
 import System.Timeout (timeout)
-import Network.HTTP.Conduit (newManager)
-import Data.Map ((!?))
-import Control.Monad (forever)
-import Control.Exception.Base (SomeException, try, Exception, throw)
 
-runBowBot :: String -> IO ()
-runBowBot discordKey = do
+runBowBot :: IO ()
+runBowBot = do
+  discordKey <- getEnvOrThrow "API_KEY"
   ifDev () $ putStrLn "this is dev version of the bot"
-  botData <- createData
   manager <- newManager managerSettings
   withDB $ \conn -> logInfoDB conn "bot started"
-  mkBackground botData
   forever $ do
     userFacingError <-
       runDiscord $
         def
           { discordToken = pack discordKey,
-            discordOnStart = onStartup botData,
-            discordOnEvent = eventHandler botData manager
+            discordOnStart = runDiscordHandler' $ runNetworkT onStartup manager,
+            discordOnEvent = \e -> withDB $ \conn -> runBot (eventHandler e) conn manager,
+            discordOnLog = putStrLn . unpack
           }
     withDB $ flip logErrorDB $ unpack userFacingError
- where
-  mkBackground bdt = void $ forkFinally (background bdt) $ \e -> do
-    withDB $ flip logErrorDB $ show e
-    mkBackground bdt
-  background bdt = do
-     sec <- read @Int <$> getTime "%S"
-     threadDelay ((65 - sec `mod` 60) * 1000000)
-     void $ forever go
-   where
-     go = do
-       _ <- forkIO $ backgroundTimeoutRun 6000 $ do
-         mint <- read @Int <$> getTime "%M"
-         backgroundMinutely bdt mint
-       threadDelay 60000000
 
-onStartup :: BotData -> DiscordHandler ()
-onStartup bdt = do
-  updateDiscordStatus
-  mkBackgroundDiscord
- where
-  mkBackgroundDiscord = do
-    ReaderT $ \x -> void $
-      forkFinally (runReaderT backgroundDiscord x) $ \e -> do
-        withDB $ flip logErrorDB $ show e
-        runReaderT mkBackgroundDiscord x
-  backgroundDiscord = do
-    sec <- liftIO $ read @Int <$> getTime "%S"
-    liftIO $ threadDelay ((60 - sec `mod` 60) * 1000000)
-    void $ forever go
-    where
-      go = do
-        _ <- ReaderT $ \x -> forkIO $ flip runReaderT x $ backgroundDiscordTimeoutRun 6000 $ do
-          mint <- liftIO $ read @Int <$> getTime "%M"
-          discordBackgroundMinutely bdt mint
-        liftIO $ threadDelay 60000000
+onStartup :: NetworkT DiscordHandler' ()
+onStartup = do
+  pure ()
 
-commands :: [Command]
-commands =
-  [ hypixelBowStatsCommand "s" UserSettings
-  , hypixelBowStatsCommand "sd" AlwaysDefault
-  , hypixelBowStatsCommand "sa" AlwaysAll
-  , hypixelBowTimeStatsCommand "st" [DailyStats, WeeklyStats, MonthlyStats] UserSettings
-  , registerCommand "register" False True
-  , urlCommand "head" True (\s -> "https://crafatar.com/avatars/" ++ uuidString s ++ "?overlay")
-  , urlCommand "heada" False (\s -> "https://crafatar.com/avatars/" ++ uuidString s ++ "?overlay")
-  , urlCommand "skin" True (\s -> "https://crafatar.com/renders/body/" ++ uuidString s ++ "?overlay")
-  , urlCommand "skina" False (\s -> "https://crafatar.com/renders/body/" ++ uuidString s ++ "?overlay")
-  , hypixelBowLeaderboardCommand "lb" "Hypixel Bow Duels Wins Leaderboard" "Wins" hypixelBowWinsLeaderboard
-  , hypixelBowLeaderboardCommand "lbl" "Hypixel Bow Duels Losses Leaderboard" "Losses" hypixelBowLossesLeaderboard
-  , hypixelBowLeaderboardCommand "lbs" "Hypixel Bow Duels Winstreak Leaderboard" "Winstreak" hypixelBowWinstreakLeaderboard
-  , hypixelBowLeaderboardCommand "lbr" "Hypixel Bow Duels WLR Leaderboard" "WLR" hypixelBowWLRLeaderboard
-  , registerCommand "add" False False
-  , registerCommand "addalt" True False
-  , minecraftCommand
-  , listCommand
-  , onlineCommand
-  , nameCommand "n" True
-  , nameCommand "na" False
-  , settingsCommand "set" Nothing
-  , settingsCommand "show" (Just (True, Always))
-  , settingsCommand "hide" (Just (False, Never))
-  , birthdayAnnounceCommand
-  , birthdaySetCommand
-  , snipeCommand
-  , hypixelBowLeaderboardBanCommand "sban"
-  , roleCommand
-  , rtwStatsCommand
-  , constStringCommand "throw" AdminLevel $ show @Integer (1 `div` 0)
-  , helpCommand "help" DefaultLevel
-    $ \pr -> "**Bow bot help:**\n\n"
-    ++ "**Commands:**\n"
-    ++ " - **" ++ pr ++ "help** - *display this message*\n"
-    ++ " - **" ++ pr ++ "online** - *show all people from watchList currently in Bow Duels*\n"
-    ++ " - **" ++ pr ++ "list** - *show all players in watchList*\n"
-    ++ " - **" ++ pr ++ "s [name]** - *show player's Bow Duels stats*\n"
-    ++ " - **" ++ pr ++ "sa [name]** - *show all Bow Duels stats*\n"
-    ++ " - **" ++ pr ++ "sd [name]** - *show a default set of Bow Duels stats*\n"
-    ++ " - **" ++ pr ++ "st [name]** - *show daily weekly and monthly Bow Duels stats*\n"
-    ++ " - **" ++ pr ++ "n(a) [name]** - *show player's past nicks*\n"
-    ++ " - **" ++ pr ++ "head(a) [name]** - *show player's head*\n"
-    ++ " - **" ++ pr ++ "skin(a) [name]** - *show player's full skin*\n"
-    ++ " - **" ++ pr ++ "lb(|l|s|r) [page number|name|all]** - *show a Bow Duels leaderboard*\n"
-    ++ " - **" ++ pr ++ "mc** - *list your linked minecraft nicks*\n"
-    ++ " - **" ++ pr ++ "mc [name]** - *select a minecraft account as your default*\n"
-    ++ " - **" ++ pr ++ "settings** - *display help for settings*\n"
-    ++ " - **" ++ pr ++ "snipe** - *show the last deleted message from this channel*\n"
-    ++ " - **" ++ pr ++ "role** - *show all toggleable roles*\n"
-    ++ " - **" ++ pr ++ "role [name]** - *toggle a discord role*\n"
-    ++ " - **" ++ pr ++ "rtws [name]** - *show player's Ranked Turf Wars stats*\n"
-    ++ "\nMade by **GregC**#9698"
-  , constStringCommand "gregc" DefaultLevel "<:gregc:904127204865228851>"
-  , helpCommand "settings" DefaultLevel
-    $ \pr -> "**Bow bot settings help:**\n"
-    ++ "**Commands:**\n"
-    ++ " - **" ++ pr ++ "settings** - *display this message*\n"
-    ++ " - **" ++ pr ++ "show [stat]** - *makes the stat visible*\n"
-    ++ " - **" ++ pr ++ "hide [stat]** - *makes the stat hidden*\n"
-    ++ " - **" ++ pr ++ "set [stat] [yes|always|show|no|never|hide|maybe|defined]** - *sets the visibility of the stat*\n"
-    ++ "*Visibility 'maybe' and 'defined' hide the stat when the value is undefined.*\n"
-    ++ "**Stat names:** wins, losses, wlr, winsuntil, beststreak, currentstreak, bestdailystreak, bowhits, bowshots, accuracy\n"
-    ++ "**Example:** *?show accuracy* makes accuracy visible in the ?s command\n"
-  , helpCommand "modhelp" ModLevel
-    $ \pr -> "**Bow bot help:**\n\n"
-    ++ "**Mod Commands:**\n"
-    ++ " - **" ++ pr ++ "modhelp** - *display this message*\n"
-    ++ " - **" ++ pr ++ "add [discord/discord id] [name]** - *register a person with a given minecraft name*\n"
-    ++ " - **" ++ pr ++ "addalt [discord/discord id] [name]** - *register a person's alt*\n"
-    ++ " - **" ++ pr ++ "sban [name]** - *ban a minecraft account from the hypixel bow duels leaderboard*\n"
-    ++ " - **" ++ pr ++ "bdsay** - *announce today's birthdays*\n"
-    ++ " - **" ++ pr ++ "bdset [discord/discord id] [day(1-31).month(1-12)]** - *override someone's birthday*"
-    ++ "\nMade by **GregC**#9698"
-  ] ++ adminCommands
+respond :: MonadDiscord m => Message -> String -> m ()
+respond m = call_ . CreateMessage (messageChannelId m) . pack
 
-eventHandler :: BotData -> Manager -> Event -> DiscordHandler ()
-eventHandler bdt man (MessageCreate m) = do
-  liftIO $ runBotDataT (detectDeleteMessage m) bdt
-  liftIO $ detectRTWData man bdt m
-  prefix <- readProp discordCommandPrefix bdt
-  when (not (fromBot m) && pack prefix `isPrefixOf` messageText m) $ do
-    let n = unpack $ T.toLower . T.drop (length prefix) . T.takeWhile (/= ' ') $ messageText m
-    for_ (filter ((==n) . commandName) commands) $ \c ->
-      withDB $ \conn ->
-        commandTimeoutRun conn (commandTimeout c) m $ do
-          logInfoDB conn $ "recieved " ++ unpack (messageText m)
+eventHandler :: Event -> Bot ()
+eventHandler (MessageCreate m) = do
+  -- liftIO $ runBotDataT (detectDeleteMessage m) bdt
+  -- liftIO $ detectRTWData man bdt m
+  unless (userIsBot (messageAuthor m)) $ do
+    prefix <- hInfoDB discordCommandPrefixInfo
+    when (pack prefix `isPrefixOf` messageContent m) $ do
+      let n = unpack $ T.toLower . T.drop (length prefix) . T.takeWhile (/= ' ') $ messageContent m
+      for_ (filter ((==n) . commandName . anyCommandInfo) commands) $ \c ->
+        commandTimeoutRun (commandTimeout $ anyCommandInfo c) m $ do
+          hLogInfoDB $ "recieved " ++ unpack (messageContent m)
           ifDev () $ do
-            testDiscordId <- readProp discordGuildId bdt
-            when (messageGuild m /= Just testDiscordId) $
+            testDiscordId <- hInfoDB discordGuildIdInfo
+            when (messageGuildId m /= Just testDiscordId) $
               respond m "```Attention! This is the dev version of the bot! Some features might not be avaliable! You shouldn't be reading this! If you see this message please report it immidately!```"
-          dPerms <- readProp discordPerms bdt
-          let perms = fromMaybe DefaultLevel $ dPerms !? userId (messageAuthor m)
+          -- dPerms <- readProp discordPerms bdt
+          let perms = DefaultLevel -- fromMaybe DefaultLevel $ dPerms !? userId (messageAuthor m)
           if perms == BanLevel
           then respond m "You have been blacklisted. You can probably appeal this decision. Or not. I don't know. I'm just a pre-programmed response."
-          else if perms >= commandPerms c
-            then runCommandHandler (commandHandler c) m man conn bdt
+          else if perms >= commandPerms (anyCommandInfo c)
+            then runAnyCommand c m
             else respond m "You don't have the permission to do that!"
-          logInfoDB conn $ "finished " ++ unpack (messageText m)
+          hLogInfoDB $ "finished " ++ unpack (messageContent m)
+eventHandler _ = pure ()
 
-eventHandler bdt _ (GuildMemberAdd gid mem) = withDB $ \conn -> do
-  trueId <- readProp discordGuildId bdt
-  unless (userIsBot $ memberUser mem) $ do
-    when (gid == trueId) $
-      runDiscordHandler' $ runConnectionT (runBotDataT (updateDiscordRolesSingleId (userId $ memberUser mem)) bdt) conn
-    void $ executeLog conn
-      "INSERT INTO `discordDEV` (`id`, `name`, `discriminator`, `nickname`) VALUES (?,?,?,?) ON DUPLICATE KEY UPDATE `name`=VALUES(`name`), `discriminator`=VALUES(`discriminator`), `nickname`=VALUES(`nickname`)"
-      (show (userId (memberUser mem)), userName (memberUser mem), userDiscrim (memberUser mem), memberNick mem)
-
-eventHandler bdt _ (GuildMemberUpdate gid roles usr _) = do
-  trueId <- readProp discordGuildId bdt
-  when (not (null roles) && gid == trueId && not (userIsBot usr)) $ do
-    withDB $ runConnectionT $ runBotDataT (updateSavedRolesSingle (userId usr) roles Nothing) bdt
-    pns <- fmap (>>=(\BowBotAccount {..} -> (,accountDiscords) <$> accountDiscords)) $ readProp bowBotAccounts bdt
-    case lookup (userId usr) pns of
-      Nothing -> pure ()
-      Just discords -> runDiscordHandler' $ withDB $ runConnectionT $ runBotDataT (for_ (filter (/=userId usr) discords) updateDiscordRolesSingleId) bdt
-
-
-eventHandler _ _ _ = pure ()
-
-timeoutDiscord :: Int -> DiscordHandler a -> DiscordHandler (Maybe a)
-timeoutDiscord n x = ReaderT (timeout n . runReaderT x)
-
-tryDiscord :: Exception e => DiscordHandler a -> DiscordHandler (Either e a)
-tryDiscord x = ReaderT (try . runReaderT x)
-
-backgroundTimeoutRun :: Int -> IO () -> IO ()
-backgroundTimeoutRun n x = withDB $ \conn -> do
-  tm <- try @SomeException (timeout (n * 1000000) x)
+commandTimeoutRun :: (MonadHoistIO m, MonadDB m, MonadDiscord m) => Int -> Message -> m () -> m ()
+commandTimeoutRun n msg x = do
+  tm <- hoistIO (try @SomeException . timeout (n * 1000000)) x
   case tm of
     Left e -> do
-      logErrorDB conn $ "Exception happened in background: " ++ show e
-      throw e
-    Right Nothing -> do
-      logErrorDB conn $ "Timed out in background: " ++ show n ++ "s"
-    Right (Just ()) -> pure ()
-
-backgroundDiscordTimeoutRun :: Int -> DiscordHandler () -> DiscordHandler ()
-backgroundDiscordTimeoutRun n x = withDB $ \conn -> do
-  tm <- tryDiscord @SomeException (timeoutDiscord (n * 1000000) x)
-  case tm of
-    Left e -> do
-      logErrorDB conn $ "Exception happened in discord background: " ++ show e
-      throw e
-    Right Nothing -> do
-      logErrorDB conn $ "Timed out in discord background: " ++ show n ++ "s"
-    Right (Just ()) -> pure ()
-
-commandTimeoutRun :: Connection -> Int -> Message -> DiscordHandler () -> DiscordHandler ()
-commandTimeoutRun conn n msg x = do
-  tm <- tryDiscord @SomeException (timeoutDiscord (n * 1000000) x)
-  case tm of
-    Left e -> do
-      logErrorDB conn $ "Exception happened in command: " ++ show e
+      hLogErrorDB $ "Exception happened in command: " ++ show e
       respond msg "Something went horribly wrong! Please report this!"
       throw e
     Right Nothing -> do
-      logErrorDB conn $ "Timed out: " ++ show n ++ "s"
+      hLogErrorDB $ "Timed out: " ++ show n ++ "s"
       respond msg "Timed out! Please report this!"
     Right (Just ()) -> pure ()
 
-fromBot :: Message -> Bool
-fromBot m = userIsBot (messageAuthor m)
-
-isAdmin :: User -> Bool
-isAdmin user = userId user == 422051538391793675
+commands :: [AnyCommand]
+commands =
+  [ AnyCommand hypixelStatsCommand
+  ]

@@ -25,37 +25,32 @@ source-repository head
 
 library
   exposed-modules:
-      BowBot.API
-      BowBot.API.Hypixel
-      BowBot.API.Mojang
-      BowBot.Background
-      BowBot.Birthday
       BowBot.Bot
-      BowBot.BotData
-      BowBot.BotData.Core
+      BowBot.BotData.Basic
+      BowBot.BotMonad
       BowBot.Command
-      BowBot.Command.Ban
-      BowBot.Command.Birthday
-      BowBot.Command.Leaderboard
-      BowBot.Command.Minecraft
-      BowBot.Command.Name
-      BowBot.Command.RankedTurfWars
-      BowBot.Command.Register
-      BowBot.Command.Role
-      BowBot.Command.Settings
-      BowBot.Command.Simple
-      BowBot.Command.Snipe
-      BowBot.Command.Stats
-      BowBot.Command.Watchlist
-      BowBot.CommandHandler
-      BowBot.CommandMonads
-      BowBot.DB
-      BowBot.DiscordNFData
-      BowBot.Minecraft
-      BowBot.RankedTurfWars
-      BowBot.Settings
-      BowBot.Snipe
-      BowBot.Stats.HypixelBow
+      BowBot.Command.Args
+      BowBot.Command.Basic
+      BowBot.Command.Handler
+      BowBot.DB.Basic
+      BowBot.DB.Class
+      BowBot.DB.Entity
+      BowBot.DB.Monad
+      BowBot.Discord.Class
+      BowBot.Discord.DiscordNFData
+      BowBot.Discord.Monad
+      BowBot.HoistIO
+      BowBot.Hypixel.Basic
+      BowBot.Hypixel.Division
+      BowBot.Hypixel.Stats
+      BowBot.Hypixel.StatsCommand
+      BowBot.Minecraft.Account
+      BowBot.Minecraft.Basic
+      BowBot.Network.Basic
+      BowBot.Network.Class
+      BowBot.Network.Monad
+      BowBot.Perms.Basic
+      BowBot.Settings.Basic
       BowBot.Utils
   other-modules:
       Paths_bowbot

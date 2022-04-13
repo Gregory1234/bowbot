@@ -1,17 +1,22 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-module BowBot.API.Mojang where
+module BowBot.Minecraft.Basic where
 
-import BowBot.API
+import BowBot.Network.Class
+import Data.Aeson
+import BowBot.Network.Basic (decodeParse)
+import Data.Traversable (for)
+import BowBot.DB.Class
 
-
-mojangNameToUUID :: APIMonad m => String -> m (Maybe UUID)
+newtype UUID = UUID { uuidString :: String } deriving (Show, Eq, Ord)
+  
+mojangNameToUUID :: (MonadNetwork m, MonadDB m) => String -> m (Maybe UUID)
 mojangNameToUUID name = do
   let url = "https://api.mojang.com/users/profiles/minecraft/" ++ name
   res <- hSendRequestTo url url
   decodeParse res $ \o -> UUID <$> o .: "id"
 
-mojangUUIDToNames :: APIMonad m => UUID -> m (Maybe [String])
+mojangUUIDToNames :: (MonadNetwork m, MonadDB m) => UUID -> m (Maybe [String])
 mojangUUIDToNames (UUID uuid) = do
   let url = "https://api.mojang.com/user/profiles/" ++ uuid ++ "/names"
   res <- hSendRequestTo url url

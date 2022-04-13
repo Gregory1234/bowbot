@@ -1,11 +1,16 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-module BowBot.API.Hypixel where
+module BowBot.Hypixel.Basic where
 
-import BowBot.API
+import BowBot.Minecraft.Basic (UUID(..))
+import Data.Aeson.Types (Object, Parser, (.:))
+import BowBot.Network.Class
+import BowBot.Utils
+import BowBot.Network.Basic
+import BowBot.DB.Class
 
 
-hypixelWithPlayerData :: APIMonad m => UUID -> (Object -> Parser a) -> m (Maybe a)
+hypixelWithPlayerData :: (MonadNetwork m, MonadDB m) => UUID -> (Object -> Parser a) -> m (Maybe a)
 hypixelWithPlayerData (UUID uuid) f = do
   apiKey <- liftIO $ fromMaybe "" <$> getEnv "HYPIXEL_API"
   let url = "https://api.hypixel.net/player?key=" ++ apiKey ++ "&uuid=" ++ uuid
@@ -13,7 +18,7 @@ hypixelWithPlayerData (UUID uuid) f = do
   res <- hSendRequestTo url cleanUrl
   decodeParse res f
 
-hypixelWithPlayerStatus :: APIMonad m => UUID -> (Object -> Parser a) -> m (Maybe a)
+hypixelWithPlayerStatus :: (MonadNetwork m, MonadDB m) => UUID -> (Object -> Parser a) -> m (Maybe a)
 hypixelWithPlayerStatus (UUID uuid) f = do
   apiKey <- liftIO $ fromMaybe "" <$> getEnv "HYPIXEL_API"
   let url = "https://api.hypixel.net/status?key=" ++ apiKey ++ "&uuid=" ++ uuid
@@ -21,7 +26,7 @@ hypixelWithPlayerStatus (UUID uuid) f = do
   res <- hSendRequestTo url cleanUrl
   decodeParse res f
   
-hypixelGuildMemberList :: APIMonad m => String -> m (Maybe [(UUID, String)])
+hypixelGuildMemberList :: (MonadNetwork m, MonadDB m) => String -> m (Maybe [(UUID, String)])
 hypixelGuildMemberList gid = do
   apiKey <- liftIO $ fromMaybe "" <$> getEnv "HYPIXEL_API"
   let url = "https://api.hypixel.net/guild?key=" ++ apiKey ++ "&id=" ++ gid

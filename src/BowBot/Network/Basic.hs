@@ -1,22 +1,21 @@
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ViewPatterns #-}
-{-# LANGUAGE DerivingVia #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
-module BowBot.API(
-  module BowBot.API, module BowBot.Utils, (.:), (.:?), (.!=), Object, Parser, Manager, module BowBot.CommandMonads
-) where
+module BowBot.Network.Basic where
+
 
 import Network.HTTP.Conduit hiding (path)
-import Control.Exception.Base (try, SomeException, evaluate)
-import Data.ByteString.Lazy (ByteString)
-import BowBot.Utils
-import Data.Aeson
-import Data.Aeson.Types
-import Control.Concurrent (threadDelay)
+import Data.Aeson.Types (FromJSON, Parser, parseEither)
+import Data.ByteString.Lazy.Char8 (ByteString)
+import Control.Exception.Base (SomeException, evaluate, try)
+import Database.MySQL.Simple (Connection)
 import Control.DeepSeq (force)
-import BowBot.CommandMonads (APIMonad(..), ManagerT(..))
-import BowBot.DB
+import BowBot.DB.Basic
+import BowBot.DB.Class
+import Control.Concurrent (threadDelay)
+import Data.Aeson (decode)
+
+
 
 managerSettings :: ManagerSettings
 managerSettings = tlsManagerSettings { managerResponseTimeout = responseTimeoutMicro 15000000 }
@@ -37,17 +36,13 @@ sendRequestTo conn manager url cleanUrl = do
       logInfoDB conn $ "Received response from: " ++ cleanUrl
       return $ responseBody v
 
-hSendRequestTo :: APIMonad m => String -> String -> m ByteString
-hSendRequestTo u c = do
-  man <- hManager
-  liftIO $ withDB $ \conn -> sendRequestTo conn man u c
 
-decodeParse :: (FromJSON o, MonadIO m) => ByteString -> (o -> Parser a) -> m (Maybe a)
+decodeParse :: (FromJSON o, MonadDB m) => ByteString -> (o -> Parser a) -> m (Maybe a)
 decodeParse (decode -> Just str) parser = case parseEither parser str of
   Left e -> do
-    withDB $ flip logErrorDB $ show e
+    hLogErrorDB $ show e
     return Nothing
   Right a -> return $ Just a
 decodeParse str _ = do
-  withDB $ flip logErrorDB $ "Decoding failed in " ++ show str ++ "!"
+  hLogErrorDB $ "Decoding failed in " ++ show str ++ "!"
   return Nothing

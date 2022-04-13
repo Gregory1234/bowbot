@@ -5,7 +5,7 @@
 {-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE DeriveAnyClass #-}
 
-module BowBot.DiscordNFData() where
+module BowBot.Discord.DiscordNFData() where
 
 import qualified Discord.Requests as R
 import qualified Discord.Internal.Rest as R
@@ -47,8 +47,6 @@ deriving stock instance Generic R.User
 deriving anyclass instance NFData R.User
 deriving stock instance Generic R.Channel
 deriving anyclass instance NFData R.Channel
-deriving stock instance Generic R.CreateGuildOpts
-deriving anyclass instance NFData R.CreateGuildOpts
 deriving stock instance Generic R.ModifyGuildOpts
 deriving anyclass instance NFData R.ModifyGuildOpts
 deriving stock instance Generic R.CreateGuildChannelOpts
@@ -67,18 +65,40 @@ deriving stock instance Generic R.CreateGuildIntegrationOpts
 deriving anyclass instance NFData R.CreateGuildIntegrationOpts
 deriving stock instance Generic R.ModifyGuildIntegrationOpts
 deriving anyclass instance NFData R.ModifyGuildIntegrationOpts
-deriving stock instance Generic R.GuildEmbed
-deriving anyclass instance NFData R.GuildEmbed
+deriving stock instance Generic R.StartThreadOpts
+deriving anyclass instance NFData R.StartThreadOpts
+deriving stock instance Generic R.StartThreadNoMessageOpts
+deriving anyclass instance NFData R.StartThreadNoMessageOpts
+deriving stock instance Generic R.DiscordColor
+deriving anyclass instance NFData R.DiscordColor
+deriving stock instance Generic R.ThreadMetadata
+deriving anyclass instance NFData R.ThreadMetadata
+deriving stock instance Generic R.ThreadMember
+deriving anyclass instance NFData R.ThreadMember
+deriving stock instance Generic R.GuildMember
+deriving anyclass instance NFData R.GuildMember
+deriving stock instance Generic R.ComponentActionRow
+deriving anyclass instance NFData R.ComponentActionRow
+deriving stock instance Generic R.ComponentButton
+deriving anyclass instance NFData R.ComponentButton
+deriving stock instance Generic R.ButtonStyle
+deriving anyclass instance NFData R.ButtonStyle
+deriving stock instance Generic R.Emoji
+deriving anyclass instance NFData R.Emoji
+deriving stock instance Generic R.ComponentSelectMenu
+deriving anyclass instance NFData R.ComponentSelectMenu
+deriving stock instance Generic R.SelectOption
+deriving anyclass instance NFData R.SelectOption
+deriving stock instance Generic R.GuildWidget
+deriving anyclass instance NFData R.GuildWidget
 
 instance NFData (R.ChannelRequest a) where
-  rnf (R.GetChannelMessage a) = a `deepseq` ()
   rnf (R.GetChannel a) = a `deepseq` ()
   rnf (R.ModifyChannel a b) = a `deepseq` b `deepseq` ()
   rnf (R.DeleteChannel a) = a `deepseq` ()
   rnf (R.GetChannelMessages a b) = a `deepseq` b `deepseq` ()
+  rnf (R.GetChannelMessage a) = a `deepseq` ()
   rnf (R.CreateMessage a b) = a `deepseq` b `deepseq` ()
-  rnf (R.CreateMessageEmbed a b c) = a `deepseq` b `deepseq` c `deepseq` ()
-  rnf (R.CreateMessageUploadFile a b c) = a `deepseq` b `deepseq` c `deepseq` ()
   rnf (R.CreateMessageDetailed a b) = a `deepseq` b `deepseq` ()
   rnf (R.CreateReaction a b) = a `deepseq` b `deepseq` ()
   rnf (R.DeleteOwnReaction a b) = a `deepseq` b `deepseq` ()
@@ -86,7 +106,7 @@ instance NFData (R.ChannelRequest a) where
   rnf (R.DeleteSingleReaction a b) = a `deepseq` b `deepseq` ()
   rnf (R.GetReactions a b c) = a `deepseq` b `deepseq` c `deepseq` ()
   rnf (R.DeleteAllReactions a) = a `deepseq` ()
-  rnf (R.EditMessage a b c) = a `deepseq` b `deepseq` c `deepseq` ()
+  rnf (R.EditMessage a b) = a `deepseq` b `deepseq` ()
   rnf (R.DeleteMessage a) = a `deepseq` ()
   rnf (R.BulkDeleteMessage a) = a `deepseq` ()
   rnf (R.EditChannelPermissions a b c) = a `deepseq` b `deepseq` c `deepseq` ()
@@ -99,6 +119,17 @@ instance NFData (R.ChannelRequest a) where
   rnf (R.DeletePinnedMessage a) = a `deepseq` ()
   rnf (R.GroupDMAddRecipient a b) = a `deepseq` b `deepseq` ()
   rnf (R.GroupDMRemoveRecipient a b) = a `deepseq` b `deepseq` ()
+  rnf (R.StartThreadFromMessage a b c) = a `deepseq` b `deepseq` c `deepseq` ()
+  rnf (R.StartThreadNoMessage a b) = a `deepseq` b `deepseq` ()
+  rnf (R.JoinThread a) = a `deepseq` ()
+  rnf (R.AddThreadMember a b) = a `deepseq` b `deepseq` ()
+  rnf (R.LeaveThread a) = a `deepseq` ()
+  rnf (R.RemoveThreadMember a b) = a `deepseq` b `deepseq` ()
+  rnf (R.GetThreadMember a b) = a `deepseq` b `deepseq` ()
+  rnf (R.ListThreadMembers a) = a `deepseq` ()
+  rnf (R.ListPublicArchivedThreads a b) = a `deepseq` b `deepseq` ()
+  rnf (R.ListPrivateArchivedThreads a b) = a `deepseq` b `deepseq` ()
+  rnf (R.ListJoinedPrivateArchivedThreads a b) = a `deepseq` b `deepseq` ()
 
 instance NFData (R.UserRequest a) where
   rnf R.GetCurrentUser = ()
@@ -111,7 +142,6 @@ instance NFData (R.UserRequest a) where
   rnf R.GetUserConnections = ()
 
 instance NFData (R.GuildRequest a) where
-  rnf (R.CreateGuild a) = a `deepseq` ()
   rnf (R.GetGuild a) = a `deepseq` ()
   rnf (R.ModifyGuild a b) = a `deepseq` b `deepseq` ()
   rnf (R.DeleteGuild a) = a `deepseq` ()
@@ -144,6 +174,6 @@ instance NFData (R.GuildRequest a) where
   rnf (R.ModifyGuildIntegration a b c) = a `deepseq` b `deepseq` c `deepseq` ()
   rnf (R.DeleteGuildIntegration a b) = a `deepseq` b `deepseq` ()
   rnf (R.SyncGuildIntegration a b) = a `deepseq` b `deepseq` ()
-  rnf (R.GetGuildEmbed a) = a `deepseq` ()
-  rnf (R.ModifyGuildEmbed a b) = a `deepseq` b `deepseq` ()
+  rnf (R.GetGuildWidget a) = a `deepseq` ()
+  rnf (R.ModifyGuildWidget a b) = a `deepseq` b `deepseq` ()
   rnf (R.GetGuildVanityURL a) = a `deepseq` ()

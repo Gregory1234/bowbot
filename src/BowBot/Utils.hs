@@ -1,9 +1,9 @@
 {-# LANGUAGE ViewPatterns #-}
-{-# LANGUAGE RecordWildCards #-}
 
 module BowBot.Utils(
   module BowBot.Utils, liftIO, MonadIO, getEnv, fromMaybe, for, for_, readMaybe,
-  atomically, readTVar, writeTVar, modifyTVar, pack, unpack, when, unless, void
+  atomically, readTVar, writeTVar, modifyTVar, pack, unpack, when, unless, void,
+  module BowBot.HoistIO
 ) where
 
 import Control.Monad.IO.Class ( liftIO, MonadIO )
@@ -20,6 +20,7 @@ import Control.Concurrent.STM (atomically, STM)
 import Control.Concurrent.STM.TVar (readTVar, writeTVar, modifyTVar, TVar)
 import Data.Text (pack, unpack)
 import Control.Monad (when, unless, void)
+import BowBot.HoistIO
 import Discord.Types
 import qualified Data.Map as M
 import qualified Data.Map.Internal as M
@@ -58,61 +59,20 @@ dist a b =
 getTime :: String -> IO String
 getTime f = formatTime defaultTimeLocale f <$> getCurrentTime
 
-pad' :: Bool -> Char -> Int -> String -> String
-pad' d c l x = if d then x ++ replicate (l - length x) c else replicate (l - length x) c ++ x
-
-pad :: Int -> String -> String
-pad = pad' True ' '
-
-showMemberOrUser :: Bool -> Either User GuildMember -> String
-showMemberOrUser False (Left User {..}) = unpack userName ++ "#" ++ unpack userDiscrim
-showMemberOrUser True (Left User {..}) = "**" ++ discordEscape (unpack userName) ++ "**#" ++ unpack userDiscrim
-showMemberOrUser b (Right GuildMember {memberNick = Nothing, ..}) = showMemberOrUser b $ Left memberUser
-showMemberOrUser False (Right GuildMember {memberNick = Just nick, ..}) = unpack nick ++ " (" ++ showMemberOrUser False (Left memberUser) ++ ")"
-showMemberOrUser True (Right GuildMember {memberNick = Just nick, ..}) = "**" ++ discordEscape (unpack nick) ++ "** (" ++ discordEscape (showMemberOrUser False (Left memberUser)) ++ ")"
-
--- TODO: move ifDev and the ids into BotData
+getEnvOrThrow :: String -> IO String
+getEnvOrThrow n = do
+  v <- getEnv n
+  case v of
+    Nothing -> error $ n ++ " not avaliable!"
+    Just s -> return s
 
 ifDev :: MonadIO m => a -> m a -> m a
 ifDev v action = do
   devmode <- liftIO $ fromMaybe "" <$> getEnv "IS_DEV"
   if devmode == "1" then action else return v
 
-stm :: MonadIO m => STM a -> m a
-stm = liftIO . atomically
-
-readProp :: MonadIO m => (a -> TVar b) -> a -> m b
-readProp f a = stm $ readTVar (f a)
-
-modifyProp :: MonadIO m => (a -> TVar b) -> a -> (b -> b) -> m ()
-modifyProp f a g = stm $ modifyTVar (f a) g
-
-writeProp :: MonadIO m => (a -> TVar b) -> a -> b -> m ()
-writeProp f a g = stm $ writeTVar (f a) g
-
-discordEscape :: String -> String
-discordEscape [] = ""
-discordEscape (x:xs)
-  | x `elem` "_*~`>" = '\\':x:discordEscape xs
-  | otherwise = x:discordEscape xs      
-
 showWLR :: Integral a => a -> a -> String
 showWLR (fromIntegral -> bowWins) (fromIntegral -> bowLosses)
   | bowWins == 0, bowLosses == 0 = "NaN"
   | bowLosses == 0 = "∞"
   | otherwise = printf "%.04f" (fromRational (bowWins % bowLosses) :: Double)
-
-groupByToMap :: Ord k => (v -> k) -> [v] -> M.Map k [v]
-groupByToMap _ [] = M.empty
-groupByToMap f (x:xs) = M.insertWith (++) (f x) [x] $ groupByToMap f xs
-
-groupToMap :: Ord k => [(k,v)] -> M.Map k [v]
-groupToMap = M.map (map snd) . groupByToMap fst
-
-zipMapWith :: Ord k => (Maybe a -> Maybe b -> c) -> M.Map k a -> M.Map k b -> M.Map k c
-zipMapWith f = M.merge (M.mapMissing $ \_ x -> f (Just x) Nothing) (M.mapMissing $ \_ y -> f Nothing (Just y)) (M.zipWithMatched $ \_ x y -> f (Just x) (Just y))
-
-assertIO :: MonadIO m => Bool -> m ()
-assertIO x = liftIO . evaluate $ assert x ()
-
-newtype UUID = UUID { uuidString :: String } deriving (Show, Eq, Ord)

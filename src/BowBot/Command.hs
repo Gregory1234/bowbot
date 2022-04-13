@@ -1,30 +1,28 @@
+{-# LANGUAGE ExistentialQuantification #-}
+{-# LANGUAGE RecordWildCards #-}
+
 module BowBot.Command(
-  module BowBot.Command, module BowBot.CommandHandler, module BowBot.CommandMonads, module BowBot.API, module BowBot.DB,
-  module Discord, module Discord.Types, module BowBot.BotData, module BowBot.Utils
+  module BowBot.Command, module BowBot.Command.Basic, module BowBot.Command.Handler, module BowBot.Command.Args
 ) where
 
-import Discord
-import BowBot.Utils
-import Discord.Types hiding (accountId)
-import BowBot.BotData
-import BowBot.CommandMonads
-import BowBot.CommandHandler
-import BowBot.API
-import BowBot.DB
+import BowBot.Command.Basic
+import BowBot.Command.Handler
+import BowBot.Command.Args
+import BowBot.BotMonad
+import Discord.Types
+import BowBot.DB.Class (hConnection)
+import BowBot.Network.Class (hManager)
+import BowBot.Discord.Class (liftDiscord)
+  
+data Command desc args = Command { commandArgsDescription :: desc, commandInfo :: CommandInfo, commandHandler :: CommandHandler args () }
 
-data Command = Command { commandName :: String, commandPerms :: PermissionLevel, commandTimeout :: Int, commandHandler :: CommandHandler () }
+data AnyCommand = forall desc args. (CommandArgs desc args) => AnyCommand { anyCommand :: Command desc args }
 
-registerMessage :: String
-registerMessage = "*You aren't on the list! To register, type `?register yourign`.*"
+anyCommandInfo :: AnyCommand -> CommandInfo
+anyCommandInfo AnyCommand {..} = commandInfo anyCommand
 
-discordNotFoundMessage :: String
-discordNotFoundMessage = "*The discord user is not registered!*"
-
-wrongSyntaxMessage :: String
-wrongSyntaxMessage = "*Wrong command syntax!*"
-
-playerNotFoundMessage :: String
-playerNotFoundMessage = "*The player doesn't exist!*"
-
-somethingWrongMessage :: String
-somethingWrongMessage = "*Something went wrong!*"
+runAnyCommand :: AnyCommand -> Message -> Bot ()
+runAnyCommand AnyCommand {..} m = do
+  conn <- hConnection
+  manager <- hManager
+  liftDiscord $ runCommandHandler (commandHandler anyCommand) (commandEnvFromMessage (commandArgsDescription anyCommand) m) conn manager
