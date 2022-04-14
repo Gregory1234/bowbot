@@ -5,20 +5,38 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE TupleSections #-}
+{-# LANGUAGE DerivingVia #-}
+{-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE MonoLocalBinds #-}
 
 module BowBot.Command.Args(module BowBot.Command.Args, Only(..)) where
 
 import Database.MySQL.Simple (Only(..))
-import BowBot.BotMonad (BotT)
+import BowBot.BotMonad
 import Control.Monad.Except
+import Discord
+import Discord.Types
+import Network.HTTP.Conduit (Manager)
+import BowBot.Network.Class (MonadNetwork)
+import BowBot.Discord.Class (MonadDiscord)
+import Control.Monad.Reader (ReaderT(..), MonadReader)
+import Control.Applicative (Alternative)
+import BowBot.BotData.Basic
+import BowBot.BotData.Cached (MonadCache)
 
+data ArgsParserContext = ArgsParserContext { argsParserSender :: User, argsParserChannel :: ChannelId }
+
+newtype ArgsParser a = ArgsParser { runArgsParser :: ArgsParserContext -> BotData -> Manager -> DiscordHandle -> IO (Either String a) }
+  deriving (Functor, Applicative, Monad, MonadIO, MonadNetwork, MonadDiscord, MonadError String,
+            MonadFail, MonadFix, Alternative, MonadPlus, MonadReader ArgsParserContext) via (ReaderT ArgsParserContext (BotT (ExceptT String IO)))
+
+deriving via (ReaderT ArgsParserContext (BotT (ExceptT String IO))) instance (MonadCache c (BotT (ExceptT String IO))) => MonadCache c ArgsParser
 
 class CommandArgs a v | a -> v where
-  parseArgsFromStrings :: a -> [String] -> BotT (ExceptT String IO) v
+  parseArgsFromStrings :: a -> [String] -> ArgsParser v
 
 class CommandArg a v | a -> v where
-  parseArgFromStrings :: a -> [String] -> (BotT (ExceptT String IO) v, [String])
+  parseArgFromStrings :: a -> [String] -> (ArgsParser v, [String])
 
 newtype SingleStringArg = SingleStringArg { singleStringArgName :: String }
 

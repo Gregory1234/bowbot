@@ -13,14 +13,13 @@ import qualified Data.HashMap.Strict as HM
 import Data.Proxy
 import BowBot.BotData.Cached (getCacheMap)
 import Data.Char (toLower)
-import BowBot.BotMonad
 import Data.List (sortOn)
 import Data.Maybe (listToMaybe)
 
 
 data MinecraftArg a = MinecraftArg
   { minecraftArgName :: String
-  , minecraftArgFilter :: MinecraftAccount -> BotT (ExceptT String IO) a
+  , minecraftArgFilter :: MinecraftAccount -> ArgsParser a
   }
 
 data MinecraftResponse a = MinecraftResponse { responseType :: MinecraftResponseType, responseAccount :: MinecraftAccount, responseValue :: a }

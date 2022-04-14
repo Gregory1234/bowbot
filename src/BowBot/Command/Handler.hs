@@ -25,6 +25,7 @@ import BowBot.Command.Args
 import Control.Monad.Except (ExceptT(..), runExceptT)
 import BowBot.BotData.Basic
 import BowBot.BotData.Cached (MonadCache)
+import Data.Coerce (coerce)
 
 data CommandEnvironment args = CommandEnvironment
   { envSender :: User
@@ -42,7 +43,7 @@ commandEnvFromMessage p m = CommandEnvironment
   , envChannel = messageChannelId m
   , envRespond = call_ . R.CreateMessage (messageChannelId m) . pack
   , envRespondFile = \n s -> call_ $ R.CreateMessageDetailed (messageChannelId m) def { R.messageDetailedFile = Just (pack n, encodeUtf8 $ pack s) }
-  , envArgs = parseArgsFromStrings p (tail $ words $ unpack $ messageContent m)
+  , envArgs = coerce $ flip runArgsParser ArgsParserContext { argsParserSender = messageAuthor m, argsParserChannel = messageChannelId m } $ parseArgsFromStrings p (tail $ words $ unpack $ messageContent m)
   }
 
 newtype CommandHandler args a = CommandHandler { runCommandHandler :: CommandEnvironment args -> BotData -> Manager -> DiscordHandler a }
