@@ -11,7 +11,13 @@ import BowBot.DB.Class (MonadDB)
 import BowBot.Discord.Class (MonadDiscord)
 import BowBot.Network.Monad (NetworkT(..))
 import BowBot.DB.Monad (DatabaseT(..))
-import BowBot.Discord.Monad (DiscordHandler'(..))
+import BowBot.Discord.Monad (DiscordHandlerT(..))
+import Control.Monad.Trans
 
-newtype Bot a = Bot { runBot :: Connection -> Manager -> DiscordHandler a }
-  deriving (Functor, Applicative, Monad, MonadIO, MonadHoistIO, MonadNetwork, MonadDB, MonadDiscord) via (DatabaseT (NetworkT DiscordHandler'))
+newtype BotT m a = BotT { runBotT :: Connection -> Manager -> DiscordHandle -> m a }
+  deriving (Functor, Applicative, Monad, MonadIO, MonadHoistIO, MonadNetwork, MonadDB, MonadDiscord) via (DatabaseT (NetworkT (DiscordHandlerT m)))
+
+instance MonadTrans BotT where
+  lift f = BotT $ \_ _ _ -> f
+
+type Bot = BotT IO

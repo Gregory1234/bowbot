@@ -16,7 +16,7 @@ import Network.HTTP.Conduit (newManager)
 import BowBot.Network.Basic (managerSettings)
 import BowBot.BotMonad
 import BowBot.Network.Monad (NetworkT(..))
-import BowBot.Discord.Monad (DiscordHandler'(..))
+import BowBot.Discord.Monad (DiscordHandlerT(..))
 import qualified Data.Text as T
 import Data.Text (isPrefixOf)
 import BowBot.Command
@@ -24,6 +24,7 @@ import BowBot.Hypixel.StatsCommand
 import BowBot.Discord.Class (MonadDiscord, call_)
 import Control.Exception.Base (SomeException, try, throw)
 import System.Timeout (timeout)
+import Control.Monad.Reader (ReaderT(..))
 
 runBowBot :: IO ()
 runBowBot = do
@@ -36,13 +37,13 @@ runBowBot = do
       runDiscord $
         def
           { discordToken = pack discordKey,
-            discordOnStart = runDiscordHandler' $ runNetworkT onStartup manager,
-            discordOnEvent = \e -> withDB $ \conn -> runBot (eventHandler e) conn manager,
+            discordOnStart = ReaderT $ \d -> runDiscordHandlerT (runNetworkT onStartup manager) d,
+            discordOnEvent = \e -> ReaderT $ \d -> withDB $ \conn -> runBotT (eventHandler e) conn manager d, -- TODO: don't call withDB unnecessarily
             discordOnLog = putStrLn . unpack
           }
     withDB $ flip logErrorDB $ unpack userFacingError
 
-onStartup :: NetworkT DiscordHandler' ()
+onStartup :: NetworkT (DiscordHandlerT IO) ()
 onStartup = do
   pure ()
 

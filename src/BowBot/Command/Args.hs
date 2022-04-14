@@ -9,29 +9,32 @@
 module BowBot.Command.Args(module BowBot.Command.Args, Only(..)) where
 
 import Database.MySQL.Simple (Only(..))
+import BowBot.BotMonad (BotT)
+import Control.Monad.Except
+import Control.Monad.Trans.Except
 
 
 class CommandArgs a v | a -> v where
-  parseArgsFromStrings :: a -> [String] -> Either String v
+  parseArgsFromStrings :: a -> [String] -> BotT (ExceptT String IO) v
 
 class CommandArg a v | a -> v where
-  parseArgFromStrings :: a -> [String] -> Either String (v, [String])
+  parseArgFromStrings :: a -> [String] -> BotT (ExceptT String IO) (v, [String])
 
 newtype SingleStringArg = SingleStringArg { singleStringArgName :: String }
 
 instance CommandArg SingleStringArg String where
-  parseArgFromStrings SingleStringArg {..} [] = Left ("*Argument not provided: " ++ singleStringArgName ++ "!*")
-  parseArgFromStrings _ (a:as) = Right (a, as)
+  parseArgFromStrings SingleStringArg {..} [] = lift $ throwE ("*Argument not provided: " ++ singleStringArgName ++ "!*")
+  parseArgFromStrings _ (a:as) = return (a, as)
 
 newtype GreedyStringArg = GreedyStringArg { greedyStringArgName :: String }
 
 instance CommandArg GreedyStringArg String where
-  parseArgFromStrings GreedyStringArg {..} [] = Left ("*Argument not provided: " ++ greedyStringArgName ++ "!*")
-  parseArgFromStrings _ as = Right (unwords as, [])
+  parseArgFromStrings GreedyStringArg {..} [] = lift $ throwE ("*Argument not provided: " ++ greedyStringArgName ++ "!*")
+  parseArgFromStrings _ as = return (unwords as, [])
 
 instance CommandArgs () () where
-  parseArgsFromStrings _ [] = Right ()
-  parseArgsFromStrings _ _ = Left "*Too many arguments!*"
+  parseArgsFromStrings _ [] = return ()
+  parseArgsFromStrings _ _ = lift $ throwE "*Too many arguments!*"
 
 instance (CommandArg a1 v1) => CommandArgs (Only a1) (Only v1) where
   parseArgsFromStrings (Only a1) as = do

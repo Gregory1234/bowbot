@@ -40,9 +40,6 @@ data MinecraftAccount = MinecraftAccount
   , mcHypixelBow :: IsBanned
   } deriving (Show)
 
-mcName :: MinecraftAccount -> String
-mcName = head . mcNames
-
 instance DBEntity MinecraftAccount where
   type DBUniqueKey MinecraftAccount = UUID
   data DBFilter MinecraftAccount = MinecraftAccountFilter

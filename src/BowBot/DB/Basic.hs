@@ -18,6 +18,7 @@ import Control.Exception.Base (bracket)
 
 withDB :: MonadHoistIO m => (Connection -> m a) -> m a -- TODO: report connection errors
 withDB f = do
+  liftIO $ putStrLn "Start connection"
   connectHost <- liftIO $ getEnvOrThrow "DB_HOST"
   connectUser <- liftIO $ getEnvOrThrow "DB_USER"
   connectPassword <- liftIO $ getEnvOrThrow "DB_PASS"

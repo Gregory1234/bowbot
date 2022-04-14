@@ -9,15 +9,16 @@ import Discord
 import qualified Discord.Requests as R
 import Network.HTTP.Conduit (Manager)
 import Database.MySQL.Simple (Connection)
-import BowBot.Network.Class (MonadNetwork)
-import BowBot.DB.Class (MonadDB)
+import BowBot.Network.Class (MonadNetwork, hManager)
+import BowBot.DB.Class (MonadDB, hConnection)
 import BowBot.Discord.Class
 import Discord.Types
-import Control.Monad.Reader (ReaderT(..))
+import Control.Monad.Reader (ReaderT(..), ask)
 import BowBot.BotMonad
 import Data.Text.Encoding (encodeUtf8)
 import BowBot.Discord.DiscordNFData ()
 import BowBot.Command.Args
+import Control.Monad.Except (ExceptT(..), runExceptT)
 
 data CommandEnvironment args = CommandEnvironment
   { envSender :: User
@@ -25,7 +26,7 @@ data CommandEnvironment args = CommandEnvironment
   , envChannel :: ChannelId
   , envRespond :: String -> CommandHandler args ()
   , envRespondFile :: String -> String -> CommandHandler args ()
-  , envArgs :: Either String args
+  , envArgs :: BotT (ExceptT String IO) args
   }
 
 commandEnvFromMessage :: CommandArgs desc v => desc -> Message -> CommandEnvironment v
@@ -56,7 +57,9 @@ hRespondFile n m = do
 
 withArgs :: (args -> CommandHandler args ()) -> CommandHandler args ()
 withArgs f = do
-  maybeArgs <- hEnv envArgs
+  maybeArgs' <- hEnv envArgs
+  maybeArgsIO <- fmap runExceptT $ runBotT maybeArgs' <$> hConnection <*> hManager <*> liftDiscord ask
+  maybeArgs <- liftIO maybeArgsIO
   case maybeArgs of
     Left err -> hRespond err
     Right args -> f args

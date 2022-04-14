@@ -45,6 +45,7 @@ library
       BowBot.Hypixel.Stats
       BowBot.Hypixel.StatsCommand
       BowBot.Minecraft.Account
+      BowBot.Minecraft.Arg
       BowBot.Minecraft.Basic
       BowBot.Network.Basic
       BowBot.Network.Class
