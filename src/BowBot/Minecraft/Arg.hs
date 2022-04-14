@@ -1,6 +1,7 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE TupleSections #-}
 
 module BowBot.Minecraft.Arg where
 
@@ -16,13 +17,13 @@ import Data.Char (toLower)
 newtype MinecraftAccountArg = MinecraftAccountArg { minecraftAccountArgName :: String }
 
 instance CommandArg MinecraftAccountArg MinecraftAccount where
-  parseArgFromStrings MinecraftAccountArg {..} [] = throwError $ "*Argument not provided: " ++ minecraftAccountArgName ++ "!*"
-  parseArgFromStrings _ (a:as) = do
+  parseArgFromStrings MinecraftAccountArg {..} [] = (throwError $ "*Argument not provided: " ++ minecraftAccountArgName ++ "!*", [])
+  parseArgFromStrings _ (a:as) = (,as) $ do
     acc' <- filter ((==map toLower a) . map toLower . head . mcNames) . HM.elems <$> getCacheMap (Proxy @MinecraftAccount)
     case acc' of
-      [acc] -> return (acc, as)
+      [acc] -> return acc
       _ -> do
         uuid <- liftMaybe "*The player doesn't exist!*" =<< mcNameToUUID a
         names <- liftMaybe "*The player doesn't exist!*" =<< mcUUIDToNames uuid
-        return (MinecraftAccount { mcUUID = uuid, mcNames = names, mcHypixelBow = NotBanned }, as)
+        return MinecraftAccount { mcUUID = uuid, mcNames = names, mcHypixelBow = NotBanned }
       -- TODO: add autocorrect
