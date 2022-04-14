@@ -25,6 +25,7 @@ import Discord.Types
 import qualified Data.Map as M
 import qualified Data.Map.Internal as M
 import Control.Exception (evaluate, assert)
+import Control.Monad.Error.Class (MonadError, throwError)
 
 dist :: Eq a => [a] -> [a] -> Int
 dist a b =
@@ -76,3 +77,7 @@ showWLR (fromIntegral -> bowWins) (fromIntegral -> bowLosses)
   | bowWins == 0, bowLosses == 0 = "NaN"
   | bowLosses == 0 = "∞"
   | otherwise = printf "%.04f" (fromRational (bowWins % bowLosses) :: Double)
+
+liftMaybe :: MonadError e m => e -> Maybe a -> m a
+liftMaybe _ (Just a) = return a
+liftMaybe e Nothing = throwError e

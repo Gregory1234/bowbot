@@ -11,7 +11,6 @@ module BowBot.Command.Args(module BowBot.Command.Args, Only(..)) where
 import Database.MySQL.Simple (Only(..))
 import BowBot.BotMonad (BotT)
 import Control.Monad.Except
-import Control.Monad.Trans.Except
 
 
 class CommandArgs a v | a -> v where
@@ -23,18 +22,18 @@ class CommandArg a v | a -> v where
 newtype SingleStringArg = SingleStringArg { singleStringArgName :: String }
 
 instance CommandArg SingleStringArg String where
-  parseArgFromStrings SingleStringArg {..} [] = lift $ throwE ("*Argument not provided: " ++ singleStringArgName ++ "!*")
+  parseArgFromStrings SingleStringArg {..} [] = throwError $ "*Argument not provided: " ++ singleStringArgName ++ "!*"
   parseArgFromStrings _ (a:as) = return (a, as)
 
 newtype GreedyStringArg = GreedyStringArg { greedyStringArgName :: String }
 
 instance CommandArg GreedyStringArg String where
-  parseArgFromStrings GreedyStringArg {..} [] = lift $ throwE ("*Argument not provided: " ++ greedyStringArgName ++ "!*")
+  parseArgFromStrings GreedyStringArg {..} [] = throwError $ "*Argument not provided: " ++ greedyStringArgName ++ "!*"
   parseArgFromStrings _ as = return (unwords as, [])
 
 instance CommandArgs () () where
   parseArgsFromStrings _ [] = return ()
-  parseArgsFromStrings _ _ = lift $ throwE "*Too many arguments!*"
+  parseArgsFromStrings _ _ = throwError "*Too many arguments!*"
 
 instance (CommandArg a1 v1) => CommandArgs (Only a1) (Only v1) where
   parseArgsFromStrings (Only a1) as = do
