@@ -4,6 +4,7 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
 module BowBot.Discord.DiscordNFData() where
 
@@ -12,6 +13,7 @@ import qualified Discord.Internal.Rest as R
 import Discord.Types
 import Control.DeepSeq (NFData(..), deepseq)
 import GHC.Generics (Generic)
+import Data.Hashable (Hashable)
 
 deriving stock instance Generic Snowflake
 deriving anyclass instance NFData Snowflake
@@ -177,3 +179,5 @@ instance NFData (R.GuildRequest a) where
   rnf (R.GetGuildWidget a) = a `deepseq` ()
   rnf (R.ModifyGuildWidget a b) = a `deepseq` b `deepseq` ()
   rnf (R.GetGuildVanityURL a) = a `deepseq` ()
+
+deriving newtype instance Hashable Snowflake

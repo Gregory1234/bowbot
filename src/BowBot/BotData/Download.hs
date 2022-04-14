@@ -12,6 +12,7 @@ import Database.MySQL.Simple (Connection)
 import BowBot.BotData.Cached (refreshCache)
 import Data.Proxy
 import BowBot.DB.Basic (withDB)
+import BowBot.Command.Basic (PermissionLevel)
 
 
 
@@ -19,12 +20,14 @@ emptyBotData :: STM BotData
 emptyBotData = do
   infoFieldCache <- newTVar empty
   minecraftAccountCache <- newTVar empty
+  permissionCache <- newTVar empty
   return BotData {..}
 
 updateBotData :: Connection -> BotData -> IO ()
 updateBotData conn bdt = flip runBotDataT bdt $ do
   refreshCache conn (Proxy @InfoField)
   refreshCache conn (Proxy @MinecraftAccount)
+  refreshCache conn (Proxy @PermissionLevel)
 
 downloadBotData :: IO BotData
 downloadBotData = do

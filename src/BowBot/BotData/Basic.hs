@@ -18,10 +18,12 @@ import Control.Monad.State.Class (MonadState)
 import Control.Monad.Writer.Class (MonadWriter)
 import Control.Applicative (Alternative)
 import Control.Monad (MonadPlus)
+import BowBot.Command.Basic
   
 data BotData = BotData
   { infoFieldCache :: DatabaseCache InfoField
   , minecraftAccountCache :: DatabaseCache MinecraftAccount
+  , permissionCache :: DatabaseCache PermissionLevel
   }
 
 newtype BotDataT m a = BotDataT { runBotDataT :: BotData -> m a }
@@ -34,6 +36,9 @@ instance MonadIO m => MonadCache InfoField (BotDataT m) where
 
 instance MonadIO m => MonadCache MinecraftAccount (BotDataT m) where
   getCache _ = BotDataT $ return . minecraftAccountCache
+
+instance MonadIO m => MonadCache PermissionLevel (BotDataT m) where
+  getCache _ = BotDataT $ return . permissionCache
 
 instance MonadReader r m => MonadReader r (BotDataT m) where
   ask = BotDataT $ const ask

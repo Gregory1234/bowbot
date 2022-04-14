@@ -19,7 +19,7 @@ import Control.Concurrent (forkIO)
 
 withDB :: MonadHoistIO m => (Connection -> m a) -> m a -- TODO: report connection errors
 withDB f = do
-  liftIO $ putStrLn "Start connection"
+  -- liftIO $ putStrLn "Start connection"
   connectHost <- liftIO $ getEnvOrThrow "DB_HOST"
   connectUser <- liftIO $ getEnvOrThrow "DB_USER"
   connectPassword <- liftIO $ getEnvOrThrow "DB_PASS"
@@ -30,7 +30,7 @@ logInfoDB :: MonadIO m => Connection -> String -> m ()
 logInfoDB conn msg = liftIO $ void $ do
   putStrLn msg
   execute conn "INSERT INTO `logs`(`message`) VALUES (?)" (Only msg)
-
+-- TODO: logs are sometimes out of order
 logInfo :: MonadIO m => String -> m ()
 logInfo msg = void $ liftIO $ forkIO $ withDB $ \conn -> logInfoDB conn msg
 

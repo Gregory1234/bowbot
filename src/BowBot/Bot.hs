@@ -14,8 +14,6 @@ import BowBot.BotData.Info
 import Network.HTTP.Conduit (newManager)
 import BowBot.Network.Basic (managerSettings)
 import BowBot.BotMonad
-import BowBot.Network.Monad (NetworkT(..))
-import BowBot.Discord.Monad (DiscordHandlerT(..))
 import qualified Data.Text as T
 import Data.Text (isPrefixOf)
 import BowBot.Command
@@ -25,6 +23,9 @@ import Control.Exception.Base (SomeException, try, throw)
 import System.Timeout (timeout)
 import Control.Monad.Reader (ReaderT(..))
 import BowBot.BotData.Download
+import BowBot.BotData.RefreshCommand
+import Data.Proxy
+import BowBot.BotData.Cached
 
 runBowBot :: IO ()
 runBowBot = do
@@ -38,13 +39,13 @@ runBowBot = do
       runDiscord $
         def
           { discordToken = pack discordKey,
-            discordOnStart = ReaderT $ \d -> runDiscordHandlerT (runNetworkT onStartup manager) d,
-            discordOnEvent = \e -> ReaderT $ \d -> runBotT (eventHandler e) bdt manager d,
+            discordOnStart = ReaderT $ runBotT onStartup bdt manager,
+            discordOnEvent = \e -> ReaderT $ runBotT (eventHandler e) bdt manager,
             discordOnLog = putStrLn . unpack
           }
     logError $ unpack userFacingError
 
-onStartup :: NetworkT (DiscordHandlerT IO) ()
+onStartup :: Bot ()
 onStartup = do
   pure ()
 
@@ -66,8 +67,7 @@ eventHandler (MessageCreate m) = do
             testDiscordId <- hInfoDB discordGuildIdInfo
             when (messageGuildId m /= Just testDiscordId) $
               respond m "```Attention! This is the dev version of the bot! Some features might not be avaliable! You shouldn't be reading this! If you see this message please report it immidately!```"
-          -- dPerms <- readProp discordPerms bdt
-          let perms = DefaultLevel -- fromMaybe DefaultLevel $ dPerms !? userId (messageAuthor m)
+          perms <- fromMaybe DefaultLevel <$> getFromCache (Proxy @PermissionLevel) (userId (messageAuthor m))
           if perms == BanLevel
           then respond m "You have been blacklisted. You can probably appeal this decision. Or not. I don't know. I'm just a pre-programmed response."
           else if perms >= commandPerms (anyCommandInfo c)
@@ -92,4 +92,5 @@ commandTimeoutRun n msg x = do
 commands :: [AnyCommand]
 commands =
   [ AnyCommand hypixelStatsCommand
+  , AnyCommand refreshDataCommand
   ]
