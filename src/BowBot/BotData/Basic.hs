@@ -1,35 +1,40 @@
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE DerivingVia #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE UndecidableInstances #-}
 
 module BowBot.BotData.Basic where
 
-import Database.MySQL.Simple
-import BowBot.DB.Class
-import Discord.Internal.Rest (GuildId)
+import BowBot.BotData.Info
+import BowBot.BotData.Cached
+import BowBot.Minecraft.Account
 import BowBot.Utils
+import Control.Monad.Cont (MonadTrans)
+import Control.Monad.Reader (ReaderT(..), MonadReader(..), MonadFix)
+import BowBot.Network.Class (MonadNetwork)
+import BowBot.Discord.Class (MonadDiscord)
+import Control.Monad.Error.Class (MonadError)
+import Control.Monad.State.Class (MonadState)
+import Control.Monad.Writer.Class (MonadWriter)
+import Control.Applicative (Alternative)
+import Control.Monad (MonadPlus)
+  
+data BotData = BotData
+  { infoFieldCache :: DatabaseCache InfoField
+  , minecraftAccountCache :: DatabaseCache MinecraftAccount
+  }
 
+newtype BotDataT m a = BotDataT { runBotDataT :: BotData -> m a }
+  deriving (Functor, Applicative, Monad, MonadIO, MonadHoistIO, MonadNetwork, MonadDiscord, MonadError e, 
+            MonadState s, MonadWriter w, MonadFail, MonadFix, Alternative, MonadPlus) via (ReaderT BotData m)
+  deriving (MonadTrans) via (ReaderT BotData)
 
-hInfoDB :: MonadDB m => InfoType a -> m a
-hInfoDB InfoType {..} = do
-  xs :: [Only String] <- hQueryLog "SELECT `value` FROM `botInfoDEV` WHERE `name` = ?" (Only infoName)
-  case xs of
-    [Only r] -> case infoParse r of
-      Right v -> return v
-      Left e -> do
-        hLogErrorDB $ "Info perser error in " ++ infoName ++ ": " ++ e
-        return infoDefault
-    _ -> do
-      hLogErrorDB $ "Info not found: " ++ infoName
-      return infoDefault
+instance MonadIO m => MonadCache InfoField (BotDataT m) where
+  getCache _ = BotDataT $ return . infoFieldCache
 
-data InfoType a = InfoType { infoName :: String, infoDefault :: a, infoParse :: String -> Either String a }
+instance MonadIO m => MonadCache MinecraftAccount (BotDataT m) where
+  getCache _ = BotDataT $ return . minecraftAccountCache
 
-discordCommandPrefixInfo :: InfoType String
-discordCommandPrefixInfo = InfoType { infoName = "command_prefix", infoDefault = "???", infoParse = Right }
-
-readEither :: Read a => String -> Either String a
-readEither a = maybe (Left "wrong format") Right $ readMaybe a
-
-discordGuildIdInfo :: InfoType GuildId
-discordGuildIdInfo = InfoType { infoName = "discord_guild_id", infoDefault = 0, infoParse = readEither }
+instance MonadReader r m => MonadReader r (BotDataT m) where
+  ask = BotDataT $ const ask
+  local f (BotDataT g) = BotDataT $ local f . g

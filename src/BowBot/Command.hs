@@ -10,7 +10,6 @@ import BowBot.Command.Handler
 import BowBot.Command.Args
 import BowBot.BotMonad
 import Discord.Types
-import BowBot.DB.Class (hConnection)
 import BowBot.Network.Class (hManager)
 import BowBot.Discord.Class (liftDiscord)
   
@@ -23,6 +22,6 @@ anyCommandInfo AnyCommand {..} = commandInfo anyCommand
 
 runAnyCommand :: AnyCommand -> Message -> Bot ()
 runAnyCommand AnyCommand {..} m = do
-  conn <- hConnection
+  bdt <- BotT $ \d _ _ -> return d
   manager <- hManager
-  liftDiscord $ runCommandHandler (commandHandler anyCommand) (commandEnvFromMessage (commandArgsDescription anyCommand) m) conn manager
+  liftDiscord $ runCommandHandler (commandHandler anyCommand) (commandEnvFromMessage (commandArgsDescription anyCommand) m) bdt manager

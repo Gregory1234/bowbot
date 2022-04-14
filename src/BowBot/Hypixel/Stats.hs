@@ -12,7 +12,6 @@ import BowBot.Utils
 import Data.Maybe (catMaybes, isJust, isNothing)
 import BowBot.Hypixel.Division
 import Data.Ratio ((%))
-import BowBot.DB.Class
 
 data HypixelBowStats = HypixelBowStats
   { bowWins :: Integer,
@@ -25,7 +24,7 @@ data HypixelBowStats = HypixelBowStats
   } deriving (Show)
 
 
-requestHypixelBowStats :: (MonadNetwork m, MonadDB m) => UUID -> m (Maybe HypixelBowStats)
+requestHypixelBowStats :: (MonadNetwork m) => UUID -> m (Maybe HypixelBowStats)
 requestHypixelBowStats uuid = hypixelWithPlayerData uuid $ \o -> do
     pl <- o .: "player"
     stats <- pl .: "stats"

@@ -81,3 +81,8 @@ showWLR (fromIntegral -> bowWins) (fromIntegral -> bowLosses)
 liftMaybe :: MonadError e m => e -> Maybe a -> m a
 liftMaybe _ (Just a) = return a
 liftMaybe e Nothing = throwError e
+
+assertIO :: MonadIO m => Bool -> m ()
+assertIO x = liftIO $ do
+  True <- return x
+  pure ()

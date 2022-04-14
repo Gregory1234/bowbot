@@ -10,8 +10,7 @@ import Discord.Requests
 import Discord.Types
 import Control.Monad (forever)
 import BowBot.DB.Basic
-import BowBot.DB.Class
-import BowBot.BotData.Basic
+import BowBot.BotData.Info
 import Network.HTTP.Conduit (newManager)
 import BowBot.Network.Basic (managerSettings)
 import BowBot.BotMonad
@@ -25,23 +24,25 @@ import BowBot.Discord.Class (MonadDiscord, call_)
 import Control.Exception.Base (SomeException, try, throw)
 import System.Timeout (timeout)
 import Control.Monad.Reader (ReaderT(..))
+import BowBot.BotData.Download
 
 runBowBot :: IO ()
 runBowBot = do
   discordKey <- getEnvOrThrow "API_KEY"
   ifDev () $ putStrLn "this is dev version of the bot"
   manager <- newManager managerSettings
-  withDB $ \conn -> logInfoDB conn "bot started"
+  bdt <- downloadBotData
+  logInfo "bot started"
   forever $ do
     userFacingError <-
       runDiscord $
         def
           { discordToken = pack discordKey,
             discordOnStart = ReaderT $ \d -> runDiscordHandlerT (runNetworkT onStartup manager) d,
-            discordOnEvent = \e -> ReaderT $ \d -> withDB $ \conn -> runBotT (eventHandler e) conn manager d, -- TODO: don't call withDB unnecessarily
+            discordOnEvent = \e -> ReaderT $ \d -> runBotT (eventHandler e) bdt manager d,
             discordOnLog = putStrLn . unpack
           }
-    withDB $ flip logErrorDB $ unpack userFacingError
+    logError $ unpack userFacingError
 
 onStartup :: NetworkT (DiscordHandlerT IO) ()
 onStartup = do
@@ -60,7 +61,7 @@ eventHandler (MessageCreate m) = do
       let n = unpack $ T.toLower . T.drop (length prefix) . T.takeWhile (/= ' ') $ messageContent m
       for_ (filter ((==n) . commandName . anyCommandInfo) commands) $ \c ->
         commandTimeoutRun (commandTimeout $ anyCommandInfo c) m $ do
-          hLogInfoDB $ "recieved " ++ unpack (messageContent m)
+          logInfo $ "recieved " ++ unpack (messageContent m)
           ifDev () $ do
             testDiscordId <- hInfoDB discordGuildIdInfo
             when (messageGuildId m /= Just testDiscordId) $
@@ -72,19 +73,19 @@ eventHandler (MessageCreate m) = do
           else if perms >= commandPerms (anyCommandInfo c)
             then runAnyCommand c m
             else respond m "You don't have the permission to do that!"
-          hLogInfoDB $ "finished " ++ unpack (messageContent m)
+          logInfo $ "finished " ++ unpack (messageContent m)
 eventHandler _ = pure ()
 
-commandTimeoutRun :: (MonadHoistIO m, MonadDB m, MonadDiscord m) => Int -> Message -> m () -> m ()
+commandTimeoutRun :: (MonadHoistIO m, MonadDiscord m) => Int -> Message -> m () -> m ()
 commandTimeoutRun n msg x = do
   tm <- hoistIO (try @SomeException . timeout (n * 1000000)) x
   case tm of
     Left e -> do
-      hLogErrorDB $ "Exception happened in command: " ++ show e
+      logError $ "Exception happened in command: " ++ show e
       respond msg "Something went horribly wrong! Please report this!"
       throw e
     Right Nothing -> do
-      hLogErrorDB $ "Timed out: " ++ show n ++ "s"
+      logError $ "Timed out: " ++ show n ++ "s"
       respond msg "Timed out! Please report this!"
     Right (Just ()) -> pure ()
 

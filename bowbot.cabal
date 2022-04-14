@@ -27,15 +27,15 @@ library
   exposed-modules:
       BowBot.Bot
       BowBot.BotData.Basic
+      BowBot.BotData.Cached
+      BowBot.BotData.Download
+      BowBot.BotData.Info
       BowBot.BotMonad
       BowBot.Command
       BowBot.Command.Args
       BowBot.Command.Basic
       BowBot.Command.Handler
       BowBot.DB.Basic
-      BowBot.DB.Class
-      BowBot.DB.Entity
-      BowBot.DB.Monad
       BowBot.Discord.Class
       BowBot.Discord.DiscordNFData
       BowBot.Discord.Monad
@@ -66,6 +66,7 @@ library
     , containers
     , deepseq
     , discord-haskell
+    , hashable
     , http-client-tls
     , http-conduit
     , mtl
@@ -97,6 +98,7 @@ executable bowbot-exe
     , containers
     , deepseq
     , discord-haskell
+    , hashable
     , http-client-tls
     , http-conduit
     , mtl
@@ -129,6 +131,7 @@ test-suite bowbot-test
     , containers
     , deepseq
     , discord-haskell
+    , hashable
     , http-client-tls
     , http-conduit
     , mtl

@@ -14,6 +14,7 @@ import qualified Data.ByteString.Search as BS
 import Data.String (fromString)
 import Data.List (intercalate)
 import Control.Exception.Base (bracket)
+import Control.Concurrent (forkIO)
 
 
 withDB :: MonadHoistIO m => (Connection -> m a) -> m a -- TODO: report connection errors
@@ -30,11 +31,16 @@ logInfoDB conn msg = liftIO $ void $ do
   putStrLn msg
   execute conn "INSERT INTO `logs`(`message`) VALUES (?)" (Only msg)
 
+logInfo :: MonadIO m => String -> m ()
+logInfo msg = void $ liftIO $ forkIO $ withDB $ \conn -> logInfoDB conn msg
 
 logErrorDB :: MonadIO m => Connection -> String -> m ()
 logErrorDB conn msg = liftIO $ void $ do
   putStrLn msg
   execute conn "INSERT INTO `logs`(`message`,`type`) VALUES (?,'error')" (Only msg)
+
+logError :: MonadIO m => String -> m ()
+logError msg = void $ liftIO $ forkIO $ withDB $ \conn -> logErrorDB conn msg
 
 replaceQuery :: String -> String -> Query -> Query
 replaceQuery from to q = Query $ BS.toStrict $ BS.replace (fromString from) (fromString to :: BS.ByteString) (fromQuery q)

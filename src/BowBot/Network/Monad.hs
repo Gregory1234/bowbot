@@ -8,7 +8,6 @@ module BowBot.Network.Monad where
 import BowBot.Utils
 import Network.HTTP.Client.Conduit (Manager)
 import BowBot.Network.Class
-import BowBot.DB.Class (MonadDB)
 import Control.Monad.Cont (MonadTrans)
 import Control.Monad.Reader (ReaderT(..), MonadReader(..), MonadFix)
 import BowBot.Discord.Class (MonadDiscord)
@@ -19,7 +18,7 @@ import Control.Applicative (Alternative)
 import Control.Monad (MonadPlus)
 
 newtype NetworkT m a = NetworkT { runNetworkT :: Manager -> m a }
-  deriving (Functor, Applicative, Monad, MonadIO, MonadHoistIO, MonadDB, MonadDiscord, MonadError e,
+  deriving (Functor, Applicative, Monad, MonadIO, MonadHoistIO, MonadDiscord, MonadError e,
             MonadState s, MonadWriter w, MonadFail, MonadFix, Alternative, MonadPlus) via (ReaderT Manager m)
   deriving (MonadTrans) via (ReaderT Manager)
 

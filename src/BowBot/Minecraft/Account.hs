@@ -6,19 +6,20 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE FlexibleContexts #-}
 
 module BowBot.Minecraft.Account where
 
 import BowBot.Minecraft.Basic
-import BowBot.DB.Entity
-import Data.Maybe (listToMaybe, isJust)
-import BowBot.DB.Basic (queryLog, executeManyLog, optionalQueryFilters)
-import Database.MySQL.Simple.Types (Only(..))
+import BowBot.BotData.Cached
+import BowBot.DB.Basic (queryLog, executeManyLog, withDB)
 import Data.List.Split (splitOn)
 import Data.List (intercalate)
-import BowBot.DB.Class
 import BowBot.Network.Class
 import Data.Proxy (Proxy(..))
+import Data.Char (toLower)
+import BowBot.Utils (writeTVar, atomically, liftIO, when, modifyTVar)
+import qualified Data.HashMap.Strict as HM
 
 data IsBanned
   = NotBanned
@@ -40,39 +41,37 @@ data MinecraftAccount = MinecraftAccount
   , mcHypixelBow :: IsBanned
   } deriving (Show)
 
-instance DBEntity MinecraftAccount where
-  type DBUniqueKey MinecraftAccount = UUID
-  data DBFilter MinecraftAccount = MinecraftAccountFilter
-    { mcfUUID :: Maybe UUID
-    , mcfName :: Maybe String
-    , mcfHypixelBow :: Maybe IsBanned
-    } deriving (Show)
-  emptyFilter = MinecraftAccountFilter { mcfUUID = Nothing, mcfName = Nothing, mcfHypixelBow = Nothing }
-  uniqueKey = mcUUID
-  getFromDB conn _ mcUUID@(UUID uuid) = do
-    res :: [(String, String)] <- queryLog conn "SELECT `names`, `hypixel` FROM `minecraftDEV` WHERE `uuid` = ?" (Only uuid)
-    return $ listToMaybe $ flip fmap res $ \case
-      (splitOn "," -> mcNames, stringToIsBanned -> Just mcHypixelBow) -> MinecraftAccount {..}
-      (splitOn "," -> mcNames, _) -> MinecraftAccount {mcHypixelBow = NotBanned, ..}
-  filterFromDB conn MinecraftAccountFilter {..} = do
-    res :: [(String, String, String)] <- queryLog conn (optionalQueryFilters [("uuid", isJust mcfUUID), ("name", isJust mcfName), ("hypixel", isJust mcfHypixelBow)] "SELECT `uuid`, `names`, `hypixel` FROM `minecraftDEV`") (uuidString <$> mcfUUID, mcfName, isBannedToString <$> mcfHypixelBow)
-    return $ flip fmap res $ \case
-      (UUID -> mcUUID, splitOn "," -> mcNames, stringToIsBanned -> Just mcHypixelBow) -> MinecraftAccount {..}
-      (UUID -> mcUUID, splitOn "," -> mcNames, _) -> MinecraftAccount {mcHypixelBow = NotBanned, ..}
-  storeInDB conn accs = (== fromIntegral (length accs)) <$> executeManyLog conn "INSERT INTO `minecraftDEV` (`uuid`, `name`, `names`, `hypixel`) VALUES (?,?,?,?) ON DUPLICATE KEY UPDATE `name`=VALUES(`name`), `names`=VALUES(`names`), `hypixel`=VALUES(`hypixel`)" (map toQueryParams accs)
-      where
-        toQueryParams MinecraftAccount {..} = (uuidString mcUUID, head mcNames, intercalate "," mcNames, isBannedToString mcHypixelBow)
+instance Cached MinecraftAccount where
+  type CacheIndex MinecraftAccount = UUID
+  refreshCache conn _ = do
+    cache <- getCache (Proxy @MinecraftAccount)
+    res :: [(String, String, String)] <- queryLog conn "SELECT `uuid`, `names`, `hypixel` FROM `minecraftDEV`" ()
+    let newValues = HM.fromList $ flip fmap res $ \case
+          (UUID -> mcUUID, splitOn "," -> mcNames, stringToIsBanned -> Just mcHypixelBow) -> (mcUUID, MinecraftAccount {..})
+          (UUID -> mcUUID, splitOn "," -> mcNames, _) -> (mcUUID, MinecraftAccount {mcHypixelBow = NotBanned, ..})
+    liftIO $ atomically $ writeTVar cache newValues
+  storeInCacheIndexed accs = do
+    assertGoodIndexes accs
+    let toQueryParams (_, MinecraftAccount {..}) = (uuidString mcUUID, head mcNames, intercalate "," mcNames, isBannedToString mcHypixelBow)
+    success <- liftIO $ withDB $ \conn -> (== fromIntegral (length accs)) <$> executeManyLog conn "INSERT INTO `minecraftDEV` (`uuid`, `name`, `names`, `hypixel`) VALUES (?,?,?,?) ON DUPLICATE KEY UPDATE `name`=VALUES(`name`), `names`=VALUES(`names`), `hypixel`=VALUES(`hypixel`)" (map toQueryParams accs)
+    when success $ do
+      cache <- getCache (Proxy @MinecraftAccount)
+      liftIO $ atomically $ modifyTVar cache (insertMany accs)
+    return success
 
-mcNameToUUID :: (MonadDB m, MonadNetwork m) => String -> m (Maybe UUID)
+instance CachedIndexed MinecraftAccount where
+  cacheIndex = mcUUID
+
+mcNameToUUID :: (MonadCache MinecraftAccount m, MonadNetwork m) => String -> m (Maybe UUID)
 mcNameToUUID name = do
-  goodAcc <- hFilterFromDB emptyFilter { mcfName = Just name } 
+  goodAcc <- filter ((==map toLower name) . map toLower . head . mcNames) . HM.elems <$> getCacheMap (Proxy @MinecraftAccount)
   case goodAcc of
     [MinecraftAccount {mcUUID}] -> return (Just mcUUID)
     _ -> mojangNameToUUID name
 
-mcUUIDToNames :: (MonadDB m, MonadNetwork m) => UUID -> m (Maybe [String])
+mcUUIDToNames :: (MonadCache MinecraftAccount m, MonadNetwork m) => UUID -> m (Maybe [String])
 mcUUIDToNames uuid = do
-  goodAcc <- hGetFromDB (Proxy @MinecraftAccount) uuid
+  goodAcc <- getFromCache (Proxy @MinecraftAccount) uuid
   case goodAcc of
     Just MinecraftAccount {mcNames} -> return (Just mcNames)
     _ -> mojangUUIDToNames uuid
