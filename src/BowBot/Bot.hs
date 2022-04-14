@@ -26,6 +26,7 @@ import BowBot.BotData.Download
 import BowBot.BotData.RefreshCommand
 import Data.Proxy
 import BowBot.BotData.Cached
+import Control.Concurrent (threadDelay, forkIO)
 
 runBowBot :: IO ()
 runBowBot = do
@@ -34,20 +35,35 @@ runBowBot = do
   manager <- newManager managerSettings
   bdt <- downloadBotData
   logInfo "bot started"
-  forever $ do
-    userFacingError <-
-      runDiscord $
-        def
-          { discordToken = pack discordKey,
-            discordOnStart = ReaderT $ runBotT onStartup bdt manager,
-            discordOnEvent = \e -> ReaderT $ runBotT (eventHandler e) bdt manager,
-            discordOnLog = putStrLn . unpack
-          }
-    logError $ unpack userFacingError
+  userFacingError <-
+    runDiscord $
+      def
+        { discordToken = pack discordKey,
+          discordOnStart = ReaderT $ runBotT onStartup bdt manager,
+          discordOnEvent = \e -> ReaderT $ runBotT (eventHandler e) bdt manager,
+          discordOnLog = putStrLn . unpack
+        }
+  logError $ unpack userFacingError
+
+backgroundMinutely :: Int -> Bot ()
+backgroundMinutely mint = do
+  when (mint == 0) $ withDB $ \conn -> do
+    logInfoDB conn "started update"
+    bdt <- BotT $ \d _ _ -> return d
+    liftIO $ updateBotData conn bdt
+    -- TODO: clear logs
+    -- TODO: update minecrafts and discords from source
+    logInfoDB conn "finished update"
 
 onStartup :: Bot ()
-onStartup = do
-  pure ()
+onStartup = void $ hoistIO forkIO $ do
+  sec <- liftIO $ read @Int <$> getTime "%S"
+  liftIO $ threadDelay ((65 - sec `mod` 60) * 1000000)
+  void $ forever $ do
+    _ <- hoistIO forkIO $ backgroundTimeoutRun 6000 $ do
+      mint <- liftIO $ read @Int <$> getTime "%M"
+      backgroundMinutely mint
+    liftIO $ threadDelay 60000000
 
 respond :: MonadDiscord m => Message -> String -> m ()
 respond m = call_ . CreateMessage (messageChannelId m) . pack
@@ -87,6 +103,17 @@ commandTimeoutRun n msg x = do
     Right Nothing -> do
       logError $ "Timed out: " ++ show n ++ "s"
       respond msg "Timed out! Please report this!"
+    Right (Just ()) -> pure ()
+
+backgroundTimeoutRun :: MonadHoistIO m => Int -> m () -> m ()
+backgroundTimeoutRun n x = do
+  tm <- hoistIO (try @SomeException . timeout (n * 1000000)) x
+  case tm of
+    Left e -> do
+      logError $ "Exception happened in command: " ++ show e
+      throw e
+    Right Nothing -> do
+      logError $ "Timed out: " ++ show n ++ "s"
     Right (Just ()) -> pure ()
 
 commands :: [AnyCommand]
