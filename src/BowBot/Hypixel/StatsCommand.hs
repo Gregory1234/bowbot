@@ -38,5 +38,7 @@ hypixelStatsCommand src name = Command (Only (MinecraftArg "name" helper)) Comma
     helper MinecraftAccount {..} = do
       cv <- tryIncreaseCounter (Proxy @HypixelApi) 1
       case cv of
-        Nothing -> liftMaybe "*The player has never joined Hypixel!*" =<< requestHypixelBowStats mcUUID
+        Nothing -> do
+          stats <- liftMaybe "*The player has never joined Hypixel!*" =<< requestHypixelBowStats mcUUID
+          return (bowWins stats + bowLosses stats /= 0, stats)
         Just sec -> throwError $ "*Too many requests! Wait another " ++ show sec ++ " seconds!*"
