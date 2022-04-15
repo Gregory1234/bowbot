@@ -25,6 +25,7 @@ source-repository head
 
 library
   exposed-modules:
+      BowBot.Account.Basic
       BowBot.Bot
       BowBot.BotData.Basic
       BowBot.BotData.Cached

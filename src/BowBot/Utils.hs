@@ -86,3 +86,7 @@ assertIO :: MonadIO m => Bool -> m ()
 assertIO x = liftIO $ do
   True <- return x
   pure ()
+
+groupByToMap :: Ord k => (v -> k) -> [v] -> M.Map k [v]
+groupByToMap _ [] = M.empty
+groupByToMap f (x:xs) = M.insertWith (++) (f x) [x] $ groupByToMap f xs
