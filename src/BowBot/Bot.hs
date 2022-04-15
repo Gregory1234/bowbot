@@ -27,6 +27,7 @@ import BowBot.BotData.RefreshCommand
 import Data.Proxy
 import BowBot.BotData.Cached
 import Control.Concurrent (threadDelay, forkIO)
+import BowBot.Settings.Basic
 
 runBowBot :: IO ()
 runBowBot = do
@@ -119,6 +120,8 @@ backgroundTimeoutRun n x = do
 
 commands :: [AnyCommand]
 commands =
-  [ AnyCommand hypixelStatsCommand
+  [ AnyCommand $ hypixelStatsCommand UserSettings "s"
+  , AnyCommand $ hypixelStatsCommand DefSettings "sd"
+  , AnyCommand $ hypixelStatsCommand AllSettings "sa"
   , AnyCommand refreshDataCommand
   ]

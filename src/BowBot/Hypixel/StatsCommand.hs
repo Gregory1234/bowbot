@@ -8,17 +8,18 @@ import BowBot.Command
 import BowBot.Minecraft.Account
 import BowBot.Minecraft.Arg
 import BowBot.Hypixel.Stats
-import BowBot.Settings.Basic (defSettings)
+import BowBot.Settings.Basic
 import BowBot.Utils (liftMaybe)
 import BowBot.Hypixel.Basic (HypixelApi)
 import Data.Proxy
 import BowBot.BotData.Counter
 import Control.Monad.Error.Class (throwError)
+import Discord.Types (userId)
 
 
-hypixelStatsCommand :: Command (Only (MinecraftArg HypixelBowStats)) (Only (MinecraftResponse HypixelBowStats))
-hypixelStatsCommand = Command (Only (MinecraftArg "name" helper)) CommandInfo
-  { commandName = "s"
+hypixelStatsCommand :: SettingsSource -> String -> Command (Only (MinecraftArg HypixelBowStats)) (Only (MinecraftResponse HypixelBowStats))
+hypixelStatsCommand src name = Command (Only (MinecraftArg "name" helper)) CommandInfo
+  { commandName = name
   , commandDescription = "" -- TODO
   , commandPerms = DefaultLevel
   , commandTimeout = 15
@@ -28,7 +29,9 @@ hypixelStatsCommand = Command (Only (MinecraftArg "name" helper)) CommandInfo
           OldResponse o -> ("", o ++ " (" ++ head mcNames ++ ")")
           DidYouMeanResponse -> ("*Did you mean* ", head mcNames)
           DidYouMeanOldResponse o -> ("*Did you mean* ", o ++ " (" ++ head mcNames ++ ")")
-    hRespond $ didYouMean ++ "**" ++ renderedName ++ "**:\n" ++ showHypixelBowStats defSettings responseValue
+    user <- hEnv envSender
+    settings <- getSettingsFromSource src (userId user)
+    hRespond $ didYouMean ++ "**" ++ renderedName ++ "**:\n" ++ showHypixelBowStats settings responseValue
     -- TODO: update leaderboards
     -- TODO: save if enough wins
   where
