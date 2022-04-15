@@ -53,17 +53,16 @@ instance Cached MinecraftAccount where
           (UUID -> mcUUID, splitOn "," -> mcNames, stringToIsBanned -> Just mcHypixelBow) -> (mcUUID, MinecraftAccount {..})
           (UUID -> mcUUID, splitOn "," -> mcNames, _) -> (mcUUID, MinecraftAccount {mcHypixelBow = NotBanned, ..})
     liftIO $ atomically $ writeTVar cache newValues
-  storeInCacheIndexed accs = do -- TODO: use transactions
-    assertGoodIndexes accs
-    let toQueryParams (_, MinecraftAccount {..}) = (uuidString mcUUID, head mcNames, intercalate "," mcNames, isBannedToString mcHypixelBow) -- TODO: only track changes
-    success <- liftIO $ withDB $ \conn -> (== fromIntegral (length accs)) <$> executeManyLog conn "INSERT INTO `minecraftDEV` (`uuid`, `name`, `names`, `hypixel`) VALUES (?,?,?,?) ON DUPLICATE KEY UPDATE `name`=VALUES(`name`), `names`=VALUES(`names`), `hypixel`=VALUES(`hypixel`)" (map toQueryParams accs)
-    when success $ do
-      cache <- getCache (Proxy @MinecraftAccount)
-      liftIO $ atomically $ modifyTVar cache (insertMany accs)
-    return success
 
 instance CachedIndexed MinecraftAccount where
   cacheIndex = mcUUID
+  storeInCache accs = do -- TODO: use transactions
+    let toQueryParams MinecraftAccount {..} = (uuidString mcUUID, head mcNames, intercalate "," mcNames, isBannedToString mcHypixelBow) -- TODO: only track changes
+    success <- liftIO $ withDB $ \conn -> (== fromIntegral (length accs)) <$> executeManyLog conn "INSERT INTO `minecraftDEV` (`uuid`, `name`, `names`, `hypixel`) VALUES (?,?,?,?) ON DUPLICATE KEY UPDATE `name`=VALUES(`name`), `names`=VALUES(`names`), `hypixel`=VALUES(`hypixel`)" (map toQueryParams accs)
+    when success $ do
+      cache <- getCache (Proxy @MinecraftAccount)
+      liftIO $ atomically $ modifyTVar cache (insertMany (map (\x -> (mcUUID x, x)) accs))
+    return success
 
 instance CachedUpdatable MinecraftAccount where
   updateCache proxy uuids = do

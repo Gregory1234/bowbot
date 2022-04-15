@@ -44,6 +44,8 @@ instance Cached PermissionLevel where
           (fromInteger -> discord, stringToPermissionLevel -> Just level) -> (discord, level)
           (fromInteger -> discord, _) -> (discord, DefaultLevel)
     liftIO $ atomically $ writeTVar cache newValues
+
+instance CachedStorable PermissionLevel where
   storeInCacheIndexed accs = do
     let toQueryParams (did, lvl) = (toInteger did, permissionLevelToString lvl)
     success <- liftIO $ withDB $ \conn -> (== fromIntegral (length accs)) <$> executeManyLog conn "INSERT INTO `permissionsDEV` (`id`, `level`) VALUES (?,?) ON DUPLICATE KEY UPDATE `level`=VALUES(`level`)" (map toQueryParams accs)

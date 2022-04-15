@@ -58,6 +58,8 @@ instance Cached Settings where
             parseBool -> Just sBowHits, parseBool -> Just sBowShots, parseSense -> Just sAccuracy) -> (discord, Settings {..})
           (fromInteger -> discord, _, _, _, _, _, _, _, _, _, _) -> (discord, defSettings)
     liftIO $ atomically $ writeTVar cache newValues
+
+instance CachedStorable Settings where
   storeInCacheIndexed accs = do
     let toQueryParams (d, Settings {..}) = (toInteger d, stringBool sWins, stringBool sLosses, stringSense sWLR, stringSense sWinsUntil, stringSense sBestStreak, stringSense sCurrentStreak, stringSense sBestDailyStreak, stringBool sBowHits, stringBool sBowShots, stringSense sAccuracy)
     success <- liftIO $ withDB $ \conn -> (== fromIntegral (length accs)) <$> executeManyLog conn "INSERT INTO `minecraftDEV` (`discord`, `wins`, `losses`, `wlr`, `winsUntil`, `bestStreak`, `currentStreak`, `bestDailyStreak`, `bowHits`, `bowShots`, `accuracy`) VALUES (?,?,?,?,?,?,?,?,?,?,?) ON DUPLICATE KEY UPDATE `wins`=VALUES(`wins`), `losses`=VALUES(`losses`), `wlr`=VALUES(`wlr`), `winsUntil`=VALUES(`winsUntil`), `bestStreak`=VALUES(`bestStreak`), `currentStreak`=VALUES(`currentStreak`), `bestDailyStreak`=VALUES(`bestDailyStreak`), `bowHits`=VALUES(`bowHits`), `bowShots`=VALUES(`bowShots`), `accuracy`=VALUES(`accuracy`)" (map toQueryParams accs)

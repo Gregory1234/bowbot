@@ -23,17 +23,16 @@ instance Cached InfoField where
     res :: [(String, String)] <- queryLog conn "SELECT `name`, `value` FROM `botInfoDEV`" ()
     let newValues = HM.fromList $ flip fmap res $ \(infoFieldName, infoFieldValue) -> (infoFieldName, InfoField {..})
     liftIO $ atomically $ writeTVar cache newValues
-  storeInCacheIndexed accs = do
-    assertGoodIndexes accs
-    let toQueryParams (_, InfoField {..}) = (infoFieldName, infoFieldValue)
-    success <- liftIO $ withDB $ \conn -> (== fromIntegral (length accs)) <$> executeManyLog conn "INSERT INTO `botInfoDEV` (`name`, `value`) VALUES (?,?) ON DUPLICATE KEY UPDATE `value`=VALUES(`value`)" (map toQueryParams accs)
-    when success $ do
-      cache <- getCache (Proxy @InfoField)
-      liftIO $ atomically $ modifyTVar cache (insertMany accs)
-    return success
 
 instance CachedIndexed InfoField where
   cacheIndex = infoFieldName
+  storeInCache accs = do
+    let toQueryParams InfoField {..} = (infoFieldName, infoFieldValue)
+    success <- liftIO $ withDB $ \conn -> (== fromIntegral (length accs)) <$> executeManyLog conn "INSERT INTO `botInfoDEV` (`name`, `value`) VALUES (?,?) ON DUPLICATE KEY UPDATE `value`=VALUES(`value`)" (map toQueryParams accs)
+    when success $ do
+      cache <- getCache (Proxy @InfoField)
+      liftIO $ atomically $ modifyTVar cache (insertMany $ map (\x -> (infoFieldValue x, x)) accs)
+    return success
 
 hInfoDB :: MonadCache InfoField m => InfoType a -> m a
 hInfoDB InfoType {..} = do

@@ -25,10 +25,13 @@ instance MonadCache c m => MonadCache c (ReaderT r m) where
 class (Eq (CacheIndex a), Hashable (CacheIndex a)) => Cached a where
   type CacheIndex a
   refreshCache :: MonadCache a m => Connection -> proxy a -> m ()
+
+class Cached a => CachedStorable a where
   storeInCacheIndexed :: MonadCache a m => [(CacheIndex a, a)] -> m Bool
 
 class Cached a => CachedIndexed a where
   cacheIndex :: a -> CacheIndex a
+  storeInCache :: MonadCache a m => [a] -> m Bool
 
 class Cached a => CachedUpdatable a where
   updateCache :: (MonadNetwork m, MonadCache a m) => proxy a -> [CacheIndex a] -> m ()
@@ -42,9 +45,6 @@ getFromCache :: (MonadCache a m, Cached a) => proxy a -> CacheIndex a -> m (Mayb
 getFromCache proxy a = do
   m <- getCacheMap proxy
   return $ m HM.!? a
-
-storeInCache :: (MonadCache a m, CachedIndexed a) => [a] -> m Bool
-storeInCache v = storeInCacheIndexed (map (\x -> (cacheIndex x, x)) v)
 
 getCacheMap :: MonadCache a m => proxy a -> m (HM.HashMap (CacheIndex a) a)
 getCacheMap proxy = do

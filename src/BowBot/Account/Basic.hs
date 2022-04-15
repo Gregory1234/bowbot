@@ -36,7 +36,6 @@ instance Cached BowBotAccount where
     let discordsMap = M.map (map (fromIntegral . snd)) $ groupByToMap fst discords
     let newValues = HM.fromList $ flip fmap ids $ \(Only i) -> (i, let (accountSelectedMinecraft, accountMinecrafts) = minecraftsMap M.! i in BowBotAccount { accountId = i, accountDiscords = discordsMap M.! i, ..})
     liftIO $ atomically $ writeTVar cache newValues
-  storeInCacheIndexed _ = undefined -- TODO
     {-assertGoodIndexes accs
     success <- liftIO $ withDB $ \conn -> do
       minecrafts :: [(Integer, String, Bool)] <- queryLog conn "SELECT `id`, `minecraft`, `selected` FROM `peopleMinecraftDEV` WHERE `id` IN ?" (Only (In (map fst accs)))
@@ -55,6 +54,3 @@ instance Cached BowBotAccount where
 
 getBowBotAccountByDiscord :: MonadCache BowBotAccount m => UserId -> m (Maybe BowBotAccount)
 getBowBotAccountByDiscord did = find ((did `elem`) . accountDiscords) . HM.elems <$> getCacheMap (Proxy @BowBotAccount)
-
-instance CachedIndexed BowBotAccount where
-  cacheIndex = accountId
