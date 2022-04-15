@@ -52,6 +52,7 @@ library
       BowBot.Minecraft.Basic
       BowBot.Network.Basic
       BowBot.Network.Class
+      BowBot.Network.ClearLogs
       BowBot.Network.Monad
       BowBot.Perms.Basic
       BowBot.Settings.Basic

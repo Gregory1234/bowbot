@@ -29,6 +29,7 @@ import BowBot.BotData.Cached
 import Control.Concurrent (threadDelay, forkIO)
 import BowBot.Settings.Basic
 import BowBot.Network.Class (hManager)
+import BowBot.Network.ClearLogs
 
 runBowBot :: IO ()
 runBowBot = do
@@ -56,7 +57,10 @@ backgroundMinutely mint = do
     liftIO $ refreshBotData conn bdt
     manager <- hManager
     liftIO $ updateBotData manager bdt
-    -- TODO: clear logs
+    dev <- ifDev False $ return True
+    unless dev $ do
+      hour <- liftIO $ read @Int <$> getTime "%k"
+      when (hour `mod` 8 == 0) clearLogs
     -- TODO: update discords from source
     logInfoDB conn "finished update"
 
@@ -128,4 +132,5 @@ commands =
   , AnyCommand $ hypixelStatsCommand AllSettings "sa"
   , AnyCommand refreshDataCommand
   , AnyCommand updateDataCommand
+  , AnyCommand clearLogsCommand
   ]
