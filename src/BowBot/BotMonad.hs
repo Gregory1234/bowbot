@@ -23,6 +23,7 @@ import Control.Applicative (Alternative)
 import Control.Monad (MonadPlus)
 import BowBot.BotData.Basic
 import BowBot.BotData.Cached (MonadCache)
+import BowBot.BotData.Counter (MonadCounter, Counted)
 
 newtype BotT m a = BotT { runBotT :: BotData -> Manager -> DiscordHandle -> m a }
   deriving (Functor, Applicative, Monad, MonadIO, MonadHoistIO, MonadNetwork, MonadDiscord, MonadError e,
@@ -32,5 +33,7 @@ instance MonadTrans BotT where
   lift f = BotT $ \_ _ _ -> f
 
 deriving via (BotDataT (NetworkT (DiscordHandlerT m))) instance (MonadCache c (BotDataT (NetworkT (DiscordHandlerT m))), MonadIO (BotT m)) => MonadCache c (BotT m)
+
+deriving via (BotDataT (NetworkT (DiscordHandlerT m))) instance (Counted c, MonadCounter c (BotDataT (NetworkT (DiscordHandlerT m))), MonadIO (BotT m)) => MonadCounter c (BotT m)
 
 type Bot = BotT IO

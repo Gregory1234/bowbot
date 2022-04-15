@@ -1,5 +1,6 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE TypeApplications #-}
 
 module BowBot.Hypixel.StatsCommand where
 
@@ -9,6 +10,10 @@ import BowBot.Minecraft.Arg
 import BowBot.Hypixel.Stats
 import BowBot.Settings.Basic (defSettings)
 import BowBot.Utils (liftMaybe)
+import BowBot.Hypixel.Basic (HypixelApi)
+import Data.Proxy
+import BowBot.BotData.Counter
+import Control.Monad.Error.Class (throwError)
 
 
 hypixelStatsCommand :: Command (Only (MinecraftArg HypixelBowStats)) (Only (MinecraftResponse HypixelBowStats))
@@ -27,4 +32,8 @@ hypixelStatsCommand = Command (Only (MinecraftArg "name" helper)) CommandInfo
     -- TODO: update leaderboards
     -- TODO: save if enough wins
   where
-    helper MinecraftAccount {..} = liftMaybe "*The player has never joined Hypixel!*" =<< requestHypixelBowStats mcUUID
+    helper MinecraftAccount {..} = do
+      cv <- tryIncreaseCounter (Proxy @HypixelApi) 1
+      case cv of
+        Nothing -> liftMaybe "*The player has never joined Hypixel!*" =<< requestHypixelBowStats mcUUID
+        Just sec -> throwError $ "*Too many requests! Wait another " ++ show sec ++ " seconds!*"

@@ -47,9 +47,10 @@ runBowBot = do
 
 backgroundMinutely :: Int -> Bot ()
 backgroundMinutely mint = do
+  bdt <- BotT $ \d _ _ -> return d
+  liftIO $ clearBotDataCaches bdt
   when (mint == 0) $ withDB $ \conn -> do
     logInfoDB conn "started update"
-    bdt <- BotT $ \d _ _ -> return d
     liftIO $ updateBotData conn bdt
     -- TODO: clear logs
     -- TODO: update minecrafts and discords from source

@@ -7,7 +7,12 @@ import Data.Aeson.Types (Object, Parser, (.:))
 import BowBot.Network.Class
 import BowBot.Utils
 import BowBot.Network.Basic
+import BowBot.BotData.Counter
 
+data HypixelApi
+
+instance Counted HypixelApi where
+  counterLimit _ = 100
 
 hypixelWithPlayerData :: (MonadNetwork m) => UUID -> (Object -> Parser a) -> m (Maybe a)
 hypixelWithPlayerData (UUID uuid) f = do

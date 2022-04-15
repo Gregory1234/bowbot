@@ -2,6 +2,7 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE StandaloneDeriving #-}
 
 module BowBot.BotData.Basic where
 
@@ -20,12 +21,15 @@ import Control.Applicative (Alternative)
 import Control.Monad (MonadPlus)
 import BowBot.Command.Basic
 import BowBot.Account.Basic
+import BowBot.BotData.Counter
+import BowBot.Hypixel.Basic
   
 data BotData = BotData
   { infoFieldCache :: DatabaseCache InfoField
   , minecraftAccountCache :: DatabaseCache MinecraftAccount
   , permissionCache :: DatabaseCache PermissionLevel
   , bowBotAccountCache :: DatabaseCache BowBotAccount
+  , hypixelApiCounter :: Counter
   }
 
 newtype BotDataT m a = BotDataT { runBotDataT :: BotData -> m a }
@@ -48,3 +52,8 @@ instance MonadIO m => MonadCache BowBotAccount (BotDataT m) where
 instance MonadReader r m => MonadReader r (BotDataT m) where
   ask = BotDataT $ const ask
   local f (BotDataT g) = BotDataT $ local f . g
+
+instance MonadIO m => MonadSimpleCounter HypixelApi (BotDataT m) where
+  getCounter _ = BotDataT $ return . hypixelApiCounter
+
+deriving via (SimpleCounter (BotDataT m)) instance MonadIO m => MonadCounter HypixelApi (BotDataT m)

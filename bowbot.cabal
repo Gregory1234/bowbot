@@ -29,6 +29,7 @@ library
       BowBot.Bot
       BowBot.BotData.Basic
       BowBot.BotData.Cached
+      BowBot.BotData.Counter
       BowBot.BotData.Download
       BowBot.BotData.Info
       BowBot.BotData.RefreshCommand
