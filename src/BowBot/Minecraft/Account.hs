@@ -13,13 +13,16 @@ module BowBot.Minecraft.Account where
 import BowBot.Minecraft.Basic
 import BowBot.BotData.Cached
 import BowBot.DB.Basic (queryLog, executeManyLog, withDB)
-import Data.List.Split (splitOn)
+import Data.List.Split (splitOn, chunksOf)
 import Data.List (intercalate)
 import BowBot.Network.Class
 import Data.Proxy (Proxy(..))
 import Data.Char (toLower)
-import BowBot.Utils (writeTVar, atomically, liftIO, when, modifyTVar)
+import BowBot.Utils (writeTVar, atomically, liftIO, when, modifyTVar, for, fromMaybe, void)
 import qualified Data.HashMap.Strict as HM
+import BowBot.Network.Monad (runNetworkT)
+import Control.Concurrent.Async (mapConcurrently)
+import Data.Maybe (fromJust, catMaybes)
 
 data IsBanned
   = NotBanned
@@ -52,7 +55,7 @@ instance Cached MinecraftAccount where
     liftIO $ atomically $ writeTVar cache newValues
   storeInCacheIndexed accs = do -- TODO: use transactions
     assertGoodIndexes accs
-    let toQueryParams (_, MinecraftAccount {..}) = (uuidString mcUUID, head mcNames, intercalate "," mcNames, isBannedToString mcHypixelBow)
+    let toQueryParams (_, MinecraftAccount {..}) = (uuidString mcUUID, head mcNames, intercalate "," mcNames, isBannedToString mcHypixelBow) -- TODO: only track changes
     success <- liftIO $ withDB $ \conn -> (== fromIntegral (length accs)) <$> executeManyLog conn "INSERT INTO `minecraftDEV` (`uuid`, `name`, `names`, `hypixel`) VALUES (?,?,?,?) ON DUPLICATE KEY UPDATE `name`=VALUES(`name`), `names`=VALUES(`names`), `hypixel`=VALUES(`hypixel`)" (map toQueryParams accs)
     when success $ do
       cache <- getCache (Proxy @MinecraftAccount)
@@ -61,6 +64,16 @@ instance Cached MinecraftAccount where
 
 instance CachedIndexed MinecraftAccount where
   cacheIndex = mcUUID
+
+instance CachedUpdatable MinecraftAccount where
+  updateCache proxy uuids = do
+    manager <- hManager
+    let helper MinecraftAccount {..} = do
+          newNames <- mojangUUIDToNames mcUUID
+          return MinecraftAccount {mcNames = fromMaybe mcNames newNames, ..}
+    chunked <- fmap (chunksOf 10 . catMaybes) $ for uuids $ getFromCache proxy
+    updatedAccounts <- liftIO $ fmap concat $ for chunked $ mapConcurrently (fmap (`runNetworkT` manager) helper)
+    void $ storeInCache updatedAccounts
 
 mcNameToUUID :: (MonadCache MinecraftAccount m, MonadNetwork m) => String -> m (Maybe UUID)
 mcNameToUUID name = do

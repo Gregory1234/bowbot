@@ -12,6 +12,7 @@ import Control.Concurrent.STM.TVar (TVar)
 import Database.MySQL.Simple (Connection)
 import BowBot.Utils (liftIO, readTVar, atomically, MonadIO, assertIO)
 import Control.Monad.Reader (ReaderT(..))
+import BowBot.Network.Class (MonadNetwork)
 
 type DatabaseCache a = TVar (HM.HashMap (CacheIndex a) a)
 
@@ -28,6 +29,14 @@ class (Eq (CacheIndex a), Hashable (CacheIndex a)) => Cached a where
 
 class Cached a => CachedIndexed a where
   cacheIndex :: a -> CacheIndex a
+
+class Cached a => CachedUpdatable a where
+  updateCache :: (MonadNetwork m, MonadCache a m) => proxy a -> [CacheIndex a] -> m ()
+
+updateCacheAll :: (MonadNetwork m, MonadCache a m, CachedUpdatable a) => proxy a -> m ()
+updateCacheAll proxy = do
+  cache <- getCacheMap proxy
+  updateCache proxy $ HM.keys cache
 
 getFromCache :: (MonadCache a m, Cached a) => proxy a -> CacheIndex a -> m (Maybe a)
 getFromCache proxy a = do

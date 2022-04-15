@@ -28,6 +28,7 @@ import Data.Proxy
 import BowBot.BotData.Cached
 import Control.Concurrent (threadDelay, forkIO)
 import BowBot.Settings.Basic
+import BowBot.Network.Class (hManager)
 
 runBowBot :: IO ()
 runBowBot = do
@@ -52,9 +53,11 @@ backgroundMinutely mint = do
   liftIO $ clearBotDataCaches bdt
   when (mint == 0) $ withDB $ \conn -> do
     logInfoDB conn "started update"
-    liftIO $ updateBotData conn bdt
+    liftIO $ refreshBotData conn bdt
+    manager <- hManager
+    liftIO $ updateBotData manager bdt
     -- TODO: clear logs
-    -- TODO: update minecrafts and discords from source
+    -- TODO: update discords from source
     logInfoDB conn "finished update"
 
 onStartup :: Bot ()
@@ -124,4 +127,5 @@ commands =
   , AnyCommand $ hypixelStatsCommand DefSettings "sd"
   , AnyCommand $ hypixelStatsCommand AllSettings "sa"
   , AnyCommand refreshDataCommand
+  , AnyCommand updateDataCommand
   ]
