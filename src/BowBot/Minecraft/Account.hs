@@ -18,11 +18,11 @@ import Data.List (intercalate)
 import BowBot.Network.Class
 import Data.Proxy (Proxy(..))
 import Data.Char (toLower)
-import BowBot.Utils (writeTVar, atomically, liftIO, when, modifyTVar, for, fromMaybe, void)
+import BowBot.Utils
 import qualified Data.HashMap.Strict as HM
 import BowBot.Network.Monad (runNetworkT)
 import Control.Concurrent.Async (mapConcurrently)
-import Data.Maybe (fromJust, catMaybes)
+import Data.Maybe (catMaybes, mapMaybe)
 
 data IsBanned
   = NotBanned
@@ -42,7 +42,7 @@ data MinecraftAccount = MinecraftAccount
   { mcUUID :: UUID
   , mcNames :: [String]
   , mcHypixelBow :: IsBanned
-  } deriving (Show)
+  } deriving (Show, Eq)
 
 instance Cached MinecraftAccount where
   type CacheIndex MinecraftAccount = UUID
@@ -56,9 +56,11 @@ instance Cached MinecraftAccount where
 
 instance CachedIndexed MinecraftAccount where
   cacheIndex = mcUUID
-  storeInCache accs = do -- TODO: use transactions
-    let toQueryParams MinecraftAccount {..} = (uuidString mcUUID, head mcNames, intercalate "," mcNames, isBannedToString mcHypixelBow) -- TODO: only track changes
-    success <- liftIO $ withDB $ \conn -> (== fromIntegral (length accs)) <$> executeManyLog conn "INSERT INTO `minecraftDEV` (`uuid`, `name`, `names`, `hypixel`) VALUES (?,?,?,?) ON DUPLICATE KEY UPDATE `name`=VALUES(`name`), `names`=VALUES(`names`), `hypixel`=VALUES(`hypixel`)" (map toQueryParams accs)
+  storeInCache accs = do
+    cacheMap <- getCacheMap (Proxy @MinecraftAccount)
+    let toQueryParams acc@MinecraftAccount {..} = if acc == cacheMap HM.! mcUUID then Nothing else Just (uuidString mcUUID, head mcNames, intercalate "," mcNames, isBannedToString mcHypixelBow)
+    let queryParams = mapMaybe toQueryParams accs
+    success <- liftIO $ withDB $ \conn -> (>0) <$> executeManyLog conn "INSERT INTO `minecraftDEV` (`uuid`, `name`, `names`, `hypixel`) VALUES (?,?,?,?) ON DUPLICATE KEY UPDATE `name`=VALUES(`name`), `names`=VALUES(`names`), `hypixel`=VALUES(`hypixel`)" queryParams
     when success $ do
       cache <- getCache (Proxy @MinecraftAccount)
       liftIO $ atomically $ modifyTVar cache (insertMany (map (\x -> (mcUUID x, x)) accs))

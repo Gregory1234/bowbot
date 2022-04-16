@@ -13,8 +13,9 @@ import BowBot.Utils
 import qualified Data.HashMap.Strict as HM
 import BowBot.BotData.Cached
 import Data.Proxy
+import Data.Maybe (mapMaybe)
 
-data InfoField = InfoField { infoFieldName :: String, infoFieldValue :: String }
+data InfoField = InfoField { infoFieldName :: String, infoFieldValue :: String } deriving (Show, Eq)
 
 instance Cached InfoField where
   type CacheIndex InfoField = String
@@ -27,8 +28,10 @@ instance Cached InfoField where
 instance CachedIndexed InfoField where
   cacheIndex = infoFieldName
   storeInCache accs = do
-    let toQueryParams InfoField {..} = (infoFieldName, infoFieldValue)
-    success <- liftIO $ withDB $ \conn -> (== fromIntegral (length accs)) <$> executeManyLog conn "INSERT INTO `botInfoDEV` (`name`, `value`) VALUES (?,?) ON DUPLICATE KEY UPDATE `value`=VALUES(`value`)" (map toQueryParams accs)
+    cacheMap <- getCacheMap (Proxy @InfoField)
+    let toQueryParams f@InfoField {..} = if f == cacheMap HM.! infoFieldName then Nothing else Just (infoFieldName, infoFieldValue)
+    let queryParams = mapMaybe toQueryParams accs
+    success <- liftIO $ withDB $ \conn -> (>0) <$> executeManyLog conn "INSERT INTO `botInfoDEV` (`name`, `value`) VALUES (?,?) ON DUPLICATE KEY UPDATE `value`=VALUES(`value`)" queryParams
     when success $ do
       cache <- getCache (Proxy @InfoField)
       liftIO $ atomically $ modifyTVar cache (insertMany $ map (\x -> (infoFieldValue x, x)) accs)

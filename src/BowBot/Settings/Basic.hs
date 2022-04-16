@@ -16,6 +16,7 @@ import qualified Data.HashMap.Strict as HM
 import Data.Proxy
 import BowBot.DB.Basic
 import BowBot.Utils
+import Data.Maybe (mapMaybe)
 
 data BoolSense = Never | WhenSensible | Always deriving (Show, Eq, Ord, Enum)
 
@@ -61,8 +62,10 @@ instance Cached Settings where
 
 instance CachedStorable Settings where
   storeInCacheIndexed accs = do
-    let toQueryParams (d, Settings {..}) = (toInteger d, stringBool sWins, stringBool sLosses, stringSense sWLR, stringSense sWinsUntil, stringSense sBestStreak, stringSense sCurrentStreak, stringSense sBestDailyStreak, stringBool sBowHits, stringBool sBowShots, stringSense sAccuracy)
-    success <- liftIO $ withDB $ \conn -> (== fromIntegral (length accs)) <$> executeManyLog conn "INSERT INTO `minecraftDEV` (`discord`, `wins`, `losses`, `wlr`, `winsUntil`, `bestStreak`, `currentStreak`, `bestDailyStreak`, `bowHits`, `bowShots`, `accuracy`) VALUES (?,?,?,?,?,?,?,?,?,?,?) ON DUPLICATE KEY UPDATE `wins`=VALUES(`wins`), `losses`=VALUES(`losses`), `wlr`=VALUES(`wlr`), `winsUntil`=VALUES(`winsUntil`), `bestStreak`=VALUES(`bestStreak`), `currentStreak`=VALUES(`currentStreak`), `bestDailyStreak`=VALUES(`bestDailyStreak`), `bowHits`=VALUES(`bowHits`), `bowShots`=VALUES(`bowShots`), `accuracy`=VALUES(`accuracy`)" (map toQueryParams accs)
+    cacheMap <- getCacheMap (Proxy @Settings)
+    let toQueryParams (d, set@Settings {..}) = if set == cacheMap HM.! d then Nothing else Just (toInteger d, stringBool sWins, stringBool sLosses, stringSense sWLR, stringSense sWinsUntil, stringSense sBestStreak, stringSense sCurrentStreak, stringSense sBestDailyStreak, stringBool sBowHits, stringBool sBowShots, stringSense sAccuracy)
+    let queryParams = mapMaybe toQueryParams accs
+    success <- liftIO $ withDB $ \conn -> (>0) <$> executeManyLog conn "INSERT INTO `minecraftDEV` (`discord`, `wins`, `losses`, `wlr`, `winsUntil`, `bestStreak`, `currentStreak`, `bestDailyStreak`, `bowHits`, `bowShots`, `accuracy`) VALUES (?,?,?,?,?,?,?,?,?,?,?) ON DUPLICATE KEY UPDATE `wins`=VALUES(`wins`), `losses`=VALUES(`losses`), `wlr`=VALUES(`wlr`), `winsUntil`=VALUES(`winsUntil`), `bestStreak`=VALUES(`bestStreak`), `currentStreak`=VALUES(`currentStreak`), `bestDailyStreak`=VALUES(`bestDailyStreak`), `bowHits`=VALUES(`bowHits`), `bowShots`=VALUES(`bowShots`), `accuracy`=VALUES(`accuracy`)"  queryParams
     when success $ do
       cache <- getCache (Proxy @Settings)
       liftIO $ atomically $ modifyTVar cache (insertMany accs)

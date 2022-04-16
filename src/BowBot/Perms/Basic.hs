@@ -14,6 +14,7 @@ import qualified Data.HashMap.Strict as HM
 import Data.Proxy
 import BowBot.Utils
 import BowBot.DB.Basic (queryLog, withDB, executeManyLog)
+import Data.Maybe (mapMaybe)
 
 data PermissionLevel
   = BanLevel
@@ -47,8 +48,10 @@ instance Cached PermissionLevel where
 
 instance CachedStorable PermissionLevel where
   storeInCacheIndexed accs = do
-    let toQueryParams (did, lvl) = (toInteger did, permissionLevelToString lvl)
-    success <- liftIO $ withDB $ \conn -> (== fromIntegral (length accs)) <$> executeManyLog conn "INSERT INTO `permissionsDEV` (`id`, `level`) VALUES (?,?) ON DUPLICATE KEY UPDATE `level`=VALUES(`level`)" (map toQueryParams accs)
+    cacheMap <- getCacheMap (Proxy @PermissionLevel)
+    let toQueryParams (did, lvl) = if lvl == cacheMap HM.! did then Nothing else Just (toInteger did, permissionLevelToString lvl)
+    let queryParams = mapMaybe toQueryParams accs
+    success <- liftIO $ withDB $ \conn -> (>0) <$> executeManyLog conn "INSERT INTO `permissionsDEV` (`id`, `level`) VALUES (?,?) ON DUPLICATE KEY UPDATE `level`=VALUES(`level`)" queryParams
     when success $ do
       cache <- getCache (Proxy @PermissionLevel)
       liftIO $ atomically $ modifyTVar cache (insertMany accs)
