@@ -49,7 +49,7 @@ instance Cached PermissionLevel where
 instance CachedStorable PermissionLevel where
   storeInCacheIndexed accs = do
     cacheMap <- getCacheMap (Proxy @PermissionLevel)
-    let toQueryParams (did, lvl) = if lvl == cacheMap HM.! did then Nothing else Just (toInteger did, permissionLevelToString lvl)
+    let toQueryParams (did, lvl) = if Just lvl == cacheMap HM.!? did then Nothing else Just (toInteger did, permissionLevelToString lvl)
     let queryParams = mapMaybe toQueryParams accs
     success <- liftIO $ withDB $ \conn -> (>0) <$> executeManyLog conn "INSERT INTO `permissionsDEV` (`id`, `level`) VALUES (?,?) ON DUPLICATE KEY UPDATE `level`=VALUES(`level`)" queryParams
     when success $ do

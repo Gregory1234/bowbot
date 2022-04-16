@@ -24,6 +24,7 @@ import BowBot.Account.Basic
 import BowBot.BotData.Counter
 import BowBot.Hypixel.Basic
 import BowBot.Settings.Basic
+import BowBot.Hypixel.Leaderboard
   
 data BotData = BotData
   { infoFieldCache :: DatabaseCache InfoField
@@ -32,6 +33,7 @@ data BotData = BotData
   , bowBotAccountCache :: DatabaseCache BowBotAccount
   , hypixelApiCounter :: Counter
   , settingsCache :: DatabaseCache Settings
+  , hypixelLeaderboardCache :: DatabaseCache HypixelBowLeaderboardEntry
   }
 
 newtype BotDataT m a = BotDataT { runBotDataT :: BotData -> m a }
@@ -58,6 +60,9 @@ deriving via (SimpleCounter (BotDataT m)) instance MonadIO m => MonadCounter Hyp
 
 instance MonadIO m => MonadCache Settings (BotDataT m) where
   getCache _ = BotDataT $ return . settingsCache
+
+instance MonadIO m => MonadCache HypixelBowLeaderboardEntry (BotDataT m) where
+  getCache _ = BotDataT $ return . hypixelLeaderboardCache
 
 instance MonadReader r m => MonadReader r (BotDataT m) where
   ask = BotDataT $ const ask

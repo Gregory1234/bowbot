@@ -31,7 +31,7 @@ requestHypixelBowStats uuid = hypixelWithPlayerData uuid $ \o -> do
     duelsStats <- stats .:? "Duels"
     bowWins <- fromMaybe 0 <$> for duelsStats (\x -> x .:? "bow_duel_wins" .!= 0)
     bowLosses <- fromMaybe 0 <$> for duelsStats (\x -> x .:? "bow_duel_losses" .!= 0)
-    bestWinstreak <- (\a -> if a == Just 0 then Nothing else a) <$> for duelsStats (\x -> x .:? "best_winstreak_mode_bow_duel" .!= 0)
+    bestWinstreak <- (\a -> if a == Just 0 && bowWins > 0 then Nothing else a) <$> for duelsStats (\x -> x .:? "best_winstreak_mode_bow_duel" .!= 0)
     currentWinstreak <- (\a -> if isNothing bestWinstreak then Nothing else a) <$> for duelsStats (\x -> x .:? "current_bow_winstreak" .!= 0)
     bestDailyWinstreak <- (\a -> if isNothing bestWinstreak then Nothing else a) <$> for duelsStats (\x -> x .:? "duels_winstreak_best_bow_duel" .!= 0)
     bowHits <- fromMaybe 0 <$> for duelsStats (\x -> x .:? "bow_duel_bow_hits" .!= 0)

@@ -29,7 +29,7 @@ instance CachedIndexed InfoField where
   cacheIndex = infoFieldName
   storeInCache accs = do
     cacheMap <- getCacheMap (Proxy @InfoField)
-    let toQueryParams f@InfoField {..} = if f == cacheMap HM.! infoFieldName then Nothing else Just (infoFieldName, infoFieldValue)
+    let toQueryParams f@InfoField {..} = if Just f == cacheMap HM.!? infoFieldName then Nothing else Just (infoFieldName, infoFieldValue)
     let queryParams = mapMaybe toQueryParams accs
     success <- liftIO $ withDB $ \conn -> (>0) <$> executeManyLog conn "INSERT INTO `botInfoDEV` (`name`, `value`) VALUES (?,?) ON DUPLICATE KEY UPDATE `value`=VALUES(`value`)" queryParams
     when success $ do

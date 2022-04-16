@@ -45,6 +45,7 @@ library
       BowBot.HoistIO
       BowBot.Hypixel.Basic
       BowBot.Hypixel.Division
+      BowBot.Hypixel.Leaderboard
       BowBot.Hypixel.Stats
       BowBot.Hypixel.StatsCommand
       BowBot.Minecraft.Account

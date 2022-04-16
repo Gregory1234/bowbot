@@ -9,13 +9,14 @@ import BowBot.Minecraft.Account
 import BowBot.Minecraft.Arg
 import BowBot.Hypixel.Stats
 import BowBot.Settings.Basic
-import BowBot.Utils (liftMaybe)
+import BowBot.Utils
 import BowBot.Hypixel.Basic (HypixelApi)
 import Data.Proxy
 import BowBot.BotData.Counter
 import Control.Monad.Error.Class (throwError)
 import Discord.Types (userId)
-
+import BowBot.Hypixel.Leaderboard
+import BowBot.BotData.Cached (storeInCacheIndexed, getFromCache, storeInCache)
 
 hypixelStatsCommand :: SettingsSource -> String -> Command (Only (MinecraftArg HypixelBowStats)) (Only (MinecraftResponse HypixelBowStats))
 hypixelStatsCommand src name = Command (Only (MinecraftArg "name" helper)) CommandInfo
@@ -23,7 +24,7 @@ hypixelStatsCommand src name = Command (Only (MinecraftArg "name" helper)) Comma
   , commandDescription = "" -- TODO
   , commandPerms = DefaultLevel
   , commandTimeout = 15
-  } $ withArgs $ \(Only MinecraftResponse {responseAccount = MinecraftAccount {..}, ..}) -> do
+  } $ withArgs $ \(Only MinecraftResponse {responseAccount = responseAccount@MinecraftAccount {..}, ..}) -> do
     let (didYouMean, renderedName) = case responseType of
           JustResponse -> ("", head mcNames)
           OldResponse o -> ("", o ++ " (" ++ head mcNames ++ ")")
@@ -32,8 +33,14 @@ hypixelStatsCommand src name = Command (Only (MinecraftArg "name" helper)) Comma
     user <- hEnv envSender
     settings <- getSettingsFromSource src (userId user)
     hRespond $ didYouMean ++ "**" ++ renderedName ++ "**:\n" ++ showHypixelBowStats settings responseValue
-    -- TODO: update leaderboards
-    -- TODO: save if enough wins
+    saved <- getFromCache (Proxy @MinecraftAccount) mcUUID
+    case saved of
+      Nothing | bowWins responseValue >= 50 -> do
+        a <- storeInCache [responseAccount]
+        when a $ void $ storeInCacheIndexed [(mcUUID, hypixelBowStatsToLeaderboards responseValue)]
+      Just MinecraftAccount { mcHypixelBow = NotBanned} -> do
+        void $ storeInCacheIndexed [(mcUUID, hypixelBowStatsToLeaderboards responseValue)]
+      _ -> pure ()
   where
     helper MinecraftAccount {..} = do
       cv <- tryIncreaseCounter (Proxy @HypixelApi) 1
