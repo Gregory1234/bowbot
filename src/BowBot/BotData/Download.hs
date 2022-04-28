@@ -10,7 +10,8 @@ import BowBot.Account.Basic
 import Control.Concurrent.STM (STM, newTVar, atomically)
 import Data.HashMap.Strict (empty)
 import Database.MySQL.Simple (Connection)
-import BowBot.BotData.Cached (refreshCache, updateCacheAll)
+import BowBot.BotData.Cached
+import BowBot.BotData.CachedSingle
 import Data.Proxy
 import BowBot.DB.Basic (withDB)
 import BowBot.Command.Basic (PermissionLevel)
@@ -21,6 +22,7 @@ import Network.HTTP.Conduit (Manager)
 import BowBot.Network.Monad (runNetworkT)
 import BowBot.Hypixel.Leaderboard
 import BowBot.Discord.Roles
+import BowBot.Hypixel.Guild
 
 
 emptyBotData :: STM BotData
@@ -33,6 +35,7 @@ emptyBotData = do
   settingsCache <- newTVar empty
   hypixelLeaderboardCache <- newTVar empty
   savedRolesCache <- newTVar empty
+  hypixelGuildMembersCache <- newCachedData
   return BotData {..}
 
 refreshBotData :: Connection -> BotData -> IO ()
@@ -52,6 +55,7 @@ updateBotData manager bdt = flip runNetworkT manager $ flip runBotDataT bdt $ do
 clearBotDataCaches :: BotData -> IO ()
 clearBotDataCaches bdt = flip runBotDataT bdt $ do
   clearCounter (Proxy @HypixelApi)
+  clearCacheSingle (Proxy @HypixelGuildMembers)
 
 downloadBotData :: IO BotData
 downloadBotData = do

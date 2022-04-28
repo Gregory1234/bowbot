@@ -3,8 +3,6 @@ module BowBot.HoistIO where
 import Control.Monad.Reader (ReaderT(..))
 import Control.Monad.IO.Class (MonadIO)
 
-
-
 class MonadIO m => MonadHoistIO m where
   hoistIO :: (IO a -> IO b) -> m a -> m b
   hoistIOWithArg :: ((c -> IO a) -> IO b) -> (c -> m a) -> m b

@@ -25,6 +25,8 @@ import BowBot.Command.Args
 import Control.Monad.Except (ExceptT(..), runExceptT)
 import BowBot.BotData.Basic
 import BowBot.BotData.Cached (MonadCache)
+import BowBot.BotData.Counter (MonadCounter, Counted)
+import BowBot.BotData.CachedSingle (MonadCacheSingle)
 import Data.Coerce (coerce)
 
 data CommandEnvironment args = CommandEnvironment
@@ -50,6 +52,10 @@ newtype CommandHandler args a = CommandHandler { runCommandHandler :: CommandEnv
   deriving (Functor, Applicative, Monad, MonadIO, MonadNetwork, MonadDiscord) via (ReaderT (CommandEnvironment args) Bot)
 
 deriving via (ReaderT (CommandEnvironment args) Bot) instance (MonadCache c Bot, MonadIO (CommandHandler args)) => MonadCache c (CommandHandler args)
+
+deriving via (ReaderT (CommandEnvironment args) Bot) instance (Counted c, MonadCounter c Bot, MonadIO (CommandHandler args)) => MonadCounter c (CommandHandler args)
+
+deriving via (ReaderT (CommandEnvironment args) Bot) instance (MonadCacheSingle c Bot, MonadIO (CommandHandler args)) => MonadCacheSingle c (CommandHandler args)
 
 hEnv :: (CommandEnvironment args -> v) -> CommandHandler args v
 hEnv f = CommandHandler $ \e _ _ -> return $ f e 

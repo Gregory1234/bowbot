@@ -22,8 +22,9 @@ import BowBot.Discord.Class (MonadDiscord)
 import Control.Monad.Reader (ReaderT(..), MonadReader)
 import Control.Applicative (Alternative)
 import BowBot.BotData.Basic
-import BowBot.BotData.Cached (MonadCache)
+import BowBot.BotData.Cached
 import BowBot.BotData.Counter
+import BowBot.BotData.CachedSingle
 
 data ArgsParserContext = ArgsParserContext { argsParserSender :: User, argsParserChannel :: ChannelId }
 
@@ -34,6 +35,8 @@ newtype ArgsParser a = ArgsParser { runArgsParser :: ArgsParserContext -> BotDat
 deriving via (ReaderT ArgsParserContext (BotT (ExceptT String IO))) instance (MonadCache c (BotT (ExceptT String IO))) => MonadCache c ArgsParser
 
 deriving via (ReaderT ArgsParserContext (BotT (ExceptT String IO))) instance (Counted c, MonadCounter c (BotT (ExceptT String IO))) => MonadCounter c ArgsParser
+
+deriving via (ReaderT ArgsParserContext (BotT (ExceptT String IO))) instance (MonadCacheSingle c (BotT (ExceptT String IO))) => MonadCacheSingle c ArgsParser
 
 class CommandArgs a v | a -> v where
   parseArgsFromStrings :: a -> [String] -> ArgsParser v

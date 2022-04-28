@@ -17,13 +17,18 @@ import Data.List.Split (splitOn)
 import BowBot.Utils
 import BowBot.Discord.Class
 import BowBot.BotData.Cached
+import BowBot.BotData.CachedSingle
+import BowBot.BotData.Counter
 import BowBot.Account.Basic
 import Data.Proxy
 import qualified Data.HashMap.Strict as HM
 import Data.Maybe (mapMaybe)
 import qualified Discord.Requests as R
 import Data.List ((\\), intersect)
-import BowBot.DB.Basic (queryLog, logError, logInfo)
+import BowBot.DB.Basic (queryLog, logError)
+import BowBot.Hypixel.Guild
+import BowBot.Network.Class (MonadNetwork)
+import BowBot.Hypixel.Basic
 
 
 
@@ -86,10 +91,29 @@ updateRolesSaved gmem = do
   gid <- hInfoDB discordGuildIdInfo
   addRemoveDiscordRoles gid gmem (map snd $ M.toList savedRolesAll) savedRoles
 
-updateRoles :: (MonadDiscord m, MonadCache InfoField m, MonadCache HypixelBowLeaderboardEntry m, MonadCache SavedRoles m) => GuildMember -> Maybe BowBotAccount -> m ()
+updateRolesMember :: (MonadNetwork m, MonadDiscord m, MonadCache InfoField m, MonadCache HypixelBowLeaderboardEntry m, MonadCacheSingle HypixelGuildMembers m, MonadCounter HypixelApi m) => GuildMember -> Maybe BowBotAccount -> m ()
+updateRolesMember gmem (Just BowBotAccount {..}) = do
+  m <- getHypixelGuildMembers
+  let a = case m of
+        CacheBusy -> Nothing
+        CacheFailed -> Nothing
+        CacheOld a -> Just a
+        CacheFresh a -> Just a
+  for_ a $ \(HypixelGuildMembers members) -> do
+    let isMember = any (`elem` map fst (M.toList members)) accountMinecrafts
+    memberRole <- hInfoDB memberRoleInfo
+    visitorRole <- hInfoDB visitorRoleInfo
+    let expectedRole = if isMember then memberRole else visitorRole
+    gid <- hInfoDB discordGuildIdInfo
+    addRemoveDiscordRoles gid gmem [memberRole, visitorRole] [expectedRole]
+updateRolesMember gmem Nothing = do
+  pure () -- TODO
+
+updateRoles :: (MonadNetwork m, MonadDiscord m, MonadCache InfoField m, MonadCache HypixelBowLeaderboardEntry m, MonadCache SavedRoles m, MonadCacheSingle HypixelGuildMembers m, MonadCounter HypixelApi m) => GuildMember -> Maybe BowBotAccount -> m ()
 updateRoles gmem acc = do
   updateRolesSaved gmem
   updateRolesDivisionTitle gmem acc
+  updateRolesMember gmem acc
 
 discordGuildMembers :: MonadDiscord m => GuildId -> m [GuildMember]
 discordGuildMembers gid = do
@@ -100,7 +124,7 @@ discordGuildMembers gid = do
       return []
     Right m -> return m
 
-updateRolesAll :: (MonadDiscord m, MonadCache InfoField m, MonadCache HypixelBowLeaderboardEntry m, MonadCache BowBotAccount m, MonadCache SavedRoles m) => m ()
+updateRolesAll :: (MonadNetwork m, MonadDiscord m, MonadCache InfoField m, MonadCache HypixelBowLeaderboardEntry m, MonadCache BowBotAccount m, MonadCache SavedRoles m, MonadCacheSingle HypixelGuildMembers m, MonadCounter HypixelApi m) => m ()
 updateRolesAll = do
   gid <- hInfoDB discordGuildIdInfo
   mems <- discordGuildMembers gid

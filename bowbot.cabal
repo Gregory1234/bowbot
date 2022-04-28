@@ -29,6 +29,7 @@ library
       BowBot.Bot
       BowBot.BotData.Basic
       BowBot.BotData.Cached
+      BowBot.BotData.CachedSingle
       BowBot.BotData.Counter
       BowBot.BotData.Download
       BowBot.BotData.Info
@@ -47,6 +48,7 @@ library
       BowBot.HoistIO
       BowBot.Hypixel.Basic
       BowBot.Hypixel.Division
+      BowBot.Hypixel.Guild
       BowBot.Hypixel.Leaderboard
       BowBot.Hypixel.Stats
       BowBot.Hypixel.StatsCommand
