@@ -25,6 +25,7 @@ import BowBot.BotData.Counter
 import BowBot.Hypixel.Basic
 import BowBot.Settings.Basic
 import BowBot.Hypixel.Leaderboard
+import BowBot.Discord.Roles
   
 data BotData = BotData
   { infoFieldCache :: DatabaseCache InfoField
@@ -34,6 +35,7 @@ data BotData = BotData
   , hypixelApiCounter :: Counter
   , settingsCache :: DatabaseCache Settings
   , hypixelLeaderboardCache :: DatabaseCache HypixelBowLeaderboardEntry
+  , savedRolesCache :: DatabaseCache SavedRoles
   }
 
 newtype BotDataT m a = BotDataT { runBotDataT :: BotData -> m a }
@@ -63,6 +65,9 @@ instance MonadIO m => MonadCache Settings (BotDataT m) where
 
 instance MonadIO m => MonadCache HypixelBowLeaderboardEntry (BotDataT m) where
   getCache _ = BotDataT $ return . hypixelLeaderboardCache
+
+instance MonadIO m => MonadCache SavedRoles (BotDataT m) where
+  getCache _ = BotDataT $ return . savedRolesCache
 
 instance MonadReader r m => MonadReader r (BotDataT m) where
   ask = BotDataT $ const ask

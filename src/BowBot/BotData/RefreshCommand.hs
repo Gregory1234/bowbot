@@ -13,6 +13,7 @@ refreshDataCommand = Command () CommandInfo
   , commandPerms = AdminLevel
   , commandTimeout = 120
   } $ withArgs $ \() -> do
+    hRespond "Received"
     bdt <- CommandHandler $ \_ d _ -> return d
     liftIO $ withDB $ \conn -> refreshBotData conn bdt
     hRespond "Done"
@@ -24,6 +25,7 @@ updateDataCommand = Command () CommandInfo
   , commandPerms = AdminLevel
   , commandTimeout = 120
   } $ withArgs $ \() -> do
+    hRespond "Received"
     bdt <- CommandHandler $ \_ d _ -> return d
     liftIO $ withDB $ \conn -> refreshBotData conn bdt
     manager <- hManager

@@ -14,9 +14,12 @@ import BowBot.Hypixel.Basic (HypixelApi)
 import Data.Proxy
 import BowBot.BotData.Counter
 import Control.Monad.Error.Class (throwError)
-import Discord.Types (userId)
+import Discord.Types
 import BowBot.Hypixel.Leaderboard
 import BowBot.BotData.Cached (storeInCacheIndexed, getFromCache, storeInCache)
+import BowBot.BotData.Info
+import BowBot.Discord.Roles
+import BowBot.Account.Basic
 
 hypixelStatsCommand :: SettingsSource -> String -> Command (Only (MinecraftArg HypixelBowStats)) (Only (MinecraftResponse HypixelBowStats))
 hypixelStatsCommand src name = Command (Only (MinecraftArg "name" helper)) CommandInfo
@@ -41,6 +44,10 @@ hypixelStatsCommand src name = Command (Only (MinecraftArg "name" helper)) Comma
       Just MinecraftAccount { mcHypixelBow = NotBanned} -> do
         void $ storeInCacheIndexed [(mcUUID, hypixelBowStatsToLeaderboards responseValue)]
       _ -> pure ()
+    gid <- hInfoDB discordGuildIdInfo
+    gmems <- discordGuildMembers gid
+    acc' <- getBowBotAccountByMinecraft mcUUID
+    for_ acc' $ \acc -> for_ gmems $ \gmem -> when (maybe 0 userId (memberUser gmem) `elem` accountDiscords acc) $ updateRolesDivisionTitle gmem (Just acc)
   where
     helper MinecraftAccount {..} = do
       cv <- tryIncreaseCounter (Proxy @HypixelApi) 1

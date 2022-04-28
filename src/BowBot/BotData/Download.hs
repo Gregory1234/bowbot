@@ -20,6 +20,7 @@ import BowBot.Settings.Basic
 import Network.HTTP.Conduit (Manager)
 import BowBot.Network.Monad (runNetworkT)
 import BowBot.Hypixel.Leaderboard
+import BowBot.Discord.Roles
 
 
 emptyBotData :: STM BotData
@@ -31,6 +32,7 @@ emptyBotData = do
   hypixelApiCounter <- newCounter
   settingsCache <- newTVar empty
   hypixelLeaderboardCache <- newTVar empty
+  savedRolesCache <- newTVar empty
   return BotData {..}
 
 refreshBotData :: Connection -> BotData -> IO ()
@@ -41,6 +43,7 @@ refreshBotData conn bdt = flip runBotDataT bdt $ do
   refreshCache conn (Proxy @BowBotAccount)
   refreshCache conn (Proxy @Settings)
   refreshCache conn (Proxy @HypixelBowLeaderboardEntry)
+  refreshCache conn (Proxy @SavedRoles)
 
 updateBotData :: Manager -> BotData -> IO ()
 updateBotData manager bdt = flip runNetworkT manager $ flip runBotDataT bdt $ do

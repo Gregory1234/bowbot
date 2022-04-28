@@ -8,7 +8,7 @@ import BowBot.Utils
 import Control.Exception.Base (evaluate)
 
 
-class Monad m => MonadDiscord m where
+class MonadIO m => MonadDiscord m where
   liftDiscord :: DiscordHandler a -> m a
 
 instance MonadDiscord m => MonadDiscord (ReaderT r m) where

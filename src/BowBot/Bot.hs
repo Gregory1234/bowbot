@@ -30,6 +30,8 @@ import Control.Concurrent (threadDelay, forkIO)
 import BowBot.Settings.Basic
 import BowBot.Network.Class (hManager)
 import BowBot.Network.ClearLogs
+import BowBot.Discord.Roles
+import BowBot.Discord.RolesCommand
 
 runBowBot :: IO ()
 runBowBot = do
@@ -62,6 +64,7 @@ backgroundMinutely mint = do
       hour <- liftIO $ read @Int <$> getTime "%k"
       when (hour `mod` 8 == 0) clearLogs
     -- TODO: update discords from source
+    updateRolesAll
     logInfoDB conn "finished update"
 
 onStartup :: Bot ()
@@ -133,4 +136,5 @@ commands =
   , AnyCommand refreshDataCommand
   , AnyCommand updateDataCommand
   , AnyCommand clearLogsCommand
+  , AnyCommand updateRolesCommand
   ]

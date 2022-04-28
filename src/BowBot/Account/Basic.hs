@@ -39,3 +39,6 @@ instance Cached BowBotAccount where
 
 getBowBotAccountByDiscord :: MonadCache BowBotAccount m => UserId -> m (Maybe BowBotAccount)
 getBowBotAccountByDiscord did = find ((did `elem`) . accountDiscords) . HM.elems <$> getCacheMap (Proxy @BowBotAccount)
+
+getBowBotAccountByMinecraft :: MonadCache BowBotAccount m => UUID -> m (Maybe BowBotAccount)
+getBowBotAccountByMinecraft uuid = find ((uuid `elem`) . accountMinecrafts) . HM.elems <$> getCacheMap (Proxy @BowBotAccount)
