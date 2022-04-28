@@ -31,7 +31,7 @@ import BowBot.Settings.Basic
 import BowBot.Network.Class (hManager)
 import BowBot.Network.ClearLogs
 import BowBot.Discord.Roles
-import BowBot.Discord.RolesCommand
+import BowBot.Discord.Commands
 
 runBowBot :: IO ()
 runBowBot = do
@@ -137,4 +137,5 @@ commands =
   , AnyCommand updateDataCommand
   , AnyCommand clearLogsCommand
   , AnyCommand updateRolesCommand
+  , AnyCommand updateDiscordsCommand
   ]

@@ -20,6 +20,7 @@ import BowBot.BotData.Cached (storeInCacheIndexed, getFromCache, storeInCache)
 import BowBot.BotData.Info
 import BowBot.Discord.Roles
 import BowBot.Account.Basic
+import BowBot.Discord.Utils (discordGuildMembers)
 
 hypixelStatsCommand :: SettingsSource -> String -> Command (Only (MinecraftArg HypixelBowStats)) (Only (MinecraftResponse HypixelBowStats))
 hypixelStatsCommand src name = Command (Only (MinecraftArg "name" helper)) CommandInfo

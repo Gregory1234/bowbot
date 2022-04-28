@@ -23,6 +23,7 @@ import BowBot.Network.Monad (runNetworkT)
 import BowBot.Hypixel.Leaderboard
 import BowBot.Discord.Roles
 import BowBot.Hypixel.Guild
+import BowBot.Discord.Account
 
 
 emptyBotData :: STM BotData
@@ -36,6 +37,7 @@ emptyBotData = do
   hypixelLeaderboardCache <- newTVar empty
   savedRolesCache <- newTVar empty
   hypixelGuildMembersCache <- newCachedData
+  discordAccountsCache <- newTVar empty
   return BotData {..}
 
 refreshBotData :: Connection -> BotData -> IO ()
@@ -47,10 +49,11 @@ refreshBotData conn bdt = flip runBotDataT bdt $ do
   refreshCache conn (Proxy @Settings)
   refreshCache conn (Proxy @HypixelBowLeaderboardEntry)
   refreshCache conn (Proxy @SavedRoles)
+  refreshCache conn (Proxy @DiscordAccount)
 
 updateBotData :: Manager -> BotData -> IO ()
 updateBotData manager bdt = flip runNetworkT manager $ flip runBotDataT bdt $ do
-  updateCacheAll (Proxy @MinecraftAccount)
+  updateCacheAll (Proxy @MinecraftAccount) -- TODO: this should also update discords, but it can't right now
 
 clearBotDataCaches :: BotData -> IO ()
 clearBotDataCaches bdt = flip runBotDataT bdt $ do

@@ -40,11 +40,13 @@ library
       BowBot.Command.Basic
       BowBot.Command.Handler
       BowBot.DB.Basic
+      BowBot.Discord.Account
       BowBot.Discord.Class
+      BowBot.Discord.Commands
       BowBot.Discord.DiscordNFData
       BowBot.Discord.Monad
       BowBot.Discord.Roles
-      BowBot.Discord.RolesCommand
+      BowBot.Discord.Utils
       BowBot.HoistIO
       BowBot.Hypixel.Basic
       BowBot.Hypixel.Division

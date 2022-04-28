@@ -14,8 +14,7 @@ import BowBot.Hypixel.Leaderboard
 import Discord.Types
 import BowBot.BotData.Info
 import Data.List.Split (splitOn)
-import BowBot.Utils
-import BowBot.Discord.Class
+import BowBot.Discord.Utils
 import BowBot.BotData.Cached
 import BowBot.BotData.CachedSingle
 import BowBot.BotData.Counter
@@ -25,7 +24,7 @@ import qualified Data.HashMap.Strict as HM
 import Data.Maybe (mapMaybe)
 import qualified Discord.Requests as R
 import Data.List ((\\), intersect)
-import BowBot.DB.Basic (queryLog, logError)
+import BowBot.DB.Basic (queryLog)
 import BowBot.Hypixel.Guild
 import BowBot.Network.Class (MonadNetwork)
 import BowBot.Hypixel.Basic
@@ -114,15 +113,6 @@ updateRoles gmem acc = do
   updateRolesSaved gmem
   updateRolesDivisionTitle gmem acc
   updateRolesMember gmem acc
-
-discordGuildMembers :: MonadDiscord m => GuildId -> m [GuildMember]
-discordGuildMembers gid = do
-  members <- call $ R.ListGuildMembers gid R.GuildMembersTiming { R.guildMembersTimingLimit = Just 500, R.guildMembersTimingAfter = Nothing } -- TODO: what if there are more?
-  case members of
-    Left e -> do
-      logError (show e)
-      return []
-    Right m -> return m
 
 updateRolesAll :: (MonadNetwork m, MonadDiscord m, MonadCache InfoField m, MonadCache HypixelBowLeaderboardEntry m, MonadCache BowBotAccount m, MonadCache SavedRoles m, MonadCacheSingle HypixelGuildMembers m, MonadCounter HypixelApi m) => m ()
 updateRolesAll = do
