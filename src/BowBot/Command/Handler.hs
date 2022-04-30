@@ -14,68 +14,57 @@ import BowBot.Utils
 import Discord
 import qualified Discord.Requests as R
 import Network.HTTP.Conduit (Manager)
-import BowBot.Network.Class (MonadNetwork, hManager)
+import BowBot.Network.Class (MonadNetwork)
 import BowBot.Discord.Class
 import Discord.Types
-import Control.Monad.Reader (ReaderT(..), ask)
+import Control.Monad.Reader (ReaderT(..))
 import BowBot.BotMonad
 import Data.Text.Encoding (encodeUtf8)
 import BowBot.Discord.DiscordNFData ()
-import BowBot.Command.Args
-import Control.Monad.Except (ExceptT(..), runExceptT)
 import BowBot.BotData.Basic
 import BowBot.BotData.Cached (MonadCache)
 import BowBot.BotData.Counter (MonadCounter, Counted)
 import BowBot.BotData.CachedSingle (MonadCacheSingle)
-import Data.Coerce (coerce)
 
-data CommandEnvironment args = CommandEnvironment
+newtype CommandArgs = CommandMessageArgs [String]
+
+data CommandEnvironment = CommandEnvironment
   { envSender :: User
   , envSenderMember :: Maybe GuildMember
   , envChannel :: ChannelId
-  , envRespond :: String -> CommandHandler args ()
-  , envRespondFile :: String -> String -> CommandHandler args ()
-  , envArgs :: BotT (ExceptT String IO) args
+  , envRespond :: String -> CommandHandler ()
+  , envRespondFile :: String -> String -> CommandHandler ()
+  , envArgs :: CommandArgs
   }
 
-commandEnvFromMessage :: CommandArgs desc v => desc -> Message -> CommandEnvironment v
-commandEnvFromMessage p m = CommandEnvironment
+commandEnvFromMessage :: Message -> CommandEnvironment
+commandEnvFromMessage m = CommandEnvironment
   { envSender = messageAuthor m
   , envSenderMember = messageMember m
   , envChannel = messageChannelId m
   , envRespond = call_ . R.CreateMessage (messageChannelId m) . pack
   , envRespondFile = \n s -> call_ $ R.CreateMessageDetailed (messageChannelId m) def { R.messageDetailedFile = Just (pack n, encodeUtf8 $ pack s) }
-  , envArgs = coerce $ flip runArgsParser ArgsParserContext { argsParserSender = messageAuthor m, argsParserChannel = messageChannelId m } $ parseArgsFromStrings p (tail $ words $ unpack $ messageContent m)
+  , envArgs = CommandMessageArgs $ tail $ words $ unpack $ messageContent m
   }
 
-newtype CommandHandler args a = CommandHandler { runCommandHandler :: CommandEnvironment args -> BotData -> Manager -> DiscordHandler a }
-  deriving (Functor, Applicative, Monad, MonadIO, MonadNetwork, MonadDiscord) via (ReaderT (CommandEnvironment args) Bot)
+newtype CommandHandler a = CommandHandler { runCommandHandler :: CommandEnvironment -> BotData -> Manager -> DiscordHandler a }
+  deriving (Functor, Applicative, Monad, MonadIO, MonadNetwork, MonadDiscord) via (ReaderT CommandEnvironment Bot)
 
-deriving via (ReaderT (CommandEnvironment args) Bot) instance (MonadCache c Bot, MonadIO (CommandHandler args)) => MonadCache c (CommandHandler args)
+deriving via (ReaderT CommandEnvironment Bot) instance (MonadCache c Bot, MonadIO CommandHandler) => MonadCache c CommandHandler
 
-deriving via (ReaderT (CommandEnvironment args) Bot) instance (Counted c, MonadCounter c Bot, MonadIO (CommandHandler args)) => MonadCounter c (CommandHandler args)
+deriving via (ReaderT CommandEnvironment Bot) instance (Counted c, MonadCounter c Bot, MonadIO CommandHandler) => MonadCounter c CommandHandler
 
-deriving via (ReaderT (CommandEnvironment args) Bot) instance (MonadCacheSingle c Bot, MonadIO (CommandHandler args)) => MonadCacheSingle c (CommandHandler args)
+deriving via (ReaderT CommandEnvironment Bot) instance (MonadCacheSingle c Bot, MonadIO CommandHandler) => MonadCacheSingle c CommandHandler
 
-hEnv :: (CommandEnvironment args -> v) -> CommandHandler args v
+hEnv :: (CommandEnvironment -> v) -> CommandHandler v
 hEnv f = CommandHandler $ \e _ _ -> return $ f e 
 
-hRespond :: forall args. String -> CommandHandler args ()
+hRespond :: String -> CommandHandler ()
 hRespond m = do
   res <- hEnv envRespond
   res m
 
-hRespondFile :: forall args. String -> String -> CommandHandler args ()
+hRespondFile :: String -> String -> CommandHandler ()
 hRespondFile n m = do
   res <- hEnv envRespondFile
   res n m
-
-withArgs :: (args -> CommandHandler args ()) -> CommandHandler args ()
-withArgs f = do
-  maybeArgs' <- hEnv envArgs
-  maybeArgsIO <- fmap runExceptT $ runBotT maybeArgs' <$> CommandHandler (\_ d _ -> return d) <*> hManager <*> liftDiscord ask
-  maybeArgs <- liftIO maybeArgsIO
-  case maybeArgs of
-    Left err -> hRespond err
-    Right args -> f args
-    

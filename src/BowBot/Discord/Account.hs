@@ -32,7 +32,6 @@ instance CachedIndexed DiscordAccount where
   cacheIndex = discordId
   storeInCache accs = do
     cacheMap <- getCacheMap (Proxy @DiscordAccount)
-    liftIO $ putStrLn $ show accs ++ "\n\n\n" ++ show cacheMap
     let toQueryParams acc@DiscordAccount {..} = if Just acc == cacheMap HM.!? discordId then Nothing else Just (toInteger discordId, discordName, discordDiscrim, discordNickname)
     let queryParams = mapMaybe toQueryParams accs
     success <- liftIO $ withDB $ \conn -> (>0) <$> executeManyLog conn "INSERT INTO `discordDEV` (`id`, `name`, `discriminator`, `nickname`) VALUES (?,?,?,?) ON DUPLICATE KEY UPDATE `name`=VALUES(`name`), `discriminator`=VALUES(`discriminator`), `nickname`=VALUES(`nickname`)" queryParams

@@ -13,15 +13,10 @@ import Discord.Types
 import BowBot.Network.Class (hManager)
 import BowBot.Discord.Class (liftDiscord)
   
-data Command desc args = Command { commandArgsDescription :: desc, commandInfo :: CommandInfo, commandHandler :: CommandHandler args () }
+data Command = Command { commandInfo :: CommandInfo, commandHandler :: CommandHandler () }
 
-data AnyCommand = forall desc args. (CommandArgs desc args) => AnyCommand { anyCommand :: Command desc args }
-
-anyCommandInfo :: AnyCommand -> CommandInfo
-anyCommandInfo AnyCommand {..} = commandInfo anyCommand
-
-runAnyCommand :: AnyCommand -> Message -> Bot ()
-runAnyCommand AnyCommand {..} m = do
+runCommand :: Command -> Message -> Bot ()
+runCommand Command {..} m = do
   bdt <- BotT $ \d _ _ -> return d
   manager <- hManager
-  liftDiscord $ runCommandHandler (commandHandler anyCommand) (commandEnvFromMessage (commandArgsDescription anyCommand) m) bdt manager
+  liftDiscord $ runCommandHandler commandHandler (commandEnvFromMessage m) bdt manager

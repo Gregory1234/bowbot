@@ -14,7 +14,7 @@ import Control.Concurrent.STM (STM)
 import Control.Applicative ((<|>))
 import Control.Exception.Base (bracket)
 import Control.Monad.Reader
-import BowBot.Network.Class (MonadNetwork)
+import Control.Monad.Except
 
 
 data CacheResponse a
@@ -34,13 +34,6 @@ class MonadIO m => MonadCacheSingle a m where
   supplyCacheSingle :: a -> m ()
   clearCacheSingle :: proxy a -> m ()
   withCacheSingleBusy :: proxy a -> m x -> m x
-
-instance MonadCacheSingle c m => MonadCacheSingle c (ReaderT r m) where
-  getFromCacheSingle proxy = ReaderT $ const $ getFromCacheSingle proxy
-  requestCacheSingle proxy = ReaderT $ const $ requestCacheSingle proxy
-  supplyCacheSingle a = ReaderT $ const $ supplyCacheSingle a
-  clearCacheSingle proxy = ReaderT $ const $ clearCacheSingle proxy
-  withCacheSingleBusy proxy (ReaderT f) = ReaderT $ withCacheSingleBusy proxy . f
 
 getOrCalculateCacheSingle :: MonadCacheSingle a m => m (Maybe a) -> m (CacheResponse a)
 getOrCalculateCacheSingle calc = do
@@ -91,3 +84,18 @@ instance (MonadHoistIO m, MonadSimpleCacheSingle a m) => MonadCacheSingle a (Sim
   withCacheSingleBusy proxy c = do
     CachedData {..} <- getCachedData proxy
     hoistIO (bracket (atomically $ writeTVar cachedDataBusy True) (const $ atomically $ writeTVar cachedDataBusy False) . const) c
+
+
+instance MonadCacheSingle c m => MonadCacheSingle c (ReaderT r m) where
+  getFromCacheSingle proxy = ReaderT $ const $ getFromCacheSingle proxy
+  requestCacheSingle proxy = ReaderT $ const $ requestCacheSingle proxy
+  supplyCacheSingle a = ReaderT $ const $ supplyCacheSingle a
+  clearCacheSingle proxy = ReaderT $ const $ clearCacheSingle proxy
+  withCacheSingleBusy proxy (ReaderT f) = ReaderT $ withCacheSingleBusy proxy . f
+
+instance MonadCacheSingle c m => MonadCacheSingle c (ExceptT e m) where
+  getFromCacheSingle proxy = ExceptT $ Right <$> getFromCacheSingle proxy
+  requestCacheSingle proxy = ExceptT $ Right <$> requestCacheSingle proxy
+  supplyCacheSingle a = ExceptT $ Right <$> supplyCacheSingle a
+  clearCacheSingle proxy = ExceptT $ Right <$> clearCacheSingle proxy
+  withCacheSingleBusy proxy (ExceptT x) = ExceptT $ withCacheSingleBusy proxy x

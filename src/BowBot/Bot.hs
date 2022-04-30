@@ -88,8 +88,8 @@ eventHandler (MessageCreate m) = do
     prefix <- hInfoDB discordCommandPrefixInfo
     when (pack prefix `isPrefixOf` messageContent m) $ do
       let n = unpack $ T.toLower . T.drop (length prefix) . T.takeWhile (/= ' ') $ messageContent m
-      for_ (filter ((==n) . commandName . anyCommandInfo) commands) $ \c ->
-        commandTimeoutRun (commandTimeout $ anyCommandInfo c) m $ do
+      for_ (filter ((==n) . commandName . commandInfo) commands) $ \c ->
+        commandTimeoutRun (commandTimeout $ commandInfo c) m $ do
           logInfo $ "recieved " ++ unpack (messageContent m)
           ifDev () $ do
             testDiscordId <- hInfoDB discordGuildIdInfo
@@ -98,8 +98,8 @@ eventHandler (MessageCreate m) = do
           perms <- fromMaybe DefaultLevel <$> getFromCache (Proxy @PermissionLevel) (userId (messageAuthor m))
           if perms == BanLevel
           then respond m "You have been blacklisted. You can probably appeal this decision. Or not. I don't know. I'm just a pre-programmed response."
-          else if perms >= commandPerms (anyCommandInfo c)
-            then runAnyCommand c m
+          else if perms >= commandPerms (commandInfo c)
+            then runCommand c m
             else respond m "You don't have the permission to do that!"
           logInfo $ "finished " ++ unpack (messageContent m)
 eventHandler _ = pure ()
@@ -128,14 +128,14 @@ backgroundTimeoutRun n x = do
       logError $ "Timed out: " ++ show n ++ "s"
     Right (Just ()) -> pure ()
 
-commands :: [AnyCommand]
+commands :: [Command]
 commands =
-  [ AnyCommand $ hypixelStatsCommand UserSettings "s"
-  , AnyCommand $ hypixelStatsCommand DefSettings "sd"
-  , AnyCommand $ hypixelStatsCommand AllSettings "sa"
-  , AnyCommand refreshDataCommand
-  , AnyCommand updateDataCommand
-  , AnyCommand clearLogsCommand
-  , AnyCommand updateRolesCommand
-  , AnyCommand updateDiscordsCommand
+  [ hypixelStatsCommand UserSettings "s"
+  , hypixelStatsCommand DefSettings "sd"
+  , hypixelStatsCommand AllSettings "sa"
+  , refreshDataCommand
+  , updateDataCommand
+  , clearLogsCommand
+  , updateRolesCommand
+  , updateDiscordsCommand
   ]

@@ -13,6 +13,7 @@ import BowBot.Utils
 import Control.Concurrent.STM.TVar (TVar, newTVar)
 import Control.Concurrent.STM (STM)
 import Control.Monad.Reader (ReaderT(..))
+import Control.Monad.Except
 
 class Counted c where
   counterLimit :: proxy c -> Integer
@@ -21,11 +22,6 @@ class (Counted c, MonadIO m) => MonadCounter c m where
   getCurrentCounterValue :: proxy c -> m Integer
   tryIncreaseCounter :: proxy c -> Integer -> m (Maybe Int)
   clearCounter :: proxy c -> m ()
-
-instance MonadCounter c m => MonadCounter c (ReaderT r m) where
-  getCurrentCounterValue proxy = ReaderT $ const $ getCurrentCounterValue proxy
-  tryIncreaseCounter proxy extra = ReaderT $ const $ tryIncreaseCounter proxy extra
-  clearCounter proxy = ReaderT $ const $ clearCounter proxy
 
 data Counter = Counter { counterMain :: TVar Integer, counterBorder :: TVar Integer }
 
@@ -60,3 +56,13 @@ instance (Counted c, MonadIO m, MonadSimpleCounter c m) => MonadCounter c (Simpl
       border <- readTVar counterBorder
       writeTVar counterMain border
       writeTVar counterBorder 0
+
+instance MonadCounter c m => MonadCounter c (ReaderT r m) where
+  getCurrentCounterValue proxy = ReaderT $ const $ getCurrentCounterValue proxy
+  tryIncreaseCounter proxy extra = ReaderT $ const $ tryIncreaseCounter proxy extra
+  clearCounter proxy = ReaderT $ const $ clearCounter proxy
+
+instance MonadCounter c m => MonadCounter c (ExceptT e m) where
+  getCurrentCounterValue proxy = ExceptT $ Right <$> getCurrentCounterValue proxy
+  tryIncreaseCounter proxy extra = ExceptT $ Right <$> tryIncreaseCounter proxy extra
+  clearCounter proxy = ExceptT $ Right <$> clearCounter proxy

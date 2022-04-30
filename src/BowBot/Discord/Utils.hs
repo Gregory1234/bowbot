@@ -9,6 +9,8 @@ import Discord.Types
 import qualified Discord.Requests as R
 import BowBot.Utils
 import BowBot.DB.Basic
+import Data.List (isPrefixOf, isSuffixOf)
+import Data.Char (isDigit)
 
 discordGuildMembers :: MonadDiscord m => GuildId -> m [GuildMember]
 discordGuildMembers gid = do
@@ -18,3 +20,7 @@ discordGuildMembers gid = do
       logError (show e)
       return []
     Right m -> return m
+
+fromPingDiscordUser :: String -> Maybe UserId
+fromPingDiscordUser str | "<@" `isPrefixOf` str && ">" `isSuffixOf` str = readMaybe $ filter isDigit str
+fromPingDiscordUser _ = Nothing

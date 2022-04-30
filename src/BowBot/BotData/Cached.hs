@@ -13,14 +13,12 @@ import Database.MySQL.Simple (Connection)
 import BowBot.Utils (liftIO, readTVar, atomically, MonadIO, assertIO)
 import Control.Monad.Reader (ReaderT(..))
 import BowBot.Network.Class (MonadNetwork)
+import Control.Monad.Except
 
 type DatabaseCache a = TVar (HM.HashMap (CacheIndex a) a)
 
 class MonadIO m => MonadCache a m where
   getCache :: proxy a -> m (DatabaseCache a)
-
-instance MonadCache c m => MonadCache c (ReaderT r m) where
-  getCache proxy = ReaderT $ const $ getCache proxy
 
 class (Eq (CacheIndex a), Hashable (CacheIndex a)) => Cached a where
   type CacheIndex a
@@ -60,3 +58,9 @@ assertGoodIndexes [] = pure ()
 assertGoodIndexes ((a,b):as) = do
   assertIO (a == cacheIndex b)
   assertGoodIndexes as
+
+instance MonadCache c m => MonadCache c (ReaderT r m) where
+  getCache proxy = ReaderT $ const $ getCache proxy
+
+instance MonadCache c m => MonadCache c (ExceptT e m) where
+  getCache proxy = ExceptT $ Right <$> getCache proxy

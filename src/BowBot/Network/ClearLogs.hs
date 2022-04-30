@@ -16,12 +16,12 @@ clearLogs = hManager >>= \man -> liftIO $ do
   request <- parseRequest url
   void $ try @SomeException $ httpLbs request man
 
-clearLogsCommand :: Command () ()
-clearLogsCommand = Command () CommandInfo
+clearLogsCommand :: Command
+clearLogsCommand = Command CommandInfo
   { commandName = "clearlogs"
   , commandDescription = "" -- TODO
   , commandPerms = AdminLevel
   , commandTimeout = 120
-  } $ withArgs $ \() -> do
+  } $ hNoArguments $ do
     clearLogs
     hRespond "Done"

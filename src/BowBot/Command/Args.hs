@@ -1,91 +1,32 @@
-{-# LANGUAGE KindSignatures #-}
-{-# LANGUAGE DataKinds #-}
-{-# LANGUAGE FunctionalDependencies #-}
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE UndecidableInstances #-}
-{-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE DerivingVia #-}
-{-# LANGUAGE StandaloneDeriving #-}
-{-# LANGUAGE MonoLocalBinds #-}
+module BowBot.Command.Args where
 
-module BowBot.Command.Args(module BowBot.Command.Args, Only(..)) where
+import BowBot.Command.Handler
+import Control.Monad.Except (ExceptT(..), runExceptT, throwError)
+import Data.Maybe (listToMaybe)
 
-import Database.MySQL.Simple (Only(..))
-import BowBot.BotMonad
-import Control.Monad.Except
-import Discord
-import Discord.Types
-import Network.HTTP.Conduit (Manager)
-import BowBot.Network.Class (MonadNetwork)
-import BowBot.Discord.Class (MonadDiscord)
-import Control.Monad.Reader (ReaderT(..), MonadReader)
-import Control.Applicative (Alternative)
-import BowBot.BotData.Basic
-import BowBot.BotData.Cached
-import BowBot.BotData.Counter
-import BowBot.BotData.CachedSingle
+hWithArguments :: (CommandArgs -> ExceptT String CommandHandler a) -> (a -> CommandHandler ()) -> CommandHandler ()
+hWithArguments parser body = do
+  args <- hEnv envArgs
+  v <- runExceptT (parser args)
+  case v of
+    Left e -> hRespond e
+    Right a -> body a
 
-data ArgsParserContext = ArgsParserContext { argsParserSender :: User, argsParserChannel :: ChannelId }
+hNoArguments :: CommandHandler () -> CommandHandler ()
+hNoArguments body = hWithArguments noArgumentParser $ \() -> body
 
-newtype ArgsParser a = ArgsParser { runArgsParser :: ArgsParserContext -> BotData -> Manager -> DiscordHandle -> IO (Either String a) }
-  deriving (Functor, Applicative, Monad, MonadIO, MonadNetwork, MonadDiscord, MonadError String,
-            MonadFail, MonadFix, Alternative, MonadPlus, MonadReader ArgsParserContext) via (ReaderT ArgsParserContext (BotT (ExceptT String IO)))
+hOneArgument :: (String -> ExceptT String CommandHandler a) -> (a -> CommandHandler ()) -> CommandHandler ()
+hOneArgument parser = hWithArguments (\(CommandMessageArgs args) -> assertArgumentsCount 1 1 args >> parser (head args))
 
-deriving via (ReaderT ArgsParserContext (BotT (ExceptT String IO))) instance (MonadCache c (BotT (ExceptT String IO))) => MonadCache c ArgsParser
+hOneOptionalArgument :: (Maybe String -> ExceptT String CommandHandler a) -> (a -> CommandHandler ()) -> CommandHandler ()
+hOneOptionalArgument parser = hWithArguments (\(CommandMessageArgs args) -> assertArgumentsCount 0 1 args >> parser (listToMaybe args))
 
-deriving via (ReaderT ArgsParserContext (BotT (ExceptT String IO))) instance (Counted c, MonadCounter c (BotT (ExceptT String IO))) => MonadCounter c ArgsParser
+noArgumentParser :: CommandArgs -> ExceptT String CommandHandler ()
+noArgumentParser (CommandMessageArgs args) = assertArgumentsCount 0 0 args
 
-deriving via (ReaderT ArgsParserContext (BotT (ExceptT String IO))) instance (MonadCacheSingle c (BotT (ExceptT String IO))) => MonadCacheSingle c ArgsParser
-
-class CommandArgs a v | a -> v where
-  parseArgsFromStrings :: a -> [String] -> ArgsParser v
-
-class CommandArg a v | a -> v where
-  parseArgFromStrings :: a -> [String] -> (ArgsParser v, [String])
-
-newtype SingleStringArg = SingleStringArg { singleStringArgName :: String }
-
-instance CommandArg SingleStringArg String where
-  parseArgFromStrings SingleStringArg {..} [] = (throwError $ "*Argument not provided: " ++ singleStringArgName ++ "!*", [])
-  parseArgFromStrings _ (a:as) = (return a, as)
-
-newtype GreedyStringArg = GreedyStringArg { greedyStringArgName :: String }
-
-instance CommandArg GreedyStringArg String where
-  parseArgFromStrings GreedyStringArg {..} [] = (throwError $ "*Argument not provided: " ++ greedyStringArgName ++ "!*", [])
-  parseArgFromStrings _ as = (return (unwords as), [])
-
-instance CommandArgs () () where
-  parseArgsFromStrings _ [] = return ()
-  parseArgsFromStrings _ _ = throwError "*Too many arguments!*"
-
-instance (CommandArg a1 v1) => CommandArgs (Only a1) (Only v1) where
-  parseArgsFromStrings (Only a1) as = do
-    let (b1, r1) = parseArgFromStrings a1 as
-    () <- parseArgsFromStrings () r1
-    Only <$> b1
-
-instance (CommandArg a1 v1, CommandArg a2 v2) => CommandArgs (a1, a2) (v1, v2) where
-  parseArgsFromStrings (a1, a2) as = do
-    let (b1, r1) = parseArgFromStrings a1 as
-    let (b2, r2) = parseArgFromStrings a2 r1
-    () <- parseArgsFromStrings () r2
-    (,) <$> b1 <*> b2
-
-instance (CommandArg a1 v1, CommandArg a2 v2, CommandArg a3 v3) => CommandArgs (a1, a2, a3) (v1, v2, v3) where
-  parseArgsFromStrings (a1, a2, a3) as = do
-    let (b1, r1) = parseArgFromStrings a1 as
-    let (b2, r2) = parseArgFromStrings a2 r1
-    let (b3, r3) = parseArgFromStrings a3 r2
-    () <- parseArgsFromStrings () r3
-    (,,) <$> b1 <*> b2 <*> b3
-
-instance (CommandArg a1 v1, CommandArg a2 v2, CommandArg a3 v3, CommandArg a4 v4) => CommandArgs (a1, a2, a3, a4) (v1, v2, v3, v4) where
-  parseArgsFromStrings (a1, a2, a3, a4) as = do
-    let (b1, r1) = parseArgFromStrings a1 as
-    let (b2, r2) = parseArgFromStrings a2 r1
-    let (b3, r3) = parseArgFromStrings a3 r2
-    let (b4, r4) = parseArgFromStrings a4 r3
-    () <- parseArgsFromStrings () r4
-    (,,,) <$> b1 <*> b2 <*> b3 <*> b4
+assertArgumentsCount :: Int -> Int -> [String] -> ExceptT String CommandHandler ()
+assertArgumentsCount mina maxa args
+  | mina <= length args, maxa >= length args = pure ()
+  | mina == maxa = throwError $ "Got " ++ show (length args) ++ " arguments, " ++ show mina ++ " expected"
+  | mina == 0 = throwError $ "Got " ++ show (length args) ++ " arguments, at most " ++ show maxa ++ " expected"
+  | otherwise = throwError $ "Got " ++ show (length args) ++ " arguments, between " ++ show mina ++ " and " ++ show maxa ++ " expected"
