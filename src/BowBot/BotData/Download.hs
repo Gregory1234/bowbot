@@ -1,5 +1,6 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE DataKinds #-}
 
 module BowBot.BotData.Download where
 
@@ -28,6 +29,7 @@ import Discord
 import Data.Coerce (coerce)
 import BowBot.Discord.Monad
 import Control.Monad.Reader
+import BowBot.Hypixel.TimeStats
 
 
 emptyBotData :: STM BotData
@@ -42,6 +44,9 @@ emptyBotData = do
   savedRolesCache <- newTVar empty
   hypixelGuildMembersCache <- newCachedData
   discordAccountsCache <- newTVar empty
+  hypixelDailyStatsCache <- newTVar empty
+  hypixelWeeklyStatsCache <- newTVar empty
+  hypixelMonthlyStatsCache <- newTVar empty
   return BotData {..}
 
 refreshBotData :: Connection -> BotData -> IO ()
@@ -54,12 +59,18 @@ refreshBotData conn bdt = flip runBotDataT bdt $ do
   refreshCache conn (Proxy @HypixelBowLeaderboardEntry)
   refreshCache conn (Proxy @SavedRoles)
   refreshCache conn (Proxy @DiscordAccount)
+  refreshCache conn (Proxy @(HypixelBowTimeStats 'DailyStats))
+  refreshCache conn (Proxy @(HypixelBowTimeStats 'WeeklyStats))
+  refreshCache conn (Proxy @(HypixelBowTimeStats 'MonthlyStats))
 
-updateBotData :: Manager -> BotData -> DiscordHandler ()
-updateBotData manager bdt = coerce @(DiscordHandlerT IO ()) $ flip runNetworkT manager $ flip runBotDataT bdt $ do
+updateBotData :: [StatsTimeRange] -> Manager -> BotData -> DiscordHandler ()
+updateBotData times manager bdt = coerce @(DiscordHandlerT IO ()) $ flip runNetworkT manager $ flip runBotDataT bdt $ do
   updateCache (Proxy @MinecraftAccount)
   updateCache (Proxy @DiscordAccount)
   updateCache (Proxy @HypixelBowLeaderboardEntry)
+  when (DailyStats `elem` times) $ updateCache (Proxy @(HypixelBowTimeStats 'DailyStats))
+  when (WeeklyStats `elem` times) $ updateCache (Proxy @(HypixelBowTimeStats 'WeeklyStats))
+  when (MonthlyStats `elem` times) $ updateCache (Proxy @(HypixelBowTimeStats 'MonthlyStats))
 
 clearBotDataCaches :: BotData -> IO ()
 clearBotDataCaches bdt = flip runBotDataT bdt $ do

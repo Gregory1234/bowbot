@@ -41,6 +41,7 @@ dependencies:
 - mysql-simple
 - stringsearch
 - hashable
+- data-default
 
 library:
   source-dirs: src

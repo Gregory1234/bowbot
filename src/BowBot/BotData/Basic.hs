@@ -3,6 +3,9 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE GADTs #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
 module BowBot.BotData.Basic where
 
@@ -29,6 +32,8 @@ import BowBot.Discord.Roles
 import BowBot.BotData.CachedSingle
 import BowBot.Hypixel.Guild
 import BowBot.Discord.Account
+import BowBot.Hypixel.TimeStats
+import Data.Default
   
 data BotData = BotData
   { infoFieldCache :: DatabaseCache InfoField
@@ -41,6 +46,9 @@ data BotData = BotData
   , savedRolesCache :: DatabaseCache SavedRoles
   , hypixelGuildMembersCache :: CachedData HypixelGuildMembers
   , discordAccountsCache :: DatabaseCache DiscordAccount
+  , hypixelDailyStatsCache :: DatabaseCache (HypixelBowTimeStats 'DailyStats)
+  , hypixelWeeklyStatsCache :: DatabaseCache (HypixelBowTimeStats 'WeeklyStats)
+  , hypixelMonthlyStatsCache :: DatabaseCache (HypixelBowTimeStats 'MonthlyStats)
   }
 
 newtype BotDataT m a = BotDataT { runBotDataT :: BotData -> m a }
@@ -81,6 +89,12 @@ deriving via (SimpleCacheSingle (BotDataT m)) instance MonadHoistIO m => MonadCa
 
 instance MonadIO m => MonadCache DiscordAccount (BotDataT m) where
   getCache _ = BotDataT $ return . discordAccountsCache
+
+instance (MonadIO m, Default (SStatsTimeRange t)) => MonadCache (HypixelBowTimeStats t) (BotDataT m) where
+  getCache _ = BotDataT $ return . case def :: SStatsTimeRange t of
+    SDailyStats -> hypixelDailyStatsCache
+    SWeeklyStats -> hypixelWeeklyStatsCache
+    SMonthlyStats -> hypixelMonthlyStatsCache
 
 instance MonadReader r m => MonadReader r (BotDataT m) where
   ask = BotDataT $ const ask

@@ -33,6 +33,7 @@ import BowBot.Network.ClearLogs
 import BowBot.Discord.Roles
 import BowBot.Discord.Commands
 import BowBot.Hypixel.LeaderboardCommand
+import BowBot.Hypixel.TimeStats
 
 runBowBot :: IO ()
 runBowBot = do
@@ -59,12 +60,19 @@ backgroundMinutely mint = do
     logInfoDB conn "started update"
     liftIO $ refreshBotData conn bdt
     manager <- hManager
-    liftDiscord $ updateBotData manager bdt
+    hour <- liftIO $ read @Int <$> getTime "%k"
+    weekday <- liftIO $ read @Int <$> getTime "%u"
+    monthday <- liftIO $ read @Int <$> getTime "%d"
+    let times = case (hour, weekday, monthday) of
+          (0, 1, 1) -> [DailyStats, WeeklyStats, MonthlyStats]
+          (0, 1, _) -> [DailyStats, WeeklyStats]
+          (0, _, 1) -> [DailyStats, MonthlyStats]
+          (0, _, _) -> [DailyStats]
+          _ -> []
+    liftDiscord $ updateBotData times manager bdt
     updateRolesAll
     dev <- ifDev False $ return True
-    unless dev $ do
-      hour <- liftIO $ read @Int <$> getTime "%k"
-      when (hour `mod` 8 == 0) clearLogs
+    unless dev $ when (hour `mod` 8 == 0) clearLogs
     logInfoDB conn "finished update"
 
 onStartup :: Bot ()
@@ -138,7 +146,11 @@ commands =
   , leaderboardCommand winsreakLeaderboardType "lbs"
   , leaderboardCommand wlrLeaderboardType "lbr"
   , refreshDataCommand
-  , updateDataCommand
+  , updateDataCommand [] "dataupdate"
+  , updateDataCommand [DailyStats] "dataupdateday"
+  , updateDataCommand [DailyStats, WeeklyStats] "dataupdateweek"
+  , updateDataCommand [DailyStats, MonthlyStats] "dataupdatemonth"
+  , updateDataCommand [DailyStats, WeeklyStats, MonthlyStats] "dataupdateweekmonth"
   , clearLogsCommand
   , updateRolesCommand
   ]

@@ -6,6 +6,7 @@ import BowBot.DB.Basic
 import BowBot.Utils (liftIO)
 import BowBot.Network.Class (hManager)
 import BowBot.Discord.Class (liftDiscord)
+import BowBot.Hypixel.TimeStats
 
 refreshDataCommand :: Command
 refreshDataCommand = Command CommandInfo
@@ -19,9 +20,9 @@ refreshDataCommand = Command CommandInfo
     liftIO $ withDB $ \conn -> refreshBotData conn bdt
     hRespond "Done"
 
-updateDataCommand :: Command
-updateDataCommand = Command CommandInfo
-  { commandName = "dataupdate"
+updateDataCommand :: [StatsTimeRange] -> String -> Command
+updateDataCommand times name = Command CommandInfo
+  { commandName = name
   , commandDescription = "" -- TODO
   , commandPerms = AdminLevel
   , commandTimeout = 120
@@ -30,5 +31,5 @@ updateDataCommand = Command CommandInfo
     bdt <- CommandHandler $ \_ d _ -> return d
     liftIO $ withDB $ \conn -> refreshBotData conn bdt
     manager <- hManager
-    liftDiscord $ updateBotData manager bdt
+    liftDiscord $ updateBotData times manager bdt
     hRespond "Done"
