@@ -69,17 +69,17 @@ instance (Default (SStatsTimeRange t)) => Cached (HypixelBowTimeStats t) where
     let newValues = HM.fromList $ flip fmap res $ \(UUID -> uuid, bowTimeWins, bowTimeLosses) -> (uuid, HypixelBowTimeStats {..})
     liftIO $ atomically $ writeTVar cache newValues
 
-showHypixelBowTimeStats :: forall t. Default (SStatsTimeRange t) => Settings -> HypixelBowTimeStats t -> String
-showHypixelBowTimeStats Settings {..} HypixelBowTimeStats {..} = unlines $ catMaybes
+showHypixelBowTimeStats :: forall t. Default (SStatsTimeRange t) => Settings -> HypixelBowStats -> HypixelBowTimeStats t -> String
+showHypixelBowTimeStats Settings {..} HypixelBowStats {..} HypixelBowTimeStats {..} = unlines $ catMaybes
   [ onlyIf sWins
   $ " - *Bow Duels " ++ time ++ " Wins:* **"
-  ++ show bowTimeWins
+  ++ show (bowWins - bowTimeWins)
   ++ "**"
   , onlyIf sLosses
   $ " - *Bow Duels " ++ time ++ " Losses:* **"
-  ++ show bowTimeLosses
+  ++ show (bowLosses - bowTimeLosses)
   ++ "**"
-  , onlyIf (sense sWLR (bowTimeWins + bowTimeLosses /= 0))
+  , onlyIf (sense sWLR (bowWins - bowTimeWins + bowLosses - bowTimeLosses /= 0))
   $ " - *Bow Duels " ++ time ++ " Win/Loss Ratio:* **"
   ++ winLossRatio
   ++ "**"
@@ -94,7 +94,14 @@ showHypixelBowTimeStats Settings {..} HypixelBowTimeStats {..} = unlines $ catMa
     sense WhenSensible x = x
     onlyIf True a = Just a
     onlyIf False _ = Nothing
-    winLossRatio = showWLR bowTimeWins bowTimeLosses
+    winLossRatio = showWLR (bowWins - bowTimeWins) (bowLosses - bowTimeLosses)
+
+showMaybeHypixelBowTimeStats :: forall t. Default (SStatsTimeRange t) => Settings -> HypixelBowStats -> Maybe (HypixelBowTimeStats t) -> String
+showMaybeHypixelBowTimeStats _ _ Nothing = case def :: SStatsTimeRange t of
+  SDailyStats -> "**Daily data isn't avaliable yet for this player! Wait until tomorrow!**"
+  SWeeklyStats -> "**Weekly data isn't avaliable yet for this player! Wait until next week!**"
+  SMonthlyStats -> "**Monthly data isn't avaliable yet for this player! Wait until next month!**"
+showMaybeHypixelBowTimeStats s t (Just v) = showHypixelBowTimeStats s t v
 
 instance (Default (SStatsTimeRange t)) => CachedStorable (HypixelBowTimeStats t) where
   storeInCacheIndexed accs = do
