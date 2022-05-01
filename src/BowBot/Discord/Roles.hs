@@ -90,15 +90,15 @@ updateRolesSaved gmem = do
   gid <- hInfoDB discordGuildIdInfo
   addRemoveDiscordRoles gid gmem (map snd $ M.toList savedRolesAll) savedRoles
 
-updateRolesMember :: (MonadNetwork m, MonadDiscord m, MonadCache InfoField m, MonadCache HypixelBowLeaderboardEntry m, MonadCacheSingle HypixelGuildMembers m, MonadCounter HypixelApi m) => GuildMember -> Maybe BowBotAccount -> m ()
+updateRolesMember :: (MonadNetwork m, MonadDiscord m, MonadCache InfoField m, MonadCacheSingle HypixelGuildMembers m, MonadCounter HypixelApi m) => GuildMember -> Maybe BowBotAccount -> m ()
 updateRolesMember gmem (Just BowBotAccount {..}) = do
   m <- getHypixelGuildMembers
-  let a = case m of
+  let x = case m of
         CacheBusy -> Nothing
         CacheFailed -> Nothing
         CacheOld a -> Just a
         CacheFresh a -> Just a
-  for_ a $ \(HypixelGuildMembers members) -> do
+  for_ x $ \(HypixelGuildMembers members) -> do
     let isMember = any (`elem` map fst (M.toList members)) accountMinecrafts
     memberRole <- hInfoDB memberRoleInfo
     visitorRole <- hInfoDB visitorRoleInfo

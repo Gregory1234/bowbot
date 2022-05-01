@@ -10,10 +10,10 @@ import qualified Data.HashMap.Strict as HM
 import Data.Hashable (Hashable)
 import Control.Concurrent.STM.TVar (TVar)
 import Database.MySQL.Simple (Connection)
-import BowBot.Utils (liftIO, readTVar, atomically, MonadIO, assertIO)
+import BowBot.Utils (readTVar, atomically, assertIO)
 import Control.Monad.Reader (ReaderT(..))
-import BowBot.Network.Class (MonadNetwork)
 import Control.Monad.Except
+import Data.Kind (Constraint, Type)
 
 type DatabaseCache a = TVar (HM.HashMap (CacheIndex a) a)
 
@@ -32,12 +32,8 @@ class Cached a => CachedIndexed a where
   storeInCache :: MonadCache a m => [a] -> m Bool
 
 class Cached a => CachedUpdatable a where
-  updateCache :: (MonadNetwork m, MonadCache a m) => proxy a -> [CacheIndex a] -> m ()
-
-updateCacheAll :: (MonadNetwork m, MonadCache a m, CachedUpdatable a) => proxy a -> m ()
-updateCacheAll proxy = do
-  cache <- getCacheMap proxy
-  updateCache proxy $ HM.keys cache
+  type CacheUpdateSourceConstraint a :: (Type -> Type) -> Constraint
+  updateCache :: (CacheUpdateSourceConstraint a m, MonadCache a m) => proxy a -> m ()
 
 getFromCache :: (MonadCache a m, Cached a) => proxy a -> CacheIndex a -> m (Maybe a)
 getFromCache proxy a = do

@@ -5,6 +5,9 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE UndecidableInstances #-}
 
 module BowBot.Hypixel.Leaderboard where
 
@@ -17,6 +20,13 @@ import BowBot.DB.Basic (queryLog, executeManyLog, withDB)
 import BowBot.Utils
 import Data.Maybe (mapMaybe)
 import Control.Applicative ((<|>))
+import BowBot.Hypixel.Basic (HypixelApi)
+import BowBot.Network.Class
+import BowBot.BotData.Counter
+import Data.List.Split (chunksOf)
+import Control.Concurrent (threadDelay)
+import Control.Concurrent.Async (mapConcurrently)
+import BowBot.Network.Monad (runNetworkT)
 
 data HypixelBowLeaderboardEntry = HypixelBowLeaderboardEntry
   { bowLbWins :: Integer,
@@ -48,3 +58,29 @@ instance CachedStorable HypixelBowLeaderboardEntry where
       cache <- getCache (Proxy @HypixelBowLeaderboardEntry)
       liftIO $ atomically $ modifyTVar cache (insertMany fixed)
     return success
+
+class (MonadNetwork m, MonadCounter HypixelApi m) => CacheUpdateSourceConstraintForHypixelBowLeaderboardEntry m where
+instance (MonadNetwork m, MonadCounter HypixelApi m) => CacheUpdateSourceConstraintForHypixelBowLeaderboardEntry m where
+
+instance CachedUpdatable HypixelBowLeaderboardEntry where
+  type CacheUpdateSourceConstraint HypixelBowLeaderboardEntry = CacheUpdateSourceConstraintForHypixelBowLeaderboardEntry
+  updateCache proxy = do
+    manager <- hManager
+    let helper (uuid, old) = do
+          stats <- fmap hypixelBowStatsToLeaderboards <$> requestHypixelBowStats uuid
+          return (uuid, maybe old (\s -> s { bowLbWinstreak = bowLbWinstreak s <|> bowLbWinstreak old }) stats)
+    cache <- HM.toList <$> getCacheMap proxy
+    let chunked = chunksOf 30 cache
+    updatedAccounts <- fmap concat $ for chunked $ \chunk ->
+      let tryUpdate = do
+            time <- tryIncreaseCounter (Proxy @HypixelApi) 30
+            case time of
+              Nothing -> do
+                ret <- liftIO $ mapConcurrently (fmap (`runNetworkT` manager) helper) chunk
+                liftIO $ threadDelay 20000000
+                return ret
+              Just t -> do
+                liftIO $ threadDelay (t * 1000000)
+                tryUpdate
+      in tryUpdate
+    void $ storeInCacheIndexed updatedAccounts

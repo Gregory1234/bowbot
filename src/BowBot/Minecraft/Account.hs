@@ -22,7 +22,7 @@ import BowBot.Utils
 import qualified Data.HashMap.Strict as HM
 import BowBot.Network.Monad (runNetworkT)
 import Control.Concurrent.Async (mapConcurrently)
-import Data.Maybe (catMaybes, mapMaybe)
+import Data.Maybe (mapMaybe)
 
 data IsBanned
   = NotBanned
@@ -67,12 +67,14 @@ instance CachedIndexed MinecraftAccount where
     return success
 
 instance CachedUpdatable MinecraftAccount where
-  updateCache proxy uuids = do
+  type CacheUpdateSourceConstraint MinecraftAccount = MonadNetwork
+  updateCache proxy = do
     manager <- hManager
     let helper MinecraftAccount {..} = do
           newNames <- mojangUUIDToNames mcUUID
           return MinecraftAccount {mcNames = fromMaybe mcNames newNames, ..}
-    chunked <- fmap (chunksOf 10 . catMaybes) $ for uuids $ getFromCache proxy
+    cache <- HM.elems <$> getCacheMap proxy
+    let chunked = chunksOf 10 cache
     updatedAccounts <- liftIO $ fmap concat $ for chunked $ mapConcurrently (fmap (`runNetworkT` manager) helper)
     void $ storeInCache updatedAccounts
 

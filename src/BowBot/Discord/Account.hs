@@ -5,6 +5,8 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE UndecidableInstances #-}
 
 module BowBot.Discord.Account where
 
@@ -52,16 +54,20 @@ userToDiscordAccount User {..} = DiscordAccount
   , discordNickname = Nothing
   }
 
-updateDiscordAccounts :: (MonadDiscord m, MonadCache DiscordAccount m, MonadCache InfoField m) => m ()
-updateDiscordAccounts = do
-  gid <- hInfoDB discordGuildIdInfo
-  members <- map guildMemberToDiscordAccount . filter (\GuildMember {..} -> fmap userIsBot memberUser == Just False) <$> discordGuildMembers gid
-  current <- HM.elems <$> getCacheMap (Proxy @DiscordAccount)
-  updatedNonMembers <- for (deleteFirstsBy (\a b -> discordId a == discordId b) current members) $ \du -> do
-    u' <- call $ R.GetUser (discordId du)
-    case u' of
-      Left e -> do
-        logError $ show e
-        return du
-      Right u -> return $ userToDiscordAccount u
-  void $ storeInCache $ members ++ updatedNonMembers
+class (MonadDiscord m, MonadCache InfoField m) => CacheUpdateSourceConstraintForDiscordAccount m where
+instance (MonadDiscord m, MonadCache InfoField m) => CacheUpdateSourceConstraintForDiscordAccount m where
+
+instance CachedUpdatable DiscordAccount where
+  type CacheUpdateSourceConstraint DiscordAccount = CacheUpdateSourceConstraintForDiscordAccount
+  updateCache proxy = do
+    gid <- hInfoDB discordGuildIdInfo
+    members <- map guildMemberToDiscordAccount . filter (\GuildMember {..} -> fmap userIsBot memberUser == Just False) <$> discordGuildMembers gid
+    current <- HM.elems <$> getCacheMap proxy
+    updatedNonMembers <- for (deleteFirstsBy (\a b -> discordId a == discordId b) current members) $ \du -> do
+      u' <- call $ R.GetUser (discordId du)
+      case u' of
+        Left e -> do
+          logError $ show e
+          return du
+        Right u -> return $ userToDiscordAccount u
+    void $ storeInCache $ members ++ updatedNonMembers

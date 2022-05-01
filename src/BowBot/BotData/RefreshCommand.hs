@@ -5,6 +5,7 @@ import BowBot.BotData.Download
 import BowBot.DB.Basic
 import BowBot.Utils (liftIO)
 import BowBot.Network.Class (hManager)
+import BowBot.Discord.Class (liftDiscord)
 
 refreshDataCommand :: Command
 refreshDataCommand = Command CommandInfo
@@ -29,5 +30,5 @@ updateDataCommand = Command CommandInfo
     bdt <- CommandHandler $ \_ d _ -> return d
     liftIO $ withDB $ \conn -> refreshBotData conn bdt
     manager <- hManager
-    liftIO $ updateBotData manager bdt
+    liftDiscord $ updateBotData manager bdt
     hRespond "Done"

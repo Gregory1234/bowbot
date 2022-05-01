@@ -18,7 +18,7 @@ import qualified Data.Text as T
 import Data.Text (isPrefixOf)
 import BowBot.Command
 import BowBot.Hypixel.StatsCommand
-import BowBot.Discord.Class (MonadDiscord, call_)
+import BowBot.Discord.Class (MonadDiscord, call_, liftDiscord)
 import Control.Exception.Base (SomeException, try, throw)
 import System.Timeout (timeout)
 import Control.Monad.Reader (ReaderT(..))
@@ -33,7 +33,6 @@ import BowBot.Network.ClearLogs
 import BowBot.Discord.Roles
 import BowBot.Discord.Commands
 import BowBot.Hypixel.LeaderboardCommand
-import BowBot.Discord.Account
 
 runBowBot :: IO ()
 runBowBot = do
@@ -60,13 +59,12 @@ backgroundMinutely mint = do
     logInfoDB conn "started update"
     liftIO $ refreshBotData conn bdt
     manager <- hManager
-    liftIO $ updateBotData manager bdt
+    liftDiscord $ updateBotData manager bdt
+    updateRolesAll
     dev <- ifDev False $ return True
     unless dev $ do
       hour <- liftIO $ read @Int <$> getTime "%k"
       when (hour `mod` 8 == 0) clearLogs
-    updateDiscordAccounts
-    updateRolesAll
     logInfoDB conn "finished update"
 
 onStartup :: Bot ()
@@ -143,5 +141,4 @@ commands =
   , updateDataCommand
   , clearLogsCommand
   , updateRolesCommand
-  , updateDiscordsCommand
   ]
