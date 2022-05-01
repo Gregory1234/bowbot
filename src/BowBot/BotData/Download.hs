@@ -54,6 +54,7 @@ refreshBotData conn bdt = flip runBotDataT bdt $ do
 updateBotData :: Manager -> BotData -> IO ()
 updateBotData manager bdt = flip runNetworkT manager $ flip runBotDataT bdt $ do
   updateCacheAll (Proxy @MinecraftAccount) -- TODO: this should also update discords, but it can't right now
+  -- TODO: update leaderboards
 
 clearBotDataCaches :: BotData -> IO ()
 clearBotDataCaches bdt = flip runBotDataT bdt $ do

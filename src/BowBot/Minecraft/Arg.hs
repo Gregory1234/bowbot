@@ -87,8 +87,11 @@ minecraftArgAutocorrect err retm arg name = do
         (Just e', Nothing) -> throwError e'
         (_, Just ret) -> return ret
 
+theUserIsntRegisteredMessage :: String
+theUserIsntRegisteredMessage = "*The user isn't registered!*"
+
 minecraftArgDiscord' :: (MonadError String m, MonadCache BowBotAccount m, MonadCache MinecraftAccount m) => (MinecraftAccount -> m (Bool, a)) -> UserId -> m (MinecraftResponse a)
-minecraftArgDiscord' = minecraftArgDiscord "*The user isn't registered!*"
+minecraftArgDiscord' = minecraftArgDiscord theUserIsntRegisteredMessage
 
 minecraftArgDiscordSelf :: (MonadError String m, MonadCache BowBotAccount m, MonadCache MinecraftAccount m) => (MinecraftAccount -> m (Bool, a)) -> UserId -> m (MinecraftResponse a)
 minecraftArgDiscordSelf = minecraftArgDiscord "*You aren't registered! To register, type `?register yourign`.*"

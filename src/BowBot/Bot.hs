@@ -32,6 +32,8 @@ import BowBot.Network.Class (hManager)
 import BowBot.Network.ClearLogs
 import BowBot.Discord.Roles
 import BowBot.Discord.Commands
+import BowBot.Hypixel.LeaderboardCommand
+import BowBot.Discord.Account
 
 runBowBot :: IO ()
 runBowBot = do
@@ -63,7 +65,7 @@ backgroundMinutely mint = do
     unless dev $ do
       hour <- liftIO $ read @Int <$> getTime "%k"
       when (hour `mod` 8 == 0) clearLogs
-    -- TODO: update discords from source
+    updateDiscordAccounts
     updateRolesAll
     logInfoDB conn "finished update"
 
@@ -133,6 +135,10 @@ commands =
   [ hypixelStatsCommand UserSettings "s"
   , hypixelStatsCommand DefSettings "sd"
   , hypixelStatsCommand AllSettings "sa"
+  , leaderboardCommand winsLeaderboardType "lb"
+  , leaderboardCommand lossesLeaderboardType "lbl"
+  , leaderboardCommand winsreakLeaderboardType "lbs"
+  , leaderboardCommand wlrLeaderboardType "lbr"
   , refreshDataCommand
   , updateDataCommand
   , clearLogsCommand

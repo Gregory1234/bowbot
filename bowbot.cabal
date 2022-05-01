@@ -52,6 +52,7 @@ library
       BowBot.Hypixel.Division
       BowBot.Hypixel.Guild
       BowBot.Hypixel.Leaderboard
+      BowBot.Hypixel.LeaderboardCommand
       BowBot.Hypixel.Stats
       BowBot.Hypixel.StatsCommand
       BowBot.Minecraft.Account

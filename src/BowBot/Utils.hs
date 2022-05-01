@@ -25,7 +25,7 @@ import Discord.Types
 import qualified Data.Map as M
 import qualified Data.Map.Internal as M
 import Control.Exception (evaluate, assert)
-import Control.Monad.Error.Class (MonadError, throwError)
+import Control.Monad.Error.Class (MonadError, throwError, catchError)
 
 dist :: Eq a => [a] -> [a] -> Int
 dist a b =
@@ -90,3 +90,12 @@ assertIO x = liftIO $ do
 groupByToMap :: Ord k => (v -> k) -> [v] -> M.Map k [v]
 groupByToMap _ [] = M.empty
 groupByToMap f (x:xs) = M.insertWith (++) (f x) [x] $ groupByToMap f xs
+
+pad' :: Bool -> Char -> Int -> String -> String
+pad' d c l x = if d then x ++ replicate (l - length x) c else replicate (l - length x) c ++ x
+
+pad :: Int -> String -> String
+pad = pad' True ' '
+
+catchErrorEither :: MonadError e m => m a -> m (Either e a)
+catchErrorEither body = catchError (Right <$> body) (return . Left)
