@@ -48,7 +48,7 @@ minecraftArgNoAutocorrect err arg name = do
     _ -> catchError (do
           uuid <- liftMaybe thePlayerDoesNotExistMessage =<< mcNameToUUID name
           names <- liftMaybe thePlayerDoesNotExistMessage =<< mcUUIDToNames uuid
-          let acc = MinecraftAccount { mcUUID = uuid, mcNames = names, mcHypixelBow = NotBanned }
+          let acc = MinecraftAccount { mcUUID = uuid, mcNames = names, mcHypixelBow = NotBanned, mcHypixelWatchlist = False }
           (b, val) <- arg acc
           let res = MinecraftResponse { responseType = JustResponse, responseAccount = acc, responseValue = val }
           if not b && isNothing err
@@ -71,14 +71,14 @@ minecraftArgAutocorrect err retm arg name = do
   case listToMaybe $ process (take 1) of
     Just (uuid, n) -> do
       names <- liftMaybe thePlayerDoesNotExistMessage =<< mcUUIDToNames uuid
-      let acc = MinecraftAccount { mcUUID = uuid, mcNames = names, mcHypixelBow = NotBanned }
+      let acc = MinecraftAccount { mcUUID = uuid, mcNames = names, mcHypixelBow = NotBanned, mcHypixelWatchlist = False }
       (_, val) <- arg acc
       let rtype = if map toLower n == map toLower name then JustResponse else DidYouMeanResponse
       return MinecraftResponse { responseType = rtype, responseAccount = acc, responseValue = val }
     Nothing -> case listToMaybe $ process (drop 1) of
       Just (uuid, n) -> do
         names <- liftMaybe thePlayerDoesNotExistMessage =<< mcUUIDToNames uuid
-        let acc = MinecraftAccount { mcUUID = uuid, mcNames = names, mcHypixelBow = NotBanned }
+        let acc = MinecraftAccount { mcUUID = uuid, mcNames = names, mcHypixelBow = NotBanned, mcHypixelWatchlist = False }
         (_, val) <- arg acc
         let rtype = if map toLower n == map toLower name then OldResponse n else DidYouMeanOldResponse n
         return MinecraftResponse { responseType = rtype, responseAccount = acc, responseValue = val }

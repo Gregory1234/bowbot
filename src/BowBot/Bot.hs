@@ -35,6 +35,7 @@ import BowBot.Discord.Commands
 import BowBot.Hypixel.LeaderboardCommand
 import BowBot.Hypixel.TimeStats
 import BowBot.Hypixel.TimeStatsCommand
+import BowBot.Hypixel.WatchlistCommands
 
 runBowBot :: IO ()
 runBowBot = do
@@ -145,8 +146,10 @@ commands =
   , hypixelTimeStatsCommand UserSettings "st"
   , leaderboardCommand winsLeaderboardType "lb"
   , leaderboardCommand lossesLeaderboardType "lbl"
-  , leaderboardCommand winsreakLeaderboardType "lbs"
+  , leaderboardCommand winstreakLeaderboardType "lbs"
   , leaderboardCommand wlrLeaderboardType "lbr"
+  , listCommand
+  , onlineCommand
   , refreshDataCommand
   , updateDataCommand [] "dataupdate"
   , updateDataCommand [DailyStats] "dataupdateday"

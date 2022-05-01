@@ -21,10 +21,7 @@ import Control.Concurrent.STM.TVar (readTVar, writeTVar, modifyTVar, TVar)
 import Data.Text (pack, unpack)
 import Control.Monad (when, unless, void)
 import BowBot.HoistIO
-import Discord.Types
 import qualified Data.Map as M
-import qualified Data.Map.Internal as M
-import Control.Exception (evaluate, assert)
 import Control.Monad.Error.Class (MonadError, throwError, catchError)
 
 dist :: Eq a => [a] -> [a] -> Int

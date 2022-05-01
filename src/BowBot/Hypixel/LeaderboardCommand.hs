@@ -108,9 +108,9 @@ lossesLeaderboardType = LeaderboardType "Hypixel Bow Duels Losses Leaderboard" "
   HypixelBowLeaderboardEntry {..} | bowLbWins >= 500 -> Just (bowLbLosses, show bowLbLosses)
   _ -> Nothing
 
-winsreakLeaderboardType :: LeaderboardType
-winsreakLeaderboardType = LeaderboardType "Hypixel Bow Duels Winstreak Leaderboard" "Winstreak" $ \case
-  HypixelBowLeaderboardEntry { bowLbWinstreak = (Just ws), .. } | ws >= 50 -> Just (ws, show ws)
+winstreakLeaderboardType :: LeaderboardType
+winstreakLeaderboardType = LeaderboardType "Hypixel Bow Duels Winstreak Leaderboard" "Winstreak" $ \case
+  HypixelBowLeaderboardEntry { bowLbWinstreak = (Just ws) } | ws >= 50 -> Just (ws, show ws)
   _ -> Nothing
 
 wlrLeaderboardType :: LeaderboardType

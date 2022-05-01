@@ -30,6 +30,7 @@ import Data.Coerce (coerce)
 import BowBot.Discord.Monad
 import Control.Monad.Reader
 import BowBot.Hypixel.TimeStats
+import BowBot.Hypixel.Watchlist
 
 
 emptyBotData :: STM BotData
@@ -47,6 +48,7 @@ emptyBotData = do
   hypixelDailyStatsCache <- newTVar empty
   hypixelWeeklyStatsCache <- newTVar empty
   hypixelMonthlyStatsCache <- newTVar empty
+  hypixelOnlinePlayersCache <- newCachedData
   return BotData {..}
 
 refreshBotData :: Connection -> BotData -> IO ()
@@ -76,6 +78,7 @@ clearBotDataCaches :: BotData -> IO ()
 clearBotDataCaches bdt = flip runBotDataT bdt $ do
   clearCounter (Proxy @HypixelApi)
   clearCacheSingle (Proxy @HypixelGuildMembers)
+  clearCacheSingle (Proxy @HypixelOnlinePlayers)
 
 downloadBotData :: IO BotData
 downloadBotData = do

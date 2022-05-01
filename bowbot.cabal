@@ -57,6 +57,8 @@ library
       BowBot.Hypixel.StatsCommand
       BowBot.Hypixel.TimeStats
       BowBot.Hypixel.TimeStatsCommand
+      BowBot.Hypixel.Watchlist
+      BowBot.Hypixel.WatchlistCommands
       BowBot.Minecraft.Account
       BowBot.Minecraft.Arg
       BowBot.Minecraft.Basic

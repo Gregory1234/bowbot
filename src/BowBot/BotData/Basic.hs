@@ -34,6 +34,7 @@ import BowBot.Hypixel.Guild
 import BowBot.Discord.Account
 import BowBot.Hypixel.TimeStats
 import Data.Default
+import BowBot.Hypixel.Watchlist
   
 data BotData = BotData
   { infoFieldCache :: DatabaseCache InfoField
@@ -49,6 +50,7 @@ data BotData = BotData
   , hypixelDailyStatsCache :: DatabaseCache (HypixelBowTimeStats 'DailyStats)
   , hypixelWeeklyStatsCache :: DatabaseCache (HypixelBowTimeStats 'WeeklyStats)
   , hypixelMonthlyStatsCache :: DatabaseCache (HypixelBowTimeStats 'MonthlyStats)
+  , hypixelOnlinePlayersCache :: CachedData HypixelOnlinePlayers
   }
 
 newtype BotDataT m a = BotDataT { runBotDataT :: BotData -> m a }
@@ -95,6 +97,11 @@ instance (MonadIO m, Default (SStatsTimeRange t)) => MonadCache (HypixelBowTimeS
     SDailyStats -> hypixelDailyStatsCache
     SWeeklyStats -> hypixelWeeklyStatsCache
     SMonthlyStats -> hypixelMonthlyStatsCache
+
+instance MonadIO m => MonadSimpleCacheSingle HypixelOnlinePlayers (BotDataT m) where
+  getCachedData _ = BotDataT $ return . hypixelOnlinePlayersCache
+
+deriving via (SimpleCacheSingle (BotDataT m)) instance MonadHoistIO m => MonadCacheSingle HypixelOnlinePlayers (BotDataT m)
 
 instance MonadReader r m => MonadReader r (BotDataT m) where
   ask = BotDataT $ const ask
