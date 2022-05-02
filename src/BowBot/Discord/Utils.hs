@@ -19,7 +19,7 @@ discordGuildMembers gid = do
     Left e -> do
       logError (show e)
       return []
-    Right m -> return m
+    Right m -> return (filter (maybe False (not . userIsBot) . memberUser) m)
 
 fromPingDiscordUser :: String -> Maybe UserId
 fromPingDiscordUser str | "<@" `isPrefixOf` str && ">" `isSuffixOf` str = readMaybe $ filter isDigit str
