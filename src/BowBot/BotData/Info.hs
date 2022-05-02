@@ -61,3 +61,5 @@ readEither a = maybe (Left "wrong format") Right $ readMaybe a
 discordGuildIdInfo :: InfoType GuildId
 discordGuildIdInfo = InfoType { infoName = "discord_guild_id", infoDefault = 0, infoParse = readEither }
 
+discordStatusInfo :: InfoType String
+discordStatusInfo = InfoType { infoName = "discord_status", infoDefault = "", infoParse = Right }

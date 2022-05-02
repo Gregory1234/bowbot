@@ -1,6 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE DerivingVia #-}
 {-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE FlexibleContexts #-}
 
 module BowBot.Bot where
 
@@ -31,7 +32,6 @@ import BowBot.Settings.Basic
 import BowBot.Network.Class (hManager)
 import BowBot.Network.ClearLogs
 import BowBot.Discord.Roles
-import BowBot.Discord.Commands
 import BowBot.Hypixel.LeaderboardCommand
 import BowBot.Hypixel.TimeStats
 import BowBot.Hypixel.TimeStatsCommand
@@ -63,6 +63,7 @@ backgroundMinutely mint = do
   liftIO $ clearBotDataCaches bdt
   when (mint == 0) $ withDB $ \conn -> do
     logInfoDB conn "started update"
+    updateDiscordStatus
     liftIO $ refreshBotData conn bdt
     manager <- hManager
     hour <- liftIO $ read @Int <$> getTime "%k"
@@ -82,6 +83,7 @@ backgroundMinutely mint = do
 
 onStartup :: Bot ()
 onStartup = void $ hoistIO forkIO $ do
+  updateDiscordStatus
   sec <- liftIO $ read @Int <$> getTime "%S"
   liftIO $ threadDelay ((65 - sec `mod` 60) * 1000000)
   void $ forever $ do
@@ -89,6 +91,16 @@ onStartup = void $ hoistIO forkIO $ do
       mint <- liftIO $ read @Int <$> getTime "%M"
       backgroundMinutely mint
     liftIO $ threadDelay 60000000
+
+updateDiscordStatus :: (MonadDiscord m, MonadCache InfoField m) => m ()
+updateDiscordStatus = do
+  discordStatus <- hInfoDB discordStatusInfo
+  liftDiscord $ sendCommand (UpdateStatus $ UpdateStatusOpts {
+        updateStatusOptsSince = Nothing,
+        updateStatusOptsGame = Just (def {activityName = pack discordStatus}),
+        updateStatusOptsNewStatus = UpdateStatusOnline,
+        updateStatusOptsAFK = False
+      })
 
 respond :: MonadDiscord m => Message -> String -> m ()
 respond m = call_ . CreateMessage (messageChannelId m) . pack
@@ -163,12 +175,13 @@ commands =
   , leaderboardCommand wlrLeaderboardType "lbr"
   , listCommand
   , onlineCommand
-  , refreshDataCommand
+  , botDataCommand "datarefresh" $ \bdt -> liftIO $ withDB $ \conn -> refreshBotData conn bdt
   , updateDataCommand [] "dataupdate"
   , updateDataCommand [DailyStats] "dataupdateday"
   , updateDataCommand [DailyStats, WeeklyStats] "dataupdateweek"
   , updateDataCommand [DailyStats, MonthlyStats] "dataupdatemonth"
   , updateDataCommand [DailyStats, WeeklyStats, MonthlyStats] "dataupdateweekmonth"
-  , clearLogsCommand
-  , updateRolesCommand
+  , botDataCommand "clearLogs" $ const clearLogs
+  , botDataCommand "rolesupdate" $ const updateRolesAll
+  , botDataCommand "statusupdate" $ const updateDiscordStatus
   ]

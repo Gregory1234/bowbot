@@ -15,13 +15,3 @@ clearLogs = hManager >>= \man -> liftIO $ do
   let url = "http://" ++ website ++ "/api/log/clear.php?key=" ++ apiKey
   request <- parseRequest url
   void $ try @SomeException $ httpLbs request man
-
-clearLogsCommand :: Command
-clearLogsCommand = Command CommandInfo
-  { commandName = "clearlogs"
-  , commandDescription = "" -- TODO
-  , commandPerms = AdminLevel
-  , commandTimeout = 120
-  } $ hNoArguments $ do
-    clearLogs
-    hRespond "Done"
