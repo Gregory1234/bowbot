@@ -104,6 +104,13 @@ storeNewRolesSaved did roles = do
           cache <- getCache (Proxy @SavedRoles)
           liftIO $ atomically $ modifyTVar cache (insertMany $ map (,savedRoles) (accountDiscords a))
 
+storeNewSavedRolesAll :: (MonadDiscord m, MonadCache InfoField m, MonadCache SavedRoles m, MonadCache BowBotAccount m) => m ()
+storeNewSavedRolesAll = do
+  gid <- hInfoDB discordGuildIdInfo
+  mems <- discordGuildMembers gid
+  for_ mems $ \gmem -> do
+    storeNewRolesSaved (maybe 0 userId (memberUser gmem)) (memberRoles gmem)
+
 updateRolesSaved :: (MonadDiscord m, MonadCache InfoField m, MonadCache SavedRoles m, MonadNetwork m, MonadCacheSingle HypixelGuildMembers m, MonadCounter HypixelApi m) => GuildMember -> Maybe BowBotAccount -> m ()
 updateRolesSaved gmem acc = do
   toggleableRolesAll <- hInfoDB toggleableRolesInfo

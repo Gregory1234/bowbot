@@ -10,8 +10,8 @@ import BowBot.Hypixel.TimeStats
 import Database.MySQL.Simple (Connection)
 import BowBot.BotData.Basic (BotData)
 
-botDataCommand :: String -> (BotData -> CommandHandler ()) -> Command
-botDataCommand name body = Command CommandInfo
+adminCommand :: String -> (BotData -> CommandHandler ()) -> Command
+adminCommand name body = Command CommandInfo
   { commandName = name
   , commandDescription = "" -- TODO
   , commandPerms = AdminLevel
@@ -22,8 +22,18 @@ botDataCommand name body = Command CommandInfo
     body bdt
     hRespond "Done"
 
+quietAdminCommand :: String -> (BotData -> CommandHandler ()) -> Command
+quietAdminCommand name body = Command CommandInfo
+  { commandName = name
+  , commandDescription = "" -- TODO
+  , commandPerms = AdminLevel
+  , commandTimeout = 120
+  } $ hNoArguments $ do
+    bdt <- CommandHandler $ \_ d _ -> return d
+    body bdt
+
 updateDataCommand :: [StatsTimeRange] -> String -> Command
-updateDataCommand times name = botDataCommand name $ \bdt -> do
+updateDataCommand times name = adminCommand name $ \bdt -> do
     liftIO $ withDB $ \conn -> refreshBotData conn bdt
     manager <- hManager
     liftDiscord $ updateBotData times manager bdt

@@ -175,13 +175,16 @@ commands =
   , leaderboardCommand wlrLeaderboardType "lbr"
   , listCommand
   , onlineCommand
-  , botDataCommand "datarefresh" $ \bdt -> liftIO $ withDB $ \conn -> refreshBotData conn bdt
+  , adminCommand "datarefresh" $ \bdt -> liftIO $ withDB $ \conn -> refreshBotData conn bdt
   , updateDataCommand [] "dataupdate"
   , updateDataCommand [DailyStats] "dataupdateday"
   , updateDataCommand [DailyStats, WeeklyStats] "dataupdateweek"
   , updateDataCommand [DailyStats, MonthlyStats] "dataupdatemonth"
   , updateDataCommand [DailyStats, WeeklyStats, MonthlyStats] "dataupdateweekmonth"
-  , botDataCommand "clearLogs" $ const clearLogs
-  , botDataCommand "rolesupdate" $ const updateRolesAll
-  , botDataCommand "statusupdate" $ const updateDiscordStatus
+  , adminCommand "clearLogs" $ const clearLogs
+  , adminCommand "rolesupdate" $ const updateRolesAll
+  , adminCommand "savedrolesstore" $ const storeNewSavedRolesAll
+  , adminCommand "statusupdate" $ const updateDiscordStatus
+  , quietAdminCommand "throw" $ const $ hRespond $ show ((1 :: Integer) `div` 0)
+  , quietAdminCommand "time" $ const $ hRespond =<< liftIO (getTime "Month: %m, Day: %d, Weekday: %u, Hour: %k, Minute: %M, Second %S")
   ]
