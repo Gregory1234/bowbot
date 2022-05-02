@@ -36,6 +36,8 @@ import BowBot.Hypixel.LeaderboardCommand
 import BowBot.Hypixel.TimeStats
 import BowBot.Hypixel.TimeStatsCommand
 import BowBot.Hypixel.WatchlistCommands
+import BowBot.Discord.Account
+import BowBot.Account.Basic
 
 runBowBot :: IO ()
 runBowBot = do
@@ -50,7 +52,8 @@ runBowBot = do
         { discordToken = pack discordKey,
           discordOnStart = ReaderT $ runBotT onStartup bdt manager,
           discordOnEvent = \e -> ReaderT $ runBotT (eventHandler e) bdt manager,
-          discordOnLog = putStrLn . unpack
+          discordOnLog = putStrLn . unpack,
+          discordGatewayIntent = def { gatewayIntentMembers = True }
         }
   logError $ unpack userFacingError
 
@@ -112,6 +115,16 @@ eventHandler (MessageCreate m) = do
             then runCommand c m
             else respond m "You don't have the permission to do that!"
           logInfo $ "finished " ++ unpack (messageContent m)
+eventHandler (GuildMemberAdd gid gmem) = do
+  maingid <- hInfoDB discordGuildIdInfo
+  when (gid == maingid && not (maybe True userIsBot (memberUser gmem))) $ do
+    void $ storeInCache [guildMemberToDiscordAccount gmem]
+    acc <- getBowBotAccountByDiscord (maybe 0 userId (memberUser gmem))
+    updateRoles gmem acc
+eventHandler (GuildMemberUpdate gid roles usr _) = do
+  maingid <- hInfoDB discordGuildIdInfo
+  when (not (null roles) && gid == maingid && not (userIsBot usr)) $ do
+    storeNewRolesSaved (userId usr) roles
 eventHandler _ = pure ()
 
 commandTimeoutRun :: (MonadHoistIO m, MonadDiscord m) => Int -> Message -> m () -> m ()

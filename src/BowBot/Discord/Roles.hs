@@ -23,8 +23,8 @@ import Data.Proxy
 import qualified Data.HashMap.Strict as HM
 import Data.Maybe (mapMaybe)
 import qualified Discord.Requests as R
-import Data.List ((\\), intersect)
-import BowBot.DB.Basic (queryLog)
+import Data.List ((\\), intersect, intercalate)
+import BowBot.DB.Basic (queryLog, withDB, executeManyLog)
 import BowBot.Hypixel.Guild
 import BowBot.Network.Class (MonadNetwork)
 import BowBot.Hypixel.Basic
@@ -72,7 +72,7 @@ updateRolesDivisionTitle gmem (Just BowBotAccount {..}) = do
 updateRolesDivisionTitle gmem Nothing = do
   pure () -- TODO
 
-newtype SavedRoles = SavedRoles { getSavedRoleNames :: [String] }
+newtype SavedRoles = SavedRoles { getSavedRoleNames :: [String] } deriving (Show, Eq)
 
 instance Cached SavedRoles where
   type CacheIndex SavedRoles = UserId
@@ -81,6 +81,26 @@ instance Cached SavedRoles where
     res :: [(Integer, String)] <- queryLog conn "SELECT `discord`, `roles` FROM `unregisteredDEV` UNION SELECT `peopleDiscordDEV`.`discord`, `peopleDEV`.`roles` FROM `peopleDiscordDEV` JOIN `peopleDEV` ON `peopleDEV`.`id`=`peopleDiscordDEV`.`id`" ()
     let newValues = HM.fromList $ flip fmap res $ \(fromInteger -> did, SavedRoles . splitOn "," -> roles) -> (did, roles)
     liftIO $ atomically $ writeTVar cache newValues
+
+storeNewRolesSaved :: (MonadDiscord m, MonadCache InfoField m, MonadCache SavedRoles m, MonadCache BowBotAccount m) => UserId -> [RoleId] -> m ()
+storeNewRolesSaved did roles = do
+  old <- getFromCache (Proxy @SavedRoles) did
+  savedRolesAll <- M.fromList . map (\(x,y) -> (y,x)) . M.toList <$> hInfoDB savedRolesInfo
+  let savedRoles = SavedRoles $ mapMaybe (savedRolesAll M.!?) roles
+  let rolesStr = intercalate "," $ getSavedRoleNames savedRoles
+  when (old /= Just savedRoles) $ do
+    acc <- getBowBotAccountByDiscord did
+    case acc of
+      Nothing -> do
+        success <- liftIO $ withDB $ \conn -> (>0) <$> executeManyLog conn "INSERT INTO `unregisteredDEV` (`discord`, `roles`) VALUES (?,?) ON DUPLICATE KEY UPDATE `roles`=VALUES(`roles`)" [(toInteger did, rolesStr)]
+        when success $ do
+          cache <- getCache (Proxy @SavedRoles)
+          liftIO $ atomically $ modifyTVar cache (insertMany [(did, savedRoles)])
+      Just a -> do
+        success <- liftIO $ withDB $ \conn -> (>0) <$> executeManyLog conn "INSERT INTO `peopleDEV` (`id`, `roles`) VALUES (?,?) ON DUPLICATE KEY UPDATE `roles`=VALUES(`roles`)" [(BowBot.Account.Basic.accountId a, rolesStr)]
+        when success $ do
+          cache <- getCache (Proxy @SavedRoles)
+          liftIO $ atomically $ modifyTVar cache (insertMany $ map (,savedRoles) (accountDiscords a))
 
 updateRolesSaved :: (MonadDiscord m, MonadCache InfoField m, MonadCache SavedRoles m) => GuildMember -> m ()
 updateRolesSaved gmem = do
