@@ -24,12 +24,14 @@ import BowBot.Discord.Utils
 import BowBot.Account.Basic
 
 
-hypixelTimeStatsCommand :: SettingsSource -> String -> Command
-hypixelTimeStatsCommand src name = Command CommandInfo
+hypixelTimeStatsCommand :: SettingsSource -> String -> String -> Command
+hypixelTimeStatsCommand src name desc = Command CommandInfo
   { commandName = name
-  , commandDescription = "" -- TODO
+  , commandUsage = name ++ " [name]"
+  , commandDescription = desc
   , commandPerms = DefaultLevel
   , commandTimeout = 15
+  , commandGroup = "normal"
   } $ hOneOptionalArgument (\s -> lift (hEnv envSender) >>= minecraftArgDefault helper s . userId) $ \MinecraftResponse {responseAccount = responseAccount@MinecraftAccount {..}, ..} -> do
     let (didYouMean, renderedName) = case responseType of
           JustResponse -> ("", head mcNames)

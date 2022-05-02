@@ -39,6 +39,7 @@ library
       BowBot.Command.Args
       BowBot.Command.Basic
       BowBot.Command.Handler
+      BowBot.Command.HelpCommand
       BowBot.DB.Basic
       BowBot.Discord.Account
       BowBot.Discord.Class

@@ -74,9 +74,11 @@ generateLeaderboardLines LeaderboardType {..} selected = do
 leaderboardCommand :: LeaderboardType -> String -> Command
 leaderboardCommand lbt@LeaderboardType {..} name = Command CommandInfo
   { commandName = name
-  , commandDescription = "" -- TODO
+  , commandUsage = name ++ " [name|page|\"all\"]"
+  , commandDescription = "show Bow Duels " ++ leaderboardName ++ " leaderboard"
   , commandPerms = DefaultLevel
   , commandTimeout = 15
+  , commandGroup = "normal"
   } $ hOneOptionalArgument (leaderboardArgument leaderboardParser) $ \case
     (LeaderboardPage pagenum, selected) -> do
       lb <- generateLeaderboardLines lbt selected

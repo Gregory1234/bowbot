@@ -13,9 +13,11 @@ import BowBot.BotData.CachedSingle
 listCommand :: Command
 listCommand = Command CommandInfo
   { commandName = "list"
-  , commandDescription = "" -- TODO
+  , commandUsage = "list"
+  , commandDescription = "list all players on the watchlist"
   , commandPerms = DefaultLevel
   , commandTimeout = 2
+  , commandGroup = "normal"
   } $ hNoArguments $ do
     watchlist <- getWatchlist
     hRespond $ "**Players in watchList:**\n```\n" ++ unwords (map (head . mcNames) watchlist) ++ "```"
@@ -23,9 +25,11 @@ listCommand = Command CommandInfo
 onlineCommand :: Command
 onlineCommand = Command CommandInfo
   { commandName = "online"
-  , commandDescription = "" -- TODO
+  , commandUsage = "online"
+  , commandDescription = "list all people from the watchlist currently in Bow Duels"
   , commandPerms = DefaultLevel
   , commandTimeout = 30
+  , commandGroup = "normal"
   } $ hNoArguments $ do
     res <- getHypixelOnlinePlayers
     cache <- getCacheMap (Proxy @MinecraftAccount)

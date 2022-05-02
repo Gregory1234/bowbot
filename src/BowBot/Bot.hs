@@ -38,6 +38,7 @@ import BowBot.Hypixel.TimeStatsCommand
 import BowBot.Hypixel.WatchlistCommands
 import BowBot.Discord.Account
 import BowBot.Account.Basic
+import BowBot.Command.HelpCommand
 
 runBowBot :: IO ()
 runBowBot = do
@@ -165,26 +166,29 @@ backgroundTimeoutRun n x = do
 
 commands :: [Command]
 commands =
-  [ hypixelStatsCommand UserSettings "s"
-  , hypixelStatsCommand DefSettings "sd"
-  , hypixelStatsCommand AllSettings "sa"
-  , hypixelTimeStatsCommand UserSettings "st"
+  [ helpCommand commands DefaultLevel "normal" "help"
+  , hypixelStatsCommand UserSettings "s" "show player's Bow Duels stats"
+  , hypixelStatsCommand DefSettings "sd" "show a default set of player's Bow Duels stats"
+  , hypixelStatsCommand AllSettings "sa" "show all of player's Bow Duels stats"
+  , hypixelTimeStatsCommand UserSettings "st" "show daily, weekly and monthly Bow Duels stats"
   , leaderboardCommand winsLeaderboardType "lb"
   , leaderboardCommand lossesLeaderboardType "lbl"
   , leaderboardCommand winstreakLeaderboardType "lbs"
   , leaderboardCommand wlrLeaderboardType "lbr"
   , listCommand
   , onlineCommand
-  , adminCommand "datarefresh" $ \bdt -> liftIO $ withDB $ \conn -> refreshBotData conn bdt
+  , helpCommand commands ModLevel "normal" "modhelp"
+  , helpCommand commands AdminLevel "normal" "adminhelp"
+  , adminCommand "datarefresh" "sync Bow Bot's data from the database" $ \bdt -> liftIO $ withDB $ \conn -> refreshBotData conn bdt
   , updateDataCommand [] "dataupdate"
   , updateDataCommand [DailyStats] "dataupdateday"
   , updateDataCommand [DailyStats, WeeklyStats] "dataupdateweek"
   , updateDataCommand [DailyStats, MonthlyStats] "dataupdatemonth"
   , updateDataCommand [DailyStats, WeeklyStats, MonthlyStats] "dataupdateweekmonth"
-  , adminCommand "clearLogs" $ const clearLogs
-  , adminCommand "rolesupdate" $ const updateRolesAll
-  , adminCommand "savedrolesstore" $ const storeNewSavedRolesAll
-  , adminCommand "statusupdate" $ const updateDiscordStatus
-  , quietAdminCommand "throw" $ const $ hRespond $ show ((1 :: Integer) `div` 0)
-  , quietAdminCommand "time" $ const $ hRespond =<< liftIO (getTime "Month: %m, Day: %d, Weekday: %u, Hour: %k, Minute: %M, Second %S")
+  , adminCommand "clearLogs" "clear Bow Bot's logs" $ const clearLogs
+  , adminCommand "rolesupdate" "update everyone's discord roles" $ const updateRolesAll
+  , adminCommand "savedrolesstore" "store everyone's saved roles" $ const storeNewSavedRolesAll
+  , adminCommand "statusupdate" "update Bow Bot's discord status"$ const updateDiscordStatus
+  , quietAdminCommand "throw" "throw an error" $ const $ hRespond $ show ((1 :: Integer) `div` 0)
+  , quietAdminCommand "time" "display Bow Bot's time" $ const $ hRespond =<< liftIO (getTime "Month: %m, Day: %d, Weekday: %u, Hour: %k, Minute: %M, Second %S")
   ]

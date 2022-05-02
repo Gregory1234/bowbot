@@ -23,12 +23,14 @@ import BowBot.Account.Basic
 import BowBot.Discord.Utils (discordGuildMembers)
 import Control.Monad.Trans (lift)
 
-hypixelStatsCommand :: SettingsSource -> String -> Command
-hypixelStatsCommand src name = Command CommandInfo
+hypixelStatsCommand :: SettingsSource -> String -> String -> Command
+hypixelStatsCommand src name desc = Command CommandInfo
   { commandName = name
-  , commandDescription = "" -- TODO
+  , commandUsage = name ++ " [name]"
+  , commandDescription = desc
   , commandPerms = DefaultLevel
   , commandTimeout = 15
+  , commandGroup = "normal"
   } $ hOneOptionalArgument (\s -> lift (hEnv envSender) >>= minecraftArgDefault helper s . userId) $ \MinecraftResponse {responseAccount = responseAccount@MinecraftAccount {..}, ..} -> do
     let (didYouMean, renderedName) = case responseType of
           JustResponse -> ("", head mcNames)
