@@ -42,6 +42,7 @@ import BowBot.Command.HelpCommand
 import BowBot.Minecraft.Basic
 import BowBot.Minecraft.UrlCommand
 import BowBot.Minecraft.NameCommand
+import BowBot.Account.InfoCommand
 
 runBowBot :: IO ()
 runBowBot = do
@@ -178,6 +179,7 @@ commands =
   , leaderboardCommand lossesLeaderboardType "lbl"
   , leaderboardCommand winstreakLeaderboardType "lbs"
   , leaderboardCommand wlrLeaderboardType "lbr"
+  , infoCommand
   , nameCommand
   , urlCommand "head" "show player's head" $ \s -> "https://crafatar.com/avatars/" ++ uuidString s ++ "?overlay"
   , urlCommand "skin" "show player's full skin" $ \s -> "https://crafatar.com/renders/body/" ++ uuidString s ++ "?overlay"

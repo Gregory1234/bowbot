@@ -54,6 +54,10 @@ userToDiscordAccount User {..} = DiscordAccount
   , discordNickname = Nothing
   }
 
+showDiscordAccount :: DiscordAccount -> String
+showDiscordAccount DiscordAccount { discordNickname = Nothing, ..} = discordName ++ "#" ++ discordDiscrim
+showDiscordAccount DiscordAccount { discordNickname = Just nick, ..} = discordName ++ "#" ++ discordDiscrim ++ " (" ++ nick ++ ")"
+
 class (MonadDiscord m, MonadCache InfoField m) => CacheUpdateSourceConstraintForDiscordAccount m where
 instance (MonadDiscord m, MonadCache InfoField m) => CacheUpdateSourceConstraintForDiscordAccount m where
 

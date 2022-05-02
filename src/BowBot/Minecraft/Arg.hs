@@ -93,8 +93,11 @@ theUserIsntRegisteredMessage = "*The user isn't registered!*"
 minecraftArgDiscord' :: (MonadError String m, MonadCache BowBotAccount m, MonadCache MinecraftAccount m) => (MinecraftAccount -> m (Bool, a)) -> UserId -> m (MinecraftResponse a)
 minecraftArgDiscord' = minecraftArgDiscord theUserIsntRegisteredMessage
 
+youArentRegisteredMessage :: String
+youArentRegisteredMessage = "*You aren't registered! To register, type `?register yourign`.*"
+
 minecraftArgDiscordSelf :: (MonadError String m, MonadCache BowBotAccount m, MonadCache MinecraftAccount m) => (MinecraftAccount -> m (Bool, a)) -> UserId -> m (MinecraftResponse a)
-minecraftArgDiscordSelf = minecraftArgDiscord "*You aren't registered! To register, type `?register yourign`.*"
+minecraftArgDiscordSelf = minecraftArgDiscord youArentRegisteredMessage
 
 minecraftArgDiscord :: (MonadError String m, MonadCache BowBotAccount m, MonadCache MinecraftAccount m) => String -> (MinecraftAccount -> m (Bool, a)) -> UserId -> m (MinecraftResponse a)
 minecraftArgDiscord err arg did = do
