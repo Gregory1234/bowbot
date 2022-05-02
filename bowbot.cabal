@@ -62,6 +62,8 @@ library
       BowBot.Minecraft.Account
       BowBot.Minecraft.Arg
       BowBot.Minecraft.Basic
+      BowBot.Minecraft.NameCommand
+      BowBot.Minecraft.UrlCommand
       BowBot.Network.Basic
       BowBot.Network.Class
       BowBot.Network.ClearLogs

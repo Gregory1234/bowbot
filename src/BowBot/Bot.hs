@@ -39,6 +39,9 @@ import BowBot.Hypixel.WatchlistCommands
 import BowBot.Discord.Account
 import BowBot.Account.Basic
 import BowBot.Command.HelpCommand
+import BowBot.Minecraft.Basic
+import BowBot.Minecraft.UrlCommand
+import BowBot.Minecraft.NameCommand
 
 runBowBot :: IO ()
 runBowBot = do
@@ -175,6 +178,9 @@ commands =
   , leaderboardCommand lossesLeaderboardType "lbl"
   , leaderboardCommand winstreakLeaderboardType "lbs"
   , leaderboardCommand wlrLeaderboardType "lbr"
+  , nameCommand
+  , urlCommand "head" "show player's head" $ \s -> "https://crafatar.com/avatars/" ++ uuidString s ++ "?overlay"
+  , urlCommand "skin" "show player's full skin" $ \s -> "https://crafatar.com/renders/body/" ++ uuidString s ++ "?overlay"
   , listCommand
   , onlineCommand
   , helpCommand commands ModLevel "normal" "modhelp"
