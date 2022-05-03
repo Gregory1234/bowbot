@@ -28,6 +28,8 @@ library
       BowBot.Account.Arg
       BowBot.Account.Basic
       BowBot.Account.InfoCommand
+      BowBot.Account.Register
+      BowBot.Account.RegisterCommand
       BowBot.Bot
       BowBot.BotData.Basic
       BowBot.BotData.Cached

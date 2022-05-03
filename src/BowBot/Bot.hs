@@ -43,6 +43,7 @@ import BowBot.Minecraft.Basic
 import BowBot.Minecraft.UrlCommand
 import BowBot.Minecraft.NameCommand
 import BowBot.Account.InfoCommand
+import BowBot.Account.RegisterCommand
 
 runBowBot :: IO ()
 runBowBot = do
@@ -171,6 +172,7 @@ backgroundTimeoutRun n x = do
 commands :: [Command]
 commands =
   [ helpCommand commands DefaultLevel "normal" "help"
+  , registerCommand
   , hypixelStatsCommand UserSettings "s" "show player's Bow Duels stats"
   , hypixelStatsCommand DefSettings "sd" "show a default set of player's Bow Duels stats"
   , hypixelStatsCommand AllSettings "sa" "show all of player's Bow Duels stats"

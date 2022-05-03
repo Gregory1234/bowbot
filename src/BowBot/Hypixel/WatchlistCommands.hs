@@ -40,4 +40,4 @@ onlineCommand = Command CommandInfo
       CacheFresh online -> hRespond $ "**Players in watchList:**\n```\n" ++ showOnline online ++ "```"
       CacheOld online -> hRespond $ "**Players in watchList:** (cached response)\n```\n" ++ showOnline online ++ "```"
       CacheBusy -> hRespond "**Processing list of online players. Please send command again later.**"
-      CacheFailed -> hRespond "**Something went wrong!**"
+      CacheFailed -> hRespond somethingWentWrongMessage

@@ -12,11 +12,22 @@ hWithArguments parser body = do
     Left e -> hRespond e
     Right a -> body a
 
+hWithArguments' :: (CommandArgs -> ExceptT String CommandHandler ()) -> CommandHandler ()
+hWithArguments' body = do
+  args <- hEnv envArgs
+  v <- runExceptT (body args)
+  case v of
+    Left e -> hRespond e
+    Right _ -> pure ()
+
 hNoArguments :: CommandHandler () -> CommandHandler ()
 hNoArguments body = hWithArguments noArgumentParser $ \() -> body
 
 hOneArgument :: (String -> ExceptT String CommandHandler a) -> (a -> CommandHandler ()) -> CommandHandler ()
 hOneArgument parser = hWithArguments (\(CommandMessageArgs args) -> assertArgumentsCount 1 1 args >> parser (head args))
+
+hOneArgument' :: (String -> ExceptT String CommandHandler ()) -> CommandHandler ()
+hOneArgument' body = hWithArguments' (\(CommandMessageArgs args) -> assertArgumentsCount 1 1 args >> body (head args))
 
 hOneOptionalArgument :: (Maybe String -> ExceptT String CommandHandler a) -> (a -> CommandHandler ()) -> CommandHandler ()
 hOneOptionalArgument parser = hWithArguments (\(CommandMessageArgs args) -> assertArgumentsCount 0 1 args >> parser (listToMaybe args))

@@ -20,3 +20,6 @@ runCommand Command {..} m = do
   bdt <- BotT $ \d _ _ -> return d
   manager <- hManager
   liftDiscord $ runCommandHandler commandHandler (commandEnvFromMessage m) bdt manager
+
+somethingWentWrongMessage :: String
+somethingWentWrongMessage = "**Something went wrong!**"
