@@ -189,6 +189,7 @@ commands =
   , onlineCommand
   , helpCommand commands ModLevel "normal" "modhelp"
   , addCommand
+  , addaltCommand
   , helpCommand commands AdminLevel "normal" "adminhelp"
   , adminCommand "datarefresh" "sync Bow Bot's data from the database" $ \bdt -> liftIO $ withDB $ \conn -> refreshBotData conn bdt
   , updateDataCommand [] "dataupdate"

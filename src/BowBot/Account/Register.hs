@@ -17,6 +17,7 @@ import Database.MySQL.Simple (withTransaction, rollback, insertID)
 import Data.Functor (($>))
 import Control.Monad.Except (runExceptT, throwError)
 import Data.List (intercalate)
+import Data.Maybe (fromJust)
 
 createNewBowBotAccount :: (MonadCache BowBotAccount m, MonadCache SavedRoles m) => String -> UserId -> UUID -> m (Maybe BowBotAccount)
 createNewBowBotAccount name did uuid = do
@@ -34,3 +35,13 @@ createNewBowBotAccount name did uuid = do
     pure $ BowBotAccount { accountId = bid, accountDiscords = [did], accountSelectedMinecraft = uuid, accountMinecrafts = [uuid] }
   liftIO $ atomically $ for_ ret $ \bacc -> modifyTVar cache (insertMany [(accountId bacc, bacc)])
   return ret
+
+addAltToBowBotAccount :: MonadCache BowBotAccount m => Integer -> UUID -> m (Maybe BowBotAccount)
+addAltToBowBotAccount bid uuid = do
+  acc <- fromJust <$> getFromCache (Proxy @BowBotAccount) bid
+  success <- liftIO $ withDB $ \conn -> (>0) <$> executeLog conn "INSERT INTO `peopleMinecraftDEV`(`id`, `minecraft`,`status`, `selected`, `verified`) VALUES (?,?, 'alt', 0, 0)" (bid, uuidString uuid)
+  let newacc = acc { accountMinecrafts = accountMinecrafts acc ++ [uuid] }
+  when success $ do
+    cache <- getCache (Proxy @BowBotAccount)
+    liftIO $ atomically $ modifyTVar cache (insertMany [(bid, newacc)])
+  return $ if success then Just newacc else Nothing

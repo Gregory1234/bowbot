@@ -8,6 +8,7 @@ import BowBot.Command
 import BowBot.Minecraft.Account
 import BowBot.Account.Basic
 import BowBot.Minecraft.Arg
+import BowBot.Account.Arg
 import BowBot.Discord.Utils
 import BowBot.BotData.Cached (storeInCache, getFromCache, storeInCacheIndexed)
 import BowBot.Hypixel.Basic (HypixelApi)
@@ -92,3 +93,35 @@ addCommand = Command CommandInfo
           registerAlreadyBelongsSomeoneElseMessage = "*That account already belongs to someone else!*",
           registerAlreadyRegisteredMessage = "*That person is not registered!*"
         } name
+
+addaltCommand :: Command
+addaltCommand = Command CommandInfo
+  { commandName = "addalt"
+  , commandUsage = "addalt [discord] [name]"
+  , commandDescription = "register someone's alt account in Bow Bot"
+  , commandPerms = ModLevel
+  , commandTimeout = 30
+  , commandGroup = "normal"
+  } $ hTwoArguments' $ \did name -> do
+    bacc <- liftMaybe thePlayerIsntRegisteredMessage =<< getBowBotAccountByDiscord =<< getAndValidateDiscordId did
+    uuid <- liftMaybe thePlayerDoesNotExistMessage =<< mcNameToUUID name
+    baccother <- getBowBotAccountByMinecraft uuid
+    for_ baccother $ \acc -> throwError $ if bacc == acc then "*That account already belongs to this user!*" else "*That account already belongs to someone else!*"
+    cv <- tryIncreaseCounter (Proxy @HypixelApi) 1
+    stats <- case cv of
+      Nothing -> liftMaybe "*The player has never joined Hypixel!*" =<< requestHypixelBowStats uuid
+      Just sec -> throwError $ "*Too many requests! Wait another " ++ show sec ++ " seconds!*"
+    saved <- getFromCache (Proxy @MinecraftAccount) uuid
+    case saved of -- TODO: remove repetition!
+      Nothing -> do
+        names <- liftMaybe thePlayerDoesNotExistMessage =<< mcUUIDToNames uuid
+        let newacc = MinecraftAccount { mcUUID = uuid, mcNames = names, mcHypixelBow = NotBanned, mcHypixelWatchlist = False }
+        a <- storeInCache [newacc]
+        unless a $ throwError somethingWentWrongMessage
+        when a $ void $ storeInCacheIndexed [(uuid, hypixelBowStatsToLeaderboards stats)]
+      Just _ -> void $ storeInCacheIndexed [(uuid, hypixelBowStatsToLeaderboards stats)]
+    newacc <- liftMaybe somethingWentWrongMessage =<< addAltToBowBotAccount (BowBot.Account.Basic.accountId bacc) uuid
+    gid <- hInfoDB discordGuildIdInfo
+    gmems <- discordGuildMembers gid
+    for_ gmems $ \gmem -> when (maybe 0 userId (memberUser gmem) `elem` accountDiscords bacc) $ updateRoles gmem (Just newacc)
+    lift $ hRespond "*Registered successfully*"
