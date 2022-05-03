@@ -49,6 +49,7 @@ library
       BowBot.Discord.Class
       BowBot.Discord.DiscordNFData
       BowBot.Discord.Monad
+      BowBot.Discord.RoleCommand
       BowBot.Discord.Roles
       BowBot.Discord.Utils
       BowBot.HoistIO

@@ -75,7 +75,7 @@ instance CachedUpdatable MinecraftAccount where
           newNames <- mojangUUIDToNames mcUUID
           return MinecraftAccount {mcNames = fromMaybe mcNames newNames, ..}
     cache <- HM.elems <$> getCacheMap proxy
-    let chunked = chunksOf 10 cache
+    let chunked = chunksOf 10 cache -- TODO: there are too many of them!!!
     updatedAccounts <- liftIO $ fmap concat $ for chunked $ mapConcurrently (fmap (`runNetworkT` manager) helper)
     void $ storeInCache updatedAccounts
 

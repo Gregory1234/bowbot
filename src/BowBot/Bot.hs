@@ -44,6 +44,7 @@ import BowBot.Minecraft.UrlCommand
 import BowBot.Minecraft.NameCommand
 import BowBot.Account.InfoCommand
 import BowBot.Account.RegisterCommand
+import BowBot.Discord.RoleCommand
 
 runBowBot :: IO ()
 runBowBot = do
@@ -182,6 +183,7 @@ commands =
   , leaderboardCommand winstreakLeaderboardType "lbs"
   , leaderboardCommand wlrLeaderboardType "lbr"
   , infoCommand
+  , roleCommand
   , nameCommand
   , urlCommand "head" "show player's head" $ \s -> "https://crafatar.com/avatars/" ++ uuidString s ++ "?overlay"
   , urlCommand "skin" "show player's full skin" $ \s -> "https://crafatar.com/renders/body/" ++ uuidString s ++ "?overlay"
