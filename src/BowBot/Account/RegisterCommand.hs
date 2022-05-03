@@ -45,7 +45,7 @@ registerCommandBody RegisterCommandMessages {..} name did = do
       when a $ void $ storeInCacheIndexed [(uuid, hypixelBowStatsToLeaderboards stats)]
       pure newacc
     Just acc -> do
-      void $ storeInCacheIndexed [(uuid, hypixelBowStatsToLeaderboards stats)]
+      when (mcHypixelBow acc == NotBanned) $ void $ storeInCacheIndexed [(uuid, hypixelBowStatsToLeaderboards stats)]
       pure acc
   newacc <- liftMaybe somethingWentWrongMessage =<< createNewBowBotAccount (head $ mcNames mc) did uuid
   gid <- hInfoDB discordGuildIdInfo
@@ -119,7 +119,8 @@ addaltCommand = Command CommandInfo
         a <- storeInCache [newacc]
         unless a $ throwError somethingWentWrongMessage
         when a $ void $ storeInCacheIndexed [(uuid, hypixelBowStatsToLeaderboards stats)]
-      Just _ -> void $ storeInCacheIndexed [(uuid, hypixelBowStatsToLeaderboards stats)]
+      Just MinecraftAccount { mcHypixelBow = NotBanned } -> void $ storeInCacheIndexed [(uuid, hypixelBowStatsToLeaderboards stats)]
+      _ -> pure ()
     newacc <- liftMaybe somethingWentWrongMessage =<< addAltToBowBotAccount (BowBot.Account.Basic.accountId bacc) uuid
     gid <- hInfoDB discordGuildIdInfo
     gmems <- discordGuildMembers gid

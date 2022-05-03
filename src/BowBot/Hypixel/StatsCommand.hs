@@ -45,7 +45,7 @@ hypixelStatsCommand src name desc = Command CommandInfo
       Nothing | bowWins responseValue >= 50 -> do
         a <- storeInCache [responseAccount]
         when a $ void $ storeInCacheIndexed [(mcUUID, hypixelBowStatsToLeaderboards responseValue)]
-      Just MinecraftAccount { mcHypixelBow = NotBanned} -> do
+      Just MinecraftAccount { mcHypixelBow = NotBanned } -> do
         void $ storeInCacheIndexed [(mcUUID, hypixelBowStatsToLeaderboards responseValue)]
       _ -> pure ()
     gid <- hInfoDB discordGuildIdInfo

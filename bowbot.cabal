@@ -53,6 +53,7 @@ library
       BowBot.Discord.Roles
       BowBot.Discord.Utils
       BowBot.HoistIO
+      BowBot.Hypixel.BanCommand
       BowBot.Hypixel.Basic
       BowBot.Hypixel.Division
       BowBot.Hypixel.Guild

@@ -45,6 +45,7 @@ import BowBot.Minecraft.NameCommand
 import BowBot.Account.InfoCommand
 import BowBot.Account.RegisterCommand
 import BowBot.Discord.RoleCommand
+import BowBot.Hypixel.BanCommand
 
 runBowBot :: IO ()
 runBowBot = do
@@ -192,6 +193,7 @@ commands =
   , helpCommand commands ModLevel "normal" "modhelp"
   , addCommand
   , addaltCommand
+  , hypixelBanCommand
   , helpCommand commands AdminLevel "normal" "adminhelp"
   , adminCommand "datarefresh" "sync Bow Bot's data from the database" $ \bdt -> liftIO $ withDB $ \conn -> refreshBotData conn bdt
   , updateDataCommand [] "dataupdate"
