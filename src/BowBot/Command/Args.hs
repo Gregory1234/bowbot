@@ -32,6 +32,9 @@ hOneArgument' body = hWithArguments' (\(CommandMessageArgs args) -> assertArgume
 hOneOptionalArgument :: (Maybe String -> ExceptT String CommandHandler a) -> (a -> CommandHandler ()) -> CommandHandler ()
 hOneOptionalArgument parser = hWithArguments (\(CommandMessageArgs args) -> assertArgumentsCount 0 1 args >> parser (listToMaybe args))
 
+hTwoArguments' :: (String -> String -> ExceptT String CommandHandler ()) -> CommandHandler ()
+hTwoArguments' body = hWithArguments' (\(CommandMessageArgs args) -> assertArgumentsCount 2 2 args >> body (head args) (args !! 1))
+
 noArgumentParser :: CommandArgs -> ExceptT String CommandHandler ()
 noArgumentParser (CommandMessageArgs args) = assertArgumentsCount 0 0 args
 
