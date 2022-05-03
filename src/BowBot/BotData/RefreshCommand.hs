@@ -15,11 +15,9 @@ import Data.Char (toLower)
 adminCommand :: String -> String -> (BotData -> CommandHandler ()) -> Command
 adminCommand name desc body = Command CommandInfo
   { commandName = name
-  , commandUsage = name
-  , commandDescription = desc
+  , commandHelpEntries = [HelpEntry { helpUsage = name, helpDescription = desc, helpGroup = "normal" }]
   , commandPerms = AdminLevel
   , commandTimeout = 120
-  , commandGroup = "normal"
   } $ hNoArguments $ do
     hRespond "Received"
     bdt <- CommandHandler $ \_ d _ -> return d
@@ -29,11 +27,9 @@ adminCommand name desc body = Command CommandInfo
 quietAdminCommand :: String -> String -> (BotData -> CommandHandler ()) -> Command
 quietAdminCommand name desc body = Command CommandInfo
   { commandName = name
-  , commandUsage = name
-  , commandDescription = desc
+  , commandHelpEntries = [HelpEntry { helpUsage = name, helpDescription = desc, helpGroup = "normal" }]
   , commandPerms = AdminLevel
   , commandTimeout = 120
-  , commandGroup = "normal"
   } $ hNoArguments $ do
     bdt <- CommandHandler $ \_ d _ -> return d
     body bdt

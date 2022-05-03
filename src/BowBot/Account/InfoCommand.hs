@@ -19,11 +19,9 @@ import BowBot.Minecraft.Basic (uuidString)
 infoCommand :: Command
 infoCommand = Command CommandInfo
   { commandName = "i"
-  , commandUsage = "i [name]"
-  , commandDescription = "show info about a player"
+  , commandHelpEntries = [HelpEntry { helpUsage = "i [name]", helpDescription = "show info about a player", helpGroup = "normal" }]
   , commandPerms = DefaultLevel
   , commandTimeout = 15
-  , commandGroup = "normal"
   } $ hOneOptionalArgument (\s -> lift (hEnv envSender) >>= accountArgDefault s . userId) $ \AccountResponse { accResponseAccount = BowBotAccount {..}, ..} -> do
     let (didYouMean, renderedName) = case accResponseCause of
           (Left acc) -> ("", showDiscordAccount acc)

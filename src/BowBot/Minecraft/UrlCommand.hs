@@ -12,10 +12,8 @@ import Control.Monad.Trans (lift)
 urlCommand :: String -> String -> (UUID -> String) -> Command
 urlCommand name desc url = Command CommandInfo
   { commandName = name
-  , commandUsage = name ++ " [name]"
-  , commandDescription = desc
+  , commandHelpEntries = [HelpEntry { helpUsage = name ++ " [name]", helpDescription = desc, helpGroup = "normal" }]
   , commandPerms = DefaultLevel
   , commandTimeout = 15
-  , commandGroup = "normal"
   } $ hOneOptionalArgument (\s -> lift (hEnv envSender) >>= minecraftArgDefault (const $ return (True, ())) s . userId) $ \MinecraftResponse {responseAccount = MinecraftAccount {..}} -> do
     hRespond $ url mcUUID

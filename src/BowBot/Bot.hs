@@ -214,4 +214,5 @@ commands =
   , adminCommand "statusupdate" "update Bow Bot's discord status"$ const updateDiscordStatus
   , quietAdminCommand "throw" "throw an error" $ const $ hRespond $ show ((1 :: Integer) `div` 0)
   , quietAdminCommand "time" "display Bow Bot's time" $ const $ hRespond =<< liftIO (getTime "Month: %m, Day: %d, Weekday: %u, Hour: %k, Minute: %M, Second %S")
+  , Command CommandInfo { commandName = "gregc", commandHelpEntries = [], commandPerms = DefaultLevel, commandTimeout = 2 } $ hNoArguments $ hRespond "<:gregc:904127204865228851>"
   ]

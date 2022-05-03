@@ -11,11 +11,9 @@ import Control.Monad.Trans (lift)
 nameCommand :: Command
 nameCommand = Command CommandInfo
   { commandName = "n"
-  , commandUsage = "n [name]"
-  , commandDescription = "show player's Minecraft name history"
+  , commandHelpEntries = [HelpEntry { helpUsage = "n [name]", helpDescription = "show player's Minecraft name history", helpGroup = "normal" }]
   , commandPerms = DefaultLevel
   , commandTimeout = 15
-  , commandGroup = "normal"
   } $ hOneOptionalArgument (\s -> lift (hEnv envSender) >>= minecraftArgDefault (const $ return (True, ())) s . userId) $ \MinecraftResponse {responseAccount = MinecraftAccount {..}, ..} -> do
     let (didYouMean, renderedName) = case responseType of
           JustResponse -> ("Name history of", head mcNames)

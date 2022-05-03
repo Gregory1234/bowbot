@@ -56,11 +56,9 @@ registerCommandBody RegisterCommandMessages {..} name did = do
 registerCommand :: Command
 registerCommand = Command CommandInfo
   { commandName = "register"
-  , commandUsage = "register [name]"
-  , commandDescription = "register your Minecraft name in Bow Bot"
+  , commandHelpEntries = [HelpEntry { helpUsage = "register [name]", helpDescription = "register your Minecraft name in Bow Bot", helpGroup = "normal" }]
   , commandPerms = DefaultLevel
   , commandTimeout = 30
-  , commandGroup = "normal"
   } $ hOneArgument' $ \name ->
     lift (hEnv envSender) >>=
       registerCommandBody RegisterCommandMessages {
@@ -81,11 +79,9 @@ getAndValidateDiscordId _ = throwError "*The discord id is invalid!*"
 addCommand :: Command
 addCommand = Command CommandInfo
   { commandName = "add"
-  , commandUsage = "add [discord] [name]"
-  , commandDescription = "register someone in Bow Bot"
+  , commandHelpEntries = [HelpEntry { helpUsage = "add [discord] [name]", helpDescription = "register someone in Bow Bot", helpGroup = "normal" }]
   , commandPerms = ModLevel
   , commandTimeout = 30
-  , commandGroup = "normal"
   } $ hTwoArguments' $ \did name ->
     getAndValidateDiscordId did >>=
       registerCommandBody RegisterCommandMessages {
@@ -97,11 +93,9 @@ addCommand = Command CommandInfo
 addaltCommand :: Command
 addaltCommand = Command CommandInfo
   { commandName = "addalt"
-  , commandUsage = "addalt [discord] [name]"
-  , commandDescription = "register someone's alt account in Bow Bot"
+  , commandHelpEntries = [HelpEntry { helpUsage = "addalt [discord] [name]", helpDescription = "register someone's alt account in Bow Bot", helpGroup = "normal" }]
   , commandPerms = ModLevel
   , commandTimeout = 30
-  , commandGroup = "normal"
   } $ hTwoArguments' $ \did name -> do
     bacc <- liftMaybe thePlayerIsntRegisteredMessage =<< getBowBotAccountByDiscord =<< getAndValidateDiscordId did
     uuid <- liftMaybe thePlayerDoesNotExistMessage =<< mcNameToUUID name

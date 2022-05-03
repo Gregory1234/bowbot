@@ -14,11 +14,11 @@ import Data.List (intercalate)
 roleCommand :: Command
 roleCommand = Command CommandInfo
   { commandName = "role"
-  , commandUsage = "role [role name|]"
-  , commandDescription = "show all toggleable roles / toggle a discord role"
+  , commandHelpEntries = 
+    [ HelpEntry { helpUsage = "role", helpDescription = "show all toggleable roles", helpGroup = "normal" }
+    , HelpEntry { helpUsage = "role [role name]", helpDescription = "toggle a discord role", helpGroup = "normal" } ]
   , commandPerms = DefaultLevel
   , commandTimeout = 15
-  , commandGroup = "normal"
   } $ hOneOptionalArgument (traverse $ \n -> fmap (,n) . liftMaybe "*Toggleable role not found!*" . (M.!? n) =<< hInfoDB toggleableRolesInfo) $ \case
     Nothing -> do
       allRoles <- hInfoDB toggleableRolesInfo

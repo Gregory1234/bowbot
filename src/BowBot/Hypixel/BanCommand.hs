@@ -18,12 +18,10 @@ import Database.MySQL.Simple.Types
   
 hypixelBanCommand :: Command
 hypixelBanCommand = Command CommandInfo
-  { commandName = "sban"
-  , commandUsage = "sban [name]"
-  , commandDescription = "ban a player from the leaderboard" -- TODO: should it ban all accounts if provided a discord id?
+  { commandName = "sban" -- TODO: should it ban all accounts if provided a discord id?
+  , commandHelpEntries = [HelpEntry { helpUsage = "sban [name]", helpDescription = "ban a player from the leaderboard", helpGroup = "normal" }]
   , commandPerms = ModLevel
-  , commandTimeout = 15
-  , commandGroup = "normal" -- TODO: don't use mcNameToUUID unnecessarily
+  , commandTimeout = 15 -- TODO: don't use mcNameToUUID unnecessarily
   } $ hOneArgument (\n -> mcNameToUUID n >>= traverse (getFromCache (Proxy @MinecraftAccount)) >>= liftMaybe thePlayerDoesNotExistMessage . join) $ \mc -> do
     if mcHypixelBow mc == Banned
       then hRespond "*The player is already banned!*"
