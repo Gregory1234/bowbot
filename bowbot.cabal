@@ -76,6 +76,7 @@ library
       BowBot.Network.Monad
       BowBot.Perms.Basic
       BowBot.Settings.Basic
+      BowBot.Settings.Commands
       BowBot.Utils
   other-modules:
       Paths_bowbot

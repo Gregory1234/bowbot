@@ -46,6 +46,7 @@ import BowBot.Account.InfoCommand
 import BowBot.Account.RegisterCommand
 import BowBot.Discord.RoleCommand
 import BowBot.Hypixel.BanCommand
+import BowBot.Settings.Commands
 
 runBowBot :: IO ()
 runBowBot = do
@@ -173,7 +174,7 @@ backgroundTimeoutRun n x = do
 
 commands :: [Command]
 commands =
-  [ helpCommand commands DefaultLevel "normal" "help"
+  [ helpCommand commands DefaultLevel Nothing "normal" "help"
   , registerCommand
   , hypixelStatsCommand UserSettings "s" "show player's Bow Duels stats"
   , hypixelStatsCommand DefSettings "sd" "show a default set of player's Bow Duels stats"
@@ -190,11 +191,17 @@ commands =
   , urlCommand "skin" "show player's full skin" $ \s -> "https://crafatar.com/renders/body/" ++ uuidString s ++ "?overlay"
   , listCommand
   , onlineCommand
-  , helpCommand commands ModLevel "normal" "modhelp"
+  , helpCommand commands DefaultLevel (Just $ \prefix -> "*Visibility 'maybe' and 'defined' hide the stat when the value is undefined.*\n"
+                                                ++ "**Stat names:** wins, losses, wlr, winsuntil, beststreak, currentstreak, bestdailystreak, bowhits, bowshots, accuracy\n"
+                                                ++ "**Example:** *" ++ prefix ++ "show accuracy* makes accuracy visible in the " ++ prefix ++ "s command\n" ) "settings" "settings"
+  , setSettingCommand
+  , constSettingCommand True Always "show" "makes the stat visible"
+  , constSettingCommand False Never "hide" "makes the stat hidden"
+  , helpCommand commands ModLevel Nothing "normal" "modhelp"
   , addCommand
   , addaltCommand
   , hypixelBanCommand
-  , helpCommand commands AdminLevel "normal" "adminhelp"
+  , helpCommand commands AdminLevel Nothing "normal" "adminhelp"
   , adminCommand "datarefresh" "sync Bow Bot's data from the database" $ \bdt -> liftIO $ withDB $ \conn -> refreshBotData conn bdt
   , updateDataCommand [] "dataupdate"
   , updateDataCommand [DailyStats] "dataupdateday"
