@@ -47,6 +47,7 @@ import BowBot.Account.RegisterCommand
 import BowBot.Discord.RoleCommand
 import BowBot.Hypixel.BanCommand
 import BowBot.Settings.Commands
+import BowBot.Minecraft.SelectCommand
 
 runBowBot :: IO ()
 runBowBot = do
@@ -193,10 +194,11 @@ commands =
   , onlineCommand
   , helpCommand commands DefaultLevel (Just $ \prefix -> "*Visibility 'maybe' and 'defined' hide the stat when the value is undefined.*\n"
                                                 ++ "**Stat names:** wins, losses, wlr, winsuntil, beststreak, currentstreak, bestdailystreak, bowhits, bowshots, accuracy\n"
-                                                ++ "**Example:** *" ++ prefix ++ "show accuracy* makes accuracy visible in the " ++ prefix ++ "s command\n" ) "settings" "settings"
+                                                ++ "**Example:** `" ++ prefix ++ "show accuracy` makes accuracy visible in the `" ++ prefix ++ "s` command\n" ) "settings" "settings"
   , setSettingCommand
   , constSettingCommand True Always "show" "makes the stat visible"
   , constSettingCommand False Never "hide" "makes the stat hidden"
+  , selectMinecraftCommand
   , helpCommand commands ModLevel Nothing "normal" "modhelp"
   , addCommand
   , addaltCommand

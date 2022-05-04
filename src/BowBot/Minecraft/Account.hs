@@ -14,7 +14,7 @@ import BowBot.Minecraft.Basic
 import BowBot.BotData.Cached
 import BowBot.DB.Basic (queryLog, executeManyLog, withDB)
 import Data.List.Split (splitOn, chunksOf)
-import Data.List (intercalate)
+import Data.List (intercalate, find)
 import BowBot.Network.Class
 import Data.Proxy (Proxy(..))
 import Data.Char (toLower)
@@ -81,9 +81,9 @@ instance CachedUpdatable MinecraftAccount where
 
 mcNameToUUID :: (MonadCache MinecraftAccount m, MonadNetwork m) => String -> m (Maybe UUID)
 mcNameToUUID name = do
-  goodAcc <- filter ((==map toLower name) . map toLower . head . mcNames) . HM.elems <$> getCacheMap (Proxy @MinecraftAccount)
+  goodAcc <- getMinecraftAccountByCurrentNameFromCache name
   case goodAcc of
-    [MinecraftAccount {mcUUID}] -> return (Just mcUUID)
+    Just MinecraftAccount {mcUUID} -> return (Just mcUUID)
     _ -> mojangNameToUUID name
 
 mcUUIDToNames :: (MonadCache MinecraftAccount m, MonadNetwork m) => UUID -> m (Maybe [String])
@@ -92,3 +92,7 @@ mcUUIDToNames uuid = do
   case goodAcc of
     Just MinecraftAccount {mcNames} -> return (Just mcNames)
     _ -> mojangUUIDToNames uuid
+
+getMinecraftAccountByCurrentNameFromCache :: MonadCache MinecraftAccount m => String -> m (Maybe MinecraftAccount)
+getMinecraftAccountByCurrentNameFromCache name = find ((==map toLower name) . map toLower . head . mcNames) . HM.elems <$> getCacheMap (Proxy @MinecraftAccount)
+  

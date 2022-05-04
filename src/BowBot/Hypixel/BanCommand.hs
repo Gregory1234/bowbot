@@ -9,7 +9,7 @@ import BowBot.Discord.Utils
 import BowBot.Minecraft.Arg
 import Data.Proxy
 import BowBot.BotData.Cached
-import Control.Monad (join)
+import Control.Monad ((>=>))
 import BowBot.Hypixel.Leaderboard
 import qualified Data.HashMap.Strict as HM
 import BowBot.DB.Basic (withDB, executeLog)
@@ -21,8 +21,8 @@ hypixelBanCommand = Command CommandInfo
   { commandName = "sban" -- TODO: should it ban all accounts if provided a discord id?
   , commandHelpEntries = [HelpEntry { helpUsage = "sban [name]", helpDescription = "ban a player from the leaderboard", helpGroup = "normal" }]
   , commandPerms = ModLevel
-  , commandTimeout = 15 -- TODO: don't use mcNameToUUID unnecessarily
-  } $ hOneArgument (\n -> mcNameToUUID n >>= traverse (getFromCache (Proxy @MinecraftAccount)) >>= liftMaybe thePlayerDoesNotExistMessage . join) $ \mc -> do
+  , commandTimeout = 15
+  } $ hOneArgument (getMinecraftAccountByCurrentNameFromCache >=> liftMaybe thePlayerDoesNotExistMessage) $ \mc -> do
     if mcHypixelBow mc == Banned
       then hRespond "*The player is already banned!*"
       else do

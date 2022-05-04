@@ -69,6 +69,7 @@ library
       BowBot.Minecraft.Arg
       BowBot.Minecraft.Basic
       BowBot.Minecraft.NameCommand
+      BowBot.Minecraft.SelectCommand
       BowBot.Minecraft.UrlCommand
       BowBot.Network.Basic
       BowBot.Network.Class
