@@ -204,17 +204,17 @@ commands =
   , addaltCommand
   , hypixelBanCommand
   , helpCommand commands AdminLevel Nothing "normal" "adminhelp"
-  , adminCommand "datarefresh" "sync Bow Bot's data from the database" $ \bdt -> liftIO $ withDB $ \conn -> refreshBotData conn bdt
+  , adminCommand 30 "datarefresh" "sync Bow Bot's data from the database" $ \bdt -> liftIO $ withDB $ \conn -> refreshBotData conn bdt
   , updateDataCommand [] "dataupdate"
   , updateDataCommand [DailyStats] "dataupdateday"
   , updateDataCommand [DailyStats, WeeklyStats] "dataupdateweek"
   , updateDataCommand [DailyStats, MonthlyStats] "dataupdatemonth"
   , updateDataCommand [DailyStats, WeeklyStats, MonthlyStats] "dataupdateweekmonth"
-  , adminCommand "clearLogs" "clear Bow Bot's logs" $ const clearLogs
-  , adminCommand "rolesupdate" "update everyone's discord roles" $ const updateRolesAll
-  , adminCommand "savedrolesstore" "store everyone's saved roles" $ const storeNewSavedRolesAll
-  , adminCommand "statusupdate" "update Bow Bot's discord status"$ const updateDiscordStatus
-  , quietAdminCommand "throw" "throw an error" $ const $ hRespond $ show ((1 :: Integer) `div` 0)
-  , quietAdminCommand "time" "display Bow Bot's time" $ const $ hRespond =<< liftIO (getTime "Month: %m, Day: %d, Weekday: %u, Hour: %k, Minute: %M, Second %S")
+  , adminCommand 15 "clearLogs" "clear Bow Bot's logs" $ const clearLogs
+  , adminCommand 120 "rolesupdate" "update everyone's discord roles" $ const updateRolesAll
+  , adminCommand 120 "savedrolesstore" "store everyone's saved roles" $ const storeNewSavedRolesAll
+  , adminCommand 15 "statusupdate" "update Bow Bot's discord status"$ const updateDiscordStatus
+  , quietAdminCommand 5 "throw" "throw an error" $ const $ hRespond $ show ((1 :: Integer) `div` 0)
+  , quietAdminCommand 5 "time" "display Bow Bot's time" $ const $ hRespond =<< liftIO (getTime "Month: %m, Day: %d, Weekday: %u, Hour: %k, Minute: %M, Second %S")
   , Command CommandInfo { commandName = "gregc", commandHelpEntries = [], commandPerms = DefaultLevel, commandTimeout = 2 } $ hNoArguments $ hRespond "<:gregc:904127204865228851>"
   ]

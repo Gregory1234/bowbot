@@ -26,11 +26,11 @@ import BowBot.Discord.Roles
 import BowBot.Hypixel.Guild
 import BowBot.Discord.Account
 import Discord
-import Data.Coerce (coerce)
 import BowBot.Discord.Monad
 import Control.Monad.Reader
 import BowBot.Hypixel.TimeStats
 import BowBot.Hypixel.Watchlist
+import Control.Concurrent.Async (concurrently_)
 
 
 emptyBotData :: STM BotData
@@ -66,13 +66,16 @@ refreshBotData conn bdt = flip runBotDataT bdt $ do
   refreshCache conn (Proxy @(HypixelBowTimeStats 'MonthlyStats))
 
 updateBotData :: [StatsTimeRange] -> Manager -> BotData -> DiscordHandler ()
-updateBotData times manager bdt = coerce @(DiscordHandlerT IO ()) $ flip runNetworkT manager $ flip runBotDataT bdt $ do
-  updateCache (Proxy @MinecraftAccount)
-  updateCache (Proxy @DiscordAccount)
-  updateCache (Proxy @HypixelBowLeaderboardEntry)
-  when (DailyStats `elem` times) $ updateCache (Proxy @(HypixelBowTimeStats 'DailyStats))
-  when (WeeklyStats `elem` times) $ updateCache (Proxy @(HypixelBowTimeStats 'WeeklyStats))
-  when (MonthlyStats `elem` times) $ updateCache (Proxy @(HypixelBowTimeStats 'MonthlyStats))
+updateBotData times manager bdt = ReaderT $ \dh -> foldl1 concurrently_ $
+  map (flip runDiscordHandlerT dh . flip runNetworkT manager . flip runBotDataT bdt)
+    [ updateCache (Proxy @MinecraftAccount)
+    , updateCache (Proxy @DiscordAccount)
+    , do
+      updateCache (Proxy @HypixelBowLeaderboardEntry)
+      when (DailyStats `elem` times) $ updateCache (Proxy @(HypixelBowTimeStats 'DailyStats))
+      when (WeeklyStats `elem` times) $ updateCache (Proxy @(HypixelBowTimeStats 'WeeklyStats))
+      when (MonthlyStats `elem` times) $ updateCache (Proxy @(HypixelBowTimeStats 'MonthlyStats))
+    ]
 
 clearBotDataCaches :: BotData -> IO ()
 clearBotDataCaches bdt = flip runBotDataT bdt $ do

@@ -12,9 +12,9 @@ module BowBot.Minecraft.Account where
 
 import BowBot.Minecraft.Basic
 import BowBot.BotData.Cached
-import BowBot.DB.Basic (queryLog, executeManyLog, withDB)
+import BowBot.DB.Basic (queryLog, executeManyLog, withDB, logInfo)
 import Data.List.Split (splitOn, chunksOf)
-import Data.List (intercalate, find)
+import Data.List (intercalate, find, intersperse)
 import BowBot.Network.Class
 import Data.Proxy (Proxy(..))
 import Data.Char (toLower)
@@ -23,6 +23,7 @@ import qualified Data.HashMap.Strict as HM
 import BowBot.Network.Monad (runNetworkT)
 import Control.Concurrent.Async (mapConcurrently)
 import Data.Maybe (mapMaybe)
+import Control.Concurrent (threadDelay)
 
 data IsBanned
   = NotBanned
@@ -75,8 +76,10 @@ instance CachedUpdatable MinecraftAccount where
           newNames <- mojangUUIDToNames mcUUID
           return MinecraftAccount {mcNames = fromMaybe mcNames newNames, ..}
     cache <- HM.elems <$> getCacheMap proxy
-    let chunked = chunksOf 10 cache -- TODO: there are too many of them!!!
-    updatedAccounts <- liftIO $ fmap concat $ for chunked $ mapConcurrently (fmap (`runNetworkT` manager) helper)
+    let bigchunked = chunksOf 400 cache
+    updatedAccounts <- liftIO $ fmap concat $ sequence $ intersperse (([] <$) $ logInfo "Started 10 minute wait in Minecraft update" >> threadDelay 600000000) $ flip map bigchunked $ \bigchunk -> do
+      let chunked = chunksOf 10 bigchunk
+      fmap concat $ for chunked $ mapConcurrently (fmap (`runNetworkT` manager) helper)
     void $ storeInCache updatedAccounts
 
 mcNameToUUID :: (MonadCache MinecraftAccount m, MonadNetwork m) => String -> m (Maybe UUID)

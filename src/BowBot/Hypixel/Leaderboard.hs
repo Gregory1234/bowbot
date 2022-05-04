@@ -16,7 +16,7 @@ import BowBot.BotData.Cached
 import qualified Data.HashMap.Strict as HM
 import Data.Proxy
 import BowBot.Minecraft.Basic (UUID(..))
-import BowBot.DB.Basic (queryLog, executeManyLog, withDB)
+import BowBot.DB.Basic (queryLog, executeManyLog, withDB, logInfo)
 import BowBot.Utils
 import Data.Maybe (mapMaybe)
 import Control.Applicative ((<|>))
@@ -27,6 +27,7 @@ import Data.List.Split (chunksOf)
 import Control.Concurrent (threadDelay)
 import Control.Concurrent.Async (mapConcurrently)
 import BowBot.Network.Monad (runNetworkT)
+import Data.List (intersperse)
 
 data HypixelBowLeaderboardEntry = HypixelBowLeaderboardEntry
   { bowLbWins :: Integer,
@@ -70,17 +71,16 @@ instance CachedUpdatable HypixelBowLeaderboardEntry where
           stats <- fmap hypixelBowStatsToLeaderboards <$> requestHypixelBowStats uuid
           return (uuid, maybe old (\s -> s { bowLbWinstreak = bowLbWinstreak s <|> bowLbWinstreak old }) stats)
     cache <- HM.toList <$> getCacheMap proxy
-    let chunked = chunksOf 30 cache
-    updatedAccounts <- fmap concat $ for chunked $ \chunk ->
-      let tryUpdate = do
-            time <- tryIncreaseCounter (Proxy @HypixelApi) 30
+    let bigchunked = chunksOf 50 cache
+    updatedAccounts <- fmap concat $ sequence $ intersperse (([] <$) $ liftIO $ logInfo "Started 1 minute wait in Hypixel lb update" >> threadDelay 60000000) $ flip map bigchunked $ \bigchunk -> do
+      let chunked = chunksOf 10 bigchunk
+      let wait = do
+            time <- tryIncreaseCounter (Proxy @HypixelApi) 10
             case time of
-              Nothing -> do
-                ret <- liftIO $ mapConcurrently (fmap (`runNetworkT` manager) helper) chunk
-                liftIO $ threadDelay 20000000
-                return ret
+              Nothing -> pure ()
               Just t -> do
-                liftIO $ threadDelay (t * 1000000)
-                tryUpdate
-      in tryUpdate
+                liftIO $ threadDelay ((t+1) * 1000000)
+                wait
+      wait
+      liftIO $ fmap concat $ for chunked $ \chunk -> mapConcurrently (fmap (`runNetworkT` manager) helper) chunk
     void $ storeInCacheIndexed updatedAccounts
