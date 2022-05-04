@@ -82,6 +82,9 @@ library
       BowBot.Perms.Basic
       BowBot.Settings.Basic
       BowBot.Settings.Commands
+      BowBot.Snipe.Basic
+      BowBot.Snipe.Command
+      BowBot.Snipe.Detect
       BowBot.Utils
   other-modules:
       Paths_bowbot

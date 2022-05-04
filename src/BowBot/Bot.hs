@@ -50,6 +50,8 @@ import BowBot.Settings.Commands
 import BowBot.Minecraft.SelectCommand
 import BowBot.Birthday.Announce
 import BowBot.Birthday.SetCommand
+import BowBot.Snipe.Detect
+import BowBot.Snipe.Command
 
 runBowBot :: IO ()
 runBowBot = do
@@ -121,7 +123,7 @@ respond m = call_ . CreateMessage (messageChannelId m) . pack
 
 eventHandler :: Event -> Bot ()
 eventHandler (MessageCreate m) = do
-  -- liftIO $ runBotDataT (detectDeleteMessage m) bdt
+  detectDeleteMessage m
   -- liftIO $ detectRTWData man bdt m
   unless (userIsBot (messageAuthor m)) $ do
     prefix <- hInfoDB discordCommandPrefixInfo
@@ -190,6 +192,7 @@ commands =
   , leaderboardCommand winstreakLeaderboardType "lbs"
   , leaderboardCommand wlrLeaderboardType "lbr"
   , infoCommand
+  , snipeCommand
   , roleCommand
   , nameCommand
   , urlCommand "head" "show player's head" $ \s -> "https://crafatar.com/avatars/" ++ uuidString s ++ "?overlay"

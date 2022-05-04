@@ -36,6 +36,7 @@ import BowBot.Hypixel.TimeStats
 import Data.Default
 import BowBot.Hypixel.Watchlist
 import BowBot.Birthday.Basic
+import BowBot.Snipe.Basic
   
 data BotData = BotData
   { infoFieldCache :: DatabaseCache InfoField
@@ -53,6 +54,7 @@ data BotData = BotData
   , hypixelMonthlyStatsCache :: DatabaseCache (HypixelBowTimeStats 'MonthlyStats)
   , hypixelOnlinePlayersCache :: CachedData HypixelOnlinePlayers
   , birthdayCache :: DatabaseCache BirthdayDate
+  , snipeCache :: DatabaseCache SnipeMessage
   }
 
 newtype BotDataT m a = BotDataT { runBotDataT :: BotData -> m a }
@@ -107,6 +109,9 @@ deriving via (SimpleCacheSingle (BotDataT m)) instance MonadHoistIO m => MonadCa
 
 instance MonadIO m => MonadCache BirthdayDate (BotDataT m) where
   getCache _ = BotDataT $ return . birthdayCache
+
+instance MonadIO m => MonadCache SnipeMessage (BotDataT m) where
+  getCache _ = BotDataT $ return . snipeCache
 
 instance MonadReader r m => MonadReader r (BotDataT m) where
   ask = BotDataT $ const ask

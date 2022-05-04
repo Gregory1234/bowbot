@@ -32,6 +32,7 @@ import BowBot.Hypixel.TimeStats
 import BowBot.Hypixel.Watchlist
 import Control.Concurrent.Async (concurrently_)
 import BowBot.Birthday.Basic
+import BowBot.Snipe.Basic
 
 
 emptyBotData :: STM BotData
@@ -51,6 +52,7 @@ emptyBotData = do
   hypixelMonthlyStatsCache <- newTVar empty
   hypixelOnlinePlayersCache <- newCachedData
   birthdayCache <- newTVar empty
+  snipeCache <- newTVar empty
   return BotData {..}
 
 refreshBotData :: Connection -> BotData -> IO ()
@@ -67,6 +69,7 @@ refreshBotData conn bdt = flip runBotDataT bdt $ do
   refreshCache conn (Proxy @(HypixelBowTimeStats 'WeeklyStats))
   refreshCache conn (Proxy @(HypixelBowTimeStats 'MonthlyStats))
   refreshCache conn (Proxy @BirthdayDate)
+  refreshCache conn (Proxy @SnipeMessage) -- TODO: this is meaningless...
 
 updateBotData :: [StatsTimeRange] -> Manager -> BotData -> DiscordHandler ()
 updateBotData times manager bdt = ReaderT $ \dh -> foldl1 concurrently_ $
