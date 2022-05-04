@@ -32,16 +32,16 @@ hypixelTimeStatsCommand src name desc = Command CommandInfo
   , commandTimeout = 15
   } $ hOneOptionalArgument (\s -> lift (hEnv envSender) >>= minecraftArgDefault helper s . userId) $ \MinecraftResponse {responseAccount = responseAccount@MinecraftAccount {..}, ..} -> do
     let (didYouMean, renderedName) = case responseType of
-          JustResponse -> ("", head mcNames)
-          OldResponse o -> ("", o ++ " (" ++ head mcNames ++ ")")
-          DidYouMeanResponse -> ("*Did you mean* ", head mcNames)
-          DidYouMeanOldResponse o -> ("*Did you mean* ", o ++ " (" ++ head mcNames ++ ")")
+          JustResponse -> ("", "**" ++ head mcNames ++ "**")
+          OldResponse o -> ("", "**" ++ o ++ "** (" ++ head mcNames ++ ")")
+          DidYouMeanResponse -> ("*Did you mean* ", "**" ++ head mcNames ++ "**")
+          DidYouMeanOldResponse o -> ("*Did you mean* ", "**" ++ o ++ "** (" ++ head mcNames ++ ")")
     user <- hEnv envSender
     settings <- getSettingsFromSource src (userId user)
     dailyStats <- getFromCache (Proxy @(HypixelBowTimeStats 'DailyStats)) mcUUID
     weeklyStats <- getFromCache (Proxy @(HypixelBowTimeStats 'WeeklyStats)) mcUUID
     monthlyStats <- getFromCache (Proxy @(HypixelBowTimeStats 'MonthlyStats)) mcUUID
-    hRespond $ didYouMean ++ "**" ++ renderedName ++ "**:\n" ++ showMaybeHypixelBowTimeStats settings responseValue dailyStats ++ "\n" ++ showMaybeHypixelBowTimeStats settings responseValue weeklyStats ++ "\n" ++ showMaybeHypixelBowTimeStats settings responseValue monthlyStats
+    hRespond $ didYouMean ++ renderedName ++ ":\n" ++ showMaybeHypixelBowTimeStats settings responseValue dailyStats ++ "\n" ++ showMaybeHypixelBowTimeStats settings responseValue weeklyStats ++ "\n" ++ showMaybeHypixelBowTimeStats settings responseValue monthlyStats
     saved <- getFromCache (Proxy @MinecraftAccount) mcUUID
     case saved of
       Nothing | bowWins responseValue >= 50 -> do

@@ -1,6 +1,5 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TypeApplications #-}
-{-# LANGUAGE ViewPatterns #-}
 
 module BowBot.Account.RegisterCommand where
 
@@ -20,7 +19,8 @@ import BowBot.Discord.Roles (updateRoles)
 import BowBot.BotData.Info (hInfoDB, discordGuildIdInfo)
 import BowBot.Hypixel.Stats (requestHypixelBowStats)
 import Control.Monad.Except
-import BowBot.Discord.Account (DiscordAccount)
+import BowBot.Discord.Account
+import BowBot.Discord.Arg
 
 data RegisterCommandMessages = RegisterCommandMessages { registerAlreadyBelongsMessage :: String, registerAlreadyBelongsSomeoneElseMessage :: String, registerAlreadyRegisteredMessage :: String }
 
@@ -67,15 +67,6 @@ registerCommand = Command CommandInfo
           registerAlreadyRegisteredMessage = "*You are already registered!*"
         } name . userId
 
-getAndValidateDiscordId :: String -> ExceptT String CommandHandler UserId
-getAndValidateDiscordId (readMaybe -> Just did) = do
-  void $ liftMaybe "*The discord id doesn't exist!*" =<< getFromCache (Proxy @DiscordAccount) did
-  return did
-getAndValidateDiscordId (fromPingDiscordUser -> Just did) = do
-  void $ liftMaybe "*The discord id doesn't exist!*" =<< getFromCache (Proxy @DiscordAccount) did
-  return did
-getAndValidateDiscordId _ = throwError "*The discord id is invalid!*"
-
 addCommand :: Command
 addCommand = Command CommandInfo
   { commandName = "add"
@@ -83,12 +74,12 @@ addCommand = Command CommandInfo
   , commandPerms = ModLevel
   , commandTimeout = 30
   } $ hTwoArguments' $ \did name ->
-    getAndValidateDiscordId did >>=
+    discordArg did >>=
       registerCommandBody RegisterCommandMessages {
           registerAlreadyBelongsMessage = "*That account already belongs to this user!*",
           registerAlreadyBelongsSomeoneElseMessage = "*That account already belongs to someone else!*",
           registerAlreadyRegisteredMessage = "*That person is not registered!*"
-        } name
+        } name . discordId
 
 addaltCommand :: Command
 addaltCommand = Command CommandInfo
@@ -97,7 +88,7 @@ addaltCommand = Command CommandInfo
   , commandPerms = ModLevel
   , commandTimeout = 30
   } $ hTwoArguments' $ \did name -> do
-    bacc <- liftMaybe thePlayerIsntRegisteredMessage =<< getBowBotAccountByDiscord =<< getAndValidateDiscordId did
+    bacc <- liftMaybe thePlayerIsntRegisteredMessage =<< getBowBotAccountByDiscord . discordId =<< discordArg did
     uuid <- liftMaybe thePlayerDoesNotExistMessage =<< mcNameToUUID name
     baccother <- getBowBotAccountByMinecraft uuid
     for_ baccother $ \acc -> throwError $ if bacc == acc then "*That account already belongs to this user!*" else "*That account already belongs to someone else!*"

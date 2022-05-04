@@ -12,6 +12,7 @@ import BowBot.DB.Basic (withDB, executeLog)
 import BowBot.Utils
 import BowBot.Account.Basic
 import BowBot.Discord.Roles
+import BowBot.Birthday.Basic
 import Database.MySQL.Simple.Types (Only(..))
 import Database.MySQL.Simple (withTransaction, rollback, insertID)
 import Data.Functor (($>))
@@ -19,13 +20,14 @@ import Control.Monad.Except (runExceptT, throwError)
 import Data.List (intercalate)
 import Data.Maybe (fromJust)
 
-createNewBowBotAccount :: (MonadCache BowBotAccount m, MonadCache SavedRoles m) => String -> UserId -> UUID -> m (Maybe BowBotAccount)
+createNewBowBotAccount :: (MonadCache BowBotAccount m, MonadCache SavedRoles m, MonadCache BirthdayDate m) => String -> UserId -> UUID -> m (Maybe BowBotAccount)
 createNewBowBotAccount name did uuid = do
   cache <- getCache (Proxy @BowBotAccount)
   savedRoles <- getFromCache (Proxy @SavedRoles) did
+  birthday <- getFromCache (Proxy @BirthdayDate) did
   ret <- liftIO $ withDB $ \conn -> withTransaction conn $ (either (const $ rollback conn $> Nothing) (pure . Just) =<<) $ runExceptT $ do
     void $ executeLog conn "DELETE FROM `unregisteredDEV` WHERE `discord` = ?" (Only (toInteger did))
-    c1 <- executeLog conn "INSERT INTO `peopleDEV`(`name`, `roles`) VALUES (?,?)" (name, maybe "" (intercalate "," . getSavedRoleNames) savedRoles)
+    c1 <- executeLog conn "INSERT INTO `peopleDEV`(`name`, `roles`, `birthday`) VALUES (?,?,?)" (name, maybe "" (intercalate "," . getSavedRoleNames) savedRoles, birthdayString <$> birthday)
     when (c1 <= 0) $ throwError ()
     bid <- liftIO $ fromIntegral <$> insertID conn
     c2 <- executeLog conn "INSERT INTO `peopleMinecraftDEV`(`id`, `minecraft`,`status`, `selected`, `verified`) VALUES (?,?, 'main', 1, 0)" (bid, uuidString uuid)

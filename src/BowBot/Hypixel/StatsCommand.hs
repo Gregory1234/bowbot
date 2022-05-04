@@ -31,13 +31,13 @@ hypixelStatsCommand src name desc = Command CommandInfo
   , commandTimeout = 15
   } $ hOneOptionalArgument (\s -> lift (hEnv envSender) >>= minecraftArgDefault helper s . userId) $ \MinecraftResponse {responseAccount = responseAccount@MinecraftAccount {..}, ..} -> do
     let (didYouMean, renderedName) = case responseType of
-          JustResponse -> ("", head mcNames)
-          OldResponse o -> ("", o ++ " (" ++ head mcNames ++ ")")
-          DidYouMeanResponse -> ("*Did you mean* ", head mcNames)
-          DidYouMeanOldResponse o -> ("*Did you mean* ", o ++ " (" ++ head mcNames ++ ")")
+          JustResponse -> ("", "**" ++ head mcNames ++ "**")
+          OldResponse o -> ("", "**" ++ o ++ "** (" ++ head mcNames ++ ")")
+          DidYouMeanResponse -> ("*Did you mean* ", "**" ++ head mcNames ++ "**")
+          DidYouMeanOldResponse o -> ("*Did you mean* ", "**" ++ o ++ "** (" ++ head mcNames ++ ")")
     user <- hEnv envSender
     settings <- getSettingsFromSource src (userId user)
-    hRespond $ didYouMean ++ "**" ++ renderedName ++ "**:\n" ++ showHypixelBowStats settings responseValue
+    hRespond $ didYouMean ++ renderedName ++ ":\n" ++ showHypixelBowStats settings responseValue
     saved <- getFromCache (Proxy @MinecraftAccount) mcUUID
     case saved of
       Nothing | bowWins responseValue >= 50 -> do

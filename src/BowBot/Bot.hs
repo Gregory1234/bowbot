@@ -48,6 +48,8 @@ import BowBot.Discord.RoleCommand
 import BowBot.Hypixel.BanCommand
 import BowBot.Settings.Commands
 import BowBot.Minecraft.SelectCommand
+import BowBot.Birthday.Announce
+import BowBot.Birthday.SetCommand
 
 runBowBot :: IO ()
 runBowBot = do
@@ -85,7 +87,9 @@ backgroundMinutely mint = do
           (0, _, 1) -> [DailyStats, MonthlyStats]
           (0, _, _) -> [DailyStats]
           _ -> []
+    when (hour == 5) announceBirthdays
     liftDiscord $ updateBotData times manager bdt
+    storeNewSavedRolesAll
     updateRolesAll
     dev <- ifDev False $ return True
     unless dev $ when (hour `mod` 8 == 0) clearLogs
@@ -203,6 +207,7 @@ commands =
   , addCommand
   , addaltCommand
   , hypixelBanCommand
+  , setBirthdayCommand
   , helpCommand commands AdminLevel Nothing "normal" "adminhelp"
   , adminCommand 30 "datarefresh" "sync Bow Bot's data from the database" $ \bdt -> liftIO $ withDB $ \conn -> refreshBotData conn bdt
   , updateDataCommand [] "dataupdate"
@@ -216,5 +221,6 @@ commands =
   , adminCommand 15 "statusupdate" "update Bow Bot's discord status"$ const updateDiscordStatus
   , quietAdminCommand 5 "throw" "throw an error" $ const $ hRespond $ show ((1 :: Integer) `div` 0)
   , quietAdminCommand 5 "time" "display Bow Bot's time" $ const $ hRespond =<< liftIO (getTime "Month: %m, Day: %d, Weekday: %u, Hour: %k, Minute: %M, Second %S")
+  , adminCommand 15 "bdsay" "announce today's birthdays" $ const announceBirthdays
   , Command CommandInfo { commandName = "gregc", commandHelpEntries = [], commandPerms = DefaultLevel, commandTimeout = 2 } $ hNoArguments $ hRespond "<:gregc:904127204865228851>"
   ]

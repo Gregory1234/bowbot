@@ -24,14 +24,14 @@ infoCommand = Command CommandInfo
   , commandTimeout = 15
   } $ hOneOptionalArgument (\s -> lift (hEnv envSender) >>= accountArgDefault s . userId) $ \AccountResponse { accResponseAccount = BowBotAccount {..}, ..} -> do
     let (didYouMean, renderedName) = case accResponseCause of
-          (Left acc) -> ("", showDiscordAccount acc)
+          (Left acc) -> ("", showDiscordAccountDiscord acc)
           (Right (typ, MinecraftAccount {..})) -> case typ of
-              JustResponse -> ("", head mcNames)
-              OldResponse o -> ("", o ++ " (" ++ head mcNames ++ ")")
-              DidYouMeanResponse -> ("*Did you mean* ", head mcNames)
-              DidYouMeanOldResponse o -> ("*Did you mean* ", o ++ " (" ++ head mcNames ++ ")")
+              JustResponse -> ("", "**" ++ head mcNames ++ "**")
+              OldResponse o -> ("", "**" ++ o ++ "** (" ++ head mcNames ++ ")")
+              DidYouMeanResponse -> ("*Did you mean* ", "**" ++ head mcNames ++ "**")
+              DidYouMeanOldResponse o -> ("*Did you mean* ", "**" ++ o ++ "** (" ++ head mcNames ++ ")")
     mc <- getCacheMap (Proxy @MinecraftAccount)
     dc <- getCacheMap (Proxy @DiscordAccount)
     let mcAccs = unlines $ map (\uuid -> let MinecraftAccount {..} = mc HM.! uuid in (if mcUUID == accountSelectedMinecraft then "*" else " ") ++ head mcNames ++ " (" ++ uuidString mcUUID ++ ")") accountMinecrafts
     let dcAccs = unlines $ map (\did -> let acc@DiscordAccount {..} = dc HM.! did in showDiscordAccount acc ++ ", id " ++ show discordId ) accountDiscords
-    hRespond $ didYouMean ++ "**" ++ renderedName ++ ":**\n" ++ " - Bow Bot id: " ++ show accountId ++ "\n" ++ " - Minecraft accounts:```\n" ++ mcAccs ++ "```" ++ " - Discord accounts: ```\n" ++ dcAccs ++ "```"
+    hRespond $ didYouMean ++ renderedName ++ ":\n" ++ " - Bow Bot id: " ++ show accountId ++ "\n" ++ " - Minecraft accounts:```\n" ++ mcAccs ++ "```" ++ " - Discord accounts: ```\n" ++ dcAccs ++ "```"

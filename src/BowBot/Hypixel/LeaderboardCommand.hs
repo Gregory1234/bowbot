@@ -90,7 +90,7 @@ leaderboardCommand lbt@LeaderboardType {..} name = Command CommandInfo
             JustResponse -> ""
             OldResponse _ -> ""
             DidYouMeanResponse -> "*Did you mean* **" ++ nm ++ "**:\n"
-            DidYouMeanOldResponse o -> "*Did you mean* **" ++ o ++ " (" ++ nm ++ "):"
+            DidYouMeanOldResponse o -> "*Did you mean* **" ++ o ++ "** (" ++ nm ++ "):"
       lb <- generateLeaderboardLines lbt selected
       let pages = chunksOf 20 lb
       let pagenum = fromJust $ findIndex (any ((`elem` selected) . fst)) pages

@@ -30,6 +30,9 @@ library
       BowBot.Account.InfoCommand
       BowBot.Account.Register
       BowBot.Account.RegisterCommand
+      BowBot.Birthday.Announce
+      BowBot.Birthday.Basic
+      BowBot.Birthday.SetCommand
       BowBot.Bot
       BowBot.BotData.Basic
       BowBot.BotData.Cached
@@ -46,6 +49,7 @@ library
       BowBot.Command.HelpCommand
       BowBot.DB.Basic
       BowBot.Discord.Account
+      BowBot.Discord.Arg
       BowBot.Discord.Class
       BowBot.Discord.DiscordNFData
       BowBot.Discord.Monad
