@@ -5,7 +5,6 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE NamedFieldPuns #-}
-{-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE FlexibleContexts #-}
 
 module BowBot.Minecraft.Account where
@@ -16,7 +15,6 @@ import BowBot.DB.Basic (queryLog, executeManyLog, withDB, logInfo)
 import Data.List.Split (splitOn, chunksOf)
 import Data.List (intercalate, find, intersperse)
 import BowBot.Network.Class
-import Data.Proxy (Proxy(..))
 import Data.Char (toLower)
 import BowBot.Utils
 import qualified Data.HashMap.Strict as HM
@@ -48,8 +46,8 @@ data MinecraftAccount = MinecraftAccount
 
 instance Cached MinecraftAccount where
   type CacheIndex MinecraftAccount = UUID
-  refreshCache conn _ = do
-    cache <- getCache (Proxy @MinecraftAccount)
+  refreshCache conn = do
+    cache <- getCache
     res :: [(String, String, String, Bool)] <- queryLog conn "SELECT `uuid`, `names`, `hypixel`, `watchlist` FROM `minecraftDEV`" ()
     let newValues = HM.fromList $ flip fmap res $ \case
           (UUID -> mcUUID, splitOn "," -> mcNames, stringToIsBanned -> Just mcHypixelBow, mcHypixelWatchlist) -> (mcUUID, MinecraftAccount {..})
@@ -59,23 +57,23 @@ instance Cached MinecraftAccount where
 instance CachedIndexed MinecraftAccount where
   cacheIndex = mcUUID
   storeInCache accs = do
-    cacheMap <- getCacheMap (Proxy @MinecraftAccount)
+    cacheMap <- getCacheMap
     let toQueryParams acc@MinecraftAccount {..} = if Just acc == cacheMap HM.!? mcUUID then Nothing else Just (uuidString mcUUID, head mcNames, intercalate "," mcNames, isBannedToString mcHypixelBow, if mcHypixelWatchlist then 1 :: Integer else 0)
     let queryParams = mapMaybe toQueryParams accs
     success <- liftIO $ withDB $ \conn -> (>0) <$> executeManyLog conn "INSERT INTO `minecraftDEV` (`uuid`, `name`, `names`, `hypixel`, `watchlist`) VALUES (?,?,?,?,?) ON DUPLICATE KEY UPDATE `name`=VALUES(`name`), `names`=VALUES(`names`), `hypixel`=VALUES(`hypixel`), `watchlist`=VALUES(`watchlist`)" queryParams
     when success $ do
-      cache <- getCache (Proxy @MinecraftAccount)
+      cache <- getCache
       liftIO $ atomically $ modifyTVar cache (insertMany (map (\x -> (mcUUID x, x)) accs))
     return success
 
 instance CachedUpdatable MinecraftAccount where
   type CacheUpdateSourceConstraint MinecraftAccount = MonadNetwork
-  updateCache proxy = do
+  updateCache = do
     manager <- hManager
     let helper MinecraftAccount {..} = do
           newNames <- mojangUUIDToNames mcUUID
           return MinecraftAccount {mcNames = fromMaybe mcNames newNames, ..}
-    cache <- HM.elems <$> getCacheMap proxy
+    cache <- HM.elems <$> getCacheMap
     let bigchunked = chunksOf 400 cache
     updatedAccounts <- liftIO $ fmap concat $ sequence $ intersperse (([] <$) $ logInfo "Started 10 minute wait in Minecraft update" >> threadDelay 600000000) $ flip map bigchunked $ \bigchunk -> do
       let chunked = chunksOf 10 bigchunk
@@ -91,11 +89,11 @@ mcNameToUUID name = do
 
 mcUUIDToNames :: (MonadCache MinecraftAccount m, MonadNetwork m) => UUID -> m (Maybe [String])
 mcUUIDToNames uuid = do
-  goodAcc <- getFromCache (Proxy @MinecraftAccount) uuid
+  goodAcc <- getFromCache uuid
   case goodAcc of
     Just MinecraftAccount {mcNames} -> return (Just mcNames)
     _ -> mojangUUIDToNames uuid
 
 getMinecraftAccountByCurrentNameFromCache :: MonadCache MinecraftAccount m => String -> m (Maybe MinecraftAccount)
-getMinecraftAccountByCurrentNameFromCache name = find ((==map toLower name) . map toLower . head . mcNames) . HM.elems <$> getCacheMap (Proxy @MinecraftAccount)
+getMinecraftAccountByCurrentNameFromCache name = find ((==map toLower name) . map toLower . head . mcNames) . HM.elems <$> getCacheMap
   

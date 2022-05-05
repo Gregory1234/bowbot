@@ -63,55 +63,55 @@ newtype BotDataT m a = BotDataT { runBotDataT :: BotData -> m a }
   deriving (MonadTrans) via (ReaderT BotData)
 
 instance MonadIO m => MonadCache InfoField (BotDataT m) where
-  getCache _ = BotDataT $ return . infoFieldCache
+  getCache = BotDataT $ return . infoFieldCache
 
 instance MonadIO m => MonadCache MinecraftAccount (BotDataT m) where
-  getCache _ = BotDataT $ return . minecraftAccountCache
+  getCache = BotDataT $ return . minecraftAccountCache
 
 instance MonadIO m => MonadCache PermissionLevel (BotDataT m) where
-  getCache _ = BotDataT $ return . permissionCache
+  getCache = BotDataT $ return . permissionCache
 
 instance MonadIO m => MonadCache BowBotAccount (BotDataT m) where
-  getCache _ = BotDataT $ return . bowBotAccountCache
+  getCache = BotDataT $ return . bowBotAccountCache
 
 instance MonadIO m => MonadSimpleCounter HypixelApi (BotDataT m) where
-  getCounter _ = BotDataT $ return . hypixelApiCounter
+  getCounter = BotDataT $ return . hypixelApiCounter
 
 deriving via (SimpleCounter (BotDataT m)) instance MonadIO m => MonadCounter HypixelApi (BotDataT m)
 
 instance MonadIO m => MonadCache Settings (BotDataT m) where
-  getCache _ = BotDataT $ return . settingsCache
+  getCache = BotDataT $ return . settingsCache
 
 instance MonadIO m => MonadCache HypixelBowLeaderboardEntry (BotDataT m) where
-  getCache _ = BotDataT $ return . hypixelLeaderboardCache
+  getCache = BotDataT $ return . hypixelLeaderboardCache
 
 instance MonadIO m => MonadCache SavedRoles (BotDataT m) where
-  getCache _ = BotDataT $ return . savedRolesCache
+  getCache = BotDataT $ return . savedRolesCache
 
 instance MonadIO m => MonadSimpleCacheSingle HypixelGuildMembers (BotDataT m) where
-  getCachedData _ = BotDataT $ return . hypixelGuildMembersCache
+  getCachedData = BotDataT $ return . hypixelGuildMembersCache
 
 deriving via (SimpleCacheSingle (BotDataT m)) instance MonadHoistIO m => MonadCacheSingle HypixelGuildMembers (BotDataT m)
 
 instance MonadIO m => MonadCache DiscordAccount (BotDataT m) where
-  getCache _ = BotDataT $ return . discordAccountsCache
+  getCache = BotDataT $ return . discordAccountsCache
 
 instance (MonadIO m, Default (SStatsTimeRange t)) => MonadCache (HypixelBowTimeStats t) (BotDataT m) where
-  getCache _ = BotDataT $ return . case def :: SStatsTimeRange t of
+  getCache = BotDataT $ return . case def :: SStatsTimeRange t of
     SDailyStats -> hypixelDailyStatsCache
     SWeeklyStats -> hypixelWeeklyStatsCache
     SMonthlyStats -> hypixelMonthlyStatsCache
 
 instance MonadIO m => MonadSimpleCacheSingle HypixelOnlinePlayers (BotDataT m) where
-  getCachedData _ = BotDataT $ return . hypixelOnlinePlayersCache
+  getCachedData = BotDataT $ return . hypixelOnlinePlayersCache
 
 deriving via (SimpleCacheSingle (BotDataT m)) instance MonadHoistIO m => MonadCacheSingle HypixelOnlinePlayers (BotDataT m)
 
 instance MonadIO m => MonadCache BirthdayDate (BotDataT m) where
-  getCache _ = BotDataT $ return . birthdayCache
+  getCache = BotDataT $ return . birthdayCache
 
 instance MonadIO m => MonadCache SnipeMessage (BotDataT m) where
-  getCache _ = BotDataT $ return . snipeCache
+  getCache = BotDataT $ return . snipeCache
 
 instance MonadReader r m => MonadReader r (BotDataT m) where
   ask = BotDataT $ const ask

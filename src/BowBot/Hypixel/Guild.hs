@@ -11,7 +11,6 @@ import BowBot.BotData.Cached
 import BowBot.BotData.Counter
 import BowBot.Network.Class
 import BowBot.Hypixel.Basic
-import Data.Proxy
 
 
 hypixelGuildIdInfo :: InfoType String
@@ -21,7 +20,7 @@ newtype HypixelGuildMembers = HypixelGuildMembers { getHypixelGuildMemberMap :: 
 
 getHypixelGuildMembers :: (MonadNetwork m, MonadCacheSingle HypixelGuildMembers m, MonadCache InfoField m, MonadCounter HypixelApi m) => m (CacheResponse HypixelGuildMembers)
 getHypixelGuildMembers = getOrCalculateCacheSingle $ do
-  cv <- tryIncreaseCounter (Proxy @HypixelApi) 1
+  cv <- tryIncreaseCounter @HypixelApi 1
   case cv of
     Nothing -> do
       gid <- hInfoDB hypixelGuildIdInfo

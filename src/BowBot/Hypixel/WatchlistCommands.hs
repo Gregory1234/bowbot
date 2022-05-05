@@ -1,11 +1,8 @@
-{-# LANGUAGE TypeApplications #-}
-
 module BowBot.Hypixel.WatchlistCommands where
 
 import BowBot.Command
 import BowBot.Minecraft.Account
 import qualified Data.HashMap.Strict as HM
-import Data.Proxy
 import BowBot.BotData.Cached
 import BowBot.Hypixel.Watchlist
 import BowBot.BotData.CachedSingle
@@ -28,7 +25,7 @@ onlineCommand = Command CommandInfo
   , commandTimeout = 30
   } $ hNoArguments $ do
     res <- getHypixelOnlinePlayers
-    cache <- getCacheMap (Proxy @MinecraftAccount)
+    cache <- getCacheMap
     let showOnline online = case unwords (map (head . mcNames . (cache HM.!)) (getHypixelOnlinePlayersList online)) of
           [] -> "None of the watchListed players are currently in bow duels."
           str -> str

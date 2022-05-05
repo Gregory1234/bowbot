@@ -1,6 +1,5 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE ViewPatterns #-}
 
@@ -11,7 +10,6 @@ import BowBot.Account.Basic
 import Control.Monad.Except
 import BowBot.Utils
 import qualified Data.HashMap.Strict as HM
-import Data.Proxy
 import BowBot.BotData.Cached
 import Data.Char (toLower)
 import Data.List (sortOn)
@@ -40,7 +38,7 @@ minecraftArgNoAutocorrect' = minecraftArgNoAutocorrect Nothing
 
 minecraftArgNoAutocorrect :: (MonadError String m, MonadCache MinecraftAccount m, MonadNetwork m) => Maybe String -> (MinecraftAccount -> m (Bool, a)) -> String -> m (MinecraftResponse a)
 minecraftArgNoAutocorrect err arg name = do
-  acc' <- filter ((==map toLower name) . map toLower . head . mcNames) . HM.elems <$> getCacheMap (Proxy @MinecraftAccount)
+  acc' <- filter ((==map toLower name) . map toLower . head . mcNames) . HM.elems <$> getCacheMap
   case acc' of
     [acc] -> do
       (_, val) <- arg acc
@@ -63,7 +61,7 @@ minecraftArgAutocorrect' = minecraftArgAutocorrect Nothing Nothing
 
 minecraftArgAutocorrect :: (MonadError String m, MonadCache MinecraftAccount m, MonadNetwork m) => Maybe String -> Maybe (MinecraftResponse a) -> (MinecraftAccount -> m (Bool, a)) -> String -> m (MinecraftResponse a)
 minecraftArgAutocorrect err retm arg name = do
-  people <- HM.elems <$> getCacheMap (Proxy @MinecraftAccount)
+  people <- HM.elems <$> getCacheMap
   let process f = let
         nicks = [(mcUUID,u) | MinecraftAccount {..} <- people, u <- f mcNames]
         dists = map (\(u,n) -> ((u, n), dist (map toLower n) (map toLower name))) nicks
@@ -102,6 +100,6 @@ minecraftArgDiscordSelf = minecraftArgDiscord youArentRegisteredMessage
 minecraftArgDiscord :: (MonadError String m, MonadCache BowBotAccount m, MonadCache MinecraftAccount m) => String -> (MinecraftAccount -> m (Bool, a)) -> UserId -> m (MinecraftResponse a)
 minecraftArgDiscord err arg did = do
   bbacc <- liftMaybe err =<< getBowBotAccountByDiscord did
-  acc <- liftMaybe thePlayerDoesNotExistMessage =<< getFromCache (Proxy @MinecraftAccount) (accountSelectedMinecraft bbacc)
+  acc <- liftMaybe thePlayerDoesNotExistMessage =<< getFromCache (accountSelectedMinecraft bbacc)
   (_, val) <- arg acc
   return MinecraftResponse { responseType = JustResponse, responseAccount = acc, responseValue = val }

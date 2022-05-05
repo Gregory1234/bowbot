@@ -1,7 +1,6 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE FlexibleContexts #-}
 
@@ -12,15 +11,14 @@ import Discord.Internal.Rest (GuildId)
 import BowBot.Utils
 import qualified Data.HashMap.Strict as HM
 import BowBot.BotData.Cached
-import Data.Proxy
 import Data.Maybe (mapMaybe)
 
 data InfoField = InfoField { infoFieldName :: String, infoFieldValue :: String } deriving (Show, Eq)
 
 instance Cached InfoField where
   type CacheIndex InfoField = String
-  refreshCache conn _ = do
-    cache <- getCache (Proxy @InfoField)
+  refreshCache conn = do
+    cache <- getCache
     res :: [(String, String)] <- queryLog conn "SELECT `name`, `value` FROM `botInfoDEV`" ()
     let newValues = HM.fromList $ flip fmap res $ \(infoFieldName, infoFieldValue) -> (infoFieldName, InfoField {..})
     liftIO $ atomically $ writeTVar cache newValues
@@ -28,18 +26,18 @@ instance Cached InfoField where
 instance CachedIndexed InfoField where
   cacheIndex = infoFieldName
   storeInCache accs = do
-    cacheMap <- getCacheMap (Proxy @InfoField)
+    cacheMap <- getCacheMap
     let toQueryParams f@InfoField {..} = if Just f == cacheMap HM.!? infoFieldName then Nothing else Just (infoFieldName, infoFieldValue)
     let queryParams = mapMaybe toQueryParams accs
     success <- liftIO $ withDB $ \conn -> (>0) <$> executeManyLog conn "INSERT INTO `botInfoDEV` (`name`, `value`) VALUES (?,?) ON DUPLICATE KEY UPDATE `value`=VALUES(`value`)" queryParams
     when success $ do
-      cache <- getCache (Proxy @InfoField)
+      cache <- getCache
       liftIO $ atomically $ modifyTVar cache (insertMany $ map (\x -> (infoFieldValue x, x)) accs)
     return success
 
 hInfoDB :: MonadCache InfoField m => InfoType a -> m a
 hInfoDB InfoType {..} = do
-  xs <- getFromCache (Proxy @InfoField) infoName
+  xs <- getFromCache infoName
   case xs of
     Just InfoField { infoFieldValue = r } -> case infoParse r of
       Right v -> return v

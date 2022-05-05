@@ -1,7 +1,6 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE TypeApplications #-}
 
 module BowBot.Birthday.Announce where
 
@@ -18,7 +17,6 @@ import BowBot.DB.Basic
 import Control.Monad ((<=<))
 import Data.List (intercalate)
 import BowBot.Discord.Account
-import Data.Proxy
 
 birthdayChannelInfo :: InfoType ChannelId
 birthdayChannelInfo = InfoType { infoName = "birthday_channel", infoDefault = 0, infoParse = readEither }
@@ -28,8 +26,8 @@ announceBirthdays = do
   currentDay <- liftIO currentBirthdayDate
   birthdays <- getBirthdayPeople currentDay
   birthdayChannel <- hInfoDB birthdayChannelInfo
-  dcaccounts <- getCacheMap (Proxy @DiscordAccount)
+  dcaccounts <- getCacheMap
   logInfo $ "Announcing birthdays: " ++ intercalate ", " (map (showDiscordAccount . (dcaccounts HM.!)) birthdays)
-  pns <- HM.fromList . ((\BowBotAccount {..} -> (,accountId) <$> accountDiscords) <=< HM.elems) <$> getCacheMap (Proxy @BowBotAccount)
+  pns <- HM.fromList . ((\BowBotAccount {..} -> (,accountId) <$> accountDiscords) <=< HM.elems) <$> getCacheMap
   let peopleMap = M.toList $ groupByToMap (pns HM.!) birthdays
   for_ peopleMap $ \(_, p) -> call $ R.CreateMessage birthdayChannel $ pack $ "**Happy birthday** to " ++ intercalate ", " (map (showDiscordAccountDiscord . (dcaccounts HM.!)) p) ++ "!"

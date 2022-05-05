@@ -7,7 +7,6 @@ import BowBot.Command
 import BowBot.Minecraft.Account
 import BowBot.Discord.Utils
 import BowBot.Minecraft.Arg
-import Data.Proxy
 import BowBot.BotData.Cached
 import Control.Monad ((>=>))
 import BowBot.Hypixel.Leaderboard
@@ -28,5 +27,5 @@ hypixelBanCommand = Command CommandInfo
       else do
         a <- storeInCache [ mc { mcHypixelBow = Banned} ]
         b <- liftIO $ withDB $ \conn -> (>0) <$> executeLog conn "DELETE FROM `statsDEV` WHERE `minecraft` = ?" (Only (uuidString (mcUUID mc)))
-        when b $ getCache (Proxy @HypixelBowLeaderboardEntry) >>= liftIO . atomically . flip modifyTVar (HM.delete (mcUUID mc))
+        when b $ getCache @HypixelBowLeaderboardEntry >>= liftIO . atomically . flip modifyTVar (HM.delete (mcUUID mc))
         hRespond $ if a then "*Success, player got banned!*" else somethingWentWrongMessage

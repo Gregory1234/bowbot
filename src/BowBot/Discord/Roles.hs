@@ -1,7 +1,6 @@
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE ScopedTypeVariables #-}
@@ -19,7 +18,6 @@ import BowBot.BotData.Cached
 import BowBot.BotData.CachedSingle
 import BowBot.BotData.Counter
 import BowBot.Account.Basic
-import Data.Proxy
 import qualified Data.HashMap.Strict as HM
 import Data.Maybe (mapMaybe)
 import qualified Discord.Requests as R
@@ -63,7 +61,7 @@ addRemoveDiscordRoles gid GuildMember {..} universe correct = do
 
 updateRolesDivisionTitle :: (MonadDiscord m, MonadCache InfoField m, MonadCache HypixelBowLeaderboardEntry m) => GuildMember -> Maybe BowBotAccount -> m ()
 updateRolesDivisionTitle gmem (Just BowBotAccount {..}) = do
-  lb <- getCacheMap (Proxy @HypixelBowLeaderboardEntry)
+  lb <- getCacheMap
   let m = maximum . (0:) $ mapMaybe (fmap bowLbWins . (lb HM.!?)) accountMinecrafts
   divisionTitles <- hInfoDB divisionTitleRolesInfo
   let correctRole = fmap snd $ take 1 $ reverse $ filter (\(x,_) -> x <= m) divisionTitles
@@ -75,15 +73,15 @@ newtype SavedRoles = SavedRoles { getSavedRoleNames :: [String] } deriving (Show
 
 instance Cached SavedRoles where
   type CacheIndex SavedRoles = UserId
-  refreshCache conn _ = do
-    cache <- getCache (Proxy @SavedRoles)
+  refreshCache conn = do
+    cache <- getCache
     res :: [(Integer, String)] <- queryLog conn "SELECT `discord`, `roles` FROM `unregisteredDEV` UNION SELECT `peopleDiscordDEV`.`discord`, `peopleDEV`.`roles` FROM `peopleDiscordDEV` JOIN `peopleDEV` ON `peopleDEV`.`id`=`peopleDiscordDEV`.`id`" ()
     let newValues = HM.fromList $ flip fmap res $ \(fromInteger -> did, SavedRoles . splitOn "," -> roles) -> (did, roles)
     liftIO $ atomically $ writeTVar cache newValues
 
 storeNewRolesSaved :: (MonadDiscord m, MonadCache InfoField m, MonadCache SavedRoles m, MonadCache BowBotAccount m) => UserId -> [RoleId] -> m ()
 storeNewRolesSaved did roles = do
-  old <- getFromCache (Proxy @SavedRoles) did
+  old <- getFromCache did
   toggleableRolesAll <- hInfoDB toggleableRolesInfo
   savedRolesAll <- hInfoDB savedRolesInfo
   savedHypixelRolesAll <- hInfoDB savedHypixelRolesInfo
@@ -96,12 +94,12 @@ storeNewRolesSaved did roles = do
       Nothing -> do
         success <- liftIO $ withDB $ \conn -> (>0) <$> executeManyLog conn "INSERT INTO `unregisteredDEV` (`discord`, `roles`) VALUES (?,?) ON DUPLICATE KEY UPDATE `roles`=VALUES(`roles`)" [(toInteger did, rolesStr)]
         when success $ do
-          cache <- getCache (Proxy @SavedRoles)
+          cache <- getCache
           liftIO $ atomically $ modifyTVar cache (insertMany [(did, savedRoles)])
       Just a -> do
         success <- liftIO $ withDB $ \conn -> (>0) <$> executeManyLog conn "INSERT INTO `peopleDEV` (`id`, `roles`) VALUES (?,?) ON DUPLICATE KEY UPDATE `roles`=VALUES(`roles`)" [(BowBot.Account.Basic.accountId a, rolesStr)]
         when success $ do
-          cache <- getCache (Proxy @SavedRoles)
+          cache <- getCache
           liftIO $ atomically $ modifyTVar cache (insertMany $ map (,savedRoles) (accountDiscords a))
 
 storeNewSavedRolesAll :: (MonadDiscord m, MonadCache InfoField m, MonadCache SavedRoles m, MonadCache BowBotAccount m) => m ()
@@ -117,7 +115,7 @@ updateRolesSaved gmem acc = do
   savedRolesAll <- hInfoDB savedRolesInfo
   savedHypixelRolesAll <- hInfoDB savedHypixelRolesInfo
   let rolesAll = toggleableRolesAll <> savedRolesAll <> M.map snd savedHypixelRolesAll
-  savedRolesNames <- getFromCache (Proxy @SavedRoles) (maybe 0 userId (memberUser gmem))
+  savedRolesNames <- getFromCache (maybe 0 userId (memberUser gmem))
   let savedRoles = mapMaybe (rolesAll M.!?) $ maybe [] getSavedRoleNames savedRolesNames
   gid <- hInfoDB discordGuildIdInfo
   case acc of

@@ -1,7 +1,6 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE ViewPatterns #-}
-{-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE OverloadedStrings #-}
 
@@ -11,7 +10,6 @@ import BowBot.BotData.Cached
 import Discord.Types (UserId)
 import BowBot.Discord.DiscordNFData ()
 import qualified Data.HashMap.Strict as HM
-import Data.Proxy
 import BowBot.Utils
 import BowBot.DB.Basic (queryLog, withDB, executeManyLog)
 import Data.Maybe (mapMaybe)
@@ -38,8 +36,8 @@ permissionLevelToString AdminLevel = "admin"
 
 instance Cached PermissionLevel where
   type CacheIndex PermissionLevel = UserId
-  refreshCache conn _ = do
-    cache <- getCache (Proxy @PermissionLevel)
+  refreshCache conn = do
+    cache <- getCache
     res :: [(Integer, String)] <- queryLog conn "SELECT `id`, `level` FROM `permissionsDEV`" ()
     let newValues = HM.fromList $ flip fmap res $ \case
           (fromInteger -> discord, stringToPermissionLevel -> Just level) -> (discord, level)
@@ -48,11 +46,11 @@ instance Cached PermissionLevel where
 
 instance CachedStorable PermissionLevel where
   storeInCacheIndexed accs = do
-    cacheMap <- getCacheMap (Proxy @PermissionLevel)
+    cacheMap <- getCacheMap
     let toQueryParams (did, lvl) = if Just lvl == cacheMap HM.!? did then Nothing else Just (toInteger did, permissionLevelToString lvl)
     let queryParams = mapMaybe toQueryParams accs
     success <- liftIO $ withDB $ \conn -> (>0) <$> executeManyLog conn "INSERT INTO `permissionsDEV` (`id`, `level`) VALUES (?,?) ON DUPLICATE KEY UPDATE `level`=VALUES(`level`)" queryParams
     when success $ do
-      cache <- getCache (Proxy @PermissionLevel)
+      cache <- getCache
       liftIO $ atomically $ modifyTVar cache (insertMany accs)
     return success

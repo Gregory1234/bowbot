@@ -2,7 +2,6 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE FlexibleContexts #-}
@@ -13,7 +12,6 @@ import BowBot.BotData.Cached
 import Discord.Types (UserId)
 import BowBot.Discord.DiscordNFData ()
 import qualified Data.HashMap.Strict as HM
-import Data.Proxy
 import BowBot.DB.Basic
 import BowBot.Utils
 import Data.Maybe (mapMaybe)
@@ -48,8 +46,8 @@ stringSense WhenSensible = "sensibly"
 
 instance Cached Settings where
   type CacheIndex Settings = UserId
-  refreshCache conn _ = do
-    cache <- getCache (Proxy @Settings)
+  refreshCache conn = do
+    cache <- getCache
     res :: [(Integer, String, String, String, String, String, String, String, String, String, String)] <-
       queryLog conn "SELECT `discord`, `wins`, `losses`, `wlr`, `winsUntil`, `bestStreak`, `currentStreak`, `bestDailyStreak`, `bowHits`, `bowShots`, `accuracy` FROM `settingsDEV`" ()
     let newValues = HM.fromList $ flip fmap res $ \case
@@ -62,12 +60,12 @@ instance Cached Settings where
 
 instance CachedStorable Settings where
   storeInCacheIndexed accs = do
-    cacheMap <- getCacheMap (Proxy @Settings)
+    cacheMap <- getCacheMap
     let toQueryParams (d, set@Settings {..}) = if Just set == cacheMap HM.!? d then Nothing else Just (toInteger d, stringBool sWins, stringBool sLosses, stringSense sWLR, stringSense sWinsUntil, stringSense sBestStreak, stringSense sCurrentStreak, stringSense sBestDailyStreak, stringBool sBowHits, stringBool sBowShots, stringSense sAccuracy)
     let queryParams = mapMaybe toQueryParams accs
     success <- liftIO $ withDB $ \conn -> (>0) <$> executeManyLog conn "INSERT INTO `settingsDEV` (`discord`, `wins`, `losses`, `wlr`, `winsUntil`, `bestStreak`, `currentStreak`, `bestDailyStreak`, `bowHits`, `bowShots`, `accuracy`) VALUES (?,?,?,?,?,?,?,?,?,?,?) ON DUPLICATE KEY UPDATE `wins`=VALUES(`wins`), `losses`=VALUES(`losses`), `wlr`=VALUES(`wlr`), `winsUntil`=VALUES(`winsUntil`), `bestStreak`=VALUES(`bestStreak`), `currentStreak`=VALUES(`currentStreak`), `bestDailyStreak`=VALUES(`bestDailyStreak`), `bowHits`=VALUES(`bowHits`), `bowShots`=VALUES(`bowShots`), `accuracy`=VALUES(`accuracy`)"  queryParams
     when success $ do
-      cache <- getCache (Proxy @Settings)
+      cache <- getCache
       liftIO $ atomically $ modifyTVar cache (insertMany accs)
     return success
 
@@ -104,7 +102,7 @@ data SettingsSource = DefSettings | AllSettings | UserSettings
 getSettingsFromSource :: MonadCache Settings m => SettingsSource -> UserId -> m Settings
 getSettingsFromSource DefSettings _ = return defSettings
 getSettingsFromSource AllSettings _ = return allSettings
-getSettingsFromSource UserSettings user = fromMaybe defSettings <$> getFromCache (Proxy @Settings) user
+getSettingsFromSource UserSettings user = fromMaybe defSettings <$> getFromCache user
 
 data SingleSetting = SingleSettingBool (Settings -> Bool) (Settings -> Bool -> Settings) | SingleSettingSense (Settings -> BoolSense) (Settings -> BoolSense -> Settings)
 

@@ -13,7 +13,6 @@ import BowBot.Hypixel.Basic
 import BowBot.Hypixel.Stats
 import BowBot.Hypixel.TimeStats
 import BowBot.BotData.Cached
-import Data.Proxy
 import Control.Monad.Error.Class (throwError)
 import BowBot.BotData.Counter
 import BowBot.Discord.Roles
@@ -38,11 +37,11 @@ hypixelTimeStatsCommand src name desc = Command CommandInfo
           DidYouMeanOldResponse o -> ("*Did you mean* ", "**" ++ o ++ "** (" ++ head mcNames ++ ")")
     user <- hEnv envSender
     settings <- getSettingsFromSource src (userId user)
-    dailyStats <- getFromCache (Proxy @(HypixelBowTimeStats 'DailyStats)) mcUUID
-    weeklyStats <- getFromCache (Proxy @(HypixelBowTimeStats 'WeeklyStats)) mcUUID
-    monthlyStats <- getFromCache (Proxy @(HypixelBowTimeStats 'MonthlyStats)) mcUUID
+    dailyStats <- getFromCache @(HypixelBowTimeStats 'DailyStats) mcUUID
+    weeklyStats <- getFromCache @(HypixelBowTimeStats 'WeeklyStats) mcUUID
+    monthlyStats <- getFromCache @(HypixelBowTimeStats 'MonthlyStats) mcUUID
     hRespond $ didYouMean ++ renderedName ++ ":\n" ++ showMaybeHypixelBowTimeStats settings responseValue dailyStats ++ "\n" ++ showMaybeHypixelBowTimeStats settings responseValue weeklyStats ++ "\n" ++ showMaybeHypixelBowTimeStats settings responseValue monthlyStats
-    saved <- getFromCache (Proxy @MinecraftAccount) mcUUID
+    saved <- getFromCache mcUUID
     case saved of
       Nothing | bowWins responseValue >= 50 -> do
         a <- storeInCache [responseAccount]
@@ -56,7 +55,7 @@ hypixelTimeStatsCommand src name desc = Command CommandInfo
     for_ acc' $ \acc -> for_ gmems $ \gmem -> when (maybe 0 userId (memberUser gmem) `elem` accountDiscords acc) $ updateRolesDivisionTitle gmem (Just acc)
   where
     helper MinecraftAccount {..} = do
-      cv <- tryIncreaseCounter (Proxy @HypixelApi) 1
+      cv <- tryIncreaseCounter @HypixelApi 1
       case cv of
         Nothing -> do
           stats <- liftMaybe "*The player has never joined Hypixel!*" =<< requestHypixelBowStats mcUUID

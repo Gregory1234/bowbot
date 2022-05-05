@@ -11,7 +11,6 @@ import BowBot.Hypixel.Stats
 import BowBot.Settings.Basic
 import BowBot.Utils
 import BowBot.Hypixel.Basic (HypixelApi)
-import Data.Proxy
 import BowBot.BotData.Counter
 import Control.Monad.Error.Class (throwError)
 import Discord.Types
@@ -38,7 +37,7 @@ hypixelStatsCommand src name desc = Command CommandInfo
     user <- hEnv envSender
     settings <- getSettingsFromSource src (userId user)
     hRespond $ didYouMean ++ renderedName ++ ":\n" ++ showHypixelBowStats settings responseValue
-    saved <- getFromCache (Proxy @MinecraftAccount) mcUUID
+    saved <- getFromCache mcUUID
     case saved of
       Nothing | bowWins responseValue >= 50 -> do
         a <- storeInCache [responseAccount]
@@ -52,7 +51,7 @@ hypixelStatsCommand src name desc = Command CommandInfo
     for_ acc' $ \acc -> for_ gmems $ \gmem -> when (maybe 0 userId (memberUser gmem) `elem` accountDiscords acc) $ updateRolesDivisionTitle gmem (Just acc)
   where
     helper MinecraftAccount {..} = do
-      cv <- tryIncreaseCounter (Proxy @HypixelApi) 1
+      cv <- tryIncreaseCounter @HypixelApi 1
       case cv of
         Nothing -> do
           stats <- liftMaybe "*The player has never joined Hypixel!*" =<< requestHypixelBowStats mcUUID

@@ -7,7 +7,6 @@ import BowBot.Utils (liftIO)
 import BowBot.Network.Class (hManager)
 import BowBot.Discord.Class (liftDiscord)
 import BowBot.Hypixel.TimeStats
-import Database.MySQL.Simple (Connection)
 import BowBot.BotData.Basic (BotData)
 import Data.List (intercalate)
 import Data.Char (toLower)

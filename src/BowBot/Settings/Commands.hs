@@ -1,5 +1,4 @@
 {-# LANGUAGE LambdaCase #-}
-{-# LANGUAGE TypeApplications #-}
 
 module BowBot.Settings.Commands where
 
@@ -7,7 +6,6 @@ import BowBot.Command
 import BowBot.Settings.Basic
 import BowBot.Discord.Utils (liftMaybe, fromMaybe)
 import BowBot.BotData.Cached
-import Data.Proxy
 import Discord.Types (userId)
 
 boolArg :: String -> Maybe Bool
@@ -50,7 +48,7 @@ setSettingCommand = Command CommandInfo
   , commandTimeout = 15
   } $ hTwoArguments (\sn val -> liftMaybe wrongSettingNameMessage (getSingleSettingByName sn) >>= (\case SingleSettingBool get set -> (\v -> (flip set v, (== v) . get)) <$> liftMaybe wrongSettingValueMessage (boolArg val); SingleSettingSense get set -> (\v -> (flip set v, (== v) . get)) <$> liftMaybe wrongSettingValueMessage (senseArg val) )) $ \(set, check) -> do
     sender <- userId <$> hEnv envSender
-    setting <- fromMaybe defSettings <$> getFromCache (Proxy @Settings) sender
+    setting <- fromMaybe defSettings <$> getFromCache sender
     if check setting
       then hRespond settingHasThatValueAlreadyMessage
       else do
@@ -65,7 +63,7 @@ constSettingCommand boolVal senseVal name desc = Command CommandInfo
   , commandTimeout = 15
   } $ hOneArgument (\sn -> (\case SingleSettingBool get set -> (flip set boolVal, (== boolVal) . get); SingleSettingSense get set -> (flip set senseVal, (== senseVal) . get)) <$> liftMaybe wrongSettingNameMessage (getSingleSettingByName sn)) $ \(set, check) -> do
     sender <- userId <$> hEnv envSender
-    setting <- fromMaybe defSettings <$> getFromCache (Proxy @Settings) sender
+    setting <- fromMaybe defSettings <$> getFromCache sender
     if check setting
       then hRespond settingHasThatValueAlreadyMessage
       else do

@@ -8,7 +8,6 @@ module BowBot.Hypixel.Watchlist where
 import BowBot.BotData.Cached
 import BowBot.Minecraft.Account
 import qualified Data.HashMap.Strict as HM
-import Data.Proxy
 import BowBot.Minecraft.Basic
 import BowBot.Network.Class
 import BowBot.BotData.CachedSingle
@@ -21,9 +20,7 @@ import Data.Aeson
 
 
 getWatchlist :: MonadCache MinecraftAccount m => m [MinecraftAccount]
-getWatchlist = do
-  cache <- getCacheMap (Proxy @MinecraftAccount)
-  return $ filter mcHypixelWatchlist $ HM.elems cache
+getWatchlist = filter mcHypixelWatchlist . HM.elems <$> getCacheMap
 
 newtype HypixelOnlinePlayers = HypixelOnlinePlayers { getHypixelOnlinePlayersList :: [UUID] }
 
@@ -36,7 +33,7 @@ isInBowDuels uuid = hypixelWithPlayerStatus uuid $ \o -> do
 getHypixelOnlinePlayers :: (MonadNetwork m, MonadCacheSingle HypixelOnlinePlayers m, MonadCache MinecraftAccount m, MonadCounter HypixelApi m) => m (CacheResponse HypixelOnlinePlayers)
 getHypixelOnlinePlayers = getOrCalculateCacheSingle $ do
   watchlist <- getWatchlist
-  cv <- tryIncreaseCounter (Proxy @HypixelApi) (fromIntegral $ length watchlist)
+  cv <- tryIncreaseCounter @HypixelApi (fromIntegral $ length watchlist)
   manager <- hManager
   case cv of
     Nothing -> liftIO $ fmap (Just . HypixelOnlinePlayers . map snd . filter fst) $ flip mapConcurrently watchlist $ \acc -> flip runNetworkT manager $ do

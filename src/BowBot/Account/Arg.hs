@@ -12,7 +12,6 @@ import qualified Data.HashMap.Strict as HM
 import BowBot.Discord.Utils
 import BowBot.BotData.Cached
 import Control.Monad.Except
-import Data.Proxy
 import BowBot.Minecraft.Arg
 import Data.Char (toLower)
 import Data.List (sortOn)
@@ -30,7 +29,7 @@ thePlayerIsntRegisteredMessage = "*The player isn't registered!*"
 
 accountArgName :: (MonadError String m, MonadCache MinecraftAccount m, MonadCache BowBotAccount m) => String -> m AccountResponse
 accountArgName name = do
-  people <- HM.elems <$> getCacheMap (Proxy @MinecraftAccount)
+  people <- HM.elems <$> getCacheMap
   let process f = let
         nicks = [(acc,u) | acc@MinecraftAccount {..} <- people, u <- f mcNames]
         dists = map (\(u,n) -> ((u, n), dist (map toLower n) (map toLower name))) nicks
@@ -56,5 +55,5 @@ accountArgDiscordSelf = accountArgDiscord youArentRegisteredMessage
 accountArgDiscord :: (MonadError String m, MonadCache DiscordAccount m, MonadCache BowBotAccount m) => String -> UserId -> m AccountResponse
 accountArgDiscord err did = do
   bacc <- liftMaybe err =<< getBowBotAccountByDiscord did
-  dacc <- liftMaybe err =<< getFromCache (Proxy @DiscordAccount) did
+  dacc <- liftMaybe err =<< getFromCache did
   return AccountResponse { accResponseCause = Left dacc, accResponseAccount = bacc }

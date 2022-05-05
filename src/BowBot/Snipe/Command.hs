@@ -1,14 +1,11 @@
-{-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE RecordWildCards #-}
 
 module BowBot.Snipe.Command where
 
 import BowBot.Command
-import Data.Proxy
 import BowBot.Snipe.Basic
 import BowBot.Discord.Account
 import BowBot.BotData.Cached
-import Discord.Types
 
 snipeCommand :: Command
 snipeCommand = Command CommandInfo
@@ -18,11 +15,11 @@ snipeCommand = Command CommandInfo
   , commandTimeout = 10
   } $ hNoArguments $ do
     channel <- hEnv envChannel
-    msg <- getFromCache (Proxy @SnipeMessage) channel
+    msg <- getFromCache channel
     case msg of
       Nothing -> hRespond "*Nothing to snipe!*"
       Just SnipeMessage {..} -> do
-        snipeAuthor' <- getFromCache (Proxy @DiscordAccount) snipeMessageAuthor
+        snipeAuthor' <- getFromCache snipeMessageAuthor
         case snipeAuthor' of
           Nothing -> hRespond somethingWentWrongMessage
           Just snipeAuthor -> hRespond $ showDiscordAccountDiscord snipeAuthor ++ " *wrote:* \n" ++ snipeMessageContent

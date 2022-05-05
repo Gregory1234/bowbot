@@ -23,7 +23,6 @@ import BowBot.DB.Basic
 import BowBot.Utils
 import BowBot.Settings.Basic
 import Data.Maybe (catMaybes, mapMaybe)
-import Data.Proxy
 
 data StatsTimeRange = DailyStats | WeeklyStats | MonthlyStats deriving (Show, Eq)
 
@@ -63,8 +62,8 @@ hypixelBowLeaderboardToTimeStats HypixelBowLeaderboardEntry {..} = HypixelBowTim
 
 instance (Default (SStatsTimeRange t)) => Cached (HypixelBowTimeStats t) where
   type CacheIndex (HypixelBowTimeStats t) = UUID
-  refreshCache conn proxy = do
-    cache <- getCache proxy
+  refreshCache conn = do
+    cache <- getCache @(HypixelBowTimeStats t)
     res :: [(String, Integer, Integer)] <- queryLog conn (replaceQuery "TIME" (statsTimeRangeName $ sStatsTimeRangeGet (def :: SStatsTimeRange t)) "SELECT `minecraft`, `lastTIMEWins`, `lastTIMELosses` FROM `statsDEV` WHERE `lastTIMEWins` >= 0 AND `lastTIMELosses` >= 0") ()
     let newValues = HM.fromList $ flip fmap res $ \(UUID -> uuid, bowTimeWins, bowTimeLosses) -> (uuid, HypixelBowTimeStats {..})
     liftIO $ atomically $ writeTVar cache newValues
@@ -105,17 +104,17 @@ showMaybeHypixelBowTimeStats s t (Just v) = showHypixelBowTimeStats s t v
 
 instance (Default (SStatsTimeRange t)) => CachedStorable (HypixelBowTimeStats t) where
   storeInCacheIndexed accs = do
-    cacheMap <- getCacheMap (Proxy @(HypixelBowTimeStats t))
+    cacheMap <- getCacheMap
     let toQueryParams (uuid, lbe) = if Just lbe == cacheMap HM.!? uuid then Nothing else Just (uuidString uuid, bowTimeWins lbe, bowTimeLosses lbe)
     let queryParams = mapMaybe toQueryParams accs
     success <- liftIO $ withDB $ \conn -> (>0) <$> executeManyLog conn (replaceQuery "TIME" (statsTimeRangeName $ sStatsTimeRangeGet (def :: SStatsTimeRange t)) "INSERT INTO `statsDEV` (`minecraft`, `lastTIMEWins`, `lastTIMELosses`) VALUES (?,?,?) ON DUPLICATE KEY UPDATE `lastTIMEWins`=VALUES(`lastTIMEWins`), `lastTIMELosses`=VALUES(`lastTIMELosses`)") queryParams
     when success $ do
-      cache <- getCache (Proxy @(HypixelBowTimeStats t))
+      cache <- getCache
       liftIO $ atomically $ modifyTVar cache (insertMany accs)
     return success
 
 instance (Default (SStatsTimeRange t)) => CachedUpdatable (HypixelBowTimeStats t) where
   type CacheUpdateSourceConstraint (HypixelBowTimeStats t) = MonadCache HypixelBowLeaderboardEntry
-  updateCache _ = do
-    lbCache <- HM.toList <$> getCacheMap (Proxy @HypixelBowLeaderboardEntry)
+  updateCache = do
+    lbCache <- HM.toList <$> getCacheMap
     void $ storeInCacheIndexed (map (\(u,v) -> (u, hypixelBowLeaderboardToTimeStats @t v)) lbCache)

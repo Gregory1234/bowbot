@@ -1,6 +1,5 @@
 {-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE TypeFamilies #-}
@@ -15,7 +14,6 @@ import BowBot.BotData.Cached
 import BowBot.Discord.Utils
 import qualified Data.HashMap.Strict as HM
 import BowBot.DB.Basic (queryLog, executeManyLog, withDB)
-import Data.Proxy
 import BowBot.Account.Basic
 
 
@@ -34,8 +32,8 @@ currentBirthdayDate = fromJust . birthdayFromString <$> getTime "%d.%m"
 
 instance Cached BirthdayDate where
   type CacheIndex BirthdayDate = UserId
-  refreshCache conn _ = do
-    cache <- getCache (Proxy @BirthdayDate)
+  refreshCache conn = do
+    cache <- getCache
     res :: [(Integer, Maybe String)] <- queryLog conn "SELECT `discord`, `birthday` FROM `unregisteredDEV` UNION SELECT `peopleDiscordDEV`.`discord`, `peopleDEV`.`birthday` FROM `peopleDiscordDEV` JOIN `peopleDEV` ON `peopleDEV`.`id`=`peopleDiscordDEV`.`id`" ()
     let newValues = HM.fromList $ flip mapMaybe res $ \(fromInteger -> did, (>>= birthdayFromString) -> bd) -> (did,) <$> bd
     liftIO $ atomically $ writeTVar cache newValues
@@ -47,17 +45,15 @@ setBirthday did bd = do
     Nothing -> do
       success <- liftIO $ withDB $ \conn -> (>0) <$> executeManyLog conn "INSERT INTO `unregisteredDEV` (`discord`, `birthday`) VALUES (?,?) ON DUPLICATE KEY UPDATE `birthday`=VALUES(`birthday`)" [(toInteger did, birthdayString bd)]
       when success $ do
-        cache <- getCache (Proxy @BirthdayDate)
+        cache <- getCache
         liftIO $ atomically $ modifyTVar cache (insertMany [(did, bd)])
       return success
     Just a -> do
       success <- liftIO $ withDB $ \conn -> (>0) <$> executeManyLog conn "INSERT INTO `peopleDEV` (`id`, `birthday`) VALUES (?,?) ON DUPLICATE KEY UPDATE `birthday`=VALUES(`birthday`)" [(BowBot.Account.Basic.accountId a, birthdayString bd)]
       when success $ do
-        cache <- getCache (Proxy @BirthdayDate)
+        cache <- getCache
         liftIO $ atomically $ modifyTVar cache (insertMany $ map (,bd) (accountDiscords a))
       return success
 
 getBirthdayPeople :: MonadCache BirthdayDate m => BirthdayDate -> m [UserId]
-getBirthdayPeople date = do
-  cache <- getCacheMap (Proxy @BirthdayDate)
-  return $ HM.keys $ HM.filter (== date) cache
+getBirthdayPeople date = HM.keys . HM.filter (== date) <$> getCacheMap

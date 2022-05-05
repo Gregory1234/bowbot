@@ -1,5 +1,4 @@
 {-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE ScopedTypeVariables #-}
@@ -14,7 +13,6 @@ import BowBot.BotData.Cached
 import BowBot.Discord.Utils
 import qualified Data.HashMap.Strict as HM
 import BowBot.DB.Basic
-import Data.Proxy
 import Data.Maybe (mapMaybe)
 import BowBot.BotData.Info
 import qualified Discord.Requests as R
@@ -24,8 +22,8 @@ data DiscordAccount = DiscordAccount { discordId :: UserId, discordName :: Strin
 
 instance Cached DiscordAccount where
   type CacheIndex DiscordAccount = UserId
-  refreshCache conn _ = do
-    cache <- getCache (Proxy @DiscordAccount)
+  refreshCache conn = do
+    cache <- getCache
     res :: [(Integer, String, String, Maybe String)] <- queryLog conn "SELECT `id`, `name`, `discriminator`, `nickname` FROM `discordDEV`" ()
     let newValues = HM.fromList $ flip fmap res $ \(fromIntegral -> discordId, discordName, discordDiscrim, discordNickname) -> (discordId, DiscordAccount {..})
     liftIO $ atomically $ writeTVar cache newValues
@@ -33,12 +31,12 @@ instance Cached DiscordAccount where
 instance CachedIndexed DiscordAccount where
   cacheIndex = discordId
   storeInCache accs = do
-    cacheMap <- getCacheMap (Proxy @DiscordAccount)
+    cacheMap <- getCacheMap
     let toQueryParams acc@DiscordAccount {..} = if Just acc == cacheMap HM.!? discordId then Nothing else Just (toInteger discordId, discordName, discordDiscrim, discordNickname)
     let queryParams = mapMaybe toQueryParams accs
     success <- liftIO $ withDB $ \conn -> (>0) <$> executeManyLog conn "INSERT INTO `discordDEV` (`id`, `name`, `discriminator`, `nickname`) VALUES (?,?,?,?) ON DUPLICATE KEY UPDATE `name`=VALUES(`name`), `discriminator`=VALUES(`discriminator`), `nickname`=VALUES(`nickname`)" queryParams
     when success $ do
-      cache <- getCache (Proxy @DiscordAccount)
+      cache <- getCache
       liftIO $ atomically $ modifyTVar cache (insertMany (map (\x -> (discordId x, x)) accs))
     return success
 
@@ -67,10 +65,10 @@ instance (MonadDiscord m, MonadCache InfoField m) => CacheUpdateSourceConstraint
 
 instance CachedUpdatable DiscordAccount where
   type CacheUpdateSourceConstraint DiscordAccount = CacheUpdateSourceConstraintForDiscordAccount
-  updateCache proxy = do
+  updateCache = do
     gid <- hInfoDB discordGuildIdInfo
     members <- map guildMemberToDiscordAccount . filter (\GuildMember {..} -> fmap userIsBot memberUser == Just False) <$> discordGuildMembers gid
-    current <- HM.elems <$> getCacheMap proxy
+    current <- HM.elems <$> getCacheMap
     updatedNonMembers <- for (deleteFirstsBy (\a b -> discordId a == discordId b) current members) $ \du -> do
       u' <- call $ R.GetUser (discordId du)
       case u' of

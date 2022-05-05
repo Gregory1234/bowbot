@@ -1,4 +1,3 @@
-{-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE OverloadedStrings #-}
 
 module BowBot.Minecraft.SelectCommand where
@@ -10,7 +9,6 @@ import BowBot.Minecraft.Account
 import Control.Monad ((>=>))
 import BowBot.Discord.Utils
 import BowBot.BotData.Cached
-import Data.Proxy
 import BowBot.DB.Basic
 import BowBot.Minecraft.Basic (uuidString)
 
@@ -33,7 +31,7 @@ selectMinecraftCommand = Command CommandInfo
             else do
               a <- liftIO $ withDB $ \conn -> (>0) <$> executeLog conn "INSERT INTO `peopleMinecraftDEV` (`minecraft`, `selected`) VALUES (?,0),(?,1) ON DUPLICATE KEY UPDATE `selected`=VALUES(`selected`)" (uuidString $ accountSelectedMinecraft acc, uuidString $ mcUUID mc)
               if a then do
-                cache <- getCache (Proxy @BowBotAccount)
+                cache <- getCache
                 liftIO $ atomically $ modifyTVar cache (insertMany [(BowBot.Account.Basic.accountId acc, acc { accountSelectedMinecraft = mcUUID mc})])
                 hRespond "*Selected account updated!*"
               else hRespond somethingWentWrongMessage

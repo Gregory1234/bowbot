@@ -2,7 +2,6 @@
 {-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE TypeApplications #-}
 
 module BowBot.Hypixel.LeaderboardCommand where
 
@@ -14,7 +13,6 @@ import BowBot.Account.Basic
 import Control.Monad.Except
 import BowBot.Minecraft.Basic
 import Discord.Types
-import Data.Proxy
 import BowBot.BotData.Cached
 import BowBot.Discord.Utils
 import qualified Data.HashMap.Strict as HM
@@ -33,7 +31,7 @@ thePlayerIsntOnThisLeaderboardMessage = "*The player isn't on this leaderboard!*
 
 throwUnlessAccountOnLeaderboard :: (HypixelBowLeaderboardEntry -> Maybe (Integer, String)) -> UUID -> ExceptT String CommandHandler ()
 throwUnlessAccountOnLeaderboard leaderboardParser uuid = do
-  lb <- liftMaybe "*The player hasn't had their stats checked or isn't on this leaderboard!*" =<< getFromCache (Proxy @HypixelBowLeaderboardEntry) uuid
+  lb <- liftMaybe "*The player hasn't had their stats checked or isn't on this leaderboard!*" =<< getFromCache uuid
   _ <- liftMaybe thePlayerIsntOnThisLeaderboardMessage (leaderboardParser lb)
   pure ()
 
@@ -50,14 +48,14 @@ leaderboardArgument _ (Just (readMaybe -> Just pagenum)) = do
 leaderboardArgument leaderboardParser Nothing = do
   acc <- lift (hEnv envSender) >>= getBowBotAccountByDiscord . userId
   onLb <- filterAccountsOnLeaderboard leaderboardParser (maybe [] accountMinecrafts acc)
-  names <- getCacheMap (Proxy @MinecraftAccount)
+  names <- getCacheMap
   if null onLb
     then return (LeaderboardPage 0, [])
     else return (LeaderboardFind JustResponse (head $ mcNames $ names HM.! accountSelectedMinecraft (fromJust acc)), onLb)
 leaderboardArgument leaderboardParser (Just (fromPingDiscordUser -> Just did)) = do
   acc <- liftMaybe theUserIsntRegisteredMessage =<< getBowBotAccountByDiscord did
   onLb <- filterAccountsOnLeaderboard leaderboardParser (accountMinecrafts acc)
-  names <- getCacheMap (Proxy @MinecraftAccount)
+  names <- getCacheMap
   when (null onLb) $ throwError thePlayerIsntOnThisLeaderboardMessage
   return (LeaderboardFind JustResponse (head $ mcNames $ names HM.! accountSelectedMinecraft acc), onLb)
 leaderboardArgument leaderboardParser (Just name) = do
@@ -67,8 +65,8 @@ leaderboardArgument leaderboardParser (Just name) = do
 
 generateLeaderboardLines :: LeaderboardType -> [UUID] -> CommandHandler [(UUID, String)]
 generateLeaderboardLines LeaderboardType {..} selected = do
-  lb <- HM.toList <$> getCacheMap (Proxy @HypixelBowLeaderboardEntry)
-  names <- getCacheMap (Proxy @MinecraftAccount)
+  lb <- HM.toList <$> getCacheMap
+  names <- getCacheMap
   return $ zipWith (\index (_, (uuid, str)) -> (uuid, pad 5 (show index ++ ".") ++ str)) [1 :: Integer ..] $ sortOn fst $ mapMaybe (\(uuid, lbe) -> (\(score, str) -> let MinecraftAccount {..} = names HM.! uuid in (-score, (mcUUID, (if mcUUID `elem` selected then "*" else " ") ++ pad 20 (head mcNames) ++ " ( " ++ str ++ " " ++ leaderboardStatName ++ " )"))) <$> leaderboardParser lbe) lb
 
 leaderboardCommand :: LeaderboardType -> String -> Command

@@ -1,4 +1,3 @@
-{-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE OverloadedStrings #-}
 
@@ -7,7 +6,6 @@ module BowBot.Account.Register where
 import BowBot.Minecraft.Basic (UUID(..))
 import Discord.Internal.Rest (UserId)
 import BowBot.BotData.Cached
-import Data.Proxy (Proxy(..))
 import BowBot.DB.Basic (withDB, executeLog)
 import BowBot.Utils
 import BowBot.Account.Basic
@@ -22,9 +20,9 @@ import Data.Maybe (fromJust)
 
 createNewBowBotAccount :: (MonadCache BowBotAccount m, MonadCache SavedRoles m, MonadCache BirthdayDate m) => String -> UserId -> UUID -> m (Maybe BowBotAccount)
 createNewBowBotAccount name did uuid = do
-  cache <- getCache (Proxy @BowBotAccount)
-  savedRoles <- getFromCache (Proxy @SavedRoles) did
-  birthday <- getFromCache (Proxy @BirthdayDate) did
+  cache <- getCache
+  savedRoles <- getFromCache did
+  birthday <- getFromCache did
   ret <- liftIO $ withDB $ \conn -> withTransaction conn $ (either (const $ rollback conn $> Nothing) (pure . Just) =<<) $ runExceptT $ do
     void $ executeLog conn "DELETE FROM `unregisteredDEV` WHERE `discord` = ?" (Only (toInteger did))
     c1 <- executeLog conn "INSERT INTO `peopleDEV`(`name`, `roles`, `birthday`) VALUES (?,?,?)" (name, maybe "" (intercalate "," . getSavedRoleNames) savedRoles, birthdayString <$> birthday)
@@ -40,10 +38,10 @@ createNewBowBotAccount name did uuid = do
 
 addAltToBowBotAccount :: MonadCache BowBotAccount m => Integer -> UUID -> m (Maybe BowBotAccount)
 addAltToBowBotAccount bid uuid = do
-  acc <- fromJust <$> getFromCache (Proxy @BowBotAccount) bid
+  acc <- fromJust <$> getFromCache bid
   success <- liftIO $ withDB $ \conn -> (>0) <$> executeLog conn "INSERT INTO `peopleMinecraftDEV`(`id`, `minecraft`,`status`, `selected`, `verified`) VALUES (?,?, 'alt', 0, 0)" (bid, uuidString uuid)
   let newacc = acc { accountMinecrafts = accountMinecrafts acc ++ [uuid] }
   when success $ do
-    cache <- getCache (Proxy @BowBotAccount)
+    cache <- getCache
     liftIO $ atomically $ modifyTVar cache (insertMany [(bid, newacc)])
   return $ if success then Just newacc else Nothing

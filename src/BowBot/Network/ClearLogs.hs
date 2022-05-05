@@ -6,7 +6,6 @@ import BowBot.Network.Class
 import Control.Exception.Base (SomeException, try)
 import BowBot.Utils
 import Network.HTTP.Conduit hiding (path)
-import BowBot.Command
 
 clearLogs :: MonadNetwork m => m ()
 clearLogs = hManager >>= \man -> liftIO $ do

@@ -13,7 +13,6 @@ import Data.HashMap.Strict (empty)
 import Database.MySQL.Simple (Connection)
 import BowBot.BotData.Cached
 import BowBot.BotData.CachedSingle
-import Data.Proxy
 import BowBot.DB.Basic (withDB)
 import BowBot.Command.Basic (PermissionLevel)
 import BowBot.BotData.Counter
@@ -57,37 +56,37 @@ emptyBotData = do
 
 refreshBotData :: Connection -> BotData -> IO ()
 refreshBotData conn bdt = flip runBotDataT bdt $ do
-  refreshCache conn (Proxy @InfoField)
-  refreshCache conn (Proxy @MinecraftAccount)
-  refreshCache conn (Proxy @PermissionLevel)
-  refreshCache conn (Proxy @BowBotAccount)
-  refreshCache conn (Proxy @Settings)
-  refreshCache conn (Proxy @HypixelBowLeaderboardEntry)
-  refreshCache conn (Proxy @SavedRoles)
-  refreshCache conn (Proxy @DiscordAccount)
-  refreshCache conn (Proxy @(HypixelBowTimeStats 'DailyStats))
-  refreshCache conn (Proxy @(HypixelBowTimeStats 'WeeklyStats))
-  refreshCache conn (Proxy @(HypixelBowTimeStats 'MonthlyStats))
-  refreshCache conn (Proxy @BirthdayDate)
-  refreshCache conn (Proxy @SnipeMessage) -- TODO: this is meaningless...
+  refreshCache @InfoField conn
+  refreshCache @MinecraftAccount conn
+  refreshCache @PermissionLevel conn
+  refreshCache @BowBotAccount conn
+  refreshCache @Settings conn
+  refreshCache @HypixelBowLeaderboardEntry conn
+  refreshCache @SavedRoles conn
+  refreshCache @DiscordAccount conn
+  refreshCache @(HypixelBowTimeStats 'DailyStats) conn
+  refreshCache @(HypixelBowTimeStats 'WeeklyStats) conn
+  refreshCache @(HypixelBowTimeStats 'MonthlyStats) conn
+  refreshCache @BirthdayDate conn
+  refreshCache @SnipeMessage conn -- TODO: this is meaningless...
 
 updateBotData :: [StatsTimeRange] -> Manager -> BotData -> DiscordHandler ()
 updateBotData times manager bdt = ReaderT $ \dh -> foldl1 concurrently_ $
   map (flip runDiscordHandlerT dh . flip runNetworkT manager . flip runBotDataT bdt)
-    [ updateCache (Proxy @MinecraftAccount)
-    , updateCache (Proxy @DiscordAccount)
+    [ updateCache @MinecraftAccount
+    , updateCache @DiscordAccount
     , do
-      updateCache (Proxy @HypixelBowLeaderboardEntry)
-      when (DailyStats `elem` times) $ updateCache (Proxy @(HypixelBowTimeStats 'DailyStats))
-      when (WeeklyStats `elem` times) $ updateCache (Proxy @(HypixelBowTimeStats 'WeeklyStats))
-      when (MonthlyStats `elem` times) $ updateCache (Proxy @(HypixelBowTimeStats 'MonthlyStats))
+      updateCache @HypixelBowLeaderboardEntry
+      when (DailyStats `elem` times) $ updateCache @(HypixelBowTimeStats 'DailyStats)
+      when (WeeklyStats `elem` times) $ updateCache @(HypixelBowTimeStats 'WeeklyStats)
+      when (MonthlyStats `elem` times) $ updateCache @(HypixelBowTimeStats 'MonthlyStats)
     ]
 
 clearBotDataCaches :: BotData -> IO ()
 clearBotDataCaches bdt = flip runBotDataT bdt $ do
-  clearCounter (Proxy @HypixelApi)
-  clearCacheSingle (Proxy @HypixelGuildMembers)
-  clearCacheSingle (Proxy @HypixelOnlinePlayers)
+  clearCounter @HypixelApi
+  clearCacheSingle @HypixelGuildMembers
+  clearCacheSingle @HypixelOnlinePlayers
 
 downloadBotData :: IO BotData
 downloadBotData = do
