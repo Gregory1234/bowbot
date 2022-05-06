@@ -87,8 +87,8 @@ leaderboardCommand lbt@LeaderboardType {..} name = Command CommandInfo
       let didYouMean = case rt of
             JustResponse -> ""
             OldResponse _ -> ""
-            DidYouMeanResponse -> "*Did you mean* **" ++ nm ++ "**:\n"
-            DidYouMeanOldResponse o -> "*Did you mean* **" ++ o ++ "** (" ++ nm ++ "):"
+            DidYouMeanResponse -> "*Did you mean* **" ++ discordEscape nm ++ "**:\n"
+            DidYouMeanOldResponse o -> "*Did you mean* **" ++ discordEscape o ++ "** (" ++ discordEscape nm ++ "):"
       lb <- generateLeaderboardLines lbt selected
       let pages = chunksOf 20 lb
       let pagenum = fromJust $ findIndex (any ((`elem` selected) . fst)) pages

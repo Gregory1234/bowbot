@@ -29,11 +29,7 @@ hypixelStatsCommand src name desc = Command CommandInfo
   , commandPerms = DefaultLevel
   , commandTimeout = 15
   } $ hOneOptionalArgument (\s -> lift (hEnv envSender) >>= minecraftArgDefault helper s . userId) $ \MinecraftResponse {responseAccount = responseAccount@MinecraftAccount {..}, ..} -> do
-    let (didYouMean, renderedName) = case responseType of
-          JustResponse -> ("", "**" ++ head mcNames ++ "**")
-          OldResponse o -> ("", "**" ++ o ++ "** (" ++ head mcNames ++ ")")
-          DidYouMeanResponse -> ("*Did you mean* ", "**" ++ head mcNames ++ "**")
-          DidYouMeanOldResponse o -> ("*Did you mean* ", "**" ++ o ++ "** (" ++ head mcNames ++ ")")
+    let (didYouMean, renderedName) = (if isDidYouMean responseType then "*Did you mean* " else "", showMinecraftAccountDiscord responseType responseAccount)
     user <- hEnv envSender
     settings <- getSettingsFromSource src (userId user)
     hRespond $ didYouMean ++ renderedName ++ ":\n" ++ showHypixelBowStats settings responseValue

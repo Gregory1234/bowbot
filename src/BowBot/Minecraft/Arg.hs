@@ -103,3 +103,20 @@ minecraftArgDiscord err arg did = do
   acc <- liftMaybe thePlayerDoesNotExistMessage =<< getFromCache (accountSelectedMinecraft bbacc)
   (_, val) <- arg acc
   return MinecraftResponse { responseType = JustResponse, responseAccount = acc, responseValue = val }
+
+showMinecraftAccount :: MinecraftResponseType -> MinecraftAccount -> String
+showMinecraftAccount JustResponse MinecraftAccount {..} = head mcNames
+showMinecraftAccount (OldResponse o) MinecraftAccount {..} = o ++ " (" ++ head mcNames ++ ")"
+showMinecraftAccount DidYouMeanResponse MinecraftAccount {..} = head mcNames
+showMinecraftAccount (DidYouMeanOldResponse o) MinecraftAccount {..} = o ++ " (" ++ head mcNames ++ ")"
+
+showMinecraftAccountDiscord :: MinecraftResponseType -> MinecraftAccount -> String
+showMinecraftAccountDiscord JustResponse MinecraftAccount {..} = "**" ++ discordEscape (head mcNames) ++ "**"
+showMinecraftAccountDiscord (OldResponse o) MinecraftAccount {..} = "**" ++ discordEscape o ++ "** (" ++ discordEscape (head mcNames) ++ ")"
+showMinecraftAccountDiscord DidYouMeanResponse MinecraftAccount {..} = "**" ++ discordEscape (head mcNames) ++ "**"
+showMinecraftAccountDiscord (DidYouMeanOldResponse o) MinecraftAccount {..} = "**" ++ discordEscape o ++ "** (" ++ discordEscape (head mcNames) ++ ")"
+
+isDidYouMean :: MinecraftResponseType -> Bool
+isDidYouMean DidYouMeanResponse = True
+isDidYouMean (DidYouMeanOldResponse _) = True
+isDidYouMean _ = False

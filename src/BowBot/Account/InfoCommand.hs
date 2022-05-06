@@ -23,11 +23,7 @@ infoCommand = Command CommandInfo
   } $ hOneOptionalArgument (\s -> lift (hEnv envSender) >>= accountArgDefault s . userId) $ \AccountResponse { accResponseAccount = BowBotAccount {..}, ..} -> do
     let (didYouMean, renderedName) = case accResponseCause of
           (Left acc) -> ("", showDiscordAccountDiscord acc)
-          (Right (typ, MinecraftAccount {..})) -> case typ of
-              JustResponse -> ("", "**" ++ head mcNames ++ "**")
-              OldResponse o -> ("", "**" ++ o ++ "** (" ++ head mcNames ++ ")")
-              DidYouMeanResponse -> ("*Did you mean* ", "**" ++ head mcNames ++ "**")
-              DidYouMeanOldResponse o -> ("*Did you mean* ", "**" ++ o ++ "** (" ++ head mcNames ++ ")")
+          (Right (typ, acc)) -> (if isDidYouMean typ then "*Did you mean* " else "", showMinecraftAccountDiscord typ acc)
     mc <- getCacheMap
     dc <- getCacheMap
     let mcAccs = unlines $ map (\uuid -> let MinecraftAccount {..} = mc HM.! uuid in (if mcUUID == accountSelectedMinecraft then "*" else " ") ++ head mcNames ++ " (" ++ uuidString mcUUID ++ ")") accountMinecrafts

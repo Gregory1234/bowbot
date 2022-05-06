@@ -14,10 +14,6 @@ nameCommand = Command CommandInfo
   , commandHelpEntries = [HelpEntry { helpUsage = "n [name]", helpDescription = "show player's Minecraft name history", helpGroup = "normal" }]
   , commandPerms = DefaultLevel
   , commandTimeout = 15
-  } $ hOneOptionalArgument (\s -> lift (hEnv envSender) >>= minecraftArgDefault (const $ return (True, ())) s . userId) $ \MinecraftResponse {responseAccount = MinecraftAccount {..}, ..} -> do
-    let (didYouMean, renderedName) = case responseType of
-          JustResponse -> ("Name history of", head mcNames)
-          OldResponse o -> ("Name history of", o ++ " (" ++ head mcNames ++ ")")
-          DidYouMeanResponse -> ("*Did you mean*", head mcNames)
-          DidYouMeanOldResponse o -> ("*Did you mean*", o ++ " (" ++ head mcNames ++ ")")
+  } $ hOneOptionalArgument (\s -> lift (hEnv envSender) >>= minecraftArgDefault (const $ return (True, ())) s . userId) $ \MinecraftResponse {responseAccount = responseAccount@MinecraftAccount {..}, ..} -> do
+    let (didYouMean, renderedName) = (if isDidYouMean responseType then "*Did you mean*" else "Name history of", showMinecraftAccountDiscord responseType responseAccount)
     hRespond $ didYouMean ++ " **" ++ renderedName ++ "**:```\n" ++ unlines mcNames ++ "```"

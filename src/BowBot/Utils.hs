@@ -96,3 +96,9 @@ pad = pad' True ' '
 
 catchErrorEither :: MonadError e m => m a -> m (Either e a)
 catchErrorEither body = catchError (Right <$> body) (return . Left)
+
+discordEscape :: String -> String
+discordEscape [] = ""
+discordEscape (x:xs)
+  | x `elem` "_*~`>" = '\\':x:discordEscape xs
+  | otherwise = x:discordEscape xs     

@@ -57,8 +57,8 @@ showDiscordAccount DiscordAccount { discordNickname = Nothing, ..} = discordName
 showDiscordAccount DiscordAccount { discordNickname = Just nick, ..} = nick ++ " (" ++ discordName ++ "#" ++ discordDiscrim ++ ")"
 
 showDiscordAccountDiscord :: DiscordAccount -> String
-showDiscordAccountDiscord DiscordAccount { discordNickname = Nothing, ..} = "**" ++ discordName ++ "**#" ++ discordDiscrim
-showDiscordAccountDiscord DiscordAccount { discordNickname = Just nick, ..} = "**" ++ nick ++ "** (" ++ discordName ++ "#" ++ discordDiscrim ++ ")"
+showDiscordAccountDiscord DiscordAccount { discordNickname = Nothing, ..} = "**" ++ discordEscape discordName ++ "**#" ++ discordDiscrim
+showDiscordAccountDiscord DiscordAccount { discordNickname = Just nick, ..} = "**" ++ discordEscape nick ++ "** (" ++ discordEscape discordName ++ "#" ++ discordDiscrim ++ ")"
 
 class (MonadDiscord m, MonadCache InfoField m) => CacheUpdateSourceConstraintForDiscordAccount m where
 instance (MonadDiscord m, MonadCache InfoField m) => CacheUpdateSourceConstraintForDiscordAccount m where
