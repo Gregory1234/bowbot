@@ -32,6 +32,7 @@ data CommandEnvironment = CommandEnvironment
   { envSender :: User
   , envSenderMember :: Maybe GuildMember
   , envChannel :: ChannelId
+  , envGuild :: GuildId
   , envRespond :: String -> CommandHandler ()
   , envRespondFile :: String -> String -> CommandHandler ()
   , envArgs :: CommandArgs
@@ -42,6 +43,7 @@ commandEnvFromMessage m = CommandEnvironment
   { envSender = messageAuthor m
   , envSenderMember = messageMember m
   , envChannel = messageChannelId m
+  , envGuild = fromMaybe 0 $ messageGuildId m
   , envRespond = call_ . R.CreateMessage (messageChannelId m) . pack
   , envRespondFile = \n s -> call_ $ R.CreateMessageDetailed (messageChannelId m) def { R.messageDetailedFile = Just (pack n, encodeUtf8 $ pack s) }
   , envArgs = CommandMessageArgs $ tail $ words $ unpack $ messageContent m

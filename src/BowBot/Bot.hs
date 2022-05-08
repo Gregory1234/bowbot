@@ -224,5 +224,6 @@ commands =
   , quietAdminCommand 5 "throw" "throw an error" $ const $ hRespond $ show ((1 :: Integer) `div` 0)
   , quietAdminCommand 5 "time" "display Bow Bot's time" $ const $ hRespond =<< liftIO (getTime "Month: %m, Day: %d, Weekday: %u, Hour: %k, Minute: %M, Second %S")
   , adminCommand 15 "bdsay" "announce today's birthdays" $ const announceBirthdays
+  , quietAdminCommand 5 "evacuate" "leaves the discord server" $ const $ hEnv envGuild >>= call_ . LeaveGuild
   , Command CommandInfo { commandName = "gregc", commandHelpEntries = [], commandPerms = DefaultLevel, commandTimeout = 2 } $ hNoArguments $ hRespond "<:gregc:904127204865228851>"
   ]
