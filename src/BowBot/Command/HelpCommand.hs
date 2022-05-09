@@ -13,9 +13,9 @@ helpCommand commands level footer group name = Command CommandInfo
     [HelpEntry { helpUsage = name, helpDescription = "show this help message", helpGroup = group } | group /= "normal"]
   , commandPerms = level
   , commandTimeout = 2
-  } $ hNoArguments $ do
-    prefix <- hInfoDB discordCommandPrefixInfo
-    hRespond $ "**Bow Bot " ++ (if group == "normal" then "" else group ++ " ") ++ "help:**\n\n**" ++ levelnameupper ++ "Commands:**\n" ++
+  } $ noArguments $ do
+    prefix <- askInfo discordCommandPrefixInfo
+    respond $ "**Bow Bot " ++ (if group == "normal" then "" else group ++ " ") ++ "help:**\n\n**" ++ levelnameupper ++ "Commands:**\n" ++
       unlines ((map (helper prefix) . filter ((==group) . helpGroup) . commandHelpEntries) =<< filter (\c -> level == commandPerms c) (map commandInfo commands)) ++
       maybe "" (("\n"++) . ($ prefix)) footer ++
       "\nMade by **GregC**#9698"

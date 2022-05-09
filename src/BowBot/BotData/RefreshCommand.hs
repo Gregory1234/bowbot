@@ -15,10 +15,10 @@ adminCommand timeout name desc body = Command CommandInfo
   , commandHelpEntries = [HelpEntry { helpUsage = name, helpDescription = desc, helpGroup = "normal" }]
   , commandPerms = AdminLevel
   , commandTimeout = timeout
-  } $ hNoArguments $ do
-    hRespond "Received"
+  } $ noArguments $ do
+    respond "Received"
     body
-    hRespond "Done"
+    respond "Done"
 
 quietAdminCommand :: Int -> String -> String -> CommandHandler () -> Command
 quietAdminCommand timeout name desc body = Command CommandInfo
@@ -26,7 +26,7 @@ quietAdminCommand timeout name desc body = Command CommandInfo
   , commandHelpEntries = [HelpEntry { helpUsage = name, helpDescription = desc, helpGroup = "normal" }]
   , commandPerms = AdminLevel
   , commandTimeout = timeout
-  } $ hNoArguments body
+  } $ noArguments body
 
 updateDataCommand :: [StatsTimeRange] -> String -> Command
 updateDataCommand times name = adminCommand 3600 name ("update Bow Bot data" ++ if null times then "" else " as if it was the beginning of: " ++ intercalate ", " (map (map toLower . statsTimeRangeName) times)) $ do

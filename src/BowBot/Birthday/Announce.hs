@@ -24,7 +24,7 @@ announceBirthdays :: (MonadIO m, MonadReader r m, Has DiscordHandle r, HasCache 
 announceBirthdays = do
   currentDay <- liftIO currentBirthdayDate
   birthdays <- getBirthdayPeople currentDay
-  birthdayChannel <- hInfoDB birthdayChannelInfo
+  birthdayChannel <- askInfo birthdayChannelInfo
   dcaccounts <- getCacheMap
   logInfo $ "Announcing birthdays: " ++ intercalate ", " (map (showDiscordAccount . (dcaccounts HM.!)) birthdays)
   pns <- HM.fromList . ((\BowBotAccount {..} -> (,accountId) <$> accountDiscords) <=< HM.elems) <$> getCacheMap

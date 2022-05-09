@@ -40,15 +40,15 @@ type CommandHandlerContext = CommandEnvironment :*: Manager :*: DiscordHandle :*
 
 type CommandHandler = ReaderT CommandHandlerContext IO
 
-hEnv :: (CommandEnvironment -> v) -> CommandHandler v
-hEnv f = asks $ f . getter
+envs :: (CommandEnvironment -> v) -> CommandHandler v
+envs f = asks $ f . getter
 
-hRespond :: String -> CommandHandler ()
-hRespond m = do
-  res <- hEnv envRespond
+respond :: String -> CommandHandler ()
+respond m = do
+  res <- envs envRespond
   res m
 
-hRespondFile :: String -> String -> CommandHandler ()
-hRespondFile n m = do
-  res <- hEnv envRespondFile
+respondFile :: String -> String -> CommandHandler ()
+respondFile n m = do
+  res <- envs envRespondFile
   res n m

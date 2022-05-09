@@ -35,8 +35,8 @@ instance CachedIndexed InfoField where
       liftIO $ atomically $ modifyTVar cache (insertMany $ map (\x -> (infoFieldValue x, x)) accs)
     return success
 
-hInfoDB :: (MonadIO m, MonadReader r m, HasCache InfoField r) => InfoType a -> m a
-hInfoDB InfoType {..} = do
+askInfo :: (MonadIO m, MonadReader r m, HasCache InfoField r) => InfoType a -> m a
+askInfo InfoType {..} = do
   xs <- getFromCache infoName
   case xs of
     Just InfoField { infoFieldValue = r } -> case infoParse r of

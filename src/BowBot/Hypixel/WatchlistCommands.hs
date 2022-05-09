@@ -13,9 +13,9 @@ listCommand = Command CommandInfo
   , commandHelpEntries = [HelpEntry { helpUsage = "list", helpDescription = "list all players on the watchlist", helpGroup = "normal" }]
   , commandPerms = DefaultLevel
   , commandTimeout = 2
-  } $ hNoArguments $ do
+  } $ noArguments $ do
     watchlist <- getWatchlist
-    hRespond $ "**Players in watchList:**\n```\n" ++ unwords (map (head . mcNames) watchlist) ++ "```"
+    respond $ "**Players in watchList:**\n```\n" ++ unwords (map (head . mcNames) watchlist) ++ "```"
 
 onlineCommand :: Command
 onlineCommand = Command CommandInfo
@@ -23,14 +23,14 @@ onlineCommand = Command CommandInfo
   , commandHelpEntries = [HelpEntry { helpUsage = "online", helpDescription = "list all people from the watchlist currently in Bow Duels", helpGroup = "normal" }]
   , commandPerms = DefaultLevel
   , commandTimeout = 30
-  } $ hNoArguments $ do
+  } $ noArguments $ do
     res <- getHypixelOnlinePlayers
     cache <- getCacheMap
     let showOnline online = case unwords (map (head . mcNames . (cache HM.!)) (getHypixelOnlinePlayersList online)) of
           [] -> "None of the watchListed players are currently in bow duels."
           str -> str
     case res of
-      CacheFresh online -> hRespond $ "**Players in watchList:**\n```\n" ++ showOnline online ++ "```"
-      CacheOld online -> hRespond $ "**Players in watchList:** (cached response)\n```\n" ++ showOnline online ++ "```"
-      CacheBusy -> hRespond "**Processing list of online players. Please send command again later.**"
-      CacheFailed -> hRespond somethingWentWrongMessage
+      CacheFresh online -> respond $ "**Players in watchList:**\n```\n" ++ showOnline online ++ "```"
+      CacheOld online -> respond $ "**Players in watchList:** (cached response)\n```\n" ++ showOnline online ++ "```"
+      CacheBusy -> respond "**Processing list of online players. Please send command again later.**"
+      CacheFailed -> respond somethingWentWrongMessage

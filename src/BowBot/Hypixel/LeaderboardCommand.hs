@@ -40,13 +40,13 @@ filterAccountsOnLeaderboard leaderboardParser = filterM $ fmap isRight . catchEr
 
 leaderboardArgument :: (HypixelBowLeaderboardEntry -> Maybe (Integer, String)) -> Maybe String -> ExceptT String CommandHandler (LeaderboardResponse, [UUID])
 leaderboardArgument _ (Just "all") = do
-  acc <- lift (hEnv envSender) >>= getBowBotAccountByDiscord . userId
+  acc <- lift (envs envSender) >>= getBowBotAccountByDiscord . userId
   return (LeaderboardAll, maybe [] accountMinecrafts acc)
 leaderboardArgument _ (Just (readMaybe -> Just pagenum)) = do
-  acc <- lift (hEnv envSender) >>= getBowBotAccountByDiscord . userId
+  acc <- lift (envs envSender) >>= getBowBotAccountByDiscord . userId
   return (LeaderboardPage (pagenum - 1), maybe [] accountMinecrafts acc)
 leaderboardArgument leaderboardParser Nothing = do
-  acc <- lift (hEnv envSender) >>= getBowBotAccountByDiscord . userId
+  acc <- lift (envs envSender) >>= getBowBotAccountByDiscord . userId
   onLb <- filterAccountsOnLeaderboard leaderboardParser (maybe [] accountMinecrafts acc)
   names <- getCacheMap
   if null onLb
@@ -76,11 +76,11 @@ leaderboardCommand lbt@LeaderboardType {..} name = Command CommandInfo
     [ HelpEntry { helpUsage = name ++ " [name|page|\"all\"]", helpDescription = "show Bow Duels " ++ leaderboardName ++ " leaderboard", helpGroup = "normal" } ]
   , commandPerms = DefaultLevel
   , commandTimeout = 15
-  } $ hOneOptionalArgument (leaderboardArgument leaderboardParser) $ \case
+  } $ oneOptionalArgument (leaderboardArgument leaderboardParser) $ \case
     (LeaderboardPage pagenum, selected) -> do
       lb <- generateLeaderboardLines lbt selected
       let pages = chunksOf 20 (map snd lb)
-      hRespond $ if pagenum < 0 || pagenum >= length pages
+      respond $ if pagenum < 0 || pagenum >= length pages
         then "*Wrong page number, it has to be between **1** and **" ++ show (length pages) ++ "**.*"
         else leaderboardName ++ " (page **" ++ show (pagenum + 1) ++ "/" ++ show (length pages) ++ "**):\n```\n" ++ unlines (pages !! pagenum) ++ "```"
     (LeaderboardFind rt nm, selected) -> do
@@ -92,10 +92,10 @@ leaderboardCommand lbt@LeaderboardType {..} name = Command CommandInfo
       lb <- generateLeaderboardLines lbt selected
       let pages = chunksOf 20 lb
       let pagenum = fromJust $ findIndex (any ((`elem` selected) . fst)) pages
-      hRespond $ leaderboardName ++ " (page **" ++ show (pagenum + 1) ++ "/" ++ show (length pages) ++ "**):\n" ++ didYouMean ++ "```\n" ++ unlines (map snd $ pages !! pagenum) ++ "```"
+      respond $ leaderboardName ++ " (page **" ++ show (pagenum + 1) ++ "/" ++ show (length pages) ++ "**):\n" ++ didYouMean ++ "```\n" ++ unlines (map snd $ pages !! pagenum) ++ "```"
     (LeaderboardAll, selected) -> do
       lb <- generateLeaderboardLines lbt selected
-      hRespondFile "lb.txt" $ unlines (map snd lb)
+      respondFile "lb.txt" $ unlines (map snd lb)
 
 winsLeaderboardType :: LeaderboardType
 winsLeaderboardType = LeaderboardType "Hypixel Bow Duels Wins Leaderboard" "Wins" $ \case

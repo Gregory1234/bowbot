@@ -19,19 +19,19 @@ selectMinecraftCommand = Command CommandInfo
   , commandHelpEntries = [HelpEntry { helpUsage = "selectmc [name]", helpDescription = "select one of your registered minecraft accounts as a preferred one", helpGroup = "settings" }]
   , commandPerms = DefaultLevel
   , commandTimeout = 30
-  } $ hOneArgument (getMinecraftAccountByCurrentNameFromCache >=> liftMaybe "*This account doesn't exist!*") $ \mc -> do
-    acc' <- getBowBotAccountByDiscord . userId =<< hEnv envSender
+  } $ oneArgument (getMinecraftAccountByCurrentNameFromCache >=> liftMaybe "*This account doesn't exist!*") $ \mc -> do
+    acc' <- getBowBotAccountByDiscord . userId =<< envs envSender
     case acc' of
-      Nothing -> hRespond youArentRegisteredMessage
+      Nothing -> respond youArentRegisteredMessage
       Just acc -> do
         if mcUUID mc `notElem` accountMinecrafts acc
-          then hRespond "*This account doesn't belong to you!*"
+          then respond "*This account doesn't belong to you!*"
           else if mcUUID mc == accountSelectedMinecraft acc
-            then hRespond "*This account is selected already!*"
+            then respond "*This account is selected already!*"
             else do
               a <- liftIO $ withDB $ \conn -> (>0) <$> executeLog conn "INSERT INTO `peopleMinecraftDEV` (`minecraft`, `selected`) VALUES (?,0),(?,1) ON DUPLICATE KEY UPDATE `selected`=VALUES(`selected`)" (uuidString $ accountSelectedMinecraft acc, uuidString $ mcUUID mc)
               if a then do
                 cache <- getCache
                 liftIO $ atomically $ modifyTVar cache (insertMany [(BowBot.Account.Basic.accountId acc, acc { accountSelectedMinecraft = mcUUID mc})])
-                hRespond "*Selected account updated!*"
-              else hRespond somethingWentWrongMessage
+                respond "*Selected account updated!*"
+              else respond somethingWentWrongMessage

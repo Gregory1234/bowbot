@@ -21,11 +21,11 @@ hypixelBanCommand = Command CommandInfo
   , commandHelpEntries = [HelpEntry { helpUsage = "sban [name]", helpDescription = "ban a player from the leaderboard", helpGroup = "normal" }]
   , commandPerms = ModLevel
   , commandTimeout = 15
-  } $ hOneArgument (getMinecraftAccountByCurrentNameFromCache >=> liftMaybe thePlayerDoesNotExistMessage) $ \mc -> do
+  } $ oneArgument (getMinecraftAccountByCurrentNameFromCache >=> liftMaybe thePlayerDoesNotExistMessage) $ \mc -> do
     if mcHypixelBow mc == Banned
-      then hRespond "*The player is already banned!*"
+      then respond "*The player is already banned!*"
       else do
         a <- storeInCache [ mc { mcHypixelBow = Banned} ]
         b <- liftIO $ withDB $ \conn -> (>0) <$> executeLog conn "DELETE FROM `statsDEV` WHERE `minecraft` = ?" (Only (uuidString (mcUUID mc)))
         when b $ getCache @HypixelBowLeaderboardEntry >>= liftIO . atomically . flip modifyTVar (HM.delete (mcUUID mc))
-        hRespond $ if a then "*Success, player got banned!*" else somethingWentWrongMessage
+        respond $ if a then "*Success, player got banned!*" else somethingWentWrongMessage

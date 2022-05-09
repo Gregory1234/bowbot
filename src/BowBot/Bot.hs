@@ -108,7 +108,7 @@ onStartup = void $ hoistIO forkIO $ do
 
 updateDiscordStatus :: (MonadIO m, MonadReader r m, Has DiscordHandle r, HasCache InfoField r) => m ()
 updateDiscordStatus = do
-  discordStatus <- hInfoDB discordStatusInfo
+  discordStatus <- askInfo discordStatusInfo
   liftDiscord $ sendCommand (UpdateStatus $ UpdateStatusOpts {
         updateStatusOptsSince = Nothing,
         updateStatusOptsGame = Just (def {activityName = pack discordStatus}),
@@ -116,39 +116,39 @@ updateDiscordStatus = do
         updateStatusOptsAFK = False
       })
 
-respond :: (MonadIO m, MonadReader r m, Has DiscordHandle r) => Message -> String -> m ()
-respond m = call_ . CreateMessage (messageChannelId m) . pack
+respond' :: (MonadIO m, MonadReader r m, Has DiscordHandle r) => Message -> String -> m ()
+respond' m = call_ . CreateMessage (messageChannelId m) . pack
 
 eventHandler :: Event -> Bot ()
 eventHandler (MessageCreate m) = do
   detectDeleteMessage m
   -- liftIO $ detectRTWData man bdt m
   unless (userIsBot (messageAuthor m)) $ do
-    prefix <- hInfoDB discordCommandPrefixInfo
+    prefix <- askInfo discordCommandPrefixInfo
     when (pack prefix `isPrefixOf` messageContent m) $ do
       let n = unpack $ T.toLower . T.drop (length prefix) . T.takeWhile (/= ' ') $ messageContent m
       for_ (filter ((==n) . commandName . commandInfo) commands) $ \c ->
         commandTimeoutRun (commandTimeout $ commandInfo c) m $ do
           logInfo $ "recieved " ++ unpack (messageContent m)
           ifDev () $ do
-            testDiscordId <- hInfoDB discordGuildIdInfo
+            testDiscordId <- askInfo discordGuildIdInfo
             when (messageGuildId m /= Just testDiscordId) $
-              respond m "```Attention! This is the dev version of the bot! Some features might not be avaliable! You shouldn't be reading this! If you see this message please report it immidately!```"
+              respond' m "```Attention! This is the dev version of the bot! Some features might not be avaliable! You shouldn't be reading this! If you see this message please report it immidately!```"
           perms <- fromMaybe DefaultLevel <$> getFromCache (userId (messageAuthor m))
           if perms == BanLevel
-          then respond m "You have been blacklisted. You can probably appeal this decision. Or not. I don't know. I'm just a pre-programmed response."
+          then respond' m "You have been blacklisted. You can probably appeal this decision. Or not. I don't know. I'm just a pre-programmed response."
           else if perms >= commandPerms (commandInfo c)
             then runCommand c m
-            else respond m "You don't have the permission to do that!"
+            else respond' m "You don't have the permission to do that!"
           logInfo $ "finished " ++ unpack (messageContent m)
 eventHandler (GuildMemberAdd gid gmem) = do
-  maingid <- hInfoDB discordGuildIdInfo
+  maingid <- askInfo discordGuildIdInfo
   when (gid == maingid && not (maybe True userIsBot (memberUser gmem))) $ do
     void $ storeInCache [guildMemberToDiscordAccount gmem]
     acc <- getBowBotAccountByDiscord (maybe 0 userId (memberUser gmem))
     updateRoles gmem acc
 eventHandler (GuildMemberUpdate gid roles usr _) = do
-  maingid <- hInfoDB discordGuildIdInfo
+  maingid <- askInfo discordGuildIdInfo
   when (not (null roles) && gid == maingid && not (userIsBot usr)) $ do
     storeNewRolesSaved (userId usr) roles
 eventHandler _ = pure ()
@@ -159,11 +159,11 @@ commandTimeoutRun n msg x = do
   case tm of
     Left e -> do
       logError $ "Exception happened in command: " ++ show e
-      respond msg "Something went horribly wrong! Please report this!"
+      respond' msg "Something went horribly wrong! Please report this!"
       throw e
     Right Nothing -> do
       logError $ "Timed out: " ++ show n ++ "s"
-      respond msg "Timed out! Please report this!"
+      respond' msg "Timed out! Please report this!"
     Right (Just ()) -> pure ()
 
 backgroundTimeoutRun :: MonadHoistIO m => Int -> m () -> m ()
@@ -220,9 +220,9 @@ commands =
   , adminCommand 120 "rolesupdate" "update everyone's discord roles" updateRolesAll
   , adminCommand 120 "savedrolesstore" "store everyone's saved roles" storeNewSavedRolesAll
   , adminCommand 15 "statusupdate" "update Bow Bot's discord status" updateDiscordStatus
-  , quietAdminCommand 5 "throw" "throw an error" $ hRespond $ show ((1 :: Integer) `div` 0)
-  , quietAdminCommand 5 "time" "display Bow Bot's time" $ hRespond =<< liftIO (getTime "Month: %m, Day: %d, Weekday: %u, Hour: %k, Minute: %M, Second %S")
+  , quietAdminCommand 5 "throw" "throw an error" $ respond $ show ((1 :: Integer) `div` 0)
+  , quietAdminCommand 5 "time" "display Bow Bot's time" $ respond =<< liftIO (getTime "Month: %m, Day: %d, Weekday: %u, Hour: %k, Minute: %M, Second %S")
   , adminCommand 15 "bdsay" "announce today's birthdays" announceBirthdays
-  , quietAdminCommand 5 "evacuate" "leaves the discord server" $ hEnv envGuild >>= call_ . LeaveGuild
-  , Command CommandInfo { commandName = "gregc", commandHelpEntries = [], commandPerms = DefaultLevel, commandTimeout = 2 } $ hNoArguments $ hRespond "<:gregc:904127204865228851>"
+  , quietAdminCommand 5 "evacuate" "leaves the discord server" $ envs envGuild >>= call_ . LeaveGuild
+  , Command CommandInfo { commandName = "gregc", commandHelpEntries = [], commandPerms = DefaultLevel, commandTimeout = 2 } $ noArguments $ respond "<:gregc:904127204865228851>"
   ]

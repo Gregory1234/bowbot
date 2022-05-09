@@ -13,13 +13,13 @@ snipeCommand = Command CommandInfo
   , commandHelpEntries = [HelpEntry { helpUsage = "snipe", helpDescription = "show the last deleted message from this channel", helpGroup = "normal" }]
   , commandPerms = DefaultLevel
   , commandTimeout = 10
-  } $ hNoArguments $ do
-    channel <- hEnv envChannel
+  } $ noArguments $ do
+    channel <- envs envChannel
     msg <- getFromCache channel
     case msg of
-      Nothing -> hRespond "*Nothing to snipe!*"
+      Nothing -> respond "*Nothing to snipe!*"
       Just SnipeMessage {..} -> do
         snipeAuthor' <- getFromCache snipeMessageAuthor
         case snipeAuthor' of
-          Nothing -> hRespond somethingWentWrongMessage
-          Just snipeAuthor -> hRespond $ showDiscordAccountDiscord snipeAuthor ++ " *wrote:* \n" ++ snipeMessageContent
+          Nothing -> respond somethingWentWrongMessage
+          Just snipeAuthor -> respond $ showDiscordAccountDiscord snipeAuthor ++ " *wrote:* \n" ++ snipeMessageContent

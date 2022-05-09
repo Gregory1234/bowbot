@@ -46,14 +46,14 @@ setSettingCommand = Command CommandInfo
   , commandHelpEntries = [HelpEntry { helpUsage = "set [stat] [yes|always|show|no|never|hide|maybe|defined] ", helpDescription = "sets the visibility of the stat", helpGroup = "settings" }]
   , commandPerms = DefaultLevel
   , commandTimeout = 15
-  } $ hTwoArguments (\sn val -> liftMaybe wrongSettingNameMessage (getSingleSettingByName sn) >>= (\case SingleSettingBool get set -> (\v -> (flip set v, (== v) . get)) <$> liftMaybe wrongSettingValueMessage (boolArg val); SingleSettingSense get set -> (\v -> (flip set v, (== v) . get)) <$> liftMaybe wrongSettingValueMessage (senseArg val) )) $ \(set, check) -> do
-    sender <- userId <$> hEnv envSender
+  } $ twoArguments (\sn val -> liftMaybe wrongSettingNameMessage (getSingleSettingByName sn) >>= (\case SingleSettingBool get set -> (\v -> (flip set v, (== v) . get)) <$> liftMaybe wrongSettingValueMessage (boolArg val); SingleSettingSense get set -> (\v -> (flip set v, (== v) . get)) <$> liftMaybe wrongSettingValueMessage (senseArg val) )) $ \(set, check) -> do
+    sender <- userId <$> envs envSender
     setting <- fromMaybe defSettings <$> getFromCache sender
     if check setting
-      then hRespond settingHasThatValueAlreadyMessage
+      then respond settingHasThatValueAlreadyMessage
       else do
         a <- storeInCacheIndexed [(sender, set setting)]
-        hRespond $ if a then successfullyUpdatedMessage else somethingWentWrongMessage
+        respond $ if a then successfullyUpdatedMessage else somethingWentWrongMessage
 
 constSettingCommand :: Bool -> BoolSense -> String -> String -> Command
 constSettingCommand boolVal senseVal name desc = Command CommandInfo
@@ -61,11 +61,11 @@ constSettingCommand boolVal senseVal name desc = Command CommandInfo
   , commandHelpEntries = [HelpEntry { helpUsage = name ++ " [stat]", helpDescription = desc, helpGroup = "settings" }]
   , commandPerms = DefaultLevel
   , commandTimeout = 15
-  } $ hOneArgument (\sn -> (\case SingleSettingBool get set -> (flip set boolVal, (== boolVal) . get); SingleSettingSense get set -> (flip set senseVal, (== senseVal) . get)) <$> liftMaybe wrongSettingNameMessage (getSingleSettingByName sn)) $ \(set, check) -> do
-    sender <- userId <$> hEnv envSender
+  } $ oneArgument (\sn -> (\case SingleSettingBool get set -> (flip set boolVal, (== boolVal) . get); SingleSettingSense get set -> (flip set senseVal, (== senseVal) . get)) <$> liftMaybe wrongSettingNameMessage (getSingleSettingByName sn)) $ \(set, check) -> do
+    sender <- userId <$> envs envSender
     setting <- fromMaybe defSettings <$> getFromCache sender
     if check setting
-      then hRespond settingHasThatValueAlreadyMessage
+      then respond settingHasThatValueAlreadyMessage
       else do
         a <- storeInCacheIndexed [(sender, set setting)]
-        hRespond $ if a then successfullyUpdatedMessage else somethingWentWrongMessage
+        respond $ if a then successfullyUpdatedMessage else somethingWentWrongMessage

@@ -4,42 +4,39 @@ import BowBot.Command.Handler
 import Control.Monad.Except (ExceptT(..), runExceptT, throwError)
 import Data.Maybe (listToMaybe)
 
-hWithArguments :: (CommandArgs -> ExceptT String CommandHandler a) -> (a -> CommandHandler ()) -> CommandHandler ()
-hWithArguments parser body = do
-  args <- hEnv envArgs
+withArguments :: (CommandArgs -> ExceptT String CommandHandler a) -> (a -> CommandHandler ()) -> CommandHandler ()
+withArguments parser body = do
+  args <- envs envArgs
   v <- runExceptT (parser args)
   case v of
-    Left e -> hRespond e
+    Left e -> respond e
     Right a -> body a
 
-hWithArguments' :: (CommandArgs -> ExceptT String CommandHandler ()) -> CommandHandler ()
-hWithArguments' body = do
-  args <- hEnv envArgs
+withArguments' :: (CommandArgs -> ExceptT String CommandHandler ()) -> CommandHandler ()
+withArguments' body = do
+  args <- envs envArgs
   v <- runExceptT (body args)
   case v of
-    Left e -> hRespond e
+    Left e -> respond e
     Right _ -> pure ()
 
-hNoArguments :: CommandHandler () -> CommandHandler ()
-hNoArguments body = hWithArguments noArgumentParser $ \() -> body
+noArguments :: CommandHandler () -> CommandHandler ()
+noArguments body = withArguments (\(CommandMessageArgs args) -> assertArgumentsCount 0 0 args) $ \() -> body
 
-hOneArgument :: (String -> ExceptT String CommandHandler a) -> (a -> CommandHandler ()) -> CommandHandler ()
-hOneArgument parser = hWithArguments (\(CommandMessageArgs args) -> assertArgumentsCount 1 1 args >> parser (head args))
+oneArgument :: (String -> ExceptT String CommandHandler a) -> (a -> CommandHandler ()) -> CommandHandler ()
+oneArgument parser = withArguments (\(CommandMessageArgs args) -> assertArgumentsCount 1 1 args >> parser (head args))
 
-hOneArgument' :: (String -> ExceptT String CommandHandler ()) -> CommandHandler ()
-hOneArgument' body = hWithArguments' (\(CommandMessageArgs args) -> assertArgumentsCount 1 1 args >> body (head args))
+oneArgument' :: (String -> ExceptT String CommandHandler ()) -> CommandHandler ()
+oneArgument' body = withArguments' (\(CommandMessageArgs args) -> assertArgumentsCount 1 1 args >> body (head args))
 
-hOneOptionalArgument :: (Maybe String -> ExceptT String CommandHandler a) -> (a -> CommandHandler ()) -> CommandHandler ()
-hOneOptionalArgument parser = hWithArguments (\(CommandMessageArgs args) -> assertArgumentsCount 0 1 args >> parser (listToMaybe args))
+oneOptionalArgument :: (Maybe String -> ExceptT String CommandHandler a) -> (a -> CommandHandler ()) -> CommandHandler ()
+oneOptionalArgument parser = withArguments (\(CommandMessageArgs args) -> assertArgumentsCount 0 1 args >> parser (listToMaybe args))
 
-hTwoArguments' :: (String -> String -> ExceptT String CommandHandler ()) -> CommandHandler ()
-hTwoArguments' body = hWithArguments' (\(CommandMessageArgs args) -> assertArgumentsCount 2 2 args >> body (head args) (args !! 1))
+twoArguments' :: (String -> String -> ExceptT String CommandHandler ()) -> CommandHandler ()
+twoArguments' body = withArguments' (\(CommandMessageArgs args) -> assertArgumentsCount 2 2 args >> body (head args) (args !! 1))
 
-hTwoArguments :: (String -> String -> ExceptT String CommandHandler a) -> (a -> CommandHandler ()) -> CommandHandler ()
-hTwoArguments parser = hWithArguments (\(CommandMessageArgs args) -> assertArgumentsCount 2 2 args >> parser (head args) (args !! 1))
-
-noArgumentParser :: CommandArgs -> ExceptT String CommandHandler ()
-noArgumentParser (CommandMessageArgs args) = assertArgumentsCount 0 0 args
+twoArguments :: (String -> String -> ExceptT String CommandHandler a) -> (a -> CommandHandler ()) -> CommandHandler ()
+twoArguments parser = withArguments (\(CommandMessageArgs args) -> assertArgumentsCount 2 2 args >> parser (head args) (args !! 1))
 
 assertArgumentsCount :: Int -> Int -> [String] -> ExceptT String CommandHandler ()
 assertArgumentsCount mina maxa args

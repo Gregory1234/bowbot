@@ -29,14 +29,14 @@ hypixelTimeStatsCommand src name desc = Command CommandInfo
   , commandHelpEntries = [HelpEntry { helpUsage = name ++ " [name]", helpDescription = desc, helpGroup = "normal" }]
   , commandPerms = DefaultLevel
   , commandTimeout = 15
-  } $ hOneOptionalArgument (\s -> lift (hEnv envSender) >>= minecraftArgDefault helper s . userId) $ \MinecraftResponse {responseAccount = responseAccount@MinecraftAccount {..}, ..} -> do
+  } $ oneOptionalArgument (\s -> lift (envs envSender) >>= minecraftArgDefault helper s . userId) $ \MinecraftResponse {responseAccount = responseAccount@MinecraftAccount {..}, ..} -> do
     let (didYouMean, renderedName) = (if isDidYouMean responseType then "*Did you mean* " else "", showMinecraftAccountDiscord responseType responseAccount)
-    user <- hEnv envSender
+    user <- envs envSender
     settings <- getSettingsFromSource src (userId user)
     dailyStats <- getFromCache @(HypixelBowTimeStats 'DailyStats) mcUUID
     weeklyStats <- getFromCache @(HypixelBowTimeStats 'WeeklyStats) mcUUID
     monthlyStats <- getFromCache @(HypixelBowTimeStats 'MonthlyStats) mcUUID
-    hRespond $ didYouMean ++ renderedName ++ ":\n" ++ showMaybeHypixelBowTimeStats settings responseValue dailyStats ++ "\n" ++ showMaybeHypixelBowTimeStats settings responseValue weeklyStats ++ "\n" ++ showMaybeHypixelBowTimeStats settings responseValue monthlyStats
+    respond $ didYouMean ++ renderedName ++ ":\n" ++ showMaybeHypixelBowTimeStats settings responseValue dailyStats ++ "\n" ++ showMaybeHypixelBowTimeStats settings responseValue weeklyStats ++ "\n" ++ showMaybeHypixelBowTimeStats settings responseValue monthlyStats
     saved <- getFromCache mcUUID
     case saved of
       Nothing | bowWins responseValue >= 50 -> do
@@ -45,7 +45,7 @@ hypixelTimeStatsCommand src name desc = Command CommandInfo
       Just MinecraftAccount { mcHypixelBow = NotBanned} -> do
         void $ storeInCacheIndexed [(mcUUID, hypixelBowStatsToLeaderboards responseValue)]
       _ -> pure ()
-    gid <- hInfoDB discordGuildIdInfo
+    gid <- askInfo discordGuildIdInfo
     gmems <- discordGuildMembers gid
     acc' <- getBowBotAccountByMinecraft mcUUID
     for_ acc' $ \acc -> for_ gmems $ \gmem -> when (maybe 0 userId (memberUser gmem) `elem` accountDiscords acc) $ updateRolesDivisionTitle gmem (Just acc)

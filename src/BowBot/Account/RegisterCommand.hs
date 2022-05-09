@@ -14,7 +14,7 @@ import BowBot.Hypixel.Leaderboard (hypixelBowStatsToLeaderboards)
 import BowBot.BotData.Counter (tryIncreaseCounter)
 import BowBot.Account.Register
 import BowBot.Discord.Roles (updateRoles)
-import BowBot.BotData.Info (hInfoDB, discordGuildIdInfo)
+import BowBot.BotData.Info (askInfo, discordGuildIdInfo)
 import BowBot.Hypixel.Stats (requestHypixelBowStats)
 import Control.Monad.Except
 import BowBot.Discord.Account
@@ -46,10 +46,10 @@ registerCommandBody RegisterCommandMessages {..} name did = do
       when (mcHypixelBow acc == NotBanned) $ void $ storeInCacheIndexed [(uuid, hypixelBowStatsToLeaderboards stats)]
       pure acc
   newacc <- liftMaybe somethingWentWrongMessage =<< createNewBowBotAccount (head $ mcNames mc) did uuid
-  gid <- hInfoDB discordGuildIdInfo
+  gid <- askInfo discordGuildIdInfo
   gmems <- discordGuildMembers gid
   for_ gmems $ \gmem -> when (maybe 0 userId (memberUser gmem) == did) $ lift $ updateRoles gmem (Just newacc)
-  lift $ hRespond "*Registered successfully*"
+  lift $ respond "*Registered successfully*"
 
 registerCommand :: Command
 registerCommand = Command CommandInfo
@@ -57,8 +57,8 @@ registerCommand = Command CommandInfo
   , commandHelpEntries = [HelpEntry { helpUsage = "register [name]", helpDescription = "register your Minecraft name in Bow Bot", helpGroup = "normal" }]
   , commandPerms = DefaultLevel
   , commandTimeout = 30
-  } $ hOneArgument' $ \name ->
-    lift (hEnv envSender) >>=
+  } $ oneArgument' $ \name ->
+    lift (envs envSender) >>=
       registerCommandBody RegisterCommandMessages {
           registerAlreadyBelongsMessage = "*That account already belongs to you!*",
           registerAlreadyBelongsSomeoneElseMessage = "*That account already belongs to someone else!*",
@@ -71,7 +71,7 @@ addCommand = Command CommandInfo
   , commandHelpEntries = [HelpEntry { helpUsage = "add [discord] [name]", helpDescription = "register someone in Bow Bot", helpGroup = "normal" }]
   , commandPerms = ModLevel
   , commandTimeout = 30
-  } $ hTwoArguments' $ \did name ->
+  } $ twoArguments' $ \did name ->
     discordArg did >>=
       registerCommandBody RegisterCommandMessages {
           registerAlreadyBelongsMessage = "*That account already belongs to this user!*",
@@ -85,7 +85,7 @@ addaltCommand = Command CommandInfo
   , commandHelpEntries = [HelpEntry { helpUsage = "addalt [discord] [name]", helpDescription = "register someone's alt account in Bow Bot", helpGroup = "normal" }]
   , commandPerms = ModLevel
   , commandTimeout = 30
-  } $ hTwoArguments' $ \did name -> do
+  } $ twoArguments' $ \did name -> do
     bacc <- liftMaybe thePlayerIsntRegisteredMessage =<< getBowBotAccountByDiscord . discordId =<< discordArg did
     uuid <- liftMaybe thePlayerDoesNotExistMessage =<< mcNameToUUID name
     baccother <- getBowBotAccountByMinecraft uuid
@@ -105,7 +105,7 @@ addaltCommand = Command CommandInfo
       Just MinecraftAccount { mcHypixelBow = NotBanned } -> void $ storeInCacheIndexed [(uuid, hypixelBowStatsToLeaderboards stats)]
       _ -> pure ()
     newacc <- liftMaybe somethingWentWrongMessage =<< addAltToBowBotAccount (BowBot.Account.Basic.accountId bacc) uuid
-    gid <- hInfoDB discordGuildIdInfo
+    gid <- askInfo discordGuildIdInfo
     gmems <- discordGuildMembers gid
     for_ gmems $ \gmem -> when (maybe 0 userId (memberUser gmem) `elem` accountDiscords bacc) $ lift $ updateRoles gmem (Just newacc)
-    lift $ hRespond "*Registered successfully*"
+    lift $ respond "*Registered successfully*"

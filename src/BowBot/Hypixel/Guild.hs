@@ -23,7 +23,7 @@ getHypixelGuildMembers = getOrCalculateCacheSingle $ do
   cv <- tryIncreaseCounter HypixelApi 1
   case cv of
     Nothing -> do
-      gid <- hInfoDB hypixelGuildIdInfo
+      gid <- askInfo hypixelGuildIdInfo
       fmap (HypixelGuildMembers . M.fromList) <$> hypixelGuildMemberList gid
     _ -> return Nothing
 

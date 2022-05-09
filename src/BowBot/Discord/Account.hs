@@ -62,7 +62,7 @@ showDiscordAccountDiscord DiscordAccount { discordNickname = Just nick, ..} = "*
 
 updateDiscordAccountCache :: (MonadIO m, MonadReader r m, Has DiscordHandle r, HasCache InfoField r, HasCache DiscordAccount r) => m ()
 updateDiscordAccountCache = do
-  gid <- hInfoDB discordGuildIdInfo
+  gid <- askInfo discordGuildIdInfo
   members <- map guildMemberToDiscordAccount . filter (\GuildMember {..} -> fmap userIsBot memberUser == Just False) <$> discordGuildMembers gid
   current <- HM.elems <$> getCacheMap
   updatedNonMembers <- for (deleteFirstsBy (\a b -> discordId a == discordId b) current members) $ \du -> do

@@ -20,7 +20,7 @@ infoCommand = Command CommandInfo
   , commandHelpEntries = [HelpEntry { helpUsage = "i [name]", helpDescription = "show info about a player", helpGroup = "normal" }]
   , commandPerms = DefaultLevel
   , commandTimeout = 15
-  } $ hOneOptionalArgument (\s -> lift (hEnv envSender) >>= accountArgDefault s . userId) $ \AccountResponse { accResponseAccount = BowBotAccount {..}, ..} -> do
+  } $ oneOptionalArgument (\s -> lift (envs envSender) >>= accountArgDefault s . userId) $ \AccountResponse { accResponseAccount = BowBotAccount {..}, ..} -> do
     let (didYouMean, renderedName) = case accResponseCause of
           (Left acc) -> ("", showDiscordAccountDiscord acc)
           (Right (typ, acc)) -> (if isDidYouMean typ then "*Did you mean* " else "", showMinecraftAccountDiscord typ acc)
@@ -28,4 +28,4 @@ infoCommand = Command CommandInfo
     dc <- getCacheMap
     let mcAccs = unlines $ map (\uuid -> let MinecraftAccount {..} = mc HM.! uuid in (if mcUUID == accountSelectedMinecraft then "*" else " ") ++ head mcNames ++ " (" ++ uuidString mcUUID ++ ")") accountMinecrafts
     let dcAccs = unlines $ map (\did -> let acc@DiscordAccount {..} = dc HM.! did in showDiscordAccount acc ++ ", id " ++ show discordId ) accountDiscords
-    hRespond $ didYouMean ++ renderedName ++ ":\n" ++ " - Bow Bot id: " ++ show accountId ++ "\n" ++ " - Minecraft accounts:```\n" ++ mcAccs ++ "```" ++ " - Discord accounts: ```\n" ++ dcAccs ++ "```"
+    respond $ didYouMean ++ renderedName ++ ":\n" ++ " - Bow Bot id: " ++ show accountId ++ "\n" ++ " - Minecraft accounts:```\n" ++ mcAccs ++ "```" ++ " - Discord accounts: ```\n" ++ dcAccs ++ "```"
