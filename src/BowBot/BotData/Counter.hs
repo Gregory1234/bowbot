@@ -23,13 +23,13 @@ class (Counted c, MonadIO m) => MonadCounter c m where
   tryIncreaseCounter :: c -> Integer -> m (Maybe Int)
   clearCounter :: c -> m ()
 
-data Counter = Counter { counterMain :: TVar Integer, counterBorder :: TVar Integer }
+data Counter c = Counter { counterMain :: TVar Integer, counterBorder :: TVar Integer }
 
-newCounter :: STM Counter
+newCounter :: STM (Counter c)
 newCounter = Counter <$> newTVar 0 <*> newTVar 0
 
 class (Counted c, MonadIO m) => MonadSimpleCounter c m where
-  getCounter :: c -> m Counter
+  getCounter :: c -> m (Counter c)
 
 newtype SimpleCounter m a = SimpleCounter { unSimpleCounter :: m a } deriving newtype (Functor, Applicative, Monad, MonadIO, MonadSimpleCounter c)
 

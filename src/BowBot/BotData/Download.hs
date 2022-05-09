@@ -8,8 +8,7 @@ import BowBot.BotData.Basic
 import BowBot.BotData.Info
 import BowBot.Minecraft.Account
 import BowBot.Account.Basic
-import Control.Concurrent.STM (STM, newTVar, atomically)
-import Data.HashMap.Strict (empty)
+import Control.Concurrent.STM (STM, atomically)
 import Database.MySQL.Simple (Connection)
 import BowBot.BotData.Cached
 import BowBot.BotData.CachedSingle
@@ -36,22 +35,22 @@ import BowBot.Snipe.Basic
 
 emptyBotData :: STM BotData
 emptyBotData = do
-  infoFieldCache <- newTVar empty
-  minecraftAccountCache <- newTVar empty
-  permissionCache <- newTVar empty
-  bowBotAccountCache <- newTVar empty
+  infoFieldCache <- newCache
+  minecraftAccountCache <- newCache
+  permissionCache <- newCache
+  bowBotAccountCache <- newCache
   hypixelApiCounter <- newCounter
-  settingsCache <- newTVar empty
-  hypixelLeaderboardCache <- newTVar empty
-  savedRolesCache <- newTVar empty
+  settingsCache <- newCache
+  hypixelLeaderboardCache <- newCache
+  savedRolesCache <- newCache
   hypixelGuildMembersCache <- newCachedData
-  discordAccountsCache <- newTVar empty
-  hypixelDailyStatsCache <- newTVar empty
-  hypixelWeeklyStatsCache <- newTVar empty
-  hypixelMonthlyStatsCache <- newTVar empty
+  discordAccountsCache <- newCache
+  hypixelDailyStatsCache <- newCache
+  hypixelWeeklyStatsCache <- newCache
+  hypixelMonthlyStatsCache <- newCache
   hypixelOnlinePlayersCache <- newCachedData
-  birthdayCache <- newTVar empty
-  snipeCache <- newTVar empty
+  birthdayCache <- newCache
+  snipeCache <- newCache
   return BotData {..}
 
 refreshBotData :: Connection -> BotData -> IO ()

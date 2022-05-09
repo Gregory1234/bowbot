@@ -152,5 +152,6 @@
     <orderEntry type="library" name="StateVar-1.2.2" level="project" />
     <orderEntry type="library" name="crypto-api-0.13.3" level="project" />
     <orderEntry type="library" name="parser-combinators-1.3.0" level="project" />
+    <orderEntry type="library" name="data-has-0.4.0.0" level="project" />
   </component>
 </module>

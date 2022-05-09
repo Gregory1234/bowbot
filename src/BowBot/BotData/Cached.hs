@@ -9,16 +9,23 @@ module BowBot.BotData.Cached where
 
 import qualified Data.HashMap.Strict as HM
 import Data.Hashable (Hashable)
-import Control.Concurrent.STM.TVar (TVar)
+import Control.Concurrent.STM.TVar (TVar, newTVar)
 import Database.MySQL.Simple (Connection)
 import BowBot.Utils (readTVar, atomically, assertIO)
 import Control.Monad.Reader (ReaderT(..))
 import Control.Monad.Except
+import Control.Concurrent.STM (STM)
 
-type DatabaseCache a = TVar (HM.HashMap (CacheIndex a) a)
+newtype DatabaseCache a = DatabaseCache { unDatabaseCache :: TVar (HM.HashMap (CacheIndex a) a) }
+
+newCache :: STM (DatabaseCache a)
+newCache = DatabaseCache <$> newTVar HM.empty
 
 class MonadIO m => MonadCache a m where
-  getCache :: m (DatabaseCache a)
+  getCache' :: m (DatabaseCache a)
+
+getCache :: MonadCache a m => m (TVar (HM.HashMap (CacheIndex a) a))
+getCache = unDatabaseCache <$> getCache'
 
 class (Eq (CacheIndex a), Hashable (CacheIndex a)) => Cached a where
   type CacheIndex a
@@ -52,7 +59,7 @@ assertGoodIndexes ((a,b):as) = do
   assertGoodIndexes as
 
 instance MonadCache c m => MonadCache c (ReaderT r m) where
-  getCache = ReaderT $ const getCache
+  getCache' = ReaderT $ const getCache'
 
 instance MonadCache c m => MonadCache c (ExceptT e m) where
-  getCache = ExceptT $ Right <$> getCache
+  getCache' = ExceptT $ Right <$> getCache'

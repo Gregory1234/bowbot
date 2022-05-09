@@ -42,6 +42,7 @@ dependencies:
 - stringsearch
 - hashable
 - data-default
+- data-has
 
 library:
   source-dirs: src

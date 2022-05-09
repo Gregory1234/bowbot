@@ -98,6 +98,7 @@ library
     , bytestring
     , containers
     , data-default
+    , data-has
     , deepseq
     , discord-haskell
     , hashable
@@ -131,6 +132,7 @@ executable bowbot-exe
     , bytestring
     , containers
     , data-default
+    , data-has
     , deepseq
     , discord-haskell
     , hashable
@@ -165,6 +167,7 @@ test-suite bowbot-test
     , bytestring
     , containers
     , data-default
+    , data-has
     , deepseq
     , discord-haskell
     , hashable
