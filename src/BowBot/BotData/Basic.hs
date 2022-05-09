@@ -2,7 +2,6 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE UndecidableInstances #-}
-{-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE ScopedTypeVariables #-}
@@ -15,8 +14,6 @@ import BowBot.Minecraft.Account
 import BowBot.Utils
 import Control.Monad.Cont (MonadTrans)
 import Control.Monad.Reader (ReaderT(..), MonadReader(..), MonadFix)
-import BowBot.Network.Class (MonadNetwork)
-import BowBot.Discord.Class (MonadDiscord)
 import Control.Monad.Error.Class (MonadError)
 import Control.Monad.State.Class (MonadState)
 import Control.Monad.Writer.Class (MonadWriter)
@@ -117,7 +114,7 @@ instance Has (DatabaseCache SnipeMessage) BotData where
   modifier f x = x { snipeCache = f $ snipeCache x }
 
 newtype BotDataT m a = BotDataT { runBotDataT :: BotData -> m a }
-  deriving (Functor, Applicative, Monad, MonadIO, MonadHoistIO, MonadNetwork, MonadDiscord, MonadError e, 
+  deriving (Functor, Applicative, Monad, MonadIO, MonadHoistIO, MonadError e, 
             MonadState s, MonadWriter w, MonadFail, MonadFix, Alternative, MonadPlus) via (ReaderT BotData m)
   deriving (MonadTrans) via (ReaderT BotData)
 

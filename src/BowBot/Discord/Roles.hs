@@ -24,7 +24,7 @@ import qualified Discord.Requests as R
 import Data.List ((\\), intersect, intercalate)
 import BowBot.DB.Basic (queryLog, withDB, executeManyLog)
 import BowBot.Hypixel.Guild
-import BowBot.Network.Class (MonadNetwork)
+import BowBot.Network.Basic
 import BowBot.Hypixel.Basic
 
 
@@ -50,7 +50,7 @@ memberRoleInfo = InfoType { infoName = "member_role", infoDefault = 0, infoParse
 visitorRoleInfo :: InfoType RoleId
 visitorRoleInfo = InfoType { infoName = "visitor_role", infoDefault = 0, infoParse = fmap fromInteger . readEither }
 
-addRemoveDiscordRoles :: MonadDiscord m => GuildId -> GuildMember -> [RoleId] -> [RoleId] -> m ()
+addRemoveDiscordRoles :: (MonadIO m, MonadReader r m, Has DiscordHandle r) => GuildId -> GuildMember -> [RoleId] -> [RoleId] -> m ()
 addRemoveDiscordRoles gid GuildMember {..} universe correct = do
   let current = memberRoles `intersect` universe
   let toAdd = correct \\ current
@@ -59,7 +59,7 @@ addRemoveDiscordRoles gid GuildMember {..} universe correct = do
   for_ toAdd $ \r -> call_ $ R.AddGuildMemberRole gid did r
   for_ toRemove $ \r -> call_ $ R.RemoveGuildMemberRole gid did r
 
-updateRolesDivisionTitle :: (MonadDiscord m, MonadCache InfoField m, MonadCache HypixelBowLeaderboardEntry m) => GuildMember -> Maybe BowBotAccount -> m ()
+updateRolesDivisionTitle :: (MonadIO m, MonadReader r m, Has DiscordHandle r, MonadCache InfoField m, MonadCache HypixelBowLeaderboardEntry m) => GuildMember -> Maybe BowBotAccount -> m ()
 updateRolesDivisionTitle gmem (Just BowBotAccount {..}) = do
   lb <- getCacheMap
   let m = maximum . (0:) $ mapMaybe (fmap bowLbWins . (lb HM.!?)) accountMinecrafts
@@ -79,7 +79,7 @@ instance Cached SavedRoles where
     let newValues = HM.fromList $ flip fmap res $ \(fromInteger -> did, SavedRoles . splitOn "," -> roles) -> (did, roles)
     liftIO $ atomically $ writeTVar cache newValues
 
-storeNewRolesSaved :: (MonadDiscord m, MonadCache InfoField m, MonadCache SavedRoles m, MonadCache BowBotAccount m) => UserId -> [RoleId] -> m ()
+storeNewRolesSaved :: (MonadIO m, MonadReader r m, Has DiscordHandle r, MonadCache InfoField m, MonadCache SavedRoles m, MonadCache BowBotAccount m) => UserId -> [RoleId] -> m ()
 storeNewRolesSaved did roles = do
   old <- getFromCache did
   toggleableRolesAll <- hInfoDB toggleableRolesInfo
@@ -102,14 +102,14 @@ storeNewRolesSaved did roles = do
           cache <- getCache
           liftIO $ atomically $ modifyTVar cache (insertMany $ map (,savedRoles) (accountDiscords a))
 
-storeNewSavedRolesAll :: (MonadDiscord m, MonadCache InfoField m, MonadCache SavedRoles m, MonadCache BowBotAccount m) => m ()
+storeNewSavedRolesAll :: (MonadIO m, MonadReader r m, Has DiscordHandle r, MonadCache InfoField m, MonadCache SavedRoles m, MonadCache BowBotAccount m) => m ()
 storeNewSavedRolesAll = do
   gid <- hInfoDB discordGuildIdInfo
   mems <- discordGuildMembers gid
   for_ mems $ \gmem -> do
     storeNewRolesSaved (maybe 0 userId (memberUser gmem)) (memberRoles gmem)
 
-updateRolesSaved :: (MonadDiscord m, MonadCache InfoField m, MonadCache SavedRoles m, MonadNetwork m, MonadCacheSingle HypixelGuildMembers m, MonadCounter HypixelApi m, MonadHoistIO m) => GuildMember -> Maybe BowBotAccount -> m ()
+updateRolesSaved :: (MonadIO m, MonadReader r m, Has DiscordHandle r, Has Manager r, MonadCache InfoField m, MonadCache SavedRoles m, MonadCacheSingle HypixelGuildMembers m, MonadCounter HypixelApi m, MonadHoistIO m) => GuildMember -> Maybe BowBotAccount -> m ()
 updateRolesSaved gmem acc = do
   toggleableRolesAll <- hInfoDB toggleableRolesInfo
   savedRolesAll <- hInfoDB savedRolesInfo
@@ -134,7 +134,7 @@ updateRolesSaved gmem acc = do
           addRemoveDiscordRoles gid gmem (map snd $ M.toList rolesAll) (savedRoles `intersect` allowed)
         Nothing -> addRemoveDiscordRoles gid gmem (map snd $ M.toList rolesAll) savedRoles
 
-updateRolesMember :: (MonadNetwork m, MonadDiscord m, MonadCache InfoField m, MonadCacheSingle HypixelGuildMembers m, MonadCounter HypixelApi m, MonadHoistIO m) => GuildMember -> Maybe BowBotAccount -> m ()
+updateRolesMember :: (MonadIO m, MonadReader r m, Has DiscordHandle r, Has Manager r, MonadCache InfoField m, MonadCacheSingle HypixelGuildMembers m, MonadCounter HypixelApi m, MonadHoistIO m) => GuildMember -> Maybe BowBotAccount -> m ()
 updateRolesMember gmem (Just BowBotAccount {..}) = do
   m <- getHypixelGuildMembers
   let x = case m of
@@ -155,7 +155,7 @@ updateRolesMember gmem Nothing = do
   gid <- hInfoDB discordGuildIdInfo
   unless (memberRole `elem` memberRoles gmem) $ addRemoveDiscordRoles gid gmem [visitorRole] [visitorRole]
 
-updateRolesIllegal :: (MonadDiscord m, MonadCache InfoField m) => GuildMember -> Maybe BowBotAccount -> m ()
+updateRolesIllegal :: (MonadIO m, MonadReader r m, Has DiscordHandle r, MonadCache InfoField m) => GuildMember -> Maybe BowBotAccount -> m ()
 updateRolesIllegal gmem (Just _) = do
   illegalRole <- hInfoDB illegalRoleInfo
   gid <- hInfoDB discordGuildIdInfo
@@ -169,14 +169,14 @@ updateRolesIllegal gmem Nothing = do
   gid <- hInfoDB discordGuildIdInfo
   addRemoveDiscordRoles gid gmem [illegalRole] [illegalRole | not (null (memberRoles gmem `intersect` allRoles))]
 
-updateRoles :: (MonadNetwork m, MonadDiscord m, MonadCache InfoField m, MonadCache HypixelBowLeaderboardEntry m, MonadCache SavedRoles m, MonadCacheSingle HypixelGuildMembers m, MonadCounter HypixelApi m, MonadHoistIO m) => GuildMember -> Maybe BowBotAccount -> m ()
+updateRoles :: (MonadIO m, MonadReader r m, Has DiscordHandle r, Has Manager r, MonadCache InfoField m, MonadCache HypixelBowLeaderboardEntry m, MonadCache SavedRoles m, MonadCacheSingle HypixelGuildMembers m, MonadCounter HypixelApi m, MonadHoistIO m) => GuildMember -> Maybe BowBotAccount -> m ()
 updateRoles gmem acc = do
   updateRolesSaved gmem acc
   updateRolesDivisionTitle gmem acc
   updateRolesMember gmem acc
   updateRolesIllegal gmem acc
 
-updateRolesAll :: (MonadNetwork m, MonadDiscord m, MonadCache InfoField m, MonadCache HypixelBowLeaderboardEntry m, MonadCache BowBotAccount m, MonadCache SavedRoles m, MonadCacheSingle HypixelGuildMembers m, MonadCounter HypixelApi m, MonadHoistIO m) => m ()
+updateRolesAll :: (MonadIO m, MonadReader r m, Has DiscordHandle r, Has Manager r, MonadCache InfoField m, MonadCache HypixelBowLeaderboardEntry m, MonadCache BowBotAccount m, MonadCache SavedRoles m, MonadCacheSingle HypixelGuildMembers m, MonadCounter HypixelApi m, MonadHoistIO m) => m ()
 updateRolesAll = do
   gid <- hInfoDB discordGuildIdInfo
   mems <- discordGuildMembers gid

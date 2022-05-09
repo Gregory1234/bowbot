@@ -13,13 +13,12 @@ import Control.Monad (forever)
 import BowBot.DB.Basic
 import BowBot.BotData.Info
 import Network.HTTP.Conduit (newManager)
-import BowBot.Network.Basic (managerSettings)
 import BowBot.BotMonad
 import qualified Data.Text as T
 import Data.Text (isPrefixOf)
 import BowBot.Command
 import BowBot.Hypixel.StatsCommand
-import BowBot.Discord.Class (MonadDiscord, call_, liftDiscord)
+import BowBot.Discord.Basic
 import Control.Exception.Base (SomeException, try, throw)
 import System.Timeout (timeout)
 import Control.Monad.Reader (ReaderT(..))
@@ -28,7 +27,7 @@ import BowBot.BotData.RefreshCommand
 import BowBot.BotData.Cached
 import Control.Concurrent (threadDelay, forkIO)
 import BowBot.Settings.Basic
-import BowBot.Network.Class (hManager)
+import BowBot.Network.Basic
 import BowBot.Network.ClearLogs
 import BowBot.Discord.Roles
 import BowBot.Hypixel.LeaderboardCommand
@@ -63,8 +62,8 @@ runBowBot = do
     runDiscord $
       def
         { discordToken = pack discordKey,
-          discordOnStart = ReaderT $ runBotT onStartup bdt manager,
-          discordOnEvent = \e -> ReaderT $ runBotT (eventHandler e) bdt manager,
+          discordOnStart = ReaderT $ \h -> runBotT onStartup bdt (manager, h),
+          discordOnEvent = \e -> ReaderT $ \h -> runBotT (eventHandler e) bdt (manager, h),
           discordOnLog = putStrLn . unpack,
           discordGatewayIntent = def { gatewayIntentMembers = True }
         }
@@ -72,13 +71,13 @@ runBowBot = do
 
 backgroundMinutely :: Int -> Bot ()
 backgroundMinutely mint = do
-  bdt <- BotT $ \d _ _ -> return d
+  bdt <- BotT $ \d _ -> return d
   liftIO $ clearBotDataCaches bdt
   when (mint == 0) $ withDB $ \conn -> do
     logInfoDB conn "started update"
     updateDiscordStatus
     liftIO $ refreshBotData conn bdt
-    manager <- hManager
+    manager <- asks getter
     hour <- liftIO $ read @Int <$> getTime "%k"
     weekday <- liftIO $ read @Int <$> getTime "%u"
     monthday <- liftIO $ read @Int <$> getTime "%d"
@@ -107,7 +106,7 @@ onStartup = void $ hoistIO forkIO $ do
       backgroundMinutely mint
     liftIO $ threadDelay 60000000
 
-updateDiscordStatus :: (MonadDiscord m, MonadCache InfoField m) => m ()
+updateDiscordStatus :: (MonadIO m, MonadReader r m, Has DiscordHandle r, MonadCache InfoField m) => m ()
 updateDiscordStatus = do
   discordStatus <- hInfoDB discordStatusInfo
   liftDiscord $ sendCommand (UpdateStatus $ UpdateStatusOpts {
@@ -117,7 +116,7 @@ updateDiscordStatus = do
         updateStatusOptsAFK = False
       })
 
-respond :: MonadDiscord m => Message -> String -> m ()
+respond :: (MonadIO m, MonadReader r m, Has DiscordHandle r) => Message -> String -> m ()
 respond m = call_ . CreateMessage (messageChannelId m) . pack
 
 eventHandler :: Event -> Bot ()
@@ -154,7 +153,7 @@ eventHandler (GuildMemberUpdate gid roles usr _) = do
     storeNewRolesSaved (userId usr) roles
 eventHandler _ = pure ()
 
-commandTimeoutRun :: (MonadHoistIO m, MonadDiscord m) => Int -> Message -> m () -> m ()
+commandTimeoutRun :: (MonadHoistIO m, MonadReader r m, Has DiscordHandle r) => Int -> Message -> m () -> m ()
 commandTimeoutRun n msg x = do
   tm <- hoistIO (try @SomeException . timeout (n * 1000000)) x
   case tm of

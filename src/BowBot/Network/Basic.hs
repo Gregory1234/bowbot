@@ -1,7 +1,10 @@
 {-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE FlexibleContexts #-}
 
-module BowBot.Network.Basic where
+module BowBot.Network.Basic(
+  module BowBot.Network.Basic, Manager, MonadIO(..), MonadReader(..), asks, Has(..)
+) where
 
 
 import Network.HTTP.Conduit hiding (path)
@@ -12,15 +15,16 @@ import Control.DeepSeq (force)
 import BowBot.DB.Basic
 import Control.Concurrent (threadDelay)
 import Data.Aeson (decode)
-import BowBot.Utils (MonadIO(..))
+import Control.Monad.Reader
+import Data.Has
 
 
 
 managerSettings :: ManagerSettings
 managerSettings = tlsManagerSettings { managerResponseTimeout = responseTimeoutMicro 15000000 }
 
-sendRequestTo :: Manager -> String -> String -> IO ByteString
-sendRequestTo manager url cleanUrl = do
+sendRequestTo' :: Manager -> String -> String -> IO ByteString
+sendRequestTo' manager url cleanUrl = do
   _ <- evaluate $ force url
   _ <- evaluate $ force cleanUrl
   logInfo cleanUrl
@@ -30,10 +34,15 @@ sendRequestTo manager url cleanUrl = do
     (Left (e :: SomeException)) -> do
       logError $ show e
       threadDelay 3000000
-      sendRequestTo manager url cleanUrl
+      sendRequestTo' manager url cleanUrl
     (Right v) -> do
       logInfo $ "Received response from: " ++ cleanUrl
       return $ responseBody v
+
+sendRequestTo :: (MonadIO m, MonadReader r m, Has Manager r) => String -> String -> m ByteString
+sendRequestTo url cleanUrl = do
+  manager <- asks getter
+  liftIO $ sendRequestTo' manager url cleanUrl
 
 decodeParse :: (FromJSON o, MonadIO m) => ByteString -> (o -> Parser a) -> m (Maybe a)
 decodeParse (decode -> Just str) parser = liftIO $ case parseEither parser str of

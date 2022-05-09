@@ -18,13 +18,11 @@ import BowBot.BotData.Counter
 import BowBot.Hypixel.Basic
 import BowBot.Settings.Basic
 import Network.HTTP.Conduit (Manager)
-import BowBot.Network.Monad (runNetworkT)
 import BowBot.Hypixel.Leaderboard
 import BowBot.Discord.Roles
 import BowBot.Hypixel.Guild
 import BowBot.Discord.Account
 import Discord
-import BowBot.Discord.Monad
 import Control.Monad.Reader
 import BowBot.Hypixel.TimeStats
 import BowBot.Hypixel.Watchlist
@@ -71,7 +69,7 @@ refreshBotData conn bdt = flip runBotDataT bdt $ do
 
 updateBotData :: [StatsTimeRange] -> Manager -> BotData -> DiscordHandler ()
 updateBotData times manager bdt = ReaderT $ \dh -> foldl1 concurrently_ $
-  map (flip runDiscordHandlerT dh . flip runNetworkT manager . flip runBotDataT bdt)
+  map (flip runReaderT (dh, manager) . flip runBotDataT bdt)
     [ updateMinecraftAccountCache
     , updateDiscordAccountCache
     , do

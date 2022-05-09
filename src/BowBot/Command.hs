@@ -10,16 +10,16 @@ import BowBot.Command.Handler
 import BowBot.Command.Args
 import BowBot.BotMonad
 import Discord.Types
-import BowBot.Network.Class (hManager)
-import BowBot.Discord.Class (liftDiscord)
+import BowBot.Network.Basic
   
 data Command = Command { commandInfo :: CommandInfo, commandHandler :: CommandHandler () }
 
 runCommand :: Command -> Message -> Bot ()
 runCommand Command {..} m = do
-  bdt <- BotT $ \d _ _ -> return d
-  manager <- hManager
-  liftDiscord $ runCommandHandler commandHandler (commandEnvFromMessage m) bdt manager
+  bdt <- BotT $ \d _ -> return d
+  manager <- asks getter
+  handle <- asks getter
+  liftIO $ runCommandHandler commandHandler bdt (commandEnvFromMessage m, manager, handle)
 
 somethingWentWrongMessage :: String
 somethingWentWrongMessage = "**Something went wrong!**"

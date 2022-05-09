@@ -13,12 +13,9 @@ module BowBot.Command.Handler where
 import BowBot.Utils
 import Discord
 import qualified Discord.Requests as R
-import Network.HTTP.Conduit (Manager)
-import BowBot.Network.Class (MonadNetwork)
-import BowBot.Discord.Class
-import Discord.Types
+import BowBot.Network.Basic
+import BowBot.Discord.Basic
 import Control.Monad.Reader (ReaderT(..))
-import BowBot.BotMonad
 import Data.Text.Encoding (encodeUtf8)
 import BowBot.Discord.DiscordNFData ()
 import BowBot.BotData.Basic
@@ -49,17 +46,17 @@ commandEnvFromMessage m = CommandEnvironment
   , envArgs = CommandMessageArgs $ tail $ words $ unpack $ messageContent m
   }
 
-newtype CommandHandler a = CommandHandler { runCommandHandler :: CommandEnvironment -> BotData -> Manager -> DiscordHandler a }
-  deriving (Functor, Applicative, Monad, MonadIO, MonadNetwork, MonadDiscord, MonadHoistIO) via (ReaderT CommandEnvironment Bot)
+newtype CommandHandler a = CommandHandler { runCommandHandler :: BotData -> (CommandEnvironment, Manager, DiscordHandle) -> IO a }
+  deriving (Functor, Applicative, Monad, MonadIO, MonadReader (CommandEnvironment, Manager, DiscordHandle), MonadHoistIO) via (BotDataT (ReaderT (CommandEnvironment, Manager, DiscordHandle) IO))
 
-deriving via (ReaderT CommandEnvironment Bot) instance (MonadCache c Bot, MonadIO CommandHandler) => MonadCache c CommandHandler
+deriving via (BotDataT (ReaderT (CommandEnvironment, Manager, DiscordHandle) IO)) instance (MonadCache c (BotDataT (ReaderT (CommandEnvironment, Manager, DiscordHandle) IO)), MonadIO CommandHandler) => MonadCache c CommandHandler
 
-deriving via (ReaderT CommandEnvironment Bot) instance (Counted c, MonadCounter c Bot, MonadIO CommandHandler) => MonadCounter c CommandHandler
+deriving via (BotDataT (ReaderT (CommandEnvironment, Manager, DiscordHandle) IO)) instance (Counted c, MonadCounter c (BotDataT (ReaderT (CommandEnvironment, Manager, DiscordHandle) IO)), MonadIO CommandHandler) => MonadCounter c CommandHandler
 
-deriving via (ReaderT CommandEnvironment Bot) instance (MonadCacheSingle c Bot, MonadIO CommandHandler) => MonadCacheSingle c CommandHandler
+deriving via (BotDataT (ReaderT (CommandEnvironment, Manager, DiscordHandle) IO)) instance (MonadCacheSingle c (BotDataT (ReaderT (CommandEnvironment, Manager, DiscordHandle) IO)), MonadIO CommandHandler) => MonadCacheSingle c CommandHandler
 
 hEnv :: (CommandEnvironment -> v) -> CommandHandler v
-hEnv f = CommandHandler $ \e _ _ -> return $ f e 
+hEnv f = asks $ f . getter
 
 hRespond :: String -> CommandHandler ()
 hRespond m = do

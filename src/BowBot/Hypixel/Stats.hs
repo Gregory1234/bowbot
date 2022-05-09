@@ -1,10 +1,11 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE FlexibleContexts #-}
 
 module BowBot.Hypixel.Stats where
 
 import BowBot.Settings.Basic
-import BowBot.Network.Class (MonadNetwork)
+import BowBot.Network.Basic
 import BowBot.Minecraft.Basic (UUID)
 import BowBot.Hypixel.Basic
 import Data.Aeson
@@ -24,7 +25,7 @@ data HypixelBowStats = HypixelBowStats
   } deriving (Show)
 
 
-requestHypixelBowStats :: (MonadNetwork m) => UUID -> m (Maybe HypixelBowStats)
+requestHypixelBowStats :: (MonadIO m, MonadReader r m, Has Manager r) => UUID -> m (Maybe HypixelBowStats)
 requestHypixelBowStats uuid = hypixelWithPlayerData uuid $ \o -> do
     pl <- o .: "player"
     stats <- pl .: "stats"

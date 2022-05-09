@@ -5,7 +5,6 @@
 module BowBot.Birthday.Announce where
 
 import BowBot.BotData.Cached
-import BowBot.Discord.Class
 import BowBot.Birthday.Basic
 import qualified Discord.Requests as R
 import BowBot.Account.Basic
@@ -21,7 +20,7 @@ import BowBot.Discord.Account
 birthdayChannelInfo :: InfoType ChannelId
 birthdayChannelInfo = InfoType { infoName = "birthday_channel", infoDefault = 0, infoParse = readEither }
 
-announceBirthdays :: (MonadCache BirthdayDate m, MonadCache BowBotAccount m, MonadCache DiscordAccount m, MonadCache InfoField m, MonadDiscord m) => m ()
+announceBirthdays :: (MonadIO m, MonadReader r m, Has DiscordHandle r, MonadCache BirthdayDate m, MonadCache BowBotAccount m, MonadCache DiscordAccount m, MonadCache InfoField m) => m ()
 announceBirthdays = do
   currentDay <- liftIO currentBirthdayDate
   birthdays <- getBirthdayPeople currentDay

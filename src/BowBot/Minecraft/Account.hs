@@ -14,14 +14,14 @@ import BowBot.BotData.Cached
 import BowBot.DB.Basic (queryLog, executeManyLog, withDB, logInfo)
 import Data.List.Split (splitOn, chunksOf)
 import Data.List (intercalate, find, intersperse)
-import BowBot.Network.Class
+import BowBot.Network.Basic
 import Data.Char (toLower)
 import BowBot.Utils
 import qualified Data.HashMap.Strict as HM
-import BowBot.Network.Monad (runNetworkT)
 import Control.Concurrent.Async (mapConcurrently)
 import Data.Maybe (mapMaybe)
 import Control.Concurrent (threadDelay)
+import Control.Monad.Reader (runReaderT)
 
 data IsBanned
   = NotBanned
@@ -66,9 +66,9 @@ instance CachedIndexed MinecraftAccount where
       liftIO $ atomically $ modifyTVar cache (insertMany (map (\x -> (mcUUID x, x)) accs))
     return success
 
-updateMinecraftAccountCache :: (MonadNetwork m, MonadCache MinecraftAccount m) => m ()
+updateMinecraftAccountCache :: (MonadCache MinecraftAccount m, MonadReader r m, Has Manager r) => m ()
 updateMinecraftAccountCache = do
-  manager <- hManager
+  ctx <- ask
   let helper MinecraftAccount {..} = do
         newNames <- mojangUUIDToNames mcUUID
         return MinecraftAccount {mcNames = fromMaybe mcNames newNames, ..}
@@ -76,17 +76,17 @@ updateMinecraftAccountCache = do
   let bigchunked = chunksOf 400 cache
   updatedAccounts <- liftIO $ fmap concat $ sequence $ intersperse (([] <$) $ logInfo "Started 10 minute wait in Minecraft update" >> threadDelay 600000000) $ flip map bigchunked $ \bigchunk -> do
     let chunked = chunksOf 10 bigchunk
-    fmap concat $ for chunked $ mapConcurrently (fmap (`runNetworkT` manager) helper)
+    fmap concat $ for chunked $ mapConcurrently (fmap (`runReaderT` ctx) helper)
   void $ storeInCache updatedAccounts
 
-mcNameToUUID :: (MonadCache MinecraftAccount m, MonadNetwork m) => String -> m (Maybe UUID)
+mcNameToUUID :: (MonadCache MinecraftAccount m, MonadReader r m, Has Manager r) => String -> m (Maybe UUID)
 mcNameToUUID name = do
   goodAcc <- getMinecraftAccountByCurrentNameFromCache name
   case goodAcc of
     Just MinecraftAccount {mcUUID} -> return (Just mcUUID)
     _ -> mojangNameToUUID name
 
-mcUUIDToNames :: (MonadCache MinecraftAccount m, MonadNetwork m) => UUID -> m (Maybe [String])
+mcUUIDToNames :: (MonadCache MinecraftAccount m, MonadReader r m, Has Manager r) => UUID -> m (Maybe [String])
 mcUUIDToNames uuid = do
   goodAcc <- getFromCache uuid
   case goodAcc of

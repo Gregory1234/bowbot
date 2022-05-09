@@ -50,9 +50,8 @@ library
       BowBot.DB.Basic
       BowBot.Discord.Account
       BowBot.Discord.Arg
-      BowBot.Discord.Class
+      BowBot.Discord.Basic
       BowBot.Discord.DiscordNFData
-      BowBot.Discord.Monad
       BowBot.Discord.RoleCommand
       BowBot.Discord.Roles
       BowBot.Discord.Utils
@@ -76,9 +75,7 @@ library
       BowBot.Minecraft.SelectCommand
       BowBot.Minecraft.UrlCommand
       BowBot.Network.Basic
-      BowBot.Network.Class
       BowBot.Network.ClearLogs
-      BowBot.Network.Monad
       BowBot.Perms.Basic
       BowBot.Settings.Basic
       BowBot.Settings.Commands

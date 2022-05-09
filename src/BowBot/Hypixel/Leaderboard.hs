@@ -19,13 +19,13 @@ import BowBot.Utils
 import Data.Maybe (mapMaybe)
 import Control.Applicative ((<|>))
 import BowBot.Hypixel.Basic (HypixelApi(..))
-import BowBot.Network.Class
+import BowBot.Network.Basic
 import BowBot.BotData.Counter
 import Data.List.Split (chunksOf)
 import Control.Concurrent (threadDelay)
 import Control.Concurrent.Async (mapConcurrently)
-import BowBot.Network.Monad (runNetworkT)
 import Data.List (intersperse)
+import Control.Monad.Reader (runReaderT)
 
 data HypixelBowLeaderboardEntry = HypixelBowLeaderboardEntry
   { bowLbWins :: Integer,
@@ -58,9 +58,9 @@ instance CachedStorable HypixelBowLeaderboardEntry where
       liftIO $ atomically $ modifyTVar cache (insertMany fixed)
     return success
 
-updateHypixelLeaderboardCache :: (MonadNetwork m, MonadCounter HypixelApi m, MonadCache HypixelBowLeaderboardEntry m) => m ()
+updateHypixelLeaderboardCache :: (MonadIO m, MonadReader r m, Has Manager r, MonadCounter HypixelApi m, MonadCache HypixelBowLeaderboardEntry m) => m ()
 updateHypixelLeaderboardCache = do
-  manager <- hManager
+  ctx <- ask
   let helper (uuid, old) = do
         stats <- fmap hypixelBowStatsToLeaderboards <$> requestHypixelBowStats uuid
         return (uuid, maybe old (\s -> s { bowLbWinstreak = bowLbWinstreak s <|> bowLbWinstreak old }) stats)
@@ -76,5 +76,5 @@ updateHypixelLeaderboardCache = do
               liftIO $ threadDelay ((t+1) * 1000000)
               wait
     wait
-    liftIO $ fmap concat $ for chunked $ \chunk -> mapConcurrently (fmap (`runNetworkT` manager) helper) chunk
+    liftIO $ fmap concat $ for chunked $ \chunk -> mapConcurrently (fmap (`runReaderT` ctx) helper) chunk
   void $ storeInCacheIndexed updatedAccounts

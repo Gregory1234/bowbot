@@ -8,7 +8,7 @@ import qualified Data.Map as M
 import BowBot.BotData.CachedSingle
 import BowBot.BotData.Cached
 import BowBot.BotData.Counter
-import BowBot.Network.Class
+import BowBot.Network.Basic
 import BowBot.Hypixel.Basic
 import BowBot.Discord.Utils (MonadHoistIO)
 
@@ -18,7 +18,7 @@ hypixelGuildIdInfo = InfoType { infoName = "hypixel_guild_id", infoDefault = "",
 
 newtype HypixelGuildMembers = HypixelGuildMembers { getHypixelGuildMemberMap :: M.Map UUID String }
 
-getHypixelGuildMembers :: (MonadNetwork m, MonadCacheSingle HypixelGuildMembers m, MonadCache InfoField m, MonadCounter HypixelApi m, MonadHoistIO m) => m (CacheResponse HypixelGuildMembers)
+getHypixelGuildMembers :: (MonadIO m, MonadReader r m, Has Manager r, MonadCacheSingle HypixelGuildMembers m, MonadCache InfoField m, MonadCounter HypixelApi m, MonadHoistIO m) => m (CacheResponse HypixelGuildMembers)
 getHypixelGuildMembers = getOrCalculateCacheSingle $ do
   cv <- tryIncreaseCounter HypixelApi 1
   case cv of

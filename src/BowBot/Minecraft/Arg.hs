@@ -15,7 +15,7 @@ import Data.Char (toLower)
 import Data.List (sortOn)
 import Data.Maybe (listToMaybe, isNothing)
 import BowBot.Discord.Utils
-import BowBot.Network.Class
+import BowBot.Network.Basic
 
 data MinecraftResponse a = MinecraftResponse { responseType :: MinecraftResponseType, responseAccount :: MinecraftAccount, responseValue :: a }
 
@@ -28,15 +28,15 @@ data MinecraftResponseType
 thePlayerDoesNotExistMessage :: String
 thePlayerDoesNotExistMessage = "*The player doesn't exist!*"
 
-minecraftArgDefault :: (MonadError String m, MonadCache MinecraftAccount m, MonadNetwork m, MonadCache BowBotAccount m) => (MinecraftAccount -> m (Bool, a)) -> Maybe String -> UserId -> m (MinecraftResponse a)
+minecraftArgDefault :: (MonadError String m, MonadCache MinecraftAccount m, MonadReader r m, Has Manager r, MonadCache BowBotAccount m) => (MinecraftAccount -> m (Bool, a)) -> Maybe String -> UserId -> m (MinecraftResponse a)
 minecraftArgDefault arg Nothing did = minecraftArgDiscordSelf arg did
 minecraftArgDefault arg (Just (fromPingDiscordUser -> Just did)) _ = minecraftArgDiscord' arg did
 minecraftArgDefault arg (Just name) _ = minecraftArgNoAutocorrect' arg name
 
-minecraftArgNoAutocorrect' :: (MonadError String m, MonadCache MinecraftAccount m, MonadNetwork m) => (MinecraftAccount -> m (Bool, a)) -> String -> m (MinecraftResponse a)
+minecraftArgNoAutocorrect' :: (MonadError String m, MonadCache MinecraftAccount m, MonadReader r m, Has Manager r) => (MinecraftAccount -> m (Bool, a)) -> String -> m (MinecraftResponse a)
 minecraftArgNoAutocorrect' = minecraftArgNoAutocorrect Nothing
 
-minecraftArgNoAutocorrect :: (MonadError String m, MonadCache MinecraftAccount m, MonadNetwork m) => Maybe String -> (MinecraftAccount -> m (Bool, a)) -> String -> m (MinecraftResponse a)
+minecraftArgNoAutocorrect :: (MonadError String m, MonadCache MinecraftAccount m, MonadReader r m, Has Manager r) => Maybe String -> (MinecraftAccount -> m (Bool, a)) -> String -> m (MinecraftResponse a)
 minecraftArgNoAutocorrect err arg name = do
   acc' <- filter ((==map toLower name) . map toLower . head . mcNames) . HM.elems <$> getCacheMap
   case acc' of
@@ -56,10 +56,10 @@ minecraftArgNoAutocorrect err arg name = do
               Nothing -> minecraftArgAutocorrect (Just e) Nothing arg name
               Just e' -> throwError e'
 
-minecraftArgAutocorrect' :: (MonadError String m, MonadCache MinecraftAccount m, MonadNetwork m) => (MinecraftAccount -> m (Bool, a)) -> String -> m (MinecraftResponse a)
+minecraftArgAutocorrect' :: (MonadError String m, MonadCache MinecraftAccount m, MonadReader r m, Has Manager r) => (MinecraftAccount -> m (Bool, a)) -> String -> m (MinecraftResponse a)
 minecraftArgAutocorrect' = minecraftArgAutocorrect Nothing Nothing
 
-minecraftArgAutocorrect :: (MonadError String m, MonadCache MinecraftAccount m, MonadNetwork m) => Maybe String -> Maybe (MinecraftResponse a) -> (MinecraftAccount -> m (Bool, a)) -> String -> m (MinecraftResponse a)
+minecraftArgAutocorrect :: (MonadError String m, MonadCache MinecraftAccount m, MonadReader r m, Has Manager r) => Maybe String -> Maybe (MinecraftResponse a) -> (MinecraftAccount -> m (Bool, a)) -> String -> m (MinecraftResponse a)
 minecraftArgAutocorrect err retm arg name = do
   people <- HM.elems <$> getCacheMap
   let process f = let

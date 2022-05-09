@@ -101,4 +101,4 @@ discordEscape :: String -> String
 discordEscape [] = ""
 discordEscape (x:xs)
   | x `elem` "_*~`>" = '\\':x:discordEscape xs
-  | otherwise = x:discordEscape xs     
+  | otherwise = x:discordEscape xs
