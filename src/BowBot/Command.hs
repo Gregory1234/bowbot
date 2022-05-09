@@ -11,15 +11,14 @@ import BowBot.Command.Args
 import BowBot.BotMonad
 import Discord.Types
 import BowBot.Network.Basic
+import Control.Monad.Reader (runReaderT)
   
 data Command = Command { commandInfo :: CommandInfo, commandHandler :: CommandHandler () }
 
 runCommand :: Command -> Message -> Bot ()
 runCommand Command {..} m = do
-  bdt <- BotT $ \d _ -> return d
-  manager <- asks getter
-  handle <- asks getter
-  liftIO $ runCommandHandler commandHandler bdt (commandEnvFromMessage m, manager, handle)
+  ctx <- ask
+  liftIO $ runReaderT commandHandler (commandEnvFromMessage m, ctx)
 
 somethingWentWrongMessage :: String
 somethingWentWrongMessage = "**Something went wrong!**"

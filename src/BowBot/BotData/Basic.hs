@@ -11,14 +11,6 @@ module BowBot.BotData.Basic where
 import BowBot.BotData.Info
 import BowBot.BotData.Cached
 import BowBot.Minecraft.Account
-import BowBot.Utils
-import Control.Monad.Cont (MonadTrans)
-import Control.Monad.Reader (ReaderT(..), MonadReader(..), MonadFix)
-import Control.Monad.Error.Class (MonadError)
-import Control.Monad.State.Class (MonadState)
-import Control.Monad.Writer.Class (MonadWriter)
-import Control.Applicative (Alternative)
-import Control.Monad (MonadPlus)
 import BowBot.Command.Basic
 import BowBot.Account.Basic
 import BowBot.BotData.Counter
@@ -34,7 +26,6 @@ import Data.Default
 import BowBot.Hypixel.Watchlist
 import BowBot.Birthday.Basic
 import BowBot.Snipe.Basic
-import Data.Has
 
 data BotData = BotData
   { infoFieldCache :: DatabaseCache InfoField
@@ -105,6 +96,10 @@ instance (Default (SStatsTimeRange t)) => Has (DatabaseCache (HypixelBowTimeStat
     SWeeklyStats -> x { hypixelWeeklyStatsCache = f $ hypixelWeeklyStatsCache x }
     SMonthlyStats -> x { hypixelMonthlyStatsCache = f $ hypixelMonthlyStatsCache x }
 
+instance Has (CachedData HypixelOnlinePlayers) BotData where
+  getter = hypixelOnlinePlayersCache
+  modifier f x = x { hypixelOnlinePlayersCache = f $ hypixelOnlinePlayersCache x }
+
 instance Has (DatabaseCache BirthdayDate) BotData where
   getter = birthdayCache
   modifier f x = x { birthdayCache = f $ birthdayCache x }
@@ -112,57 +107,3 @@ instance Has (DatabaseCache BirthdayDate) BotData where
 instance Has (DatabaseCache SnipeMessage) BotData where
   getter = snipeCache
   modifier f x = x { snipeCache = f $ snipeCache x }
-
-newtype BotDataT m a = BotDataT { runBotDataT :: BotData -> m a }
-  deriving (Functor, Applicative, Monad, MonadIO, MonadHoistIO, MonadError e, 
-            MonadState s, MonadWriter w, MonadFail, MonadFix, Alternative, MonadPlus) via (ReaderT BotData m)
-  deriving (MonadTrans) via (ReaderT BotData)
-
-instance MonadIO m => MonadCache InfoField (BotDataT m) where
-  getCache' = BotDataT $ return . infoFieldCache
-
-instance MonadIO m => MonadCache MinecraftAccount (BotDataT m) where
-  getCache' = BotDataT $ return . minecraftAccountCache
-
-instance MonadIO m => MonadCache PermissionLevel (BotDataT m) where
-  getCache' = BotDataT $ return . permissionCache
-
-instance MonadIO m => MonadCache BowBotAccount (BotDataT m) where
-  getCache' = BotDataT $ return . bowBotAccountCache
-
-instance MonadIO m => MonadCounter HypixelApi (BotDataT m) where
-  getCounter _ = BotDataT $ return . hypixelApiCounter
-
-instance MonadIO m => MonadCache Settings (BotDataT m) where
-  getCache' = BotDataT $ return . settingsCache
-
-instance MonadIO m => MonadCache HypixelBowLeaderboardEntry (BotDataT m) where
-  getCache' = BotDataT $ return . hypixelLeaderboardCache
-
-instance MonadIO m => MonadCache SavedRoles (BotDataT m) where
-  getCache' = BotDataT $ return . savedRolesCache
-
-instance MonadIO m => MonadCacheSingle HypixelGuildMembers (BotDataT m) where
-  getCachedData = BotDataT $ return . hypixelGuildMembersCache
-
-instance MonadIO m => MonadCache DiscordAccount (BotDataT m) where
-  getCache' = BotDataT $ return . discordAccountsCache
-
-instance (MonadIO m, Default (SStatsTimeRange t)) => MonadCache (HypixelBowTimeStats t) (BotDataT m) where
-  getCache' = BotDataT $ return . case def :: SStatsTimeRange t of
-    SDailyStats -> hypixelDailyStatsCache
-    SWeeklyStats -> hypixelWeeklyStatsCache
-    SMonthlyStats -> hypixelMonthlyStatsCache
-
-instance MonadIO m => MonadCacheSingle HypixelOnlinePlayers (BotDataT m) where
-  getCachedData = BotDataT $ return . hypixelOnlinePlayersCache
-
-instance MonadIO m => MonadCache BirthdayDate (BotDataT m) where
-  getCache' = BotDataT $ return . birthdayCache
-
-instance MonadIO m => MonadCache SnipeMessage (BotDataT m) where
-  getCache' = BotDataT $ return . snipeCache
-
-instance MonadReader r m => MonadReader r (BotDataT m) where
-  ask = BotDataT $ const ask
-  local f (BotDataT g) = BotDataT $ local f . g

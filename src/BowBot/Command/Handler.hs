@@ -1,12 +1,4 @@
-{-# LANGUAGE DerivingVia #-}
-{-# LANGUAGE RankNTypes #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE StandaloneDeriving #-}
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE UndecidableInstances #-}
-{-# LANGUAGE MonoLocalBinds #-}
+{-# LANGUAGE TypeOperators #-}
 
 module BowBot.Command.Handler where
 
@@ -19,9 +11,7 @@ import Control.Monad.Reader (ReaderT(..))
 import Data.Text.Encoding (encodeUtf8)
 import BowBot.Discord.DiscordNFData ()
 import BowBot.BotData.Basic
-import BowBot.BotData.Cached (MonadCache)
-import BowBot.BotData.Counter (MonadCounter, Counted)
-import BowBot.BotData.CachedSingle (MonadCacheSingle)
+import Data.Has
 
 newtype CommandArgs = CommandMessageArgs [String]
 
@@ -46,14 +36,9 @@ commandEnvFromMessage m = CommandEnvironment
   , envArgs = CommandMessageArgs $ tail $ words $ unpack $ messageContent m
   }
 
-newtype CommandHandler a = CommandHandler { runCommandHandler :: BotData -> (CommandEnvironment, Manager, DiscordHandle) -> IO a }
-  deriving (Functor, Applicative, Monad, MonadIO, MonadReader (CommandEnvironment, Manager, DiscordHandle), MonadHoistIO) via (BotDataT (ReaderT (CommandEnvironment, Manager, DiscordHandle) IO))
+type CommandHandlerContext = CommandEnvironment :*: Manager :*: DiscordHandle :*: BotData
 
-deriving via (BotDataT (ReaderT (CommandEnvironment, Manager, DiscordHandle) IO)) instance (MonadCache c (BotDataT (ReaderT (CommandEnvironment, Manager, DiscordHandle) IO)), MonadIO CommandHandler) => MonadCache c CommandHandler
-
-deriving via (BotDataT (ReaderT (CommandEnvironment, Manager, DiscordHandle) IO)) instance (Counted c, MonadCounter c (BotDataT (ReaderT (CommandEnvironment, Manager, DiscordHandle) IO)), MonadIO CommandHandler) => MonadCounter c CommandHandler
-
-deriving via (BotDataT (ReaderT (CommandEnvironment, Manager, DiscordHandle) IO)) instance (MonadCacheSingle c (BotDataT (ReaderT (CommandEnvironment, Manager, DiscordHandle) IO)), MonadIO CommandHandler) => MonadCacheSingle c CommandHandler
+type CommandHandler = ReaderT CommandHandlerContext IO
 
 hEnv :: (CommandEnvironment -> v) -> CommandHandler v
 hEnv f = asks $ f . getter

@@ -9,7 +9,7 @@ import BowBot.Snipe.Basic
 import Data.Char (isDigit)
 import BowBot.BotData.Cached
 
-detectDeleteMessage :: (MonadCache SnipeMessage m) => Message -> m ()
+detectDeleteMessage :: (MonadIO m, MonadReader r m, HasCache SnipeMessage r) => Message -> m ()
 detectDeleteMessage m
   | let author = messageAuthor m
   , userAvatar author == Just "a06062af9b11085ab715e340deaab267"

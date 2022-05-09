@@ -18,7 +18,7 @@ import Data.Aeson
 import Control.Monad.Reader (runReaderT)
 
 
-getWatchlist :: MonadCache MinecraftAccount m => m [MinecraftAccount]
+getWatchlist :: (MonadIO m, MonadReader r m, HasCache MinecraftAccount r) => m [MinecraftAccount]
 getWatchlist = filter mcHypixelWatchlist . HM.elems <$> getCacheMap
 
 newtype HypixelOnlinePlayers = HypixelOnlinePlayers { getHypixelOnlinePlayersList :: [UUID] }
@@ -29,7 +29,7 @@ isInBowDuels uuid = hypixelWithPlayerStatus uuid $ \o -> do
   mode :: Maybe String <- session .:? "mode"
   return $ mode == Just "DUELS_BOW_DUEL"
 
-getHypixelOnlinePlayers :: (MonadIO m, MonadReader r m, Has Manager r, MonadCacheSingle HypixelOnlinePlayers m, MonadCache MinecraftAccount m, MonadCounter HypixelApi m, MonadHoistIO m) => m (CacheResponse HypixelOnlinePlayers)
+getHypixelOnlinePlayers :: (MonadHoistIO m, MonadReader r m, Has Manager r, HasCachedData HypixelOnlinePlayers r, HasCache MinecraftAccount r, HasCounter' HypixelApi r) => m (CacheResponse HypixelOnlinePlayers)
 getHypixelOnlinePlayers = getOrCalculateCacheSingle $ do
   watchlist <- getWatchlist
   cv <- tryIncreaseCounter HypixelApi (fromIntegral $ length watchlist)

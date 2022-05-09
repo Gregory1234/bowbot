@@ -40,8 +40,8 @@ instance Cached BowBotAccount where
           return BowBotAccount { accountId = i, ..}
     liftIO $ atomically $ writeTVar cache newValues
 
-getBowBotAccountByDiscord :: MonadCache BowBotAccount m => UserId -> m (Maybe BowBotAccount)
+getBowBotAccountByDiscord :: (MonadIO m, MonadReader r m, HasCache BowBotAccount r) => UserId -> m (Maybe BowBotAccount)
 getBowBotAccountByDiscord did = find ((did `elem`) . accountDiscords) . HM.elems <$> getCacheMap
 
-getBowBotAccountByMinecraft :: MonadCache BowBotAccount m => UUID -> m (Maybe BowBotAccount)
+getBowBotAccountByMinecraft :: (MonadIO m, MonadReader r m, HasCache BowBotAccount r) => UUID -> m (Maybe BowBotAccount)
 getBowBotAccountByMinecraft uuid = find ((uuid `elem`) . accountMinecrafts) . HM.elems <$> getCacheMap

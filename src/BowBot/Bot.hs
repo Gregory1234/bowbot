@@ -62,8 +62,8 @@ runBowBot = do
     runDiscord $
       def
         { discordToken = pack discordKey,
-          discordOnStart = ReaderT $ \h -> runBotT onStartup bdt (manager, h),
-          discordOnEvent = \e -> ReaderT $ \h -> runBotT (eventHandler e) bdt (manager, h),
+          discordOnStart = ReaderT $ \h -> runReaderT onStartup (manager, (h, bdt)),
+          discordOnEvent = \e -> ReaderT $ \h -> runReaderT (eventHandler e) (manager, (h, bdt)),
           discordOnLog = putStrLn . unpack,
           discordGatewayIntent = def { gatewayIntentMembers = True }
         }
@@ -71,7 +71,7 @@ runBowBot = do
 
 backgroundMinutely :: Int -> Bot ()
 backgroundMinutely mint = do
-  bdt <- BotT $ \d _ -> return d
+  bdt <- asks getter
   liftIO $ clearBotDataCaches bdt
   when (mint == 0) $ withDB $ \conn -> do
     logInfoDB conn "started update"
@@ -106,7 +106,7 @@ onStartup = void $ hoistIO forkIO $ do
       backgroundMinutely mint
     liftIO $ threadDelay 60000000
 
-updateDiscordStatus :: (MonadIO m, MonadReader r m, Has DiscordHandle r, MonadCache InfoField m) => m ()
+updateDiscordStatus :: (MonadIO m, MonadReader r m, Has DiscordHandle r, HasCache InfoField r) => m ()
 updateDiscordStatus = do
   discordStatus <- hInfoDB discordStatusInfo
   liftDiscord $ sendCommand (UpdateStatus $ UpdateStatusOpts {
@@ -210,19 +210,19 @@ commands =
   , hypixelBanCommand
   , setBirthdayCommand
   , helpCommand commands AdminLevel Nothing "normal" "adminhelp"
-  , adminCommand 30 "datarefresh" "sync Bow Bot's data from the database" $ \bdt -> liftIO $ withDB $ \conn -> refreshBotData conn bdt
+  , adminCommand 30 "datarefresh" "sync Bow Bot's data from the database" $ asks getter >>= (\bdt -> liftIO $ withDB $ \conn -> refreshBotData conn bdt)
   , updateDataCommand [] "dataupdate"
   , updateDataCommand [DailyStats] "dataupdateday"
   , updateDataCommand [DailyStats, WeeklyStats] "dataupdateweek"
   , updateDataCommand [DailyStats, MonthlyStats] "dataupdatemonth"
   , updateDataCommand [DailyStats, WeeklyStats, MonthlyStats] "dataupdateweekmonth"
-  , adminCommand 15 "clearLogs" "clear Bow Bot's logs" $ const clearLogs
-  , adminCommand 120 "rolesupdate" "update everyone's discord roles" $ const updateRolesAll
-  , adminCommand 120 "savedrolesstore" "store everyone's saved roles" $ const storeNewSavedRolesAll
-  , adminCommand 15 "statusupdate" "update Bow Bot's discord status"$ const updateDiscordStatus
-  , quietAdminCommand 5 "throw" "throw an error" $ const $ hRespond $ show ((1 :: Integer) `div` 0)
-  , quietAdminCommand 5 "time" "display Bow Bot's time" $ const $ hRespond =<< liftIO (getTime "Month: %m, Day: %d, Weekday: %u, Hour: %k, Minute: %M, Second %S")
-  , adminCommand 15 "bdsay" "announce today's birthdays" $ const announceBirthdays
-  , quietAdminCommand 5 "evacuate" "leaves the discord server" $ const $ hEnv envGuild >>= call_ . LeaveGuild
+  , adminCommand 15 "clearLogs" "clear Bow Bot's logs" clearLogs
+  , adminCommand 120 "rolesupdate" "update everyone's discord roles" updateRolesAll
+  , adminCommand 120 "savedrolesstore" "store everyone's saved roles" storeNewSavedRolesAll
+  , adminCommand 15 "statusupdate" "update Bow Bot's discord status" updateDiscordStatus
+  , quietAdminCommand 5 "throw" "throw an error" $ hRespond $ show ((1 :: Integer) `div` 0)
+  , quietAdminCommand 5 "time" "display Bow Bot's time" $ hRespond =<< liftIO (getTime "Month: %m, Day: %d, Weekday: %u, Hour: %k, Minute: %M, Second %S")
+  , adminCommand 15 "bdsay" "announce today's birthdays" announceBirthdays
+  , quietAdminCommand 5 "evacuate" "leaves the discord server" $ hEnv envGuild >>= call_ . LeaveGuild
   , Command CommandInfo { commandName = "gregc", commandHelpEntries = [], commandPerms = DefaultLevel, commandTimeout = 2 } $ hNoArguments $ hRespond "<:gregc:904127204865228851>"
   ]

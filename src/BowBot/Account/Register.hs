@@ -18,7 +18,7 @@ import Control.Monad.Except (runExceptT, throwError)
 import Data.List (intercalate)
 import Data.Maybe (fromJust)
 
-createNewBowBotAccount :: (MonadCache BowBotAccount m, MonadCache SavedRoles m, MonadCache BirthdayDate m) => String -> UserId -> UUID -> m (Maybe BowBotAccount)
+createNewBowBotAccount :: (MonadIO m, MonadReader r m, HasCache BowBotAccount r, HasCache SavedRoles r, HasCache BirthdayDate r) => String -> UserId -> UUID -> m (Maybe BowBotAccount)
 createNewBowBotAccount name did uuid = do
   cache <- getCache
   savedRoles <- getFromCache did
@@ -36,7 +36,7 @@ createNewBowBotAccount name did uuid = do
   liftIO $ atomically $ for_ ret $ \bacc -> modifyTVar cache (insertMany [(accountId bacc, bacc)])
   return ret
 
-addAltToBowBotAccount :: MonadCache BowBotAccount m => Integer -> UUID -> m (Maybe BowBotAccount)
+addAltToBowBotAccount :: (MonadIO m, MonadReader r m, HasCache BowBotAccount r) => Integer -> UUID -> m (Maybe BowBotAccount)
 addAltToBowBotAccount bid uuid = do
   acc <- fromJust <$> getFromCache bid
   success <- liftIO $ withDB $ \conn -> (>0) <$> executeLog conn "INSERT INTO `peopleMinecraftDEV`(`id`, `minecraft`,`status`, `selected`, `verified`) VALUES (?,?, 'alt', 0, 0)" (bid, uuidString uuid)

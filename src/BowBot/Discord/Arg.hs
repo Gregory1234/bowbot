@@ -10,7 +10,7 @@ import BowBot.Discord.Utils
 
 
 
-discordArg :: (MonadCache DiscordAccount m, MonadError String m) => String -> m DiscordAccount
+discordArg :: (MonadIO m, MonadReader r m, HasCache DiscordAccount r, MonadError String m) => String -> m DiscordAccount
 discordArg (readMaybe -> Just did) = liftMaybe "*The discord id doesn't exist!*" =<< getFromCache did
 discordArg (fromPingDiscordUser -> Just did) = liftMaybe "*The discord id doesn't exist!*" =<< getFromCache did
 discordArg _ = throwError "*The discord id is invalid!*"

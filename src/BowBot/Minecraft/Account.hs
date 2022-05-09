@@ -66,7 +66,7 @@ instance CachedIndexed MinecraftAccount where
       liftIO $ atomically $ modifyTVar cache (insertMany (map (\x -> (mcUUID x, x)) accs))
     return success
 
-updateMinecraftAccountCache :: (MonadCache MinecraftAccount m, MonadReader r m, Has Manager r) => m ()
+updateMinecraftAccountCache :: (MonadIO m, MonadReader r m, Has Manager r, HasCache MinecraftAccount r) => m ()
 updateMinecraftAccountCache = do
   ctx <- ask
   let helper MinecraftAccount {..} = do
@@ -79,20 +79,20 @@ updateMinecraftAccountCache = do
     fmap concat $ for chunked $ mapConcurrently (fmap (`runReaderT` ctx) helper)
   void $ storeInCache updatedAccounts
 
-mcNameToUUID :: (MonadCache MinecraftAccount m, MonadReader r m, Has Manager r) => String -> m (Maybe UUID)
+mcNameToUUID :: (MonadIO m, MonadReader r m, Has Manager r, HasCache MinecraftAccount r) => String -> m (Maybe UUID)
 mcNameToUUID name = do
   goodAcc <- getMinecraftAccountByCurrentNameFromCache name
   case goodAcc of
     Just MinecraftAccount {mcUUID} -> return (Just mcUUID)
     _ -> mojangNameToUUID name
 
-mcUUIDToNames :: (MonadCache MinecraftAccount m, MonadReader r m, Has Manager r) => UUID -> m (Maybe [String])
+mcUUIDToNames :: (MonadIO m, MonadReader r m, Has Manager r, HasCache MinecraftAccount r) => UUID -> m (Maybe [String])
 mcUUIDToNames uuid = do
   goodAcc <- getFromCache uuid
   case goodAcc of
     Just MinecraftAccount {mcNames} -> return (Just mcNames)
     _ -> mojangUUIDToNames uuid
 
-getMinecraftAccountByCurrentNameFromCache :: MonadCache MinecraftAccount m => String -> m (Maybe MinecraftAccount)
+getMinecraftAccountByCurrentNameFromCache :: (MonadIO m, MonadReader r m, HasCache MinecraftAccount r) => String -> m (Maybe MinecraftAccount)
 getMinecraftAccountByCurrentNameFromCache name = find ((==map toLower name) . map toLower . head . mcNames) . HM.elems <$> getCacheMap
   

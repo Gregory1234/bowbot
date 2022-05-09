@@ -99,7 +99,7 @@ allSettings = Settings
 
 data SettingsSource = DefSettings | AllSettings | UserSettings
 
-getSettingsFromSource :: MonadCache Settings m => SettingsSource -> UserId -> m Settings
+getSettingsFromSource :: (MonadIO m, MonadReader r m, HasCache Settings r) => SettingsSource -> UserId -> m Settings
 getSettingsFromSource DefSettings _ = return defSettings
 getSettingsFromSource AllSettings _ = return allSettings
 getSettingsFromSource UserSettings user = fromMaybe defSettings <$> getFromCache user

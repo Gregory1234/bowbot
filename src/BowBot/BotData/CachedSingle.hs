@@ -5,8 +5,12 @@
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE AllowAmbiguousTypes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE ConstraintKinds #-}
+{-# LANGUAGE FlexibleContexts #-}
 
-module BowBot.BotData.CachedSingle where
+module BowBot.BotData.CachedSingle(
+  module BowBot.BotData.CachedSingle, MonadIO(..), MonadReader(..), asks, Has(..)
+) where
 
 import BowBot.Utils
 import Control.Concurrent.STM.TVar (TVar, newTVar)
@@ -14,7 +18,7 @@ import Control.Concurrent.STM (STM)
 import Control.Applicative ((<|>))
 import Control.Exception.Base (bracket)
 import Control.Monad.Reader
-import Control.Monad.Except
+import Data.Has
 
 
 data CacheResponse a
@@ -28,10 +32,12 @@ data CacheResponseDirect a
   | CacheDirectNothing
   | CacheDirectResult a
 
-class MonadIO m => MonadCacheSingle a m where
-  getCachedData :: m (CachedData a)
+type HasCachedData a = Has (CachedData a)
 
-getOrCalculateCacheSingle :: forall a m. (MonadCacheSingle a m, MonadHoistIO m) => m (Maybe a) -> m (CacheResponse a)
+getCachedData :: (HasCachedData a r, MonadReader r m) => m (CachedData a)
+getCachedData = asks getter
+
+getOrCalculateCacheSingle :: forall a m r. (HasCachedData a r, MonadIO m, MonadReader r m, MonadHoistIO m) => m (Maybe a) -> m (CacheResponse a)
 getOrCalculateCacheSingle calc = do
   res <- getFromCacheSingle
   case res of
@@ -47,7 +53,7 @@ data CachedData a = CachedData { cachedDataMain :: TVar (Maybe a), cachedDataBor
 newCachedData :: STM (CachedData a)
 newCachedData = CachedData <$> newTVar Nothing <*> newTVar Nothing <*> newTVar False
 
-getFromCacheSingle :: forall a m. MonadCacheSingle a m => m (CacheResponseDirect a)
+getFromCacheSingle :: forall a m r. (HasCachedData a r, MonadIO m, MonadReader r m) => m (CacheResponseDirect a)
 getFromCacheSingle = do
   CachedData {..} <- getCachedData @a
   liftIO $ atomically $ do
@@ -56,18 +62,18 @@ getFromCacheSingle = do
       main <- readTVar cachedDataMain
       border <- readTVar cachedDataBorder
       return $ maybe CacheDirectNothing CacheDirectResult (main <|> border)
-requestCacheSingle :: forall a m. MonadCacheSingle a m => m ()
+requestCacheSingle :: forall a m r. (HasCachedData a r, MonadIO m, MonadReader r m) => m ()
 requestCacheSingle = do
   CachedData {..} <- getCachedData @a
   liftIO $ atomically $ writeTVar cachedDataBusy True
-supplyCacheSingle :: forall a m. MonadCacheSingle a m => a -> m ()
+supplyCacheSingle :: forall a m r. (HasCachedData a r, MonadIO m, MonadReader r m) => a -> m ()
 supplyCacheSingle a = do
   CachedData {..} <- getCachedData @a
   t <- liftIO $ read @Int <$> getTime "%S"
   liftIO $ atomically $ do
     writeTVar (if t <= 5 || t >= 55 then cachedDataBorder else cachedDataMain) (Just a)
     writeTVar cachedDataBusy False
-clearCacheSingle :: forall a m. MonadCacheSingle a m => m ()
+clearCacheSingle :: forall a m r. (HasCachedData a r, MonadIO m, MonadReader r m) => m ()
 clearCacheSingle = do
   CachedData {..} <- getCachedData @a
   liftIO $ atomically $ do
@@ -75,14 +81,7 @@ clearCacheSingle = do
     writeTVar cachedDataMain border
     writeTVar cachedDataBorder Nothing
     writeTVar cachedDataBusy False
-withCacheSingleBusy :: forall a m x. (MonadCacheSingle a m, MonadHoistIO m) => m x -> m x
+withCacheSingleBusy :: forall a m r x. (HasCachedData a r, MonadHoistIO m, MonadReader r m) => m x -> m x
 withCacheSingleBusy c = do
   CachedData {..} <- getCachedData @a
   hoistIO (bracket (atomically $ writeTVar cachedDataBusy True) (const $ atomically $ writeTVar cachedDataBusy False) . const) c
-
-
-instance MonadCacheSingle a m => MonadCacheSingle a (ReaderT r m) where
-  getCachedData = ReaderT $ const $ getCachedData @a
-
-instance MonadCacheSingle a m => MonadCacheSingle a (ExceptT e m) where
-  getCachedData = ExceptT $ Right <$> getCachedData @a

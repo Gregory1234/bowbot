@@ -52,7 +52,7 @@ emptyBotData = do
   return BotData {..}
 
 refreshBotData :: Connection -> BotData -> IO ()
-refreshBotData conn bdt = flip runBotDataT bdt $ do
+refreshBotData conn = runReaderT $ do
   refreshCache @InfoField conn
   refreshCache @MinecraftAccount conn
   refreshCache @PermissionLevel conn
@@ -69,7 +69,7 @@ refreshBotData conn bdt = flip runBotDataT bdt $ do
 
 updateBotData :: [StatsTimeRange] -> Manager -> BotData -> DiscordHandler ()
 updateBotData times manager bdt = ReaderT $ \dh -> foldl1 concurrently_ $
-  map (flip runReaderT (dh, manager) . flip runBotDataT bdt)
+  map (`runReaderT` (dh, (manager, bdt)))
     [ updateMinecraftAccountCache
     , updateDiscordAccountCache
     , do
@@ -78,7 +78,7 @@ updateBotData times manager bdt = ReaderT $ \dh -> foldl1 concurrently_ $
     ]
 
 clearBotDataCaches :: BotData -> IO ()
-clearBotDataCaches bdt = flip runBotDataT bdt $ do
+clearBotDataCaches = runReaderT $ do
   clearCounter HypixelApi
   clearCacheSingle @HypixelGuildMembers
   clearCacheSingle @HypixelOnlinePlayers
