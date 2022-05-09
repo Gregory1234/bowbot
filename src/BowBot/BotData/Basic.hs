@@ -133,10 +133,8 @@ instance MonadIO m => MonadCache PermissionLevel (BotDataT m) where
 instance MonadIO m => MonadCache BowBotAccount (BotDataT m) where
   getCache' = BotDataT $ return . bowBotAccountCache
 
-instance MonadIO m => MonadSimpleCounter HypixelApi (BotDataT m) where
+instance MonadIO m => MonadCounter HypixelApi (BotDataT m) where
   getCounter _ = BotDataT $ return . hypixelApiCounter
-
-deriving via (SimpleCounter (BotDataT m)) instance MonadIO m => MonadCounter HypixelApi (BotDataT m)
 
 instance MonadIO m => MonadCache Settings (BotDataT m) where
   getCache' = BotDataT $ return . settingsCache
@@ -147,10 +145,8 @@ instance MonadIO m => MonadCache HypixelBowLeaderboardEntry (BotDataT m) where
 instance MonadIO m => MonadCache SavedRoles (BotDataT m) where
   getCache' = BotDataT $ return . savedRolesCache
 
-instance MonadIO m => MonadSimpleCacheSingle HypixelGuildMembers (BotDataT m) where
+instance MonadIO m => MonadCacheSingle HypixelGuildMembers (BotDataT m) where
   getCachedData = BotDataT $ return . hypixelGuildMembersCache
-
-deriving via (SimpleCacheSingle (BotDataT m)) instance MonadHoistIO m => MonadCacheSingle HypixelGuildMembers (BotDataT m)
 
 instance MonadIO m => MonadCache DiscordAccount (BotDataT m) where
   getCache' = BotDataT $ return . discordAccountsCache
@@ -161,10 +157,8 @@ instance (MonadIO m, Default (SStatsTimeRange t)) => MonadCache (HypixelBowTimeS
     SWeeklyStats -> hypixelWeeklyStatsCache
     SMonthlyStats -> hypixelMonthlyStatsCache
 
-instance MonadIO m => MonadSimpleCacheSingle HypixelOnlinePlayers (BotDataT m) where
+instance MonadIO m => MonadCacheSingle HypixelOnlinePlayers (BotDataT m) where
   getCachedData = BotDataT $ return . hypixelOnlinePlayersCache
-
-deriving via (SimpleCacheSingle (BotDataT m)) instance MonadHoistIO m => MonadCacheSingle HypixelOnlinePlayers (BotDataT m)
 
 instance MonadIO m => MonadCache BirthdayDate (BotDataT m) where
   getCache' = BotDataT $ return . birthdayCache

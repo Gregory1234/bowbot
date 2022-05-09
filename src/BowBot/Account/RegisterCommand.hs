@@ -48,7 +48,7 @@ registerCommandBody RegisterCommandMessages {..} name did = do
   newacc <- liftMaybe somethingWentWrongMessage =<< createNewBowBotAccount (head $ mcNames mc) did uuid
   gid <- hInfoDB discordGuildIdInfo
   gmems <- discordGuildMembers gid
-  for_ gmems $ \gmem -> when (maybe 0 userId (memberUser gmem) == did) $ updateRoles gmem (Just newacc)
+  for_ gmems $ \gmem -> when (maybe 0 userId (memberUser gmem) == did) $ lift $ updateRoles gmem (Just newacc)
   lift $ hRespond "*Registered successfully*"
 
 registerCommand :: Command
@@ -107,5 +107,5 @@ addaltCommand = Command CommandInfo
     newacc <- liftMaybe somethingWentWrongMessage =<< addAltToBowBotAccount (BowBot.Account.Basic.accountId bacc) uuid
     gid <- hInfoDB discordGuildIdInfo
     gmems <- discordGuildMembers gid
-    for_ gmems $ \gmem -> when (maybe 0 userId (memberUser gmem) `elem` accountDiscords bacc) $ updateRoles gmem (Just newacc)
+    for_ gmems $ \gmem -> when (maybe 0 userId (memberUser gmem) `elem` accountDiscords bacc) $ lift $ updateRoles gmem (Just newacc)
     lift $ hRespond "*Registered successfully*"

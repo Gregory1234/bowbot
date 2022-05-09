@@ -50,7 +50,7 @@ commandEnvFromMessage m = CommandEnvironment
   }
 
 newtype CommandHandler a = CommandHandler { runCommandHandler :: CommandEnvironment -> BotData -> Manager -> DiscordHandler a }
-  deriving (Functor, Applicative, Monad, MonadIO, MonadNetwork, MonadDiscord) via (ReaderT CommandEnvironment Bot)
+  deriving (Functor, Applicative, Monad, MonadIO, MonadNetwork, MonadDiscord, MonadHoistIO) via (ReaderT CommandEnvironment Bot)
 
 deriving via (ReaderT CommandEnvironment Bot) instance (MonadCache c Bot, MonadIO CommandHandler) => MonadCache c CommandHandler
 

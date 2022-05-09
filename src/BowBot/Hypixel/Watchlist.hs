@@ -29,7 +29,7 @@ isInBowDuels uuid = hypixelWithPlayerStatus uuid $ \o -> do
   mode :: Maybe String <- session .:? "mode"
   return $ mode == Just "DUELS_BOW_DUEL"
 
-getHypixelOnlinePlayers :: (MonadNetwork m, MonadCacheSingle HypixelOnlinePlayers m, MonadCache MinecraftAccount m, MonadCounter HypixelApi m) => m (CacheResponse HypixelOnlinePlayers)
+getHypixelOnlinePlayers :: (MonadNetwork m, MonadCacheSingle HypixelOnlinePlayers m, MonadCache MinecraftAccount m, MonadCounter HypixelApi m, MonadHoistIO m) => m (CacheResponse HypixelOnlinePlayers)
 getHypixelOnlinePlayers = getOrCalculateCacheSingle $ do
   watchlist <- getWatchlist
   cv <- tryIncreaseCounter HypixelApi (fromIntegral $ length watchlist)
