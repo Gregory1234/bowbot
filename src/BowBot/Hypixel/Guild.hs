@@ -1,5 +1,4 @@
 {-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE TypeApplications #-}
 
 module BowBot.Hypixel.Guild where
 
@@ -20,7 +19,7 @@ newtype HypixelGuildMembers = HypixelGuildMembers { getHypixelGuildMemberMap :: 
 
 getHypixelGuildMembers :: (MonadNetwork m, MonadCacheSingle HypixelGuildMembers m, MonadCache InfoField m, MonadCounter HypixelApi m) => m (CacheResponse HypixelGuildMembers)
 getHypixelGuildMembers = getOrCalculateCacheSingle $ do
-  cv <- tryIncreaseCounter @HypixelApi 1
+  cv <- tryIncreaseCounter HypixelApi 1
   case cv of
     Nothing -> do
       gid <- hInfoDB hypixelGuildIdInfo

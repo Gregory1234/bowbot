@@ -1,5 +1,4 @@
 {-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE TypeApplications #-}
 
 module BowBot.Account.RegisterCommand where
 
@@ -10,7 +9,7 @@ import BowBot.Minecraft.Arg
 import BowBot.Account.Arg
 import BowBot.Discord.Utils
 import BowBot.BotData.Cached (storeInCache, getFromCache, storeInCacheIndexed)
-import BowBot.Hypixel.Basic (HypixelApi)
+import BowBot.Hypixel.Basic (HypixelApi(..))
 import BowBot.Hypixel.Leaderboard (hypixelBowStatsToLeaderboards)
 import BowBot.BotData.Counter (tryIncreaseCounter)
 import BowBot.Account.Register
@@ -30,7 +29,7 @@ registerCommandBody RegisterCommandMessages {..} name did = do
   for_ bacc $ \BowBotAccount {..} -> throwError $ if did `elem` accountDiscords then registerAlreadyBelongsMessage else registerAlreadyBelongsSomeoneElseMessage
   baccdc <- getBowBotAccountByDiscord did
   for_ baccdc $ \_ -> throwError registerAlreadyRegisteredMessage
-  cv <- tryIncreaseCounter @HypixelApi 1
+  cv <- tryIncreaseCounter HypixelApi 1
   stats <- case cv of
     Nothing -> liftMaybe "*The player has never joined Hypixel!*" =<< requestHypixelBowStats uuid
     Just sec -> throwError $ "*Too many requests! Wait another " ++ show sec ++ " seconds!*"
@@ -91,7 +90,7 @@ addaltCommand = Command CommandInfo
     uuid <- liftMaybe thePlayerDoesNotExistMessage =<< mcNameToUUID name
     baccother <- getBowBotAccountByMinecraft uuid
     for_ baccother $ \acc -> throwError $ if bacc == acc then "*That account already belongs to this user!*" else "*That account already belongs to someone else!*"
-    cv <- tryIncreaseCounter @HypixelApi 1
+    cv <- tryIncreaseCounter HypixelApi 1
     stats <- case cv of
       Nothing -> liftMaybe "*The player has never joined Hypixel!*" =<< requestHypixelBowStats uuid
       Just sec -> throwError $ "*Too many requests! Wait another " ++ show sec ++ " seconds!*"

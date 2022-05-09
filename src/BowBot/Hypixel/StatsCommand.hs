@@ -1,6 +1,5 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE TypeApplications #-}
 
 module BowBot.Hypixel.StatsCommand where
 
@@ -10,7 +9,7 @@ import BowBot.Minecraft.Arg
 import BowBot.Hypixel.Stats
 import BowBot.Settings.Basic
 import BowBot.Utils
-import BowBot.Hypixel.Basic (HypixelApi)
+import BowBot.Hypixel.Basic (HypixelApi(..))
 import BowBot.BotData.Counter
 import Control.Monad.Error.Class (throwError)
 import Discord.Types
@@ -47,7 +46,7 @@ hypixelStatsCommand src name desc = Command CommandInfo
     for_ acc' $ \acc -> for_ gmems $ \gmem -> when (maybe 0 userId (memberUser gmem) `elem` accountDiscords acc) $ updateRolesDivisionTitle gmem (Just acc)
   where
     helper MinecraftAccount {..} = do
-      cv <- tryIncreaseCounter @HypixelApi 1
+      cv <- tryIncreaseCounter HypixelApi 1
       case cv of
         Nothing -> do
           stats <- liftMaybe "*The player has never joined Hypixel!*" =<< requestHypixelBowStats mcUUID

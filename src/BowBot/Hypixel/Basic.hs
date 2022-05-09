@@ -9,10 +9,10 @@ import BowBot.Utils
 import BowBot.Network.Basic
 import BowBot.BotData.Counter
 
-data HypixelApi
+data HypixelApi = HypixelApi
 
 instance Counted HypixelApi where
-  counterLimit = 100
+  counterLimit _ = 100
 
 hypixelWithPlayerData :: (MonadNetwork m) => UUID -> (Object -> Parser a) -> m (Maybe a)
 hypixelWithPlayerData (UUID uuid) f = do

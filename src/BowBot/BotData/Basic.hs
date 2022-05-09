@@ -75,7 +75,7 @@ instance MonadIO m => MonadCache BowBotAccount (BotDataT m) where
   getCache = BotDataT $ return . bowBotAccountCache
 
 instance MonadIO m => MonadSimpleCounter HypixelApi (BotDataT m) where
-  getCounter = BotDataT $ return . hypixelApiCounter
+  getCounter _ = BotDataT $ return . hypixelApiCounter
 
 deriving via (SimpleCounter (BotDataT m)) instance MonadIO m => MonadCounter HypixelApi (BotDataT m)
 

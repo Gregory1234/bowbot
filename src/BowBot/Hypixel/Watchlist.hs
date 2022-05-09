@@ -1,4 +1,3 @@
-{-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE OverloadedStrings #-}
@@ -33,7 +32,7 @@ isInBowDuels uuid = hypixelWithPlayerStatus uuid $ \o -> do
 getHypixelOnlinePlayers :: (MonadNetwork m, MonadCacheSingle HypixelOnlinePlayers m, MonadCache MinecraftAccount m, MonadCounter HypixelApi m) => m (CacheResponse HypixelOnlinePlayers)
 getHypixelOnlinePlayers = getOrCalculateCacheSingle $ do
   watchlist <- getWatchlist
-  cv <- tryIncreaseCounter @HypixelApi (fromIntegral $ length watchlist)
+  cv <- tryIncreaseCounter HypixelApi (fromIntegral $ length watchlist)
   manager <- hManager
   case cv of
     Nothing -> liftIO $ fmap (Just . HypixelOnlinePlayers . map snd . filter fst) $ flip mapConcurrently watchlist $ \acc -> flip runNetworkT manager $ do

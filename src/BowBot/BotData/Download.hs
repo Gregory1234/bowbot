@@ -84,7 +84,7 @@ updateBotData times manager bdt = ReaderT $ \dh -> foldl1 concurrently_ $
 
 clearBotDataCaches :: BotData -> IO ()
 clearBotDataCaches bdt = flip runBotDataT bdt $ do
-  clearCounter @HypixelApi
+  clearCounter HypixelApi
   clearCacheSingle @HypixelGuildMembers
   clearCacheSingle @HypixelOnlinePlayers
 

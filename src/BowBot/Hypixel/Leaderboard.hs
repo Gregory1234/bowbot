@@ -1,6 +1,5 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE LambdaCase #-}
-{-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeFamilies #-}
@@ -19,7 +18,7 @@ import BowBot.DB.Basic (queryLog, executeManyLog, withDB, logInfo)
 import BowBot.Utils
 import Data.Maybe (mapMaybe)
 import Control.Applicative ((<|>))
-import BowBot.Hypixel.Basic (HypixelApi)
+import BowBot.Hypixel.Basic (HypixelApi(..))
 import BowBot.Network.Class
 import BowBot.BotData.Counter
 import Data.List.Split (chunksOf)
@@ -74,7 +73,7 @@ instance CachedUpdatable HypixelBowLeaderboardEntry where
     updatedAccounts <- fmap concat $ sequence $ intersperse (([] <$) $ liftIO $ logInfo "Started 1 minute wait in Hypixel lb update" >> threadDelay 60000000) $ flip map bigchunked $ \bigchunk -> do
       let chunked = chunksOf 10 bigchunk
       let wait = do
-            time <- tryIncreaseCounter @HypixelApi 10
+            time <- tryIncreaseCounter HypixelApi 10
             case time of
               Nothing -> pure ()
               Just t -> do
