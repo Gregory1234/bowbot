@@ -73,13 +73,11 @@ refreshBotData conn bdt = flip runBotDataT bdt $ do
 updateBotData :: [StatsTimeRange] -> Manager -> BotData -> DiscordHandler ()
 updateBotData times manager bdt = ReaderT $ \dh -> foldl1 concurrently_ $
   map (flip runDiscordHandlerT dh . flip runNetworkT manager . flip runBotDataT bdt)
-    [ updateCache @MinecraftAccount
-    , updateCache @DiscordAccount
+    [ updateMinecraftAccountCache
+    , updateDiscordAccountCache
     , do
-      updateCache @HypixelBowLeaderboardEntry
-      when (DailyStats `elem` times) $ updateCache @(HypixelBowTimeStats 'DailyStats)
-      when (WeeklyStats `elem` times) $ updateCache @(HypixelBowTimeStats 'WeeklyStats)
-      when (MonthlyStats `elem` times) $ updateCache @(HypixelBowTimeStats 'MonthlyStats)
+      updateHypixelLeaderboardCache
+      forM_ times updateHypixelTimeStatsCache'
     ]
 
 clearBotDataCaches :: BotData -> IO ()

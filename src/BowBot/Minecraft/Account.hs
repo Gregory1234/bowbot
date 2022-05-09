@@ -66,19 +66,18 @@ instance CachedIndexed MinecraftAccount where
       liftIO $ atomically $ modifyTVar cache (insertMany (map (\x -> (mcUUID x, x)) accs))
     return success
 
-instance CachedUpdatable MinecraftAccount where
-  type CacheUpdateSourceConstraint MinecraftAccount = MonadNetwork
-  updateCache = do
-    manager <- hManager
-    let helper MinecraftAccount {..} = do
-          newNames <- mojangUUIDToNames mcUUID
-          return MinecraftAccount {mcNames = fromMaybe mcNames newNames, ..}
-    cache <- HM.elems <$> getCacheMap
-    let bigchunked = chunksOf 400 cache
-    updatedAccounts <- liftIO $ fmap concat $ sequence $ intersperse (([] <$) $ logInfo "Started 10 minute wait in Minecraft update" >> threadDelay 600000000) $ flip map bigchunked $ \bigchunk -> do
-      let chunked = chunksOf 10 bigchunk
-      fmap concat $ for chunked $ mapConcurrently (fmap (`runNetworkT` manager) helper)
-    void $ storeInCache updatedAccounts
+updateMinecraftAccountCache :: (MonadNetwork m, MonadCache MinecraftAccount m) => m ()
+updateMinecraftAccountCache = do
+  manager <- hManager
+  let helper MinecraftAccount {..} = do
+        newNames <- mojangUUIDToNames mcUUID
+        return MinecraftAccount {mcNames = fromMaybe mcNames newNames, ..}
+  cache <- HM.elems <$> getCacheMap
+  let bigchunked = chunksOf 400 cache
+  updatedAccounts <- liftIO $ fmap concat $ sequence $ intersperse (([] <$) $ logInfo "Started 10 minute wait in Minecraft update" >> threadDelay 600000000) $ flip map bigchunked $ \bigchunk -> do
+    let chunked = chunksOf 10 bigchunk
+    fmap concat $ for chunked $ mapConcurrently (fmap (`runNetworkT` manager) helper)
+  void $ storeInCache updatedAccounts
 
 mcNameToUUID :: (MonadCache MinecraftAccount m, MonadNetwork m) => String -> m (Maybe UUID)
 mcNameToUUID name = do

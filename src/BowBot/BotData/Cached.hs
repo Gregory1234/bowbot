@@ -14,7 +14,6 @@ import Database.MySQL.Simple (Connection)
 import BowBot.Utils (readTVar, atomically, assertIO)
 import Control.Monad.Reader (ReaderT(..))
 import Control.Monad.Except
-import Data.Kind (Constraint, Type)
 
 type DatabaseCache a = TVar (HM.HashMap (CacheIndex a) a)
 
@@ -31,10 +30,6 @@ class Cached a => CachedStorable a where
 class Cached a => CachedIndexed a where
   cacheIndex :: a -> CacheIndex a
   storeInCache :: MonadCache a m => [a] -> m Bool
-
-class Cached a => CachedUpdatable a where
-  type CacheUpdateSourceConstraint a :: (Type -> Type) -> Constraint
-  updateCache :: (CacheUpdateSourceConstraint a m, MonadCache a m) => m ()
 
 getFromCache :: (MonadCache a m, Cached a) => CacheIndex a -> m (Maybe a)
 getFromCache a = do
@@ -57,7 +52,7 @@ assertGoodIndexes ((a,b):as) = do
   assertGoodIndexes as
 
 instance MonadCache c m => MonadCache c (ReaderT r m) where
-  getCache = ReaderT $ const $ getCache
+  getCache = ReaderT $ const getCache
 
 instance MonadCache c m => MonadCache c (ExceptT e m) where
   getCache = ExceptT $ Right <$> getCache

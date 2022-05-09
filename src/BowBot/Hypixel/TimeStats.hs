@@ -10,6 +10,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE QuantifiedConstraints #-}
 
 module BowBot.Hypixel.TimeStats where
 
@@ -113,8 +114,12 @@ instance (Default (SStatsTimeRange t)) => CachedStorable (HypixelBowTimeStats t)
       liftIO $ atomically $ modifyTVar cache (insertMany accs)
     return success
 
-instance (Default (SStatsTimeRange t)) => CachedUpdatable (HypixelBowTimeStats t) where
-  type CacheUpdateSourceConstraint (HypixelBowTimeStats t) = MonadCache HypixelBowLeaderboardEntry
-  updateCache = do
-    lbCache <- HM.toList <$> getCacheMap
-    void $ storeInCacheIndexed (map (\(u,v) -> (u, hypixelBowLeaderboardToTimeStats @t v)) lbCache)
+updateHypixelTimeStatsCache :: forall t m. (Default (SStatsTimeRange t), MonadCache HypixelBowLeaderboardEntry m, MonadCache (HypixelBowTimeStats t) m) => SStatsTimeRange t -> m ()
+updateHypixelTimeStatsCache _ = do
+  lbCache <- HM.toList <$> getCacheMap
+  void $ storeInCacheIndexed (map (\(u,v) -> (u, hypixelBowLeaderboardToTimeStats @t v)) lbCache)
+
+updateHypixelTimeStatsCache' :: forall m. (forall t. Default (SStatsTimeRange t) => MonadCache (HypixelBowTimeStats t) m, MonadCache HypixelBowLeaderboardEntry m) => StatsTimeRange -> m ()
+updateHypixelTimeStatsCache' DailyStats = updateHypixelTimeStatsCache SDailyStats
+updateHypixelTimeStatsCache' WeeklyStats = updateHypixelTimeStatsCache SWeeklyStats
+updateHypixelTimeStatsCache' MonthlyStats = updateHypixelTimeStatsCache SMonthlyStats

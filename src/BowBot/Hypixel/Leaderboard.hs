@@ -58,27 +58,23 @@ instance CachedStorable HypixelBowLeaderboardEntry where
       liftIO $ atomically $ modifyTVar cache (insertMany fixed)
     return success
 
-class (MonadNetwork m, MonadCounter HypixelApi m) => CacheUpdateSourceConstraintForHypixelBowLeaderboardEntry m where
-instance (MonadNetwork m, MonadCounter HypixelApi m) => CacheUpdateSourceConstraintForHypixelBowLeaderboardEntry m where
-
-instance CachedUpdatable HypixelBowLeaderboardEntry where
-  type CacheUpdateSourceConstraint HypixelBowLeaderboardEntry = CacheUpdateSourceConstraintForHypixelBowLeaderboardEntry
-  updateCache = do
-    manager <- hManager
-    let helper (uuid, old) = do
-          stats <- fmap hypixelBowStatsToLeaderboards <$> requestHypixelBowStats uuid
-          return (uuid, maybe old (\s -> s { bowLbWinstreak = bowLbWinstreak s <|> bowLbWinstreak old }) stats)
-    cache <- HM.toList <$> getCacheMap
-    let bigchunked = chunksOf 50 cache
-    updatedAccounts <- fmap concat $ sequence $ intersperse (([] <$) $ liftIO $ logInfo "Started 1 minute wait in Hypixel lb update" >> threadDelay 60000000) $ flip map bigchunked $ \bigchunk -> do
-      let chunked = chunksOf 10 bigchunk
-      let wait = do
-            time <- tryIncreaseCounter HypixelApi 10
-            case time of
-              Nothing -> pure ()
-              Just t -> do
-                liftIO $ threadDelay ((t+1) * 1000000)
-                wait
-      wait
-      liftIO $ fmap concat $ for chunked $ \chunk -> mapConcurrently (fmap (`runNetworkT` manager) helper) chunk
-    void $ storeInCacheIndexed updatedAccounts
+updateHypixelLeaderboardCache :: (MonadNetwork m, MonadCounter HypixelApi m, MonadCache HypixelBowLeaderboardEntry m) => m ()
+updateHypixelLeaderboardCache = do
+  manager <- hManager
+  let helper (uuid, old) = do
+        stats <- fmap hypixelBowStatsToLeaderboards <$> requestHypixelBowStats uuid
+        return (uuid, maybe old (\s -> s { bowLbWinstreak = bowLbWinstreak s <|> bowLbWinstreak old }) stats)
+  cache <- HM.toList <$> getCacheMap
+  let bigchunked = chunksOf 50 cache
+  updatedAccounts <- fmap concat $ sequence $ intersperse (([] <$) $ liftIO $ logInfo "Started 1 minute wait in Hypixel lb update" >> threadDelay 60000000) $ flip map bigchunked $ \bigchunk -> do
+    let chunked = chunksOf 10 bigchunk
+    let wait = do
+          time <- tryIncreaseCounter HypixelApi 10
+          case time of
+            Nothing -> pure ()
+            Just t -> do
+              liftIO $ threadDelay ((t+1) * 1000000)
+              wait
+    wait
+    liftIO $ fmap concat $ for chunked $ \chunk -> mapConcurrently (fmap (`runNetworkT` manager) helper) chunk
+  void $ storeInCacheIndexed updatedAccounts

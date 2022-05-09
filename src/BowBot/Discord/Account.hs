@@ -60,20 +60,16 @@ showDiscordAccountDiscord :: DiscordAccount -> String
 showDiscordAccountDiscord DiscordAccount { discordNickname = Nothing, ..} = "**" ++ discordEscape discordName ++ "**#" ++ discordDiscrim
 showDiscordAccountDiscord DiscordAccount { discordNickname = Just nick, ..} = "**" ++ discordEscape nick ++ "** (" ++ discordEscape discordName ++ "#" ++ discordDiscrim ++ ")"
 
-class (MonadDiscord m, MonadCache InfoField m) => CacheUpdateSourceConstraintForDiscordAccount m where
-instance (MonadDiscord m, MonadCache InfoField m) => CacheUpdateSourceConstraintForDiscordAccount m where
-
-instance CachedUpdatable DiscordAccount where
-  type CacheUpdateSourceConstraint DiscordAccount = CacheUpdateSourceConstraintForDiscordAccount
-  updateCache = do
-    gid <- hInfoDB discordGuildIdInfo
-    members <- map guildMemberToDiscordAccount . filter (\GuildMember {..} -> fmap userIsBot memberUser == Just False) <$> discordGuildMembers gid
-    current <- HM.elems <$> getCacheMap
-    updatedNonMembers <- for (deleteFirstsBy (\a b -> discordId a == discordId b) current members) $ \du -> do
-      u' <- call $ R.GetUser (discordId du)
-      case u' of
-        Left e -> do
-          logError $ show e
-          return du
-        Right u -> return $ userToDiscordAccount u
-    void $ storeInCache $ members ++ updatedNonMembers
+updateDiscordAccountCache :: (MonadDiscord m, MonadCache InfoField m, MonadCache DiscordAccount m) => m ()
+updateDiscordAccountCache = do
+  gid <- hInfoDB discordGuildIdInfo
+  members <- map guildMemberToDiscordAccount . filter (\GuildMember {..} -> fmap userIsBot memberUser == Just False) <$> discordGuildMembers gid
+  current <- HM.elems <$> getCacheMap
+  updatedNonMembers <- for (deleteFirstsBy (\a b -> discordId a == discordId b) current members) $ \du -> do
+    u' <- call $ R.GetUser (discordId du)
+    case u' of
+      Left e -> do
+        logError $ show e
+        return du
+      Right u -> return $ userToDiscordAccount u
+  void $ storeInCache $ members ++ updatedNonMembers
