@@ -1,4 +1,6 @@
 {-# LANGUAGE TypeOperators #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE ImpredicativeTypes #-}
 
 module BowBot.Command.Handler where
 
@@ -19,8 +21,8 @@ data CommandEnvironment = CommandEnvironment
   , envSenderMember :: Maybe GuildMember
   , envChannel :: ChannelId
   , envGuild :: GuildId
-  , envRespond :: String -> CommandHandler ()
-  , envRespondFile :: String -> String -> CommandHandler ()
+  , envRespond :: forall m r. (MonadIO m, MonadReader r m, Has DiscordHandle r) => String -> m ()
+  , envRespondFile :: forall m r. (MonadIO m, MonadReader r m, Has DiscordHandle r) => String -> String -> m ()
   , envArgs :: CommandArgs
   }
 
@@ -39,15 +41,15 @@ type CommandHandlerContext = CommandEnvironment :*: Manager :*: DiscordHandle :*
 
 type CommandHandler = ReaderT CommandHandlerContext IO
 
-envs :: (CommandEnvironment -> v) -> CommandHandler v
+envs :: (MonadReader r m, Has CommandEnvironment r) => (CommandEnvironment -> v) -> m v
 envs f = asks $ f . getter
 
-respond :: String -> CommandHandler ()
+respond :: (MonadIO m, MonadReader r m, Has CommandEnvironment r, Has DiscordHandle r) => String -> m ()
 respond m = do
   res <- envs envRespond
   res m
 
-respondFile :: String -> String -> CommandHandler ()
+respondFile :: (MonadIO m, MonadReader r m, Has CommandEnvironment r, Has DiscordHandle r) => String -> String -> m ()
 respondFile n m = do
   res <- envs envRespondFile
   res n m
