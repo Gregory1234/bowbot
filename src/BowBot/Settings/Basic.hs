@@ -14,7 +14,6 @@ import BowBot.Discord.DiscordNFData ()
 import qualified Data.HashMap.Strict as HM
 import BowBot.DB.Basic
 import BowBot.Utils
-import Data.Maybe (mapMaybe)
 
 data BoolSense = Never | WhenSensible | Always deriving (Show, Eq, Ord, Enum)
 

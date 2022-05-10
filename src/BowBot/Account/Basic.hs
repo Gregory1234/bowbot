@@ -12,11 +12,8 @@ import Discord.Internal.Rest (UserId)
 import BowBot.BotData.Cached
 import qualified Data.HashMap.Strict as HM
 import qualified Data.Map as M
-import BowBot.DB.Basic (queryLog)
+import BowBot.DB.Basic (queryLog, Only(..))
 import BowBot.Utils
-import Database.MySQL.Simple (Only(..))
-import Data.List (find)
-import Data.Maybe (mapMaybe)
 
 data BowBotAccount = BowBotAccount
   { accountId :: Integer

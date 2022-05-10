@@ -8,8 +8,6 @@
 
 module BowBot.Birthday.Basic where
 
-import Data.List.Split (splitOn)
-import Data.Maybe (fromJust, mapMaybe)
 import BowBot.BotData.Cached
 import BowBot.Discord.Utils
 import qualified Data.HashMap.Strict as HM

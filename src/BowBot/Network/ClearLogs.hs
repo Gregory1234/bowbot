@@ -7,7 +7,6 @@ import Control.Exception.Base (SomeException, try)
 import BowBot.Utils
 import Network.HTTP.Conduit hiding (path)
 import Data.Has
-import Control.Monad.RWS.Class
 
 clearLogs :: (MonadReader r m, Has Manager r, MonadIO m) => m ()
 clearLogs = asks getter >>= \man -> liftIO $ do

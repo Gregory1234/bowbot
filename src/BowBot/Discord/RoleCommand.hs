@@ -9,7 +9,6 @@ import qualified Discord.Requests as R
 import BowBot.BotData.Info
 import BowBot.Discord.Roles
 import BowBot.Discord.Utils
-import Data.List (intercalate)
 
 roleCommand :: Command
 roleCommand = Command CommandInfo

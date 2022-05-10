@@ -12,16 +12,13 @@ import qualified Data.Map as M
 import BowBot.Hypixel.Leaderboard
 import Discord.Types
 import BowBot.BotData.Info
-import Data.List.Split (splitOn)
 import BowBot.Discord.Utils
 import BowBot.BotData.Cached
 import BowBot.BotData.CachedSingle
 import BowBot.BotData.Counter
 import BowBot.Account.Basic
 import qualified Data.HashMap.Strict as HM
-import Data.Maybe (mapMaybe)
 import qualified Discord.Requests as R
-import Data.List ((\\), intersect, intercalate)
 import BowBot.DB.Basic (queryLog, withDB, executeManyLog)
 import BowBot.Hypixel.Guild
 import BowBot.Network.Basic

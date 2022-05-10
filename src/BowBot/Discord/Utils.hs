@@ -11,8 +11,6 @@ import Discord.Types
 import qualified Discord.Requests as R
 import BowBot.Utils
 import BowBot.DB.Basic
-import Data.List (isPrefixOf, isSuffixOf)
-import Data.Char (isDigit)
 
 discordGuildMembers :: (MonadIO m, MonadReader r m, Has DiscordHandle r) => GuildId -> m [GuildMember]
 discordGuildMembers gid = do

@@ -12,9 +12,6 @@ module BowBot.BotData.Counter(
 ) where
 
 import BowBot.Utils
-import Control.Concurrent.STM.TVar (TVar, newTVar)
-import Control.Concurrent.STM (STM)
-import Control.Monad.Reader
 import Data.Has
 
 class Counted c where

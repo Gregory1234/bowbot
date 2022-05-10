@@ -6,7 +6,6 @@ module BowBot.Snipe.Detect where
 
 import BowBot.Discord.Utils
 import BowBot.Snipe.Basic
-import Data.Char (isDigit)
 import BowBot.BotData.Cached
 
 detectDeleteMessage :: (MonadIO m, MonadReader r m, HasCache SnipeMessage r) => Message -> m ()

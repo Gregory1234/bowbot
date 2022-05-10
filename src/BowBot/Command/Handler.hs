@@ -7,7 +7,6 @@ import Discord
 import qualified Discord.Requests as R
 import BowBot.Network.Basic
 import BowBot.Discord.Basic
-import Control.Monad.Reader (ReaderT(..))
 import Data.Text.Encoding (encodeUtf8)
 import BowBot.Discord.DiscordNFData ()
 import BowBot.BotData.Basic

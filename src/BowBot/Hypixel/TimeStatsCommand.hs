@@ -16,7 +16,6 @@ import BowBot.BotData.Cached
 import Control.Monad.Error.Class (throwError)
 import BowBot.BotData.Counter
 import BowBot.Discord.Roles
-import Control.Monad.Trans (lift)
 import BowBot.Hypixel.Leaderboard (hypixelBowStatsToLeaderboards)
 import BowBot.BotData.Info
 import BowBot.Discord.Utils

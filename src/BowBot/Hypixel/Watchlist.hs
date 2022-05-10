@@ -14,8 +14,6 @@ import BowBot.BotData.Counter
 import BowBot.Hypixel.Basic
 import Control.Concurrent.Async (mapConcurrently)
 import BowBot.Utils
-import Data.Aeson
-import Control.Monad.Reader (runReaderT)
 
 
 getWatchlist :: (MonadIO m, MonadReader r m, HasCache MinecraftAccount r) => m [MinecraftAccount]

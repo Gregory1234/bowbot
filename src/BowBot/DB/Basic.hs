@@ -1,18 +1,19 @@
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE OverloadedStrings #-}
 
-module BowBot.DB.Basic where
+module BowBot.DB.Basic(
+  module BowBot.DB.Basic, Connection, Only(..), withTransaction, commit, rollback, insertID
+) where
 
 import BowBot.Utils
-import Database.MySQL.Simple (Connection, defaultConnectInfo, ConnectInfo(..), close, connect, execute, query, formatQuery, formatMany, executeMany)
+import Database.MySQL.Simple
 import Database.MySQL.Simple.QueryParams (QueryParams)
 import Database.MySQL.Simple.QueryResults (QueryResults)
-import Database.MySQL.Simple.Types (Only(..), Query(..))
+import Database.MySQL.Simple.Types (Query(..))
 import Data.Int (Int64)
 import qualified Data.ByteString.Lazy as BS
 import qualified Data.ByteString.Search as BS
 import Data.String (fromString)
-import Data.List (intercalate)
 import Control.Exception.Base (bracket)
 import Control.Concurrent (forkIO)
 

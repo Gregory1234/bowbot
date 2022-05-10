@@ -9,19 +9,15 @@ import BowBot.Utils
 import Discord
 import Discord.Requests
 import Discord.Types
-import Control.Monad (forever)
 import BowBot.DB.Basic
 import BowBot.BotData.Info
-import Network.HTTP.Conduit (newManager)
 import BowBot.BotMonad
 import qualified Data.Text as T
-import Data.Text (isPrefixOf)
 import BowBot.Command
 import BowBot.Hypixel.StatsCommand
 import BowBot.Discord.Basic
 import Control.Exception.Base (SomeException, try, throw)
 import System.Timeout (timeout)
-import Control.Monad.Reader (ReaderT(..))
 import BowBot.BotData.Download
 import BowBot.BotData.RefreshCommand
 import BowBot.BotData.Cached
@@ -125,7 +121,7 @@ eventHandler (MessageCreate m) = do
   -- liftIO $ detectRTWData man bdt m
   unless (userIsBot (messageAuthor m)) $ do
     prefix <- askInfo discordCommandPrefixInfo
-    when (pack prefix `isPrefixOf` messageContent m) $ do
+    when (pack prefix `T.isPrefixOf` messageContent m) $ do
       let n = unpack $ T.toLower . T.drop (length prefix) . T.takeWhile (/= ' ') $ messageContent m
       for_ (filter ((==n) . commandName . commandInfo) commands) $ \c ->
         commandTimeoutRun (commandTimeout $ commandInfo c) m $ do

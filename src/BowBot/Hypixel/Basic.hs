@@ -4,7 +4,6 @@
 module BowBot.Hypixel.Basic where
 
 import BowBot.Minecraft.Basic (UUID(..))
-import Data.Aeson.Types (Object, Parser, (.:))
 import BowBot.Network.Basic
 import BowBot.Utils
 import BowBot.BotData.Counter

@@ -12,12 +12,9 @@ module BowBot.BotData.Cached(
 
 import qualified Data.HashMap.Strict as HM
 import Data.Hashable (Hashable)
-import Control.Concurrent.STM.TVar (TVar, newTVar)
 import Database.MySQL.Simple (Connection)
 import BowBot.Utils
-import Control.Monad.Reader
 import Data.Has
-import Control.Concurrent.STM (STM)
 
 newtype DatabaseCache a = DatabaseCache { unDatabaseCache :: TVar (HM.HashMap (CacheIndex a) a) }
 

@@ -13,7 +13,6 @@ import BowBot.BotData.Cached
 import BowBot.Discord.Utils
 import qualified Data.HashMap.Strict as HM
 import BowBot.DB.Basic
-import Data.Maybe (mapMaybe)
 import BowBot.BotData.Info
 import qualified Discord.Requests as R
 import Data.List (deleteFirstsBy)

@@ -16,10 +16,6 @@ import Discord.Types
 import BowBot.BotData.Cached
 import BowBot.Discord.Utils
 import qualified Data.HashMap.Strict as HM
-import Data.List (sortOn, findIndex)
-import Data.Maybe (mapMaybe, fromJust)
-import Data.List.Split (chunksOf)
-import Data.Functor (($>))
 import Data.Either (isRight)
 
 data LeaderboardType = LeaderboardType { leaderboardName :: String, leaderboardStatName :: String, leaderboardParser :: HypixelBowLeaderboardEntry -> Maybe (Integer, String) }

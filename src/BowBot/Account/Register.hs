@@ -6,17 +6,12 @@ module BowBot.Account.Register where
 import BowBot.Minecraft.Basic (UUID(..))
 import Discord.Internal.Rest (UserId)
 import BowBot.BotData.Cached
-import BowBot.DB.Basic (withDB, executeLog)
+import BowBot.DB.Basic
 import BowBot.Utils
 import BowBot.Account.Basic
 import BowBot.Discord.Roles
 import BowBot.Birthday.Basic
-import Database.MySQL.Simple.Types (Only(..))
-import Database.MySQL.Simple (withTransaction, rollback, insertID)
-import Data.Functor (($>))
 import Control.Monad.Except (runExceptT, throwError)
-import Data.List (intercalate)
-import Data.Maybe (fromJust)
 
 createNewBowBotAccount :: (MonadIO m, MonadReader r m, HasCache BowBotAccount r, HasCache SavedRoles r, HasCache BirthdayDate r) => String -> UserId -> UUID -> m (Maybe BowBotAccount)
 createNewBowBotAccount name did uuid = do

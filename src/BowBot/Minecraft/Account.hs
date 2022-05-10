@@ -12,16 +12,11 @@ module BowBot.Minecraft.Account where
 import BowBot.Minecraft.Basic
 import BowBot.BotData.Cached
 import BowBot.DB.Basic (queryLog, executeManyLog, withDB, logInfo)
-import Data.List.Split (splitOn, chunksOf)
-import Data.List (intercalate, find, intersperse)
 import BowBot.Network.Basic
-import Data.Char (toLower)
 import BowBot.Utils
 import qualified Data.HashMap.Strict as HM
 import Control.Concurrent.Async (mapConcurrently)
-import Data.Maybe (mapMaybe)
 import Control.Concurrent (threadDelay)
-import Control.Monad.Reader (runReaderT)
 
 data IsBanned
   = NotBanned

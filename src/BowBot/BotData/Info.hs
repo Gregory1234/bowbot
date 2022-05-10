@@ -4,14 +4,16 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE FlexibleContexts #-}
 
-module BowBot.BotData.Info where
+module BowBot.BotData.Info(
+  module BowBot.BotData.Info, readEither
+) where
 
 import BowBot.DB.Basic
 import Discord.Internal.Rest (GuildId)
 import BowBot.Utils
 import qualified Data.HashMap.Strict as HM
 import BowBot.BotData.Cached
-import Data.Maybe (mapMaybe)
+import Text.Read (readEither)
 
 data InfoField = InfoField { infoFieldName :: String, infoFieldValue :: String } deriving (Show, Eq)
 
@@ -52,9 +54,6 @@ data InfoType a = InfoType { infoName :: String, infoDefault :: a, infoParse :: 
 
 discordCommandPrefixInfo :: InfoType String
 discordCommandPrefixInfo = InfoType { infoName = "command_prefix", infoDefault = "???", infoParse = Right }
-
-readEither :: Read a => String -> Either String a
-readEither a = maybe (Left "wrong format") Right $ readMaybe a
 
 discordGuildIdInfo :: InfoType GuildId
 discordGuildIdInfo = InfoType { infoName = "discord_guild_id", infoDefault = 0, infoParse = readEither }

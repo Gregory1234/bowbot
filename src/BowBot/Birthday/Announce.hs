@@ -13,8 +13,6 @@ import qualified Data.HashMap.Strict as HM
 import BowBot.Discord.Utils
 import BowBot.BotData.Info
 import BowBot.DB.Basic
-import Control.Monad ((<=<))
-import Data.List (intercalate)
 import BowBot.Discord.Account
 
 birthdayChannelInfo :: InfoType ChannelId

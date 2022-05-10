@@ -6,7 +6,6 @@
 module BowBot.Minecraft.Basic where
 
 import BowBot.Network.Basic
-import Data.Aeson
 import Data.Traversable (for)
 import Data.Hashable (Hashable)
 

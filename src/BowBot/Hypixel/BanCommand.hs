@@ -8,7 +8,6 @@ import BowBot.Minecraft.Account
 import BowBot.Discord.Utils
 import BowBot.Minecraft.Arg
 import BowBot.BotData.Cached
-import Control.Monad ((>=>))
 import BowBot.Hypixel.Leaderboard
 import qualified Data.HashMap.Strict as HM
 import BowBot.DB.Basic (withDB, executeLog)

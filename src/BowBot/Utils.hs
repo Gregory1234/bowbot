@@ -1,13 +1,12 @@
 {-# LANGUAGE ViewPatterns #-}
 
 module BowBot.Utils(
-  module BowBot.Utils, liftIO, MonadIO, getEnv, fromMaybe, for, for_, readMaybe,
-  atomically, readTVar, writeTVar, modifyTVar, pack, unpack, when, unless, void,
-  module BowBot.HoistIO
+  module BowBot.Utils, module BowBot.HoistIO, getEnv, for, for_, readMaybe, (<|>), ($>),
+  STM, atomically, TVar, newTVar, readTVar, writeTVar, modifyTVar, pack, unpack,
+  module Data.Char, module Data.List, module Data.List.Split, module Data.Maybe, module Control.Monad.Reader
 ) where
 
-import Control.Monad.IO.Class ( liftIO, MonadIO )
-import Data.Maybe (fromMaybe)
+import Data.Maybe
 import System.Environment.Blank (getEnv)
 import Text.Printf (printf)
 import Data.Ratio ((%))
@@ -16,13 +15,18 @@ import Data.Time.Clock.POSIX (getCurrentTime)
 import Data.Traversable (for)
 import Data.Foldable (for_)
 import Text.Read (readMaybe)
-import Control.Concurrent.STM (atomically)
-import Control.Concurrent.STM.TVar (readTVar, writeTVar, modifyTVar)
+import Control.Concurrent.STM (STM, atomically)
+import Control.Concurrent.STM.TVar (TVar, newTVar, readTVar, writeTVar, modifyTVar)
 import Data.Text (pack, unpack)
-import Control.Monad (when, unless, void)
 import BowBot.HoistIO
 import qualified Data.Map as M
 import Control.Monad.Error.Class (MonadError, throwError, catchError)
+import Control.Monad.Reader
+import Control.Applicative ((<|>))
+import Data.Char
+import Data.List (sortOn, intercalate, intersperse, isPrefixOf, isSuffixOf, (\\), intersect, find, findIndex)
+import Data.Functor (($>))
+import Data.List.Split (splitOn, chunksOf)
 
 dist :: Eq a => [a] -> [a] -> Int
 dist a b =

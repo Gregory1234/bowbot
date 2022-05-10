@@ -11,9 +11,6 @@ import Control.Monad.Except
 import BowBot.Utils
 import qualified Data.HashMap.Strict as HM
 import BowBot.BotData.Cached
-import Data.Char (toLower)
-import Data.List (sortOn)
-import Data.Maybe (listToMaybe, isNothing)
 import BowBot.Discord.Utils
 import BowBot.Network.Basic
 

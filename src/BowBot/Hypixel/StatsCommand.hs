@@ -19,7 +19,6 @@ import BowBot.BotData.Info
 import BowBot.Discord.Roles
 import BowBot.Account.Basic
 import BowBot.Discord.Utils (discordGuildMembers)
-import Control.Monad.Trans (lift)
 
 hypixelStatsCommand :: SettingsSource -> String -> String -> Command
 hypixelStatsCommand src name desc = Command CommandInfo

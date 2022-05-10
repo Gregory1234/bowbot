@@ -23,7 +23,6 @@ import BowBot.BotData.Cached
 import BowBot.DB.Basic
 import BowBot.Utils
 import BowBot.Settings.Basic
-import Data.Maybe (catMaybes, mapMaybe)
 
 data StatsTimeRange = DailyStats | WeeklyStats | MonthlyStats deriving (Show, Eq)
 

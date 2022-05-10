@@ -12,9 +12,6 @@ import BowBot.Discord.Utils
 import BowBot.BotData.Cached
 import Control.Monad.Except
 import BowBot.Minecraft.Arg
-import Data.Char (toLower)
-import Data.List (sortOn)
-import Data.Maybe (listToMaybe)
 
 data AccountResponse = AccountResponse { accResponseCause :: Either DiscordAccount (MinecraftResponseType, MinecraftAccount), accResponseAccount :: BowBotAccount }
 

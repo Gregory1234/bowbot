@@ -8,9 +8,7 @@ import BowBot.Settings.Basic
 import BowBot.Network.Basic
 import BowBot.Minecraft.Basic (UUID)
 import BowBot.Hypixel.Basic
-import Data.Aeson
 import BowBot.Utils
-import Data.Maybe (catMaybes, isJust, isNothing)
 import BowBot.Hypixel.Division
 import Data.Ratio ((%))
 

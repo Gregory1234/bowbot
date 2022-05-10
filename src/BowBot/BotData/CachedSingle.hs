@@ -13,11 +13,7 @@ module BowBot.BotData.CachedSingle(
 ) where
 
 import BowBot.Utils
-import Control.Concurrent.STM.TVar (TVar, newTVar)
-import Control.Concurrent.STM (STM)
-import Control.Applicative ((<|>))
 import Control.Exception.Base (bracket)
-import Control.Monad.Reader
 import Data.Has
 
 

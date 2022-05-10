@@ -6,7 +6,6 @@ import BowBot.Command
 import BowBot.Minecraft.Arg
 import BowBot.Account.Basic
 import BowBot.Minecraft.Account
-import Control.Monad ((>=>))
 import BowBot.Discord.Utils
 import BowBot.BotData.Cached
 import BowBot.DB.Basic

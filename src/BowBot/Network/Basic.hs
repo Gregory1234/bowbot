@@ -3,18 +3,19 @@
 {-# LANGUAGE FlexibleContexts #-}
 
 module BowBot.Network.Basic(
-  module BowBot.Network.Basic, Manager, MonadIO(..), MonadReader(..), asks, Has(..)
+  module BowBot.Network.Basic, Manager, newManager, MonadIO(..), MonadReader(..), asks, Has(..),
+  module Data.Aeson.Types, module Data.Aeson
 ) where
 
 
 import Network.HTTP.Conduit hiding (path)
-import Data.Aeson.Types (FromJSON, Parser, parseEither)
+import Data.Aeson.Types
 import Data.ByteString.Lazy.Char8 (ByteString)
 import Control.Exception.Base (SomeException, evaluate, try)
 import Control.DeepSeq (force)
 import BowBot.DB.Basic
 import Control.Concurrent (threadDelay)
-import Data.Aeson (decode)
+import Data.Aeson
 import Control.Monad.Reader
 import Data.Has
 

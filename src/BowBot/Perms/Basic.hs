@@ -12,7 +12,6 @@ import BowBot.Discord.DiscordNFData ()
 import qualified Data.HashMap.Strict as HM
 import BowBot.Utils
 import BowBot.DB.Basic (queryLog, withDB, executeManyLog)
-import Data.Maybe (mapMaybe)
 
 data PermissionLevel
   = BanLevel

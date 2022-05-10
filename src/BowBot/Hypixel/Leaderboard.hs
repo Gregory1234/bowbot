@@ -16,16 +16,11 @@ import qualified Data.HashMap.Strict as HM
 import BowBot.Minecraft.Basic (UUID(..))
 import BowBot.DB.Basic (queryLog, executeManyLog, withDB, logInfo)
 import BowBot.Utils
-import Data.Maybe (mapMaybe)
-import Control.Applicative ((<|>))
 import BowBot.Hypixel.Basic (HypixelApi(..))
 import BowBot.Network.Basic
 import BowBot.BotData.Counter
-import Data.List.Split (chunksOf)
 import Control.Concurrent (threadDelay)
 import Control.Concurrent.Async (mapConcurrently)
-import Data.List (intersperse)
-import Control.Monad.Reader (runReaderT)
 
 data HypixelBowLeaderboardEntry = HypixelBowLeaderboardEntry
   { bowLbWins :: Integer,
