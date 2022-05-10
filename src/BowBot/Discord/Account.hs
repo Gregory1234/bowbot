@@ -59,7 +59,7 @@ showDiscordAccountDiscord :: DiscordAccount -> String
 showDiscordAccountDiscord DiscordAccount { discordNickname = Nothing, ..} = "**" ++ discordEscape discordName ++ "**#" ++ discordDiscrim
 showDiscordAccountDiscord DiscordAccount { discordNickname = Just nick, ..} = "**" ++ discordEscape nick ++ "** (" ++ discordEscape discordName ++ "#" ++ discordDiscrim ++ ")"
 
-updateDiscordAccountCache :: (MonadIO m, MonadReader r m, Has DiscordHandle r, HasCache InfoField r, HasCache DiscordAccount r) => m ()
+updateDiscordAccountCache :: (MonadIO m, MonadReader r m, HasBotData d r, Has DiscordHandle r, HasCache InfoField d, HasCache DiscordAccount d) => m ()
 updateDiscordAccountCache = do
   gid <- askInfo discordGuildIdInfo
   members <- map guildMemberToDiscordAccount . filter (\GuildMember {..} -> fmap userIsBot memberUser == Just False) <$> discordGuildMembers gid

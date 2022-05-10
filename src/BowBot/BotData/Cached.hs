@@ -7,13 +7,14 @@
 {-# LANGUAGE ConstraintKinds #-}
 
 module BowBot.BotData.Cached(
-  module BowBot.BotData.Cached, MonadIO(..), MonadReader(..), asks, Has(..)
+  module BowBot.BotData.Cached, MonadIO(..), MonadReader(..), asks, Has(..), module BowBot.BotData.HasData
 ) where
 
 import qualified Data.HashMap.Strict as HM
 import Data.Hashable (Hashable)
 import Database.MySQL.Simple (Connection)
 import BowBot.Utils
+import BowBot.BotData.HasData
 import Data.Has
 
 newtype DatabaseCache a = DatabaseCache { unDatabaseCache :: TVar (HM.HashMap (CacheIndex a) a) }
@@ -23,26 +24,26 @@ newCache = DatabaseCache <$> newTVar HM.empty
 
 type HasCache a = Has (DatabaseCache a)
 
-getCache :: (HasCache a r, MonadReader r m) => m (TVar (HM.HashMap (CacheIndex a) a))
-getCache = asks (unDatabaseCache . getter)
+getCache :: (HasCache a d, MonadReader r m, HasBotData d r) => m (TVar (HM.HashMap (CacheIndex a) a))
+getCache = asks (unDatabaseCache . getterData)
 
 class (Eq (CacheIndex a), Hashable (CacheIndex a)) => Cached a where
   type CacheIndex a
-  refreshCache :: (HasCache a r, MonadIO m, MonadReader r m) => Connection -> m ()
+  refreshCache :: (HasCache a d, MonadIO m, MonadReader r m, HasBotData d r) => Connection -> m ()
 
 class Cached a => CachedStorable a where
-  storeInCacheIndexed :: (HasCache a r, MonadIO m, MonadReader r m) => [(CacheIndex a, a)] -> m Bool
+  storeInCacheIndexed :: (HasCache a d, MonadIO m, MonadReader r m, HasBotData d r) => [(CacheIndex a, a)] -> m Bool
 
 class Cached a => CachedIndexed a where
   cacheIndex :: a -> CacheIndex a
-  storeInCache :: (HasCache a r, MonadIO m, MonadReader r m) => [a] -> m Bool
+  storeInCache :: (HasCache a d, MonadIO m, MonadReader r m, HasBotData d r) => [a] -> m Bool
 
-getFromCache :: (HasCache a r, MonadIO m, MonadReader r m, Cached a) => CacheIndex a -> m (Maybe a)
+getFromCache :: (HasCache a d, MonadIO m, MonadReader r m, HasBotData d r, Cached a) => CacheIndex a -> m (Maybe a)
 getFromCache a = do
   m <- getCacheMap
   return $ m HM.!? a
 
-getCacheMap :: (HasCache a r, MonadIO m, MonadReader r m) => m (HM.HashMap (CacheIndex a) a)
+getCacheMap :: (HasCache a d, MonadIO m, MonadReader r m, HasBotData d r) => m (HM.HashMap (CacheIndex a) a)
 getCacheMap = do
   cache <- getCache
   liftIO $ atomically $ readTVar cache

@@ -2,6 +2,7 @@
 {-# LANGUAGE DerivingVia #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE RecordWildCards #-}
 
 module BowBot.Bot where
 
@@ -51,15 +52,15 @@ runBowBot :: IO ()
 runBowBot = do
   discordKey <- getEnvOrThrow "API_KEY"
   ifDev () $ putStrLn "this is dev version of the bot"
-  manager <- newManager managerSettings
-  bdt <- downloadBotData
+  bctxManager <- newManager managerSettings
+  bctxData <- downloadBotData
   logInfo "bot started"
   userFacingError <-
     runDiscord $
       def
         { discordToken = pack discordKey,
-          discordOnStart = ReaderT $ \h -> runReaderT onStartup (manager, (h, bdt)),
-          discordOnEvent = \e -> ReaderT $ \h -> runReaderT (eventHandler e) (manager, (h, bdt)),
+          discordOnStart = ReaderT $ \bctxDiscord -> runReaderT onStartup BotContext {..},
+          discordOnEvent = \e -> ReaderT $ \bctxDiscord -> runReaderT (eventHandler e) BotContext {..},
           discordOnLog = putStrLn . unpack,
           discordGatewayIntent = def { gatewayIntentMembers = True }
         }
@@ -67,13 +68,11 @@ runBowBot = do
 
 backgroundMinutely :: Int -> Bot ()
 backgroundMinutely mint = do
-  bdt <- asks getter
-  liftIO $ clearBotDataCaches bdt
+  clearBotDataCaches
   when (mint == 0) $ withDB $ \conn -> do
     logInfoDB conn "started update"
     updateDiscordStatus
-    liftIO $ refreshBotData conn bdt
-    manager <- asks getter
+    refreshBotData conn
     hour <- liftIO $ read @Int <$> getTime "%k"
     weekday <- liftIO $ read @Int <$> getTime "%u"
     monthday <- liftIO $ read @Int <$> getTime "%d"
@@ -84,7 +83,7 @@ backgroundMinutely mint = do
           (0, _, _) -> [DailyStats]
           _ -> []
     when (hour == 5) announceBirthdays
-    liftDiscord $ updateBotData times manager bdt
+    updateBotData times
     storeNewSavedRolesAll
     updateRolesAll
     dev <- ifDev False $ return True
@@ -102,7 +101,7 @@ onStartup = void $ hoistIO forkIO $ do
       backgroundMinutely mint
     liftIO $ threadDelay 60000000
 
-updateDiscordStatus :: (MonadIO m, MonadReader r m, Has DiscordHandle r, HasCache InfoField r) => m ()
+updateDiscordStatus :: (MonadIO m, MonadReader r m, HasBotData d r, Has DiscordHandle r, HasCache InfoField d) => m ()
 updateDiscordStatus = do
   discordStatus <- askInfo discordStatusInfo
   liftDiscord $ sendCommand (UpdateStatus $ UpdateStatusOpts {
@@ -206,7 +205,7 @@ commands =
   , hypixelBanCommand
   , setBirthdayCommand
   , helpCommand commands AdminLevel Nothing "normal" "adminhelp"
-  , adminCommand 30 "datarefresh" "sync Bow Bot's data from the database" $ asks getter >>= (\bdt -> liftIO $ withDB $ \conn -> refreshBotData conn bdt)
+  , adminCommand 30 "datarefresh" "sync Bow Bot's data from the database" $ withDB $ \conn -> refreshBotData conn
   , updateDataCommand [] "dataupdate"
   , updateDataCommand [DailyStats] "dataupdateday"
   , updateDataCommand [DailyStats, WeeklyStats] "dataupdateweek"

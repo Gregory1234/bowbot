@@ -8,7 +8,7 @@ import BowBot.Discord.Utils
 import BowBot.Snipe.Basic
 import BowBot.BotData.Cached
 
-detectDeleteMessage :: (MonadIO m, MonadReader r m, HasCache SnipeMessage r) => Message -> m ()
+detectDeleteMessage :: (MonadIO m, MonadReader r m, HasBotData d r, HasCache SnipeMessage d) => Message -> m ()
 detectDeleteMessage m
   | let author = messageAuthor m
   , userAvatar author == Just "a06062af9b11085ab715e340deaab267"

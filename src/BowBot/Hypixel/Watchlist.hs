@@ -16,7 +16,7 @@ import Control.Concurrent.Async (mapConcurrently)
 import BowBot.Utils
 
 
-getWatchlist :: (MonadIO m, MonadReader r m, HasCache MinecraftAccount r) => m [MinecraftAccount]
+getWatchlist :: (MonadIO m, MonadReader r m, HasBotData d r, HasCache MinecraftAccount d) => m [MinecraftAccount]
 getWatchlist = filter mcHypixelWatchlist . HM.elems <$> getCacheMap
 
 newtype HypixelOnlinePlayers = HypixelOnlinePlayers { getHypixelOnlinePlayersList :: [UUID] }
@@ -27,7 +27,7 @@ isInBowDuels uuid = hypixelWithPlayerStatus uuid $ \o -> do
   mode :: Maybe String <- session .:? "mode"
   return $ mode == Just "DUELS_BOW_DUEL"
 
-getHypixelOnlinePlayers :: (MonadHoistIO m, MonadReader r m, Has Manager r, HasCachedData HypixelOnlinePlayers r, HasCache MinecraftAccount r, HasCounter' HypixelApi r) => m (CacheResponse HypixelOnlinePlayers)
+getHypixelOnlinePlayers :: (MonadHoistIO m, MonadReader r m, HasBotData d r, Has Manager r, HasCachedData HypixelOnlinePlayers d, HasCache MinecraftAccount d, HasCounter' HypixelApi d) => m (CacheResponse HypixelOnlinePlayers)
 getHypixelOnlinePlayers = getOrCalculateCacheSingle $ do
   watchlist <- getWatchlist
   cv <- tryIncreaseCounter HypixelApi (fromIntegral $ length watchlist)

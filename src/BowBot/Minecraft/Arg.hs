@@ -25,15 +25,15 @@ data MinecraftResponseType
 thePlayerDoesNotExistMessage :: String
 thePlayerDoesNotExistMessage = "*The player doesn't exist!*"
 
-minecraftArgDefault :: (MonadError String m, MonadIO m, MonadReader r m, Has Manager r, HasCache MinecraftAccount r, HasCache BowBotAccount r) => (MinecraftAccount -> m (Bool, a)) -> Maybe String -> UserId -> m (MinecraftResponse a)
+minecraftArgDefault :: (MonadError String m, MonadIO m, MonadReader r m, HasBotData d r, Has Manager r, HasCache MinecraftAccount d, HasCache BowBotAccount d) => (MinecraftAccount -> m (Bool, a)) -> Maybe String -> UserId -> m (MinecraftResponse a)
 minecraftArgDefault arg Nothing did = minecraftArgDiscordSelf arg did
 minecraftArgDefault arg (Just (fromPingDiscordUser -> Just did)) _ = minecraftArgDiscord' arg did
 minecraftArgDefault arg (Just name) _ = minecraftArgNoAutocorrect' arg name
 
-minecraftArgNoAutocorrect' :: (MonadError String m, MonadIO m, MonadReader r m, Has Manager r, HasCache MinecraftAccount r) => (MinecraftAccount -> m (Bool, a)) -> String -> m (MinecraftResponse a)
+minecraftArgNoAutocorrect' :: (MonadError String m, MonadIO m, MonadReader r m, HasBotData d r, Has Manager r, HasCache MinecraftAccount d) => (MinecraftAccount -> m (Bool, a)) -> String -> m (MinecraftResponse a)
 minecraftArgNoAutocorrect' = minecraftArgNoAutocorrect Nothing
 
-minecraftArgNoAutocorrect :: (MonadError String m, MonadIO m, MonadReader r m, Has Manager r, HasCache MinecraftAccount r) => Maybe String -> (MinecraftAccount -> m (Bool, a)) -> String -> m (MinecraftResponse a)
+minecraftArgNoAutocorrect :: (MonadError String m, MonadIO m, MonadReader r m, HasBotData d r, Has Manager r, HasCache MinecraftAccount d) => Maybe String -> (MinecraftAccount -> m (Bool, a)) -> String -> m (MinecraftResponse a)
 minecraftArgNoAutocorrect err arg name = do
   acc' <- filter ((==map toLower name) . map toLower . head . mcNames) . HM.elems <$> getCacheMap
   case acc' of
@@ -53,10 +53,10 @@ minecraftArgNoAutocorrect err arg name = do
               Nothing -> minecraftArgAutocorrect (Just e) Nothing arg name
               Just e' -> throwError e'
 
-minecraftArgAutocorrect' :: (MonadError String m, MonadIO m, MonadReader r m, Has Manager r, HasCache MinecraftAccount r) => (MinecraftAccount -> m (Bool, a)) -> String -> m (MinecraftResponse a)
+minecraftArgAutocorrect' :: (MonadError String m, MonadIO m, MonadReader r m, HasBotData d r, Has Manager r, HasCache MinecraftAccount d) => (MinecraftAccount -> m (Bool, a)) -> String -> m (MinecraftResponse a)
 minecraftArgAutocorrect' = minecraftArgAutocorrect Nothing Nothing
 
-minecraftArgAutocorrect :: (MonadError String m, MonadIO m, MonadReader r m, Has Manager r, HasCache MinecraftAccount r) => Maybe String -> Maybe (MinecraftResponse a) -> (MinecraftAccount -> m (Bool, a)) -> String -> m (MinecraftResponse a)
+minecraftArgAutocorrect :: (MonadError String m, MonadIO m, MonadReader r m, HasBotData d r, Has Manager r, HasCache MinecraftAccount d) => Maybe String -> Maybe (MinecraftResponse a) -> (MinecraftAccount -> m (Bool, a)) -> String -> m (MinecraftResponse a)
 minecraftArgAutocorrect err retm arg name = do
   people <- HM.elems <$> getCacheMap
   let process f = let
@@ -85,16 +85,16 @@ minecraftArgAutocorrect err retm arg name = do
 theUserIsntRegisteredMessage :: String
 theUserIsntRegisteredMessage = "*The user isn't registered!*"
 
-minecraftArgDiscord' :: (MonadError String m, MonadIO m, MonadReader r m, HasCache BowBotAccount r, HasCache MinecraftAccount r) => (MinecraftAccount -> m (Bool, a)) -> UserId -> m (MinecraftResponse a)
+minecraftArgDiscord' :: (MonadError String m, MonadIO m, MonadReader r m, HasBotData d r, HasCache BowBotAccount d, HasCache MinecraftAccount d) => (MinecraftAccount -> m (Bool, a)) -> UserId -> m (MinecraftResponse a)
 minecraftArgDiscord' = minecraftArgDiscord theUserIsntRegisteredMessage
 
 youArentRegisteredMessage :: String
 youArentRegisteredMessage = "*You aren't registered! To register, type `?register yourign`.*"
 
-minecraftArgDiscordSelf :: (MonadError String m, MonadIO m, MonadReader r m, HasCache BowBotAccount r, HasCache MinecraftAccount r) => (MinecraftAccount -> m (Bool, a)) -> UserId -> m (MinecraftResponse a)
+minecraftArgDiscordSelf :: (MonadError String m, MonadIO m, MonadReader r m, HasBotData d r, HasCache BowBotAccount d, HasCache MinecraftAccount d) => (MinecraftAccount -> m (Bool, a)) -> UserId -> m (MinecraftResponse a)
 minecraftArgDiscordSelf = minecraftArgDiscord youArentRegisteredMessage
 
-minecraftArgDiscord :: (MonadError String m, MonadIO m, MonadReader r m, HasCache BowBotAccount r, HasCache MinecraftAccount r) => String -> (MinecraftAccount -> m (Bool, a)) -> UserId -> m (MinecraftResponse a)
+minecraftArgDiscord :: (MonadError String m, MonadIO m, MonadReader r m, HasBotData d r, HasCache BowBotAccount d, HasCache MinecraftAccount d) => String -> (MinecraftAccount -> m (Bool, a)) -> UserId -> m (MinecraftResponse a)
 minecraftArgDiscord err arg did = do
   bbacc <- liftMaybe err =<< getBowBotAccountByDiscord did
   acc <- liftMaybe thePlayerDoesNotExistMessage =<< getFromCache (accountSelectedMinecraft bbacc)

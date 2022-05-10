@@ -36,7 +36,7 @@ instance Cached BirthdayDate where
     let newValues = HM.fromList $ flip mapMaybe res $ \(fromInteger -> did, (>>= birthdayFromString) -> bd) -> (did,) <$> bd
     liftIO $ atomically $ writeTVar cache newValues
 
-setBirthday :: (MonadIO m, MonadReader r m, HasCache BowBotAccount r, HasCache BirthdayDate r) => UserId -> BirthdayDate -> m Bool
+setBirthday :: (MonadIO m, MonadReader r m, HasBotData d r, HasCache BowBotAccount d, HasCache BirthdayDate d) => UserId -> BirthdayDate -> m Bool
 setBirthday did bd = do
   acc <- getBowBotAccountByDiscord did
   case acc of
@@ -53,5 +53,5 @@ setBirthday did bd = do
         liftIO $ atomically $ modifyTVar cache (insertMany $ map (,bd) (accountDiscords a))
       return success
 
-getBirthdayPeople :: (MonadIO m, MonadReader r m, HasCache BirthdayDate r) => BirthdayDate -> m [UserId]
+getBirthdayPeople :: (MonadIO m, MonadReader r m, HasBotData d r, HasCache BirthdayDate d) => BirthdayDate -> m [UserId]
 getBirthdayPeople date = HM.keys . HM.filter (== date) <$> getCacheMap

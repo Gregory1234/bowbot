@@ -26,6 +26,7 @@ import Data.Default
 import BowBot.Hypixel.Watchlist
 import BowBot.Birthday.Basic
 import BowBot.Snipe.Basic
+import BowBot.BotData.HasData
 
 data BotData = BotData
   { infoFieldCache :: DatabaseCache InfoField
@@ -107,3 +108,5 @@ instance Has (DatabaseCache BirthdayDate) BotData where
 instance Has (DatabaseCache SnipeMessage) BotData where
   getter = snipeCache
   modifier f x = x { snipeCache = f $ snipeCache x }
+
+instance HasBotData BotData BotData

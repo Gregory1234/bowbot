@@ -1,6 +1,6 @@
-{-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE ImpredicativeTypes #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 
 module BowBot.Command.Handler where
 
@@ -13,6 +13,7 @@ import Data.Text.Encoding (encodeUtf8)
 import BowBot.Discord.DiscordNFData ()
 import BowBot.BotData.Basic
 import Data.Has
+import BowBot.BotData.HasData
 
 newtype CommandArgs = CommandMessageArgs [String]
 
@@ -37,7 +38,26 @@ commandEnvFromMessage m = CommandEnvironment
   , envArgs = CommandMessageArgs $ tail $ words $ unpack $ messageContent m
   }
 
-type CommandHandlerContext = CommandEnvironment :*: Manager :*: DiscordHandle :*: BotData
+data CommandHandlerContext = CommandHandlerContext
+  { cctxEnv :: CommandEnvironment
+  , cctxManager :: Manager
+  , cctxDiscord :: DiscordHandle
+  , cctxData :: BotData
+  }
+
+instance Has CommandEnvironment CommandHandlerContext where
+  getter = cctxEnv
+  modifier f x = x { cctxEnv = f $ cctxEnv x }
+instance Has Manager CommandHandlerContext where
+  getter = cctxManager
+  modifier f x = x { cctxManager = f $ cctxManager x }
+instance Has DiscordHandle CommandHandlerContext where
+  getter = cctxDiscord
+  modifier f x = x { cctxDiscord = f $ cctxDiscord x }
+instance Has BotData CommandHandlerContext where
+  getter = cctxData
+  modifier f x = x { cctxData = f $ cctxData x }
+instance HasBotData BotData CommandHandlerContext
 
 type CommandHandler = ReaderT CommandHandlerContext IO
 

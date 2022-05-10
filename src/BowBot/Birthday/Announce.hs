@@ -18,7 +18,7 @@ import BowBot.Discord.Account
 birthdayChannelInfo :: InfoType ChannelId
 birthdayChannelInfo = InfoType { infoName = "birthday_channel", infoDefault = 0, infoParse = readEither }
 
-announceBirthdays :: (MonadIO m, MonadReader r m, Has DiscordHandle r, HasCache BirthdayDate r, HasCache BowBotAccount r, HasCache DiscordAccount r, HasCache InfoField r) => m ()
+announceBirthdays :: (MonadIO m, MonadReader r m, HasBotData d r, Has DiscordHandle r, HasCache BirthdayDate d, HasCache BowBotAccount d, HasCache DiscordAccount d, HasCache InfoField d) => m ()
 announceBirthdays = do
   currentDay <- liftIO currentBirthdayDate
   birthdays <- getBirthdayPeople currentDay

@@ -1,6 +1,7 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE DataKinds #-}
+{-# LANGUAGE FlexibleContexts #-}
 
 module BowBot.BotData.Download where
 
@@ -51,8 +52,8 @@ emptyBotData = do
   snipeCache <- newCache
   return BotData {..}
 
-refreshBotData :: Connection -> BotData -> IO ()
-refreshBotData conn = runReaderT $ do
+refreshBotData :: (MonadIO m, MonadReader r m, HasBotData BotData r) => Connection -> m ()
+refreshBotData conn = do
   refreshCache @InfoField conn
   refreshCache @MinecraftAccount conn
   refreshCache @PermissionLevel conn
@@ -67,9 +68,9 @@ refreshBotData conn = runReaderT $ do
   refreshCache @BirthdayDate conn
   refreshCache @SnipeMessage conn -- TODO: this is meaningless...
 
-updateBotData :: [StatsTimeRange] -> Manager -> BotData -> DiscordHandler ()
-updateBotData times manager bdt = ReaderT $ \dh -> foldl1 concurrently_ $
-  map (`runReaderT` (dh, (manager, bdt)))
+updateBotData :: (MonadIO m, MonadReader r m, HasBotData BotData r, Has Manager r, Has DiscordHandle r) => [StatsTimeRange] -> m ()
+updateBotData times = (ask >>=) $ \ctx -> liftIO $ foldl1 concurrently_ $
+  map (`runReaderT` ctx)
     [ updateMinecraftAccountCache
     , updateDiscordAccountCache
     , do
@@ -77,8 +78,8 @@ updateBotData times manager bdt = ReaderT $ \dh -> foldl1 concurrently_ $
       forM_ times updateHypixelTimeStatsCache'
     ]
 
-clearBotDataCaches :: BotData -> IO ()
-clearBotDataCaches = runReaderT $ do
+clearBotDataCaches :: (MonadIO m, MonadReader r m, HasBotData BotData r) => m ()
+clearBotDataCaches = do
   clearCounter HypixelApi
   clearCacheSingle @HypixelGuildMembers
   clearCacheSingle @HypixelOnlinePlayers
@@ -86,5 +87,5 @@ clearBotDataCaches = runReaderT $ do
 downloadBotData :: IO BotData
 downloadBotData = do
   bdt <- atomically emptyBotData
-  withDB $ \conn -> refreshBotData conn bdt
+  withDB $ \conn -> runReaderT (refreshBotData conn) bdt
   return bdt
