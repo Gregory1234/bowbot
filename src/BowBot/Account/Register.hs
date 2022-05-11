@@ -1,5 +1,6 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE DataKinds #-}
 
 module BowBot.Account.Register where
 
@@ -13,7 +14,7 @@ import BowBot.Discord.Roles
 import BowBot.Birthday.Basic
 import Control.Monad.Except (runExceptT, throwError)
 
-createNewBowBotAccount :: (MonadIO m, MonadReader r m, HasBotData d r, HasCache BowBotAccount d, HasCache SavedRoles d, HasCache BirthdayDate d) => String -> UserId -> UUID -> m (Maybe BowBotAccount)
+createNewBowBotAccount :: (MonadIOBotData m d r, HasCaches [BowBotAccount, SavedRoles, BirthdayDate] d) => String -> UserId -> UUID -> m (Maybe BowBotAccount)
 createNewBowBotAccount name did uuid = do
   cache <- getCache
   savedRoles <- getFromCache did
@@ -31,7 +32,7 @@ createNewBowBotAccount name did uuid = do
   liftIO $ atomically $ for_ ret $ \bacc -> modifyTVar cache (insertMany [(accountId bacc, bacc)])
   return ret
 
-addAltToBowBotAccount :: (MonadIO m, MonadReader r m, HasBotData d r, HasCache BowBotAccount d) => Integer -> UUID -> m (Maybe BowBotAccount)
+addAltToBowBotAccount :: (MonadIOBotData m d r, HasCache BowBotAccount d) => Integer -> UUID -> m (Maybe BowBotAccount)
 addAltToBowBotAccount bid uuid = do
   acc <- fromJust <$> getFromCache bid
   success <- liftIO $ withDB $ \conn -> (>0) <$> executeLog conn "INSERT INTO `peopleMinecraftDEV`(`id`, `minecraft`,`status`, `selected`, `verified`) VALUES (?,?, 'alt', 0, 0)" (bid, uuidString uuid)

@@ -13,7 +13,7 @@ data HypixelApi = HypixelApi
 instance Counted HypixelApi where
   counterLimit _ = 100
 
-hypixelWithPlayerData :: (MonadIO m, MonadReader r m, Has Manager r) => UUID -> (Object -> Parser a) -> m (Maybe a)
+hypixelWithPlayerData :: (MonadIOReader m r, Has Manager r) => UUID -> (Object -> Parser a) -> m (Maybe a)
 hypixelWithPlayerData (UUID uuid) f = do
   apiKey <- liftIO $ fromMaybe "" <$> getEnv "HYPIXEL_API"
   let url = "https://api.hypixel.net/player?key=" ++ apiKey ++ "&uuid=" ++ uuid
@@ -21,7 +21,7 @@ hypixelWithPlayerData (UUID uuid) f = do
   res <- sendRequestTo url cleanUrl
   decodeParse res f
 
-hypixelWithPlayerStatus :: (MonadIO m, MonadReader r m, Has Manager r) => UUID -> (Object -> Parser a) -> m (Maybe a)
+hypixelWithPlayerStatus :: (MonadIOReader m r, Has Manager r) => UUID -> (Object -> Parser a) -> m (Maybe a)
 hypixelWithPlayerStatus (UUID uuid) f = do
   apiKey <- liftIO $ fromMaybe "" <$> getEnv "HYPIXEL_API"
   let url = "https://api.hypixel.net/status?key=" ++ apiKey ++ "&uuid=" ++ uuid
@@ -29,7 +29,7 @@ hypixelWithPlayerStatus (UUID uuid) f = do
   res <- sendRequestTo url cleanUrl
   decodeParse res f
   
-hypixelGuildMemberList :: (MonadIO m, MonadReader r m, Has Manager r) => String -> m (Maybe [(UUID, String)])
+hypixelGuildMemberList :: (MonadIOReader m r, Has Manager r) => String -> m (Maybe [(UUID, String)])
 hypixelGuildMemberList gid = do
   apiKey <- liftIO $ fromMaybe "" <$> getEnv "HYPIXEL_API"
   let url = "https://api.hypixel.net/guild?key=" ++ apiKey ++ "&id=" ++ gid

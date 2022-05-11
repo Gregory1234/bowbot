@@ -12,7 +12,7 @@ import qualified Discord.Requests as R
 import BowBot.Utils
 import BowBot.DB.Basic
 
-discordGuildMembers :: (MonadIO m, MonadReader r m, Has DiscordHandle r) => GuildId -> m [GuildMember]
+discordGuildMembers :: (MonadIOReader m r, Has DiscordHandle r) => GuildId -> m [GuildMember]
 discordGuildMembers gid = do
   members <- call $ R.ListGuildMembers gid R.GuildMembersTiming { R.guildMembersTimingLimit = Just 500, R.guildMembersTimingAfter = Nothing } -- TODO: what if there are more?
   case members of

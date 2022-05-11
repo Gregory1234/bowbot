@@ -6,6 +6,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE DataKinds #-}
 
 module BowBot.Discord.Account where
 
@@ -59,7 +60,7 @@ showDiscordAccountDiscord :: DiscordAccount -> String
 showDiscordAccountDiscord DiscordAccount { discordNickname = Nothing, ..} = "**" ++ discordEscape discordName ++ "**#" ++ discordDiscrim
 showDiscordAccountDiscord DiscordAccount { discordNickname = Just nick, ..} = "**" ++ discordEscape nick ++ "** (" ++ discordEscape discordName ++ "#" ++ discordDiscrim ++ ")"
 
-updateDiscordAccountCache :: (MonadIO m, MonadReader r m, HasBotData d r, Has DiscordHandle r, HasCache InfoField d, HasCache DiscordAccount d) => m ()
+updateDiscordAccountCache :: (MonadIOBotData m d r, Has DiscordHandle r, HasCaches [InfoField, DiscordAccount] d) => m ()
 updateDiscordAccountCache = do
   gid <- askInfo discordGuildIdInfo
   members <- map guildMemberToDiscordAccount . filter (\GuildMember {..} -> fmap userIsBot memberUser == Just False) <$> discordGuildMembers gid

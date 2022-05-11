@@ -9,7 +9,6 @@ import BowBot.BotData.Basic
 import BowBot.BotData.Info
 import BowBot.Minecraft.Account
 import BowBot.Account.Basic
-import Control.Concurrent.STM (STM, atomically)
 import Database.MySQL.Simple (Connection)
 import BowBot.BotData.Cached
 import BowBot.BotData.CachedSingle
@@ -30,6 +29,7 @@ import BowBot.Hypixel.Watchlist
 import Control.Concurrent.Async (concurrently_)
 import BowBot.Birthday.Basic
 import BowBot.Snipe.Basic
+import BowBot.Utils
 
 
 emptyBotData :: STM BotData
@@ -52,7 +52,7 @@ emptyBotData = do
   snipeCache <- newCache
   return BotData {..}
 
-refreshBotData :: (MonadIO m, MonadReader r m, HasBotData BotData r) => Connection -> m ()
+refreshBotData :: (MonadIOBotData m BotData r) => Connection -> m ()
 refreshBotData conn = do
   refreshCache @InfoField conn
   refreshCache @MinecraftAccount conn
@@ -68,7 +68,7 @@ refreshBotData conn = do
   refreshCache @BirthdayDate conn
   refreshCache @SnipeMessage conn -- TODO: this is meaningless...
 
-updateBotData :: (MonadIO m, MonadReader r m, HasBotData BotData r, Has Manager r, Has DiscordHandle r) => [StatsTimeRange] -> m ()
+updateBotData :: (MonadIOBotData m BotData r, HasAll [Manager, DiscordHandle] r) => [StatsTimeRange] -> m ()
 updateBotData times = (ask >>=) $ \ctx -> liftIO $ foldl1 concurrently_ $
   map (`runReaderT` ctx)
     [ updateMinecraftAccountCache
@@ -78,7 +78,7 @@ updateBotData times = (ask >>=) $ \ctx -> liftIO $ foldl1 concurrently_ $
       forM_ times updateHypixelTimeStatsCache'
     ]
 
-clearBotDataCaches :: (MonadIO m, MonadReader r m, HasBotData BotData r) => m ()
+clearBotDataCaches :: (MonadIOBotData m BotData r) => m ()
 clearBotDataCaches = do
   clearCounter HypixelApi
   clearCacheSingle @HypixelGuildMembers

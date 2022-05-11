@@ -53,7 +53,7 @@ instance CachedStorable HypixelBowLeaderboardEntry where
       liftIO $ atomically $ modifyTVar cache (insertMany fixed)
     return success
 
-updateHypixelLeaderboardCache :: (MonadIO m, MonadReader r m, HasBotData d r, Has Manager r, HasCounter HypixelApi d, HasCache HypixelBowLeaderboardEntry d) => m ()
+updateHypixelLeaderboardCache :: (MonadIOBotData m d r, Has Manager r, HasCounter HypixelApi d, HasCache HypixelBowLeaderboardEntry d) => m ()
 updateHypixelLeaderboardCache = do
   ctx <- ask
   let helper (uuid, old) = do

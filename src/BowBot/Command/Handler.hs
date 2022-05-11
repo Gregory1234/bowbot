@@ -1,6 +1,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE ImpredicativeTypes #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE DataKinds #-}
 
 module BowBot.Command.Handler where
 
@@ -12,7 +13,6 @@ import BowBot.Discord.Basic
 import Data.Text.Encoding (encodeUtf8)
 import BowBot.Discord.DiscordNFData ()
 import BowBot.BotData.Basic
-import Data.Has
 import BowBot.BotData.HasData
 
 newtype CommandArgs = CommandMessageArgs [String]
@@ -22,8 +22,8 @@ data CommandEnvironment = CommandEnvironment
   , envSenderMember :: Maybe GuildMember
   , envChannel :: ChannelId
   , envGuild :: GuildId
-  , envRespond :: forall m r. (MonadIO m, MonadReader r m, Has DiscordHandle r) => String -> m ()
-  , envRespondFile :: forall m r. (MonadIO m, MonadReader r m, Has DiscordHandle r) => String -> String -> m ()
+  , envRespond :: forall m r. (MonadIOReader m r, Has DiscordHandle r) => String -> m ()
+  , envRespondFile :: forall m r. (MonadIOReader m r, Has DiscordHandle r) => String -> String -> m ()
   , envArgs :: CommandArgs
   }
 
@@ -64,12 +64,12 @@ type CommandHandler = ReaderT CommandHandlerContext IO
 envs :: (MonadReader r m, Has CommandEnvironment r) => (CommandEnvironment -> v) -> m v
 envs f = asks $ f . getter
 
-respond :: (MonadIO m, MonadReader r m, Has CommandEnvironment r, Has DiscordHandle r) => String -> m ()
+respond :: (MonadIOReader m r, HasAll [CommandEnvironment, DiscordHandle] r) => String -> m ()
 respond m = do
   res <- envs envRespond
   res m
 
-respondFile :: (MonadIO m, MonadReader r m, Has CommandEnvironment r, Has DiscordHandle r) => String -> String -> m ()
+respondFile :: (MonadIOReader m r, HasAll [CommandEnvironment, DiscordHandle] r) => String -> String -> m ()
 respondFile n m = do
   res <- envs envRespondFile
   res n m

@@ -101,7 +101,7 @@ onStartup = void $ hoistIO forkIO $ do
       backgroundMinutely mint
     liftIO $ threadDelay 60000000
 
-updateDiscordStatus :: (MonadIO m, MonadReader r m, HasBotData d r, Has DiscordHandle r, HasCache InfoField d) => m ()
+updateDiscordStatus :: (MonadIOBotData m d r, Has DiscordHandle r, HasCache InfoField d) => m ()
 updateDiscordStatus = do
   discordStatus <- askInfo discordStatusInfo
   liftDiscord $ sendCommand (UpdateStatus $ UpdateStatusOpts {
@@ -111,7 +111,7 @@ updateDiscordStatus = do
         updateStatusOptsAFK = False
       })
 
-respond' :: (MonadIO m, MonadReader r m, Has DiscordHandle r) => Message -> String -> m ()
+respond' :: (MonadIOReader m r, Has DiscordHandle r) => Message -> String -> m ()
 respond' m = call_ . CreateMessage (messageChannelId m) . pack
 
 eventHandler :: Event -> Bot ()

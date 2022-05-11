@@ -17,7 +17,7 @@ import BowBot.DB.Basic
 import Control.Concurrent (threadDelay)
 import Data.Aeson
 import Control.Monad.Reader
-import Data.Has
+import BowBot.Utils
 
 
 
@@ -40,7 +40,7 @@ sendRequestTo' manager url cleanUrl = do
       logInfo $ "Received response from: " ++ cleanUrl
       return $ responseBody v
 
-sendRequestTo :: (MonadIO m, MonadReader r m, Has Manager r) => String -> String -> m ByteString
+sendRequestTo :: (MonadIOReader m r, Has Manager r) => String -> String -> m ByteString
 sendRequestTo url cleanUrl = do
   manager <- asks getter
   liftIO $ sendRequestTo' manager url cleanUrl

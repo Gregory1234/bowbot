@@ -5,6 +5,8 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE AllowAmbiguousTypes #-}
 {-# LANGUAGE ConstraintKinds #-}
+{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE TypeOperators #-}
 
 module BowBot.BotData.Cached(
   module BowBot.BotData.Cached, MonadIO(..), MonadReader(..), asks, Has(..), module BowBot.BotData.HasData
@@ -15,7 +17,7 @@ import Data.Hashable (Hashable)
 import Database.MySQL.Simple (Connection)
 import BowBot.Utils
 import BowBot.BotData.HasData
-import Data.Has
+import Data.Kind (Type, Constraint)
 
 newtype DatabaseCache a = DatabaseCache { unDatabaseCache :: TVar (HM.HashMap (CacheIndex a) a) }
 
@@ -29,21 +31,21 @@ getCache = asks (unDatabaseCache . getterData)
 
 class (Eq (CacheIndex a), Hashable (CacheIndex a)) => Cached a where
   type CacheIndex a
-  refreshCache :: (HasCache a d, MonadIO m, MonadReader r m, HasBotData d r) => Connection -> m ()
+  refreshCache :: (HasCache a d, MonadIOBotData m d r) => Connection -> m ()
 
 class Cached a => CachedStorable a where
-  storeInCacheIndexed :: (HasCache a d, MonadIO m, MonadReader r m, HasBotData d r) => [(CacheIndex a, a)] -> m Bool
+  storeInCacheIndexed :: (HasCache a d, MonadIOBotData m d r) => [(CacheIndex a, a)] -> m Bool
 
 class Cached a => CachedIndexed a where
   cacheIndex :: a -> CacheIndex a
-  storeInCache :: (HasCache a d, MonadIO m, MonadReader r m, HasBotData d r) => [a] -> m Bool
+  storeInCache :: (HasCache a d, MonadIOBotData m d r) => [a] -> m Bool
 
-getFromCache :: (HasCache a d, MonadIO m, MonadReader r m, HasBotData d r, Cached a) => CacheIndex a -> m (Maybe a)
+getFromCache :: (HasCache a d, MonadIOBotData m d r, Cached a) => CacheIndex a -> m (Maybe a)
 getFromCache a = do
   m <- getCacheMap
   return $ m HM.!? a
 
-getCacheMap :: (HasCache a d, MonadIO m, MonadReader r m, HasBotData d r) => m (HM.HashMap (CacheIndex a) a)
+getCacheMap :: (HasCache a d, MonadIOBotData m d r) => m (HM.HashMap (CacheIndex a) a)
 getCacheMap = do
   cache <- getCache
   liftIO $ atomically $ readTVar cache
@@ -57,3 +59,7 @@ assertGoodIndexes [] = pure ()
 assertGoodIndexes ((a,b):as) = do
   assertIO (a == cacheIndex b)
   assertGoodIndexes as
+
+type family HasCaches (as :: [Type]) d :: Constraint where
+  HasCaches '[] d = ()
+  HasCaches (a ': as) d = (HasCache a d, HasCaches as d)

@@ -1,6 +1,7 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE DataKinds #-}
 
 module BowBot.Birthday.Announce where
 
@@ -18,7 +19,7 @@ import BowBot.Discord.Account
 birthdayChannelInfo :: InfoType ChannelId
 birthdayChannelInfo = InfoType { infoName = "birthday_channel", infoDefault = 0, infoParse = readEither }
 
-announceBirthdays :: (MonadIO m, MonadReader r m, HasBotData d r, Has DiscordHandle r, HasCache BirthdayDate d, HasCache BowBotAccount d, HasCache DiscordAccount d, HasCache InfoField d) => m ()
+announceBirthdays :: (MonadIOBotData m d r, Has DiscordHandle r, HasCaches [BirthdayDate, BowBotAccount, DiscordAccount, InfoField] d) => m ()
 announceBirthdays = do
   currentDay <- liftIO currentBirthdayDate
   birthdays <- getBirthdayPeople currentDay

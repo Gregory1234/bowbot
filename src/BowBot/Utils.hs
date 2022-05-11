@@ -1,8 +1,12 @@
 {-# LANGUAGE ViewPatterns #-}
+{-# LANGUAGE ConstraintKinds #-}
+{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE TypeOperators #-}
+{-# LANGUAGE TypeFamilies #-}
 
 module BowBot.Utils(
   module BowBot.Utils, module BowBot.HoistIO, getEnv, for, for_, readMaybe, (<|>), ($>),
-  STM, atomically, TVar, newTVar, readTVar, writeTVar, modifyTVar, pack, unpack,
+  STM, atomically, TVar, newTVar, readTVar, writeTVar, modifyTVar, pack, unpack, Has(..),
   module Data.Char, module Data.List, module Data.List.Split, module Data.Maybe, module Control.Monad.Reader
 ) where
 
@@ -27,6 +31,8 @@ import Data.Char
 import Data.List (sortOn, intercalate, intersperse, isPrefixOf, isSuffixOf, (\\), intersect, find, findIndex)
 import Data.Functor (($>))
 import Data.List.Split (splitOn, chunksOf)
+import Data.Kind (Type, Constraint)
+import Data.Has
 
 dist :: Eq a => [a] -> [a] -> Int
 dist a b =
@@ -106,3 +112,10 @@ discordEscape [] = ""
 discordEscape (x:xs)
   | x `elem` "_*~`>" = '\\':x:discordEscape xs
   | otherwise = x:discordEscape xs
+
+type MonadIOReader m r = (MonadIO m, MonadReader r m)
+type MonadHoistIOReader m r = (MonadIO m, MonadReader r m)
+
+type family HasAll (as :: [Type]) r :: Constraint where
+  HasAll '[] r = ()
+  HasAll (a ': as) r = (Has a r, HasAll as r)

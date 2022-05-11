@@ -23,7 +23,7 @@ data HypixelBowStats = HypixelBowStats
   } deriving (Show)
 
 
-requestHypixelBowStats :: (MonadIO m, MonadReader r m, Has Manager r) => UUID -> m (Maybe HypixelBowStats)
+requestHypixelBowStats :: (MonadIOReader m r, Has Manager r) => UUID -> m (Maybe HypixelBowStats)
 requestHypixelBowStats uuid = hypixelWithPlayerData uuid $ \o -> do
     pl <- o .: "player"
     stats <- pl .: "stats"
