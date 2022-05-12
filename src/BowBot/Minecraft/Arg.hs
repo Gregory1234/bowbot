@@ -1,120 +1,138 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE DataKinds #-}
+{-# LANGUAGE TupleSections #-}
 
 module BowBot.Minecraft.Arg where
 
 import BowBot.Minecraft.Account
-import BowBot.Account.Basic
 import Control.Monad.Except
 import BowBot.Utils
 import qualified Data.HashMap.Strict as HM
 import BowBot.BotData.Cached
-import BowBot.Discord.Utils
 import BowBot.Network.Basic
+import BowBot.Discord.Account
+import BowBot.Discord.Arg
+import BowBot.Account.Basic
+import Discord.Types (UserId)
 
-data MinecraftResponse a = MinecraftResponse { responseType :: MinecraftResponseType, responseAccount :: MinecraftAccount, responseValue :: a }
+data MinecraftResponseTime = CurrentResponse | OldResponse String deriving (Show, Eq)
 
-data MinecraftResponseType
-  = JustResponse
-  | OldResponse String
-  | DidYouMeanResponse
-  | DidYouMeanOldResponse String
+data MinecraftResponseAutocorrect = ResponseAutocorrect | ResponseTrue | ResponseNew deriving (Show, Eq)
+
+data MinecraftResponse = MinecraftResponse
+  { mcResponseTime :: MinecraftResponseTime
+  , mcResponseAutocorrect :: MinecraftResponseAutocorrect
+  , mcResponseAccount :: MinecraftAccount
+  } deriving (Show, Eq)
 
 thePlayerDoesNotExistMessage :: String
 thePlayerDoesNotExistMessage = "*The player doesn't exist!*"
 
-minecraftArgDefault :: (MonadError String m, MonadIOBotData m d r, Has Manager r, HasCaches [MinecraftAccount, BowBotAccount] d) => (MinecraftAccount -> m (Bool, a)) -> Maybe String -> UserId -> m (MinecraftResponse a)
-minecraftArgDefault arg Nothing did = minecraftArgDiscordSelf arg did
-minecraftArgDefault arg (Just (fromPingDiscordUser -> Just did)) _ = minecraftArgDiscord' arg did
-minecraftArgDefault arg (Just name) _ = minecraftArgNoAutocorrect' arg name
+minecraftArgFromCache :: (MonadError String m, MonadIOBotData m d r, HasCache MinecraftAccount d) => String -> m MinecraftAccount
+minecraftArgFromCache name = liftMaybe thePlayerDoesNotExistMessage =<< getMinecraftAccountByCurrentNameFromCache name
 
-minecraftArgNoAutocorrect' :: (MonadError String m, MonadIOBotData m d r, Has Manager r, HasCache MinecraftAccount d) => (MinecraftAccount -> m (Bool, a)) -> String -> m (MinecraftResponse a)
-minecraftArgNoAutocorrect' = minecraftArgNoAutocorrect Nothing
-
-minecraftArgNoAutocorrect :: (MonadError String m, MonadIOBotData m d r, Has Manager r, HasCache MinecraftAccount d) => Maybe String -> (MinecraftAccount -> m (Bool, a)) -> String -> m (MinecraftResponse a)
-minecraftArgNoAutocorrect err arg name = do
-  acc' <- filter ((==map toLower name) . map toLower . head . mcNames) . HM.elems <$> getCacheMap
-  case acc' of
-    [acc] -> do
-      (_, val) <- arg acc
-      return MinecraftResponse { responseType = JustResponse, responseAccount = acc, responseValue = val }
-    _ -> catchError (do
-          uuid <- liftMaybe thePlayerDoesNotExistMessage =<< mcNameToUUID name
-          names <- liftMaybe thePlayerDoesNotExistMessage =<< mcUUIDToNames uuid
-          let acc = MinecraftAccount { mcUUID = uuid, mcNames = names, mcHypixelBow = NotBanned, mcHypixelWatchlist = False }
-          (b, val) <- arg acc
-          let res = MinecraftResponse { responseType = JustResponse, responseAccount = acc, responseValue = val }
-          if not b && isNothing err
-            then minecraftArgAutocorrect Nothing (Just res) arg name
-            else return res
-        ) $ \e -> case err of
-              Nothing -> minecraftArgAutocorrect (Just e) Nothing arg name
-              Just e' -> throwError e'
-
-minecraftArgAutocorrect' :: (MonadError String m, MonadIOBotData m d r, Has Manager r, HasCache MinecraftAccount d) => (MinecraftAccount -> m (Bool, a)) -> String -> m (MinecraftResponse a)
-minecraftArgAutocorrect' = minecraftArgAutocorrect Nothing Nothing
-
-minecraftArgAutocorrect :: (MonadError String m, MonadIOBotData m d r, Has Manager r, HasCache MinecraftAccount d) => Maybe String -> Maybe (MinecraftResponse a) -> (MinecraftAccount -> m (Bool, a)) -> String -> m (MinecraftResponse a)
-minecraftArgAutocorrect err retm arg name = do
+minecraftArgFromCacheAutocorrect :: (MonadError String m, MonadIOBotData m d r, HasCache MinecraftAccount d) => String -> m MinecraftResponse
+minecraftArgFromCacheAutocorrect name = do
   people <- HM.elems <$> getCacheMap
   let process f = let
         nicks = [(mcUUID,u) | MinecraftAccount {..} <- people, u <- f mcNames]
         dists = map (\(u,n) -> ((u, n), dist (map toLower n) (map toLower name))) nicks
           in map fst . sortOn snd . filter (\(_,d) -> d <= 2) $ dists
-  case listToMaybe $ process (take 1) of
-    Just (uuid, n) -> do
-      names <- liftMaybe thePlayerDoesNotExistMessage =<< mcUUIDToNames uuid
-      let acc = MinecraftAccount { mcUUID = uuid, mcNames = names, mcHypixelBow = NotBanned, mcHypixelWatchlist = False }
-      (_, val) <- arg acc
-      let rtype = if map toLower n == map toLower name then JustResponse else DidYouMeanResponse
-      return MinecraftResponse { responseType = rtype, responseAccount = acc, responseValue = val }
-    Nothing -> case listToMaybe $ process (drop 1) of
-      Just (uuid, n) -> do
-        names <- liftMaybe thePlayerDoesNotExistMessage =<< mcUUIDToNames uuid
-        let acc = MinecraftAccount { mcUUID = uuid, mcNames = names, mcHypixelBow = NotBanned, mcHypixelWatchlist = False }
-        (_, val) <- arg acc
-        let rtype = if map toLower n == map toLower name then OldResponse n else DidYouMeanOldResponse n
-        return MinecraftResponse { responseType = rtype, responseAccount = acc, responseValue = val }
-      Nothing -> case (err, retm) of
-        (Nothing, Nothing) -> minecraftArgNoAutocorrect (Just thePlayerDoesNotExistMessage) arg name
-        (Just e', Nothing) -> throwError e'
-        (_, Just ret) -> return ret
+  (uuid, n, mcResponseTime) <- liftMaybe thePlayerDoesNotExistMessage $ listToMaybe
+             ( map (\(uuid, n) -> (uuid, n, CurrentResponse)) (process (take 1))
+            ++ map (\(uuid, n) -> (uuid, n, OldResponse n)) (process (drop 1)))
+  let mcResponseAutocorrect = if map toLower n == map toLower name then ResponseTrue else ResponseAutocorrect
+  mcResponseAccount <- liftMaybe thePlayerDoesNotExistMessage =<< getFromCache uuid
+  return MinecraftResponse {..}
+
+minecraftArgFromNetwork :: (MonadError String m, MonadIOBotData m d r, HasCache MinecraftAccount d, Has Manager r) => String -> m (MinecraftResponseAutocorrect, MinecraftAccount)
+minecraftArgFromNetwork name = orElseError ((ResponseTrue,) <$> minecraftArgFromCache name) $ do
+  mcUUID <- liftMaybe thePlayerDoesNotExistMessage =<< mcNameToUUID name
+  mcNames <- liftMaybe thePlayerDoesNotExistMessage =<< mcUUIDToNames mcUUID
+  return (ResponseNew, MinecraftAccount { mcHypixelBow = NotBanned, mcHypixelWatchlist = False, ..})
+
+minecraftArgFromNetworkAutocorrect :: (MonadError String m, MonadIOBotData m d r, HasCache MinecraftAccount d, Has Manager r) => String -> m MinecraftResponse
+minecraftArgFromNetworkAutocorrect name = flip orElseError (minecraftArgFromCacheAutocorrect name) $ do
+  (mcResponseAutocorrect, mcResponseAccount) <- minecraftArgFromNetwork name
+  return MinecraftResponse { mcResponseTime = CurrentResponse, ..}
+
+data MinecraftConstraintResponse = ResponseGood | ResponseFindBetter deriving (Show, Eq)
+
+minecraftArgConstraintAny :: (MonadError String m) => (String -> m MinecraftResponse) -> (String -> m MinecraftResponse) -> (MinecraftAccount -> m (MinecraftConstraintResponse, a)) -> String -> m (MinecraftResponse, a)
+minecraftArgConstraintAny argnoac argac constraint name = do
+    first <- catchErrorEither noAutocorrect
+    case first of
+      Right (ResponseGood, r, v) -> return (r, v)
+      _ -> do
+        other <- catchErrorEither autocorrect
+        case (first, other) of
+          (Right (_, r, v), Right (ResponseFindBetter, _, _)) -> return (r, v)
+          (Right (_, r, v), Left _) -> return (r, v)
+          (Left e, Left _) -> throwError e
+          (_, Right (_, r, v)) -> return (r, v)
+  where
+    noAutocorrect = do
+      res <- argnoac name
+      (rt, v) <- constraint (mcResponseAccount res)
+      return (rt, res, v)
+    autocorrect = do
+      res <- argac name
+      (rt, v) <- constraint (mcResponseAccount res)
+      return (rt, res, v)
+
+minecraftArgFromCacheConstraint :: (MonadError String m, MonadIOBotData m d r, HasCache MinecraftAccount d) => (MinecraftAccount -> m (MinecraftConstraintResponse, a)) -> String -> m (MinecraftResponse, a)
+minecraftArgFromCacheConstraint = flip minecraftArgConstraintAny minecraftArgFromCacheAutocorrect $ \n -> do
+  mcResponseAccount <- minecraftArgFromCache n
+  return MinecraftResponse { mcResponseTime = CurrentResponse, mcResponseAutocorrect = ResponseTrue, ..}
+
+minecraftArgFromNetworkConstraint :: (MonadError String m, MonadIOBotData m d r, HasCache MinecraftAccount d, Has Manager r) => (MinecraftAccount -> m (MinecraftConstraintResponse, a)) -> String -> m (MinecraftResponse, a)
+minecraftArgFromNetworkConstraint = flip minecraftArgConstraintAny minecraftArgFromCacheAutocorrect $ \n -> do -- note: this is correct
+  (mcResponseAutocorrect, mcResponseAccount) <- minecraftArgFromNetwork n
+  return MinecraftResponse { mcResponseTime = CurrentResponse, ..}
 
 theUserIsntRegisteredMessage :: String
 theUserIsntRegisteredMessage = "*The user isn't registered!*"
 
-minecraftArgDiscord' :: (MonadError String m, MonadIOBotData m d r, HasCaches [BowBotAccount, MinecraftAccount] d) => (MinecraftAccount -> m (Bool, a)) -> UserId -> m (MinecraftResponse a)
-minecraftArgDiscord' = minecraftArgDiscord theUserIsntRegisteredMessage
+minecraftArgFromDiscord :: (MonadError String m, MonadIOBotData m d r, HasCaches '[DiscordAccount, MinecraftAccount, BowBotAccount] d) => String -> m MinecraftAccount
+minecraftArgFromDiscord did = do
+  dacc <- discordArg did
+  bbacc <- liftMaybe theUserIsntRegisteredMessage =<< getBowBotAccountByDiscord (discordId dacc)
+  liftMaybe theUserIsntRegisteredMessage =<< getFromCache (accountSelectedMinecraft bbacc)
 
 youArentRegisteredMessage :: String
 youArentRegisteredMessage = "*You aren't registered! To register, type `?register yourign`.*"
 
-minecraftArgDiscordSelf :: (MonadError String m, MonadIOBotData m d r, HasCaches [BowBotAccount, MinecraftAccount] d) => (MinecraftAccount -> m (Bool, a)) -> UserId -> m (MinecraftResponse a)
-minecraftArgDiscordSelf = minecraftArgDiscord youArentRegisteredMessage
+minecraftArgFromDiscordSelf :: (MonadError String m, MonadIOBotData m d r, HasCaches '[DiscordAccount, MinecraftAccount, BowBotAccount] d) => UserId -> m MinecraftAccount
+minecraftArgFromDiscordSelf did = do
+  dacc <- discordArgSelf did
+  bbacc <- liftMaybe youArentRegisteredMessage =<< getBowBotAccountByDiscord (discordId dacc)
+  liftMaybe youArentRegisteredMessage =<< getFromCache (accountSelectedMinecraft bbacc)
 
-minecraftArgDiscord :: (MonadError String m, MonadIOBotData m d r, HasCaches [BowBotAccount, MinecraftAccount] d) => String -> (MinecraftAccount -> m (Bool, a)) -> UserId -> m (MinecraftResponse a)
-minecraftArgDiscord err arg did = do
-  bbacc <- liftMaybe err =<< getBowBotAccountByDiscord did
-  acc <- liftMaybe thePlayerDoesNotExistMessage =<< getFromCache (accountSelectedMinecraft bbacc)
-  (_, val) <- arg acc
-  return MinecraftResponse { responseType = JustResponse, responseAccount = acc, responseValue = val }
+minecraftArgFull :: (MonadError String m, MonadIOBotData m d r, HasCaches '[DiscordAccount, MinecraftAccount, BowBotAccount] d, Has Manager r) => UserId -> Maybe String -> m MinecraftResponse
+minecraftArgFull did Nothing = do
+  mcResponseAccount <- minecraftArgFromDiscordSelf did
+  return MinecraftResponse { mcResponseTime = CurrentResponse, mcResponseAutocorrect = ResponseTrue, ..}
+minecraftArgFull _ (Just name) = flip orElseError (minecraftArgFromNetworkAutocorrect name) $ do
+  mcResponseAccount <- minecraftArgFromDiscord name
+  return MinecraftResponse { mcResponseTime = CurrentResponse, mcResponseAutocorrect = ResponseTrue, ..}
 
-showMinecraftAccount :: MinecraftResponseType -> MinecraftAccount -> String
-showMinecraftAccount JustResponse MinecraftAccount {..} = head mcNames
+minecraftArgFullConstraint :: (MonadError String m, MonadIOBotData m d r, HasCaches '[DiscordAccount, MinecraftAccount, BowBotAccount] d, Has Manager r) => (MinecraftAccount -> m (MinecraftConstraintResponse, a)) -> UserId -> Maybe String -> m (MinecraftResponse, a)
+minecraftArgFullConstraint constraint did Nothing = do
+  mcResponseAccount <- minecraftArgFromDiscordSelf did
+  (_, v) <- constraint mcResponseAccount
+  return (MinecraftResponse { mcResponseTime = CurrentResponse, mcResponseAutocorrect = ResponseTrue, ..}, v)
+minecraftArgFullConstraint constraint _ (Just name) = flip orElseError (minecraftArgFromNetworkConstraint constraint name) $ do
+  mcResponseAccount <- minecraftArgFromDiscord name
+  (_, v) <- constraint mcResponseAccount
+  return (MinecraftResponse { mcResponseTime = CurrentResponse, mcResponseAutocorrect = ResponseTrue, ..}, v)
+
+
+showMinecraftAccount :: MinecraftResponseTime -> MinecraftAccount -> String
+showMinecraftAccount CurrentResponse MinecraftAccount {..} = head mcNames
 showMinecraftAccount (OldResponse o) MinecraftAccount {..} = o ++ " (" ++ head mcNames ++ ")"
-showMinecraftAccount DidYouMeanResponse MinecraftAccount {..} = head mcNames
-showMinecraftAccount (DidYouMeanOldResponse o) MinecraftAccount {..} = o ++ " (" ++ head mcNames ++ ")"
 
-showMinecraftAccountDiscord :: MinecraftResponseType -> MinecraftAccount -> String
-showMinecraftAccountDiscord JustResponse MinecraftAccount {..} = "**" ++ discordEscape (head mcNames) ++ "**"
+showMinecraftAccountDiscord :: MinecraftResponseTime -> MinecraftAccount -> String
+showMinecraftAccountDiscord CurrentResponse MinecraftAccount {..} = "**" ++ discordEscape (head mcNames) ++ "**"
 showMinecraftAccountDiscord (OldResponse o) MinecraftAccount {..} = "**" ++ discordEscape o ++ "** (" ++ discordEscape (head mcNames) ++ ")"
-showMinecraftAccountDiscord DidYouMeanResponse MinecraftAccount {..} = "**" ++ discordEscape (head mcNames) ++ "**"
-showMinecraftAccountDiscord (DidYouMeanOldResponse o) MinecraftAccount {..} = "**" ++ discordEscape o ++ "** (" ++ discordEscape (head mcNames) ++ ")"
-
-isDidYouMean :: MinecraftResponseType -> Bool
-isDidYouMean DidYouMeanResponse = True
-isDidYouMean (DidYouMeanOldResponse _) = True
-isDidYouMean _ = False

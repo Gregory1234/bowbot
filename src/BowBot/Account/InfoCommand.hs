@@ -20,10 +20,10 @@ infoCommand = Command CommandInfo
   , commandHelpEntries = [HelpEntry { helpUsage = "i [name]", helpDescription = "show info about a player", helpGroup = "normal" }]
   , commandPerms = DefaultLevel
   , commandTimeout = 15
-  } $ oneOptionalArgument (\s -> lift (envs envSender) >>= accountArgDefault s . userId) $ \AccountResponse { accResponseAccount = BowBotAccount {..}, ..} -> do
-    let (didYouMean, renderedName) = case accResponseCause of
-          (Left acc) -> ("", showDiscordAccountDiscord acc)
-          (Right (typ, acc)) -> (if isDidYouMean typ then "*Did you mean* " else "", showMinecraftAccountDiscord typ acc)
+  } $ oneOptionalArgument (\s -> lift (envs envSender) >>= flip accountArgFull s . userId) $ \AccountResponse { accResponseAccount = BowBotAccount {..}, ..} -> do
+    let (didYouMean, renderedName) = case accResponseType of
+          (AccountDiscordResponse acc) -> ("", showDiscordAccountDiscord acc)
+          (AccountMinecraftResponse MinecraftResponse {..}) -> (if mcResponseAutocorrect == ResponseAutocorrect then "*Did you mean* " else "", showMinecraftAccountDiscord mcResponseTime mcResponseAccount)
     mc <- getCacheMap
     dc <- getCacheMap
     let mcAccs = unlines $ map (\uuid -> let MinecraftAccount {..} = mc HM.! uuid in (if mcUUID == accountSelectedMinecraft then "*" else " ") ++ head mcNames ++ " (" ++ uuidString mcUUID ++ ")") accountMinecrafts

@@ -10,6 +10,7 @@ import BowBot.Hypixel.Leaderboard
 import BowBot.Minecraft.Arg
 import BowBot.Minecraft.Account
 import BowBot.Account.Basic
+import BowBot.Account.Arg
 import Control.Monad.Except
 import BowBot.Minecraft.Basic
 import Discord.Types
@@ -17,10 +18,11 @@ import BowBot.BotData.Cached
 import BowBot.Discord.Utils
 import qualified Data.HashMap.Strict as HM
 import Data.Either (isRight)
+import BowBot.Discord.Account
 
 data LeaderboardType = LeaderboardType { leaderboardName :: String, leaderboardStatName :: String, leaderboardParser :: HypixelBowLeaderboardEntry -> Maybe (Integer, String) }
 
-data LeaderboardResponse = LeaderboardPage Int | LeaderboardFind MinecraftResponseType String | LeaderboardAll
+data LeaderboardResponse = LeaderboardPage Int | LeaderboardFind MinecraftResponseTime MinecraftResponseAutocorrect String | LeaderboardAll
 
 thePlayerIsntOnThisLeaderboardMessage :: String
 thePlayerIsntOnThisLeaderboardMessage = "*The player isn't on this leaderboard!*"
@@ -38,26 +40,27 @@ leaderboardArgument :: (HypixelBowLeaderboardEntry -> Maybe (Integer, String)) -
 leaderboardArgument _ (Just "all") = do
   acc <- lift (envs envSender) >>= getBowBotAccountByDiscord . userId
   return (LeaderboardAll, maybe [] accountMinecrafts acc)
-leaderboardArgument _ (Just (readMaybe -> Just pagenum)) = do
+leaderboardArgument _ (Just (readMaybe -> Just pagenum)) = do -- TODO: big numbers could be discord ids...
   acc <- lift (envs envSender) >>= getBowBotAccountByDiscord . userId
   return (LeaderboardPage (pagenum - 1), maybe [] accountMinecrafts acc)
-leaderboardArgument leaderboardParser Nothing = do
-  acc <- lift (envs envSender) >>= getBowBotAccountByDiscord . userId
-  onLb <- filterAccountsOnLeaderboard leaderboardParser (maybe [] accountMinecrafts acc)
+leaderboardArgument leaderboardParser maybename = do
   names <- getCacheMap
-  if null onLb
-    then return (LeaderboardPage 0, [])
-    else return (LeaderboardFind JustResponse (head $ mcNames $ names HM.! accountSelectedMinecraft (fromJust acc)), onLb)
-leaderboardArgument leaderboardParser (Just (fromPingDiscordUser -> Just did)) = do
-  acc <- liftMaybe theUserIsntRegisteredMessage =<< getBowBotAccountByDiscord did
-  onLb <- filterAccountsOnLeaderboard leaderboardParser (accountMinecrafts acc)
-  names <- getCacheMap
-  when (null onLb) $ throwError thePlayerIsntOnThisLeaderboardMessage
-  return (LeaderboardFind JustResponse (head $ mcNames $ names HM.! accountSelectedMinecraft acc), onLb)
-leaderboardArgument leaderboardParser (Just name) = do
-  let helper MinecraftAccount {..} = throwUnlessAccountOnLeaderboard leaderboardParser mcUUID $> (True, ())
-  MinecraftResponse {..} <- minecraftArgAutocorrect' helper name
-  return (LeaderboardFind responseType (head $ mcNames responseAccount), [mcUUID responseAccount])
+  mcOrDc <- lift (envs envSender) >>= flip noAccountArgFull maybename . userId
+  case (maybename, mcOrDc) of
+    (Nothing, AccountDiscordResponse dc) -> do
+      acc <- getBowBotAccountByDiscord (discordId dc)
+      onLb <- filterAccountsOnLeaderboard leaderboardParser (maybe [] accountMinecrafts acc)
+      if null onLb
+        then return (LeaderboardPage 0, [])
+        else return (LeaderboardFind CurrentResponse ResponseTrue (head $ mcNames $ names HM.! accountSelectedMinecraft (fromJust acc)), onLb)
+    (Just _, AccountDiscordResponse dc) -> do
+      acc <- liftMaybe theUserIsntRegisteredMessage =<< getBowBotAccountByDiscord (discordId dc)
+      onLb <- filterAccountsOnLeaderboard leaderboardParser (accountMinecrafts acc)
+      when (null onLb) $ throwError thePlayerIsntOnThisLeaderboardMessage
+      return (LeaderboardFind CurrentResponse ResponseTrue (head $ mcNames $ names HM.! accountSelectedMinecraft acc), onLb)
+    (_, AccountMinecraftResponse MinecraftResponse {..}) -> do
+      throwUnlessAccountOnLeaderboard leaderboardParser (mcUUID mcResponseAccount)
+      return (LeaderboardFind mcResponseTime mcResponseAutocorrect (head $ mcNames mcResponseAccount), [mcUUID mcResponseAccount])
 
 generateLeaderboardLines :: LeaderboardType -> [UUID] -> CommandHandler [(UUID, String)]
 generateLeaderboardLines LeaderboardType {..} selected = do
@@ -79,12 +82,11 @@ leaderboardCommand lbt@LeaderboardType {..} name = Command CommandInfo
       respond $ if pagenum < 0 || pagenum >= length pages
         then "*Wrong page number, it has to be between **1** and **" ++ show (length pages) ++ "**.*"
         else leaderboardName ++ " (page **" ++ show (pagenum + 1) ++ "/" ++ show (length pages) ++ "**):\n```\n" ++ unlines (pages !! pagenum) ++ "```"
-    (LeaderboardFind rt nm, selected) -> do
-      let didYouMean = case rt of
-            JustResponse -> ""
-            OldResponse _ -> ""
-            DidYouMeanResponse -> "*Did you mean* **" ++ discordEscape nm ++ "**:\n"
-            DidYouMeanOldResponse o -> "*Did you mean* **" ++ discordEscape o ++ "** (" ++ discordEscape nm ++ "):"
+    (LeaderboardFind rt ra nm, selected) -> do
+      let didYouMean = case (rt, ra) of
+            (CurrentResponse, ResponseAutocorrect) -> "*Did you mean* **" ++ discordEscape nm ++ "**:\n"
+            (OldResponse o, ResponseAutocorrect) -> "*Did you mean* **" ++ discordEscape o ++ "** (" ++ discordEscape nm ++ "):"
+            (_, _) -> ""
       lb <- generateLeaderboardLines lbt selected
       let pages = chunksOf 20 lb
       let pagenum = fromJust $ findIndex (any ((`elem` selected) . fst)) pages

@@ -1,56 +1,49 @@
 {-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE DataKinds #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TupleSections #-}
 
 module BowBot.Account.Arg where
 
 import BowBot.Minecraft.Account
 import BowBot.Discord.Account
 import BowBot.Account.Basic
-import qualified Data.HashMap.Strict as HM
 import BowBot.Discord.Utils
 import BowBot.BotData.Cached
 import Control.Monad.Except
 import BowBot.Minecraft.Arg
+import BowBot.Discord.Arg
+import BowBot.Network.Basic (Manager)
 
-data AccountResponse = AccountResponse { accResponseCause :: Either DiscordAccount (MinecraftResponseType, MinecraftAccount), accResponseAccount :: BowBotAccount }
+data AccountResponseType = AccountMinecraftResponse MinecraftResponse | AccountDiscordResponse DiscordAccount
 
-accountArgDefault :: (MonadError String m, MonadIOBotData m d r, HasCaches [MinecraftAccount, DiscordAccount, BowBotAccount] d) => Maybe String -> UserId -> m AccountResponse
-accountArgDefault Nothing did = accountArgDiscordSelf did
-accountArgDefault (Just (fromPingDiscordUser -> Just did)) _ = accountArgDiscord' did
-accountArgDefault (Just name) _ = accountArgName name
+data AccountResponse = AccountResponse { accResponseType :: AccountResponseType, accResponseAccount :: BowBotAccount }
+
+noAccountArg :: (MonadError String m, MonadIOBotData m d r, HasCaches '[DiscordAccount, MinecraftAccount] d, Has Manager r) => String -> m AccountResponseType
+noAccountArg name = (AccountDiscordResponse <$> discordArg name) `orElseError` (AccountMinecraftResponse <$> minecraftArgFromNetworkAutocorrect name)
+
+noAccountArgFull :: (MonadError String m, MonadIOBotData m d r, HasCaches '[DiscordAccount, MinecraftAccount] d, Has Manager r) => UserId -> Maybe String -> m AccountResponseType
+noAccountArgFull did Nothing = AccountDiscordResponse <$> discordArgSelf did
+noAccountArgFull _ (Just name) = noAccountArg name
 
 thePlayerIsntRegisteredMessage :: String
 thePlayerIsntRegisteredMessage = "*The player isn't registered!*"
 
-accountArgName :: (MonadError String m, MonadIOBotData m d r, HasCaches [MinecraftAccount, BowBotAccount] d) => String -> m AccountResponse
-accountArgName name = do
-  people <- HM.elems <$> getCacheMap
-  let process f = let
-        nicks = [(acc,u) | acc@MinecraftAccount {..} <- people, u <- f mcNames]
-        dists = map (\(u,n) -> ((u, n), dist (map toLower n) (map toLower name))) nicks
-          in map fst . sortOn snd . filter (\(_,d) -> d <= 2) $ dists
-  case listToMaybe $ process (take 1) of
-    Just (acc, n) -> do
-      bacc <- liftMaybe thePlayerIsntRegisteredMessage =<< getBowBotAccountByMinecraft (mcUUID acc)
-      let rtype = if map toLower n == map toLower name then JustResponse else DidYouMeanResponse
-      return AccountResponse { accResponseCause = Right (rtype, acc), accResponseAccount = bacc }
-    Nothing -> case listToMaybe $ process (drop 1) of
-      Just (acc, n) -> do
-        bacc <- liftMaybe thePlayerIsntRegisteredMessage =<< getBowBotAccountByMinecraft (mcUUID acc)
-        let rtype = if map toLower n == map toLower name then OldResponse n else DidYouMeanOldResponse n
-        return AccountResponse { accResponseCause = Right (rtype, acc), accResponseAccount = bacc }
-      Nothing -> throwError thePlayerIsntRegisteredMessage
+accountArg :: (MonadError String m, MonadIOBotData m d r, HasCaches '[DiscordAccount, MinecraftAccount, BowBotAccount] d) => String -> m AccountResponse
+accountArg name = (do
+  dacc <- discordArg name
+  acc <- liftMaybe theUserIsntRegisteredMessage =<< getBowBotAccountByDiscord (discordId dacc)
+  return AccountResponse { accResponseType = AccountDiscordResponse dacc, accResponseAccount = acc }) `orElseError` (do
+    (res, acc) <- flip minecraftArgFromCacheConstraint name $ \MinecraftAccount {..} -> fmap (ResponseGood,) $ liftMaybe thePlayerIsntRegisteredMessage =<< getBowBotAccountByMinecraft mcUUID
+    return AccountResponse { accResponseType = AccountMinecraftResponse res, accResponseAccount = acc })
 
-accountArgDiscord' :: (MonadError String m, MonadIOBotData m d r, HasCaches [DiscordAccount, BowBotAccount] d) => UserId -> m AccountResponse
-accountArgDiscord' = accountArgDiscord theUserIsntRegisteredMessage
+accountArgSelf :: (MonadError String m, MonadIOBotData m d r, HasCaches '[DiscordAccount, BowBotAccount] d) => UserId -> m AccountResponse
+accountArgSelf did = do
+  dacc <- discordArgSelf did
+  accResponseAccount <- liftMaybe youArentRegisteredMessage =<< getBowBotAccountByDiscord (discordId dacc)
+  return AccountResponse { accResponseType = AccountDiscordResponse dacc, ..}
 
-accountArgDiscordSelf :: (MonadError String m, MonadIOBotData m d r, HasCaches [DiscordAccount, BowBotAccount] d) => UserId -> m AccountResponse
-accountArgDiscordSelf = accountArgDiscord youArentRegisteredMessage
-
-accountArgDiscord :: (MonadError String m, MonadIOBotData m d r, HasCaches [DiscordAccount, BowBotAccount] d) => String -> UserId -> m AccountResponse
-accountArgDiscord err did = do
-  bacc <- liftMaybe err =<< getBowBotAccountByDiscord did
-  dacc <- liftMaybe err =<< getFromCache did
-  return AccountResponse { accResponseCause = Left dacc, accResponseAccount = bacc }
+accountArgFull :: (MonadError String m, MonadIOBotData m d r, HasCaches '[DiscordAccount, MinecraftAccount, BowBotAccount] d) => UserId -> Maybe String -> m AccountResponse
+accountArgFull did Nothing = accountArgSelf did
+accountArgFull _ (Just name) = accountArg name

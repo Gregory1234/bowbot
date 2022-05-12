@@ -8,9 +8,14 @@ import Control.Monad.Error.Class
 import BowBot.Discord.Account
 import BowBot.Discord.Utils
 
-
+discordAccFull :: (MonadIOBotData m d r, HasCache DiscordAccount d, MonadError String m) => UserId -> Maybe String -> m DiscordAccount
+discordAccFull did Nothing = discordArgSelf did
+discordAccFull _ (Just did) = discordArg did
 
 discordArg :: (MonadIOBotData m d r, HasCache DiscordAccount d, MonadError String m) => String -> m DiscordAccount
 discordArg (readMaybe -> Just did) = liftMaybe "*The discord id doesn't exist!*" =<< getFromCache did
 discordArg (fromPingDiscordUser -> Just did) = liftMaybe "*The discord id doesn't exist!*" =<< getFromCache did
 discordArg _ = throwError "*The discord id is invalid!*"
+
+discordArgSelf :: (MonadIOBotData m d r, HasCache DiscordAccount d, MonadError String m) => UserId -> m DiscordAccount
+discordArgSelf did = liftMaybe "*The discord id doesn't exist!*" =<< getFromCache did

@@ -119,3 +119,6 @@ type MonadHoistIOReader m r = (MonadIO m, MonadReader r m)
 type family HasAll (as :: [Type]) r :: Constraint where
   HasAll '[] r = ()
   HasAll (a ': as) r = (Has a r, HasAll as r)
+
+orElseError :: (MonadError e m) => m a -> m a -> m a
+orElseError a b = catchError a $ const b

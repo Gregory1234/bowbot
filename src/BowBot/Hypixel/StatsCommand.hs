@@ -14,7 +14,7 @@ import BowBot.BotData.Counter
 import Control.Monad.Error.Class (throwError)
 import Discord.Types
 import BowBot.Hypixel.Leaderboard
-import BowBot.BotData.Cached (storeInCacheIndexed, getFromCache, storeInCache)
+import BowBot.BotData.Cached (storeInCacheIndexed, storeInCache)
 import BowBot.BotData.Info
 import BowBot.Discord.Roles
 import BowBot.Account.Basic
@@ -26,19 +26,15 @@ hypixelStatsCommand src name desc = Command CommandInfo
   , commandHelpEntries = [HelpEntry { helpUsage = name ++ " [name]", helpDescription = desc, helpGroup = "normal" }]
   , commandPerms = DefaultLevel
   , commandTimeout = 15
-  } $ oneOptionalArgument (\s -> lift (envs envSender) >>= minecraftArgDefault helper s . userId) $ \MinecraftResponse {responseAccount = responseAccount@MinecraftAccount {..}, ..} -> do
-    let (didYouMean, renderedName) = (if isDidYouMean responseType then "*Did you mean* " else "", showMinecraftAccountDiscord responseType responseAccount)
+  } $ oneOptionalArgument (\s -> lift (envs envSender) >>= flip (minecraftArgFullConstraint helper) s . userId) $ \(MinecraftResponse {mcResponseAccount = mcResponseAccount@MinecraftAccount {..}, ..}, stats) -> do
+    let (didYouMean, renderedName) = (if mcResponseAutocorrect == ResponseAutocorrect then "*Did you mean* " else "", showMinecraftAccountDiscord mcResponseTime mcResponseAccount)
     user <- envs envSender
     settings <- getSettingsFromSource src (userId user)
-    respond $ didYouMean ++ renderedName ++ ":\n" ++ showHypixelBowStats settings responseValue
-    saved <- getFromCache mcUUID
-    case saved of
-      Nothing | bowWins responseValue >= 50 -> do
-        a <- storeInCache [responseAccount]
-        when a $ void $ storeInCacheIndexed [(mcUUID, hypixelBowStatsToLeaderboards responseValue)]
-      Just MinecraftAccount { mcHypixelBow = NotBanned } -> do
-        void $ storeInCacheIndexed [(mcUUID, hypixelBowStatsToLeaderboards responseValue)]
-      _ -> pure ()
+    respond $ didYouMean ++ renderedName ++ ":\n" ++ showHypixelBowStats settings stats
+    when (bowWins stats >= 50 && mcResponseAutocorrect == ResponseNew) $ do
+      a <- storeInCache [mcResponseAccount]
+      when a $ void $ storeInCacheIndexed [(mcUUID, hypixelBowStatsToLeaderboards stats)]
+    when (mcResponseAutocorrect == ResponseTrue) $ void $ storeInCacheIndexed [(mcUUID, hypixelBowStatsToLeaderboards stats)]
     gid <- askInfo discordGuildIdInfo
     gmems <- discordGuildMembers gid
     acc' <- getBowBotAccountByMinecraft mcUUID
@@ -49,5 +45,5 @@ hypixelStatsCommand src name desc = Command CommandInfo
       case cv of
         Nothing -> do
           stats <- liftMaybe "*The player has never joined Hypixel!*" =<< requestHypixelBowStats mcUUID
-          return (bowWins stats + bowLosses stats /= 0, stats)
+          return (if bowWins stats + bowLosses stats /= 0 then ResponseGood else ResponseFindBetter, stats)
         Just sec -> throwError $ "*Too many requests! Wait another " ++ show sec ++ " seconds!*"

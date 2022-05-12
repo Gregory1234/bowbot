@@ -15,5 +15,5 @@ urlCommand name desc url = Command CommandInfo
   , commandHelpEntries = [HelpEntry { helpUsage = name ++ " [name]", helpDescription = desc, helpGroup = "normal" }]
   , commandPerms = DefaultLevel
   , commandTimeout = 15
-  } $ oneOptionalArgument (\s -> lift (envs envSender) >>= minecraftArgDefault (const $ return (True, ())) s . userId) $ \MinecraftResponse {responseAccount = MinecraftAccount {..}} -> do
+  } $ oneOptionalArgument (\s -> lift (envs envSender) >>= flip minecraftArgFull s . userId) $ \MinecraftResponse {mcResponseAccount = MinecraftAccount {..}} -> do
     respond $ url mcUUID
