@@ -3,6 +3,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE TupleSections #-}
+{-# LANGUAGE ViewPatterns #-}
 
 module BowBot.Minecraft.Arg where
 
@@ -15,6 +16,7 @@ import BowBot.Network.Basic
 import BowBot.Discord.Account
 import BowBot.Discord.Arg
 import BowBot.Account.Basic
+import BowBot.Minecraft.Basic
 import Discord.Types (UserId)
 
 data MinecraftResponseTime = CurrentResponse | OldResponse String deriving (Show, Eq)
@@ -31,9 +33,11 @@ thePlayerDoesNotExistMessage :: String
 thePlayerDoesNotExistMessage = "*The player doesn't exist!*"
 
 minecraftArgFromCache :: (MonadError String m, MonadIOBotData m d r, HasCache MinecraftAccount d) => String -> m MinecraftAccount
+minecraftArgFromCache (uuidFromString -> Just uuid) = liftMaybe thePlayerDoesNotExistMessage =<< getFromCache uuid
 minecraftArgFromCache name = liftMaybe thePlayerDoesNotExistMessage =<< getMinecraftAccountByCurrentNameFromCache name
 
 minecraftArgFromCacheAutocorrect :: (MonadError String m, MonadIOBotData m d r, HasCache MinecraftAccount d) => String -> m MinecraftResponse
+minecraftArgFromCacheAutocorrect (uuidFromString -> Just uuid) = fmap (MinecraftResponse CurrentResponse ResponseTrue) $ liftMaybe thePlayerDoesNotExistMessage =<< getFromCache uuid
 minecraftArgFromCacheAutocorrect name = do
   people <- HM.elems <$> getCacheMap
   let process f = let
@@ -49,7 +53,9 @@ minecraftArgFromCacheAutocorrect name = do
 
 minecraftArgFromNetwork :: (MonadError String m, MonadIOBotData m d r, HasCache MinecraftAccount d, Has Manager r) => String -> m (MinecraftResponseAutocorrect, MinecraftAccount)
 minecraftArgFromNetwork name = orElseError ((ResponseTrue,) <$> minecraftArgFromCache name) $ do
-  mcUUID <- liftMaybe thePlayerDoesNotExistMessage =<< mcNameToUUID name
+  mcUUID <- case name of
+    (uuidFromString -> Just uuid) -> return uuid
+    _ -> liftMaybe thePlayerDoesNotExistMessage =<< mcNameToUUID name
   mcNames <- liftMaybe thePlayerDoesNotExistMessage =<< mcUUIDToNames mcUUID
   return (ResponseNew, MinecraftAccount { mcHypixelBow = NotBanned, mcHypixelWatchlist = False, ..})
 
