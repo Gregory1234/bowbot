@@ -128,9 +128,11 @@ minecraftArgFromNetworkAutocorrectWithDiscordName name = flip orElseError (minec
   return MinecraftResponse { mcResponseTime = CurrentResponse, ..}
 
 minecraftArgFromNetworkConstraintWithDiscordName :: (MonadError String m, MonadIOBotData m d r, HasCaches '[DiscordAccount, MinecraftAccount, BowBotAccount] d, Has Manager r) => (MinecraftAccount -> m (MinecraftConstraintResponse, a)) -> String -> m (MinecraftResponse, a)
-minecraftArgFromNetworkConstraintWithDiscordName = flip minecraftArgConstraintAny minecraftArgFromCacheAutocorrect $ \n -> do -- note: this is correct
-  (mcResponseAutocorrect, mcResponseAccount) <- minecraftArgFromNetwork n `orElseError` ((ResponseTrue,) <$> minecraftArgFromDiscordName n)
-  return MinecraftResponse { mcResponseTime = CurrentResponse, ..}
+minecraftArgFromNetworkConstraintWithDiscordName = minecraftArgConstraintAny (\n -> do -- note: this is correct
+  (mcResponseAutocorrect, mcResponseAccount) <- minecraftArgFromNetwork n
+  return MinecraftResponse { mcResponseTime = CurrentResponse, ..}) (\n -> flip orElseError (minecraftArgFromCacheAutocorrect n) $ do
+    mcResponseAccount <- minecraftArgFromDiscordName n
+    return MinecraftResponse { mcResponseTime = CurrentResponse, mcResponseAutocorrect = ResponseTrue, ..})
 
 minecraftArgFull :: (MonadError String m, MonadIOBotData m d r, HasCaches '[DiscordAccount, MinecraftAccount, BowBotAccount] d, Has Manager r) => UserId -> Maybe String -> m MinecraftResponse
 minecraftArgFull did Nothing = do
