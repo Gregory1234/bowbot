@@ -14,7 +14,7 @@ import BowBot.BotData.Counter
 import Control.Monad.Error.Class (throwError)
 import Discord.Types
 import BowBot.Hypixel.Leaderboard
-import BowBot.BotData.Cached (storeInCacheIndexed, storeInCache)
+import BowBot.BotData.Cached (storeInCacheIndexed, storeInCache, getFromCache)
 import BowBot.BotData.Info
 import BowBot.Discord.Roles
 import BowBot.Account.Basic
@@ -45,5 +45,6 @@ hypixelStatsCommand src name desc = Command CommandInfo
       case cv of
         Nothing -> do
           stats <- liftMaybe "*The player has never joined Hypixel!*" =<< requestHypixelBowStats mcUUID
-          return (if bowWins stats + bowLosses stats /= 0 then ResponseGood else ResponseFindBetter, stats)
+          oldstats <- getFromCache mcUUID
+          return (if bowWins stats + bowLosses stats /= 0 then ResponseGood else ResponseFindBetter, completeHypixelBowStats stats oldstats)
         Just sec -> throwError $ "*Too many requests! Wait another " ++ show sec ++ " seconds!*"

@@ -12,10 +12,31 @@ import BowBot.Utils
 import BowBot.Hypixel.Division
 import Data.Ratio ((%))
 
+data CachedMaybe a = NewJust a | CachedJust a | CachedNothing deriving (Show, Eq)
+
+isCachedNothing :: CachedMaybe a -> Bool
+isCachedNothing CachedNothing = True
+isCachedNothing _ = False
+
+isAnyJust :: CachedMaybe a -> Bool
+isAnyJust = not . isCachedNothing
+
+cachedMaybe :: a -> (b -> a) -> (b -> a) -> CachedMaybe b -> a
+cachedMaybe n _ _ CachedNothing = n
+cachedMaybe _ f _ (NewJust a) = f a
+cachedMaybe _ _ f (CachedJust a) = f a
+
+completeCachedMaybe :: CachedMaybe a -> Maybe a -> CachedMaybe a
+completeCachedMaybe CachedNothing (Just a) = CachedJust a
+completeCachedMaybe c _ = c
+
+cachedToMaybe :: CachedMaybe a -> Maybe a
+cachedToMaybe = cachedMaybe Nothing Just Just
+
 data HypixelBowStats = HypixelBowStats
   { bowWins :: Integer,
     bowLosses :: Integer,
-    bestWinstreak :: Maybe Integer,
+    bestWinstreak :: CachedMaybe Integer,
     currentWinstreak :: Maybe Integer,
     bestDailyWinstreak :: Maybe Integer,
     bowHits :: Integer,
@@ -30,9 +51,9 @@ requestHypixelBowStats uuid = hypixelWithPlayerData uuid $ \o -> do
     duelsStats <- stats .:? "Duels"
     bowWins <- fromMaybe 0 <$> for duelsStats (\x -> x .:? "bow_duel_wins" .!= 0)
     bowLosses <- fromMaybe 0 <$> for duelsStats (\x -> x .:? "bow_duel_losses" .!= 0)
-    bestWinstreak <- (\a -> if a == Just 0 && bowWins > 0 then Nothing else a) <$> for duelsStats (\x -> x .:? "best_winstreak_mode_bow_duel" .!= 0)
-    currentWinstreak <- (\a -> if isNothing bestWinstreak then Nothing else a) <$> for duelsStats (\x -> x .:? "current_bow_winstreak" .!= 0)
-    bestDailyWinstreak <- (\a -> if isNothing bestWinstreak then Nothing else a) <$> for duelsStats (\x -> x .:? "duels_winstreak_best_bow_duel" .!= 0)
+    bestWinstreak <- (\a -> if a == Just 0 && bowWins > 0 then CachedNothing else maybe CachedNothing NewJust a) <$> for duelsStats (\x -> x .:? "best_winstreak_mode_bow_duel" .!= 0)
+    currentWinstreak <- (\a -> if isCachedNothing bestWinstreak then Nothing else a) <$> for duelsStats (\x -> x .:? "current_bow_winstreak" .!= 0)
+    bestDailyWinstreak <- (\a -> if isCachedNothing bestWinstreak then Nothing else a) <$> for duelsStats (\x -> x .:? "duels_winstreak_best_bow_duel" .!= 0)
     bowHits <- fromMaybe 0 <$> for duelsStats (\x -> x .:? "bow_duel_bow_hits" .!= 0)
     bowShots <- fromMaybe 0 <$> for duelsStats (\x -> x .:? "bow_duel_bow_shots" .!= 0)
     return HypixelBowStats {..}
@@ -58,9 +79,9 @@ showHypixelBowStats Settings {..} HypixelBowStats {..} = unlines $ catMaybes
   ++ " WLR:* **"
   ++ winsRemaining
   ++ "**"
-  , onlyIf (sense sBestStreak (isJust bestWinstreak))
+  , onlyIf (sense sBestStreak (isAnyJust bestWinstreak))
   $ " - *Best Bow Duels Winstreak:* **"
-  ++ maybe "API DISABLED" show bestWinstreak
+  ++ cachedMaybe "API DISABLED" show ((++" (CACHED)") . show) bestWinstreak
   ++ "**"
   , onlyIf (sense sCurrentStreak (isJust currentWinstreak))
   $ " - *Current Bow Duels Winstreak:* **"

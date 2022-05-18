@@ -39,7 +39,7 @@ instance Cached HypixelBowLeaderboardEntry where
 
 hypixelBowStatsToLeaderboards :: HypixelBowStats -> HypixelBowLeaderboardEntry
 hypixelBowStatsToLeaderboards HypixelBowStats {..} = HypixelBowLeaderboardEntry
-  { bowLbWins = bowWins, bowLbLosses = bowLosses, bowLbWinstreak = bestWinstreak }
+  { bowLbWins = bowWins, bowLbLosses = bowLosses, bowLbWinstreak = cachedToMaybe bestWinstreak }
 
 instance CachedStorable HypixelBowLeaderboardEntry where
   storeInCacheIndexed accs = do
@@ -73,3 +73,7 @@ updateHypixelLeaderboardCache = do
     wait
     liftIO $ fmap concat $ for chunked $ \chunk -> mapConcurrently (fmap (`runReaderT` ctx) helper) chunk
   void $ storeInCacheIndexed updatedAccounts
+
+completeHypixelBowStats :: HypixelBowStats -> Maybe HypixelBowLeaderboardEntry -> HypixelBowStats
+completeHypixelBowStats s Nothing = s
+completeHypixelBowStats s (Just HypixelBowLeaderboardEntry {..}) = s { bestWinstreak = bestWinstreak s `completeCachedMaybe` bowLbWinstreak}
