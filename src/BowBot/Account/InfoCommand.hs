@@ -27,5 +27,5 @@ infoCommand = Command CommandInfo
     mc <- getCacheMap
     dc <- getCacheMap
     let mcAccs = unlines $ map (\uuid -> let MinecraftAccount {..} = mc HM.! uuid in (if mcUUID == accountSelectedMinecraft then "*" else " ") ++ head mcNames ++ " (" ++ uuidString mcUUID ++ ")") accountMinecrafts
-    let dcAccs = unlines $ map (\did -> let acc@DiscordAccount {..} = dc HM.! did in showDiscordAccount acc ++ ", id " ++ show discordId ) accountDiscords
+    let dcAccs = unlines $ map (\did -> let acc@DiscordAccount {..} = dc HM.! did in (if discordIsMember then "*" else " ") ++ showDiscordAccount acc ++ ", id " ++ show discordId ) accountDiscords
     respond $ didYouMean ++ renderedName ++ ":\n" ++ " - Bow Bot id: " ++ show accountId ++ "\n" ++ " - Minecraft accounts:```\n" ++ mcAccs ++ "```" ++ " - Discord accounts: ```\n" ++ dcAccs ++ "```"

@@ -142,10 +142,15 @@ eventHandler (GuildMemberAdd gid gmem) = do
     void $ storeInCache [guildMemberToDiscordAccount gmem]
     acc <- getBowBotAccountByDiscord (maybe 0 userId (memberUser gmem))
     updateRoles gmem acc
-eventHandler (GuildMemberUpdate gid roles usr _) = do
+eventHandler (GuildMemberUpdate gid roles usr newname) = do
   maingid <- askInfo discordGuildIdInfo
-  when (not (null roles) && gid == maingid && not (userIsBot usr)) $ do
-    storeNewRolesSaved (userId usr) roles
+  when (gid == maingid && not (userIsBot usr)) $ do
+    void $ storeInCache [(userToDiscordAccount usr) { discordNickname = fmap unpack newname, discordIsMember = True }]
+    unless (null roles) $ storeNewRolesSaved (userId usr) roles
+eventHandler (GuildMemberRemove gid usr) = do
+  maingid <- askInfo discordGuildIdInfo
+  when (gid == maingid && not (userIsBot usr)) $ do
+    void $ storeInCache [userToDiscordAccount usr]
 eventHandler _ = pure ()
 
 commandTimeoutRun :: (MonadHoistIO m, MonadReader r m, Has DiscordHandle r) => Int -> Message -> m () -> m ()
