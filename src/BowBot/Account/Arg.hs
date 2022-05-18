@@ -21,7 +21,7 @@ data AccountResponseType = AccountMinecraftResponse MinecraftResponse | AccountD
 data AccountResponse = AccountResponse { accResponseType :: AccountResponseType, accResponseAccount :: BowBotAccount }
 
 noAccountArg :: (MonadError String m, MonadIOBotData m d r, HasCaches '[DiscordAccount, MinecraftAccount] d, Has Manager r) => String -> m AccountResponseType
-noAccountArg name = (AccountDiscordResponse <$> discordArg name) `orElseError` (AccountMinecraftResponse <$> minecraftArgFromNetworkAutocorrect name)
+noAccountArg name = (AccountDiscordResponse <$> (discordArg name `orElseError` discordArgFromName name)) `orElseError` (AccountMinecraftResponse <$> minecraftArgFromNetworkAutocorrect name)
 
 noAccountArgFull :: (MonadError String m, MonadIOBotData m d r, HasCaches '[DiscordAccount, MinecraftAccount] d, Has Manager r) => UserId -> Maybe String -> m AccountResponseType
 noAccountArgFull did Nothing = AccountDiscordResponse <$> discordArgSelf did
@@ -32,7 +32,7 @@ thePlayerIsntRegisteredMessage = "*The player isn't registered!*"
 
 accountArg :: (MonadError String m, MonadIOBotData m d r, HasCaches '[DiscordAccount, MinecraftAccount, BowBotAccount] d) => String -> m AccountResponse
 accountArg name = (do
-  dacc <- discordArg name
+  dacc <- discordArg name `orElseError` discordArgFromName name
   acc <- liftMaybe theUserIsntRegisteredMessage =<< getBowBotAccountByDiscord (discordId dacc)
   return AccountResponse { accResponseType = AccountDiscordResponse dacc, accResponseAccount = acc }) `orElseError` (do
     (res, acc) <- flip minecraftArgFromCacheConstraint name $ \MinecraftAccount {..} -> fmap (ResponseGood,) $ liftMaybe thePlayerIsntRegisteredMessage =<< getBowBotAccountByMinecraft mcUUID

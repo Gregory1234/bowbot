@@ -116,11 +116,27 @@ minecraftArgFromDiscordSelf did = do
   bbacc <- liftMaybe youArentRegisteredMessage =<< getBowBotAccountByDiscord (discordId dacc)
   liftMaybe youArentRegisteredMessage =<< getFromCache (accountSelectedMinecraft bbacc)
 
+minecraftArgFromDiscordName :: (MonadError String m, MonadIOBotData m d r, HasCaches '[DiscordAccount, MinecraftAccount, BowBotAccount] d) => String -> m MinecraftAccount
+minecraftArgFromDiscordName name = do
+  dacc <- discordArgFromName name
+  bbacc <- liftMaybe theUserIsntRegisteredMessage =<< getBowBotAccountByDiscord (discordId dacc)
+  liftMaybe theUserIsntRegisteredMessage =<< getFromCache (accountSelectedMinecraft bbacc)
+
+minecraftArgFromNetworkAutocorrectWithDiscordName :: (MonadError String m, MonadIOBotData m d r, HasCaches '[DiscordAccount, MinecraftAccount, BowBotAccount] d, Has Manager r) => String -> m MinecraftResponse
+minecraftArgFromNetworkAutocorrectWithDiscordName name = flip orElseError (minecraftArgFromCacheAutocorrect name) $ do
+  (mcResponseAutocorrect, mcResponseAccount) <- minecraftArgFromNetwork name `orElseError` ((ResponseTrue,) <$> minecraftArgFromDiscordName name)
+  return MinecraftResponse { mcResponseTime = CurrentResponse, ..}
+
+minecraftArgFromNetworkConstraintWithDiscordName :: (MonadError String m, MonadIOBotData m d r, HasCaches '[DiscordAccount, MinecraftAccount, BowBotAccount] d, Has Manager r) => (MinecraftAccount -> m (MinecraftConstraintResponse, a)) -> String -> m (MinecraftResponse, a)
+minecraftArgFromNetworkConstraintWithDiscordName = flip minecraftArgConstraintAny minecraftArgFromCacheAutocorrect $ \n -> do -- note: this is correct
+  (mcResponseAutocorrect, mcResponseAccount) <- minecraftArgFromNetwork n `orElseError` ((ResponseTrue,) <$> minecraftArgFromDiscordName n)
+  return MinecraftResponse { mcResponseTime = CurrentResponse, ..}
+
 minecraftArgFull :: (MonadError String m, MonadIOBotData m d r, HasCaches '[DiscordAccount, MinecraftAccount, BowBotAccount] d, Has Manager r) => UserId -> Maybe String -> m MinecraftResponse
 minecraftArgFull did Nothing = do
   mcResponseAccount <- minecraftArgFromDiscordSelf did
   return MinecraftResponse { mcResponseTime = CurrentResponse, mcResponseAutocorrect = ResponseTrue, ..}
-minecraftArgFull _ (Just name) = flip orElseError (minecraftArgFromNetworkAutocorrect name) $ do
+minecraftArgFull _ (Just name) = flip orElseError (minecraftArgFromNetworkAutocorrectWithDiscordName name) $ do
   mcResponseAccount <- minecraftArgFromDiscord name
   return MinecraftResponse { mcResponseTime = CurrentResponse, mcResponseAutocorrect = ResponseTrue, ..}
 
@@ -129,7 +145,7 @@ minecraftArgFullConstraint constraint did Nothing = do
   mcResponseAccount <- minecraftArgFromDiscordSelf did
   (_, v) <- constraint mcResponseAccount
   return (MinecraftResponse { mcResponseTime = CurrentResponse, mcResponseAutocorrect = ResponseTrue, ..}, v)
-minecraftArgFullConstraint constraint _ (Just name) = flip orElseError (minecraftArgFromNetworkConstraint constraint name) $ do
+minecraftArgFullConstraint constraint _ (Just name) = flip orElseError (minecraftArgFromNetworkConstraintWithDiscordName constraint name) $ do
   mcResponseAccount <- minecraftArgFromDiscord name
   (_, v) <- constraint mcResponseAccount
   return (MinecraftResponse { mcResponseTime = CurrentResponse, mcResponseAutocorrect = ResponseTrue, ..}, v)
