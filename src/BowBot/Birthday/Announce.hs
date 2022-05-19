@@ -25,7 +25,7 @@ announceBirthdays = do
   birthdays <- getBirthdayPeople currentDay
   birthdayChannel <- askInfo birthdayChannelInfo
   dcaccounts <- getCacheMap
-  logInfo $ "Announcing birthdays: " ++ intercalate ", " (map (showDiscordAccount . (dcaccounts HM.!)) birthdays)
+  logInfo $ "Announcing birthdays: " ++ intercalate ", " (map showDiscordAccount . filter discordIsMember . map (dcaccounts HM.!) $ birthdays)
   pns <- HM.fromList . ((\BowBotAccount {..} -> (,accountId) <$> accountDiscords) <=< HM.elems) <$> getCacheMap
-  let peopleMap = M.toList $ groupByToMap (pns HM.!) birthdays
-  for_ peopleMap $ \(_, p) -> call $ R.CreateMessage birthdayChannel $ pack $ "**Happy birthday** to " ++ intercalate ", " (map (showDiscordAccountDiscord . (dcaccounts HM.!)) p) ++ "!"
+  let peopleMap = M.toList $ M.filter (not . null) $ M.map (filter discordIsMember . map (dcaccounts HM.!)) $ groupByToMap (pns HM.!) birthdays
+  for_ peopleMap $ \(_, p) -> call $ R.CreateMessage birthdayChannel $ pack $ "**Happy birthday** to " ++ intercalate ", " (map showDiscordAccountDiscord p) ++ "!"
