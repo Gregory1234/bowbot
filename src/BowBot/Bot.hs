@@ -47,6 +47,7 @@ import BowBot.Birthday.Announce
 import BowBot.Birthday.SetCommand
 import BowBot.Snipe.Detect
 import BowBot.Snipe.Command
+import BowBot.Hypixel.Announce
 
 runBowBot :: IO ()
 runBowBot = do
@@ -83,7 +84,9 @@ backgroundMinutely mint = do
           (0, _, _) -> [DailyStats]
           _ -> []
     when (hour == 5) announceBirthdays
+    oldDaily <- getCacheMap
     updateBotData times
+    when (hour == 0) $ announceMilestones oldDaily
     storeNewSavedRolesAll
     updateRolesAll
     dev <- ifDev False $ return True
