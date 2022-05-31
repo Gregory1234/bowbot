@@ -163,3 +163,15 @@ wlrLeaderboardType :: LeaderboardType
 wlrLeaderboardType = LeaderboardType "Hypixel Bow Duels WLR" "WLR" $ \case
   HypixelBowLeaderboardEntry {..} | bowLbWins >= bowLbLosses, bowLbWins >= 150 -> Just (if bowLbLosses == 0 then bowLbWins*100000000 else (bowLbWins*10000) `div` bowLbLosses, showWLR bowLbWins bowLbLosses)
   _ -> Nothing
+
+winsLeaderboardTypeUnrestricted :: LeaderboardType
+winsLeaderboardTypeUnrestricted = LeaderboardType "Hypixel Bow Duels Wins" "Wins" $ \HypixelBowLeaderboardEntry {..} -> Just (bowLbWins, show bowLbWins)
+
+lossesLeaderboardTypeUnrestricted :: LeaderboardType
+lossesLeaderboardTypeUnrestricted = LeaderboardType "Hypixel Bow Duels Losses" "Losses" $ \HypixelBowLeaderboardEntry {..} -> Just (bowLbLosses, show bowLbLosses)
+
+winstreakLeaderboardTypeUnrestricted :: LeaderboardType
+winstreakLeaderboardTypeUnrestricted = LeaderboardType "Hypixel Bow Duels Winstreak" "Winstreak" $ \HypixelBowLeaderboardEntry { bowLbWinstreak = (Just ws) } -> Just (ws, show ws)
+
+wlrLeaderboardTypeUnrestricted :: LeaderboardType
+wlrLeaderboardTypeUnrestricted = LeaderboardType "Hypixel Bow Duels WLR" "WLR" $ \HypixelBowLeaderboardEntry {..} -> Just (if bowLbLosses == 0 then bowLbWins*100000000 else (bowLbWins*10000) `div` bowLbLosses, showWLR bowLbWins bowLbLosses)
