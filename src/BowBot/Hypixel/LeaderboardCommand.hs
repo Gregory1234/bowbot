@@ -17,8 +17,11 @@ import Discord.Types
 import BowBot.BotData.Cached
 import BowBot.Discord.Utils
 import qualified Data.HashMap.Strict as HM
+import qualified Data.Map as M
 import Data.Either (isRight)
 import BowBot.Discord.Account
+import BowBot.BotData.CachedSingle
+import BowBot.Hypixel.Guild
 
 data LeaderboardType = LeaderboardType { leaderboardName :: String, leaderboardStatName :: String, leaderboardParser :: HypixelBowLeaderboardEntry -> Maybe (Integer, String) }
 
@@ -81,7 +84,7 @@ leaderboardCommand lbt@LeaderboardType {..} name = Command CommandInfo
       let pages = chunksOf 20 (map snd lb)
       respond $ if pagenum < 0 || pagenum >= length pages
         then "*Wrong page number, it has to be between **1** and **" ++ show (length pages) ++ "**.*"
-        else leaderboardName ++ " (page **" ++ show (pagenum + 1) ++ "/" ++ show (length pages) ++ "**):\n```\n" ++ unlines (pages !! pagenum) ++ "```"
+        else leaderboardName ++ " Leaderboard (page **" ++ show (pagenum + 1) ++ "/" ++ show (length pages) ++ "**):\n```\n" ++ unlines (pages !! pagenum) ++ "```"
     (LeaderboardFind rt ra nm, selected) -> do
       let didYouMean = case (rt, ra) of
             (CurrentResponse, ResponseAutocorrect) -> "*Did you mean* **" ++ discordEscape nm ++ "**:\n"
@@ -90,27 +93,73 @@ leaderboardCommand lbt@LeaderboardType {..} name = Command CommandInfo
       lb <- generateLeaderboardLines lbt selected
       let pages = chunksOf 20 lb
       let pagenum = fromJust $ findIndex (any ((`elem` selected) . fst)) pages
-      respond $ leaderboardName ++ " (page **" ++ show (pagenum + 1) ++ "/" ++ show (length pages) ++ "**):\n" ++ didYouMean ++ "```\n" ++ unlines (map snd $ pages !! pagenum) ++ "```"
+      respond $ leaderboardName ++ " Leaderboard (page **" ++ show (pagenum + 1) ++ "/" ++ show (length pages) ++ "**):\n" ++ didYouMean ++ "```\n" ++ unlines (map snd $ pages !! pagenum) ++ "```"
     (LeaderboardAll, selected) -> do
       lb <- generateLeaderboardLines lbt selected
       respondFile "lb.txt" $ unlines (map snd lb)
 
+-- TODO: refactor all of this!!!
+
+leaderboardArgumentGuild :: (HypixelBowLeaderboardEntry -> Maybe (Integer, String)) -> Maybe String -> ExceptT String CommandHandler (HypixelGuildMembers, LeaderboardResponse, [UUID])
+leaderboardArgumentGuild parser arg = do
+  (res, sel) <- leaderboardArgument parser arg
+  gmems <- liftMaybe somethingWentWrongMessage . cacheResponseToMaybe =<< lift getHypixelGuildMembers
+  case res of
+    LeaderboardFind {} | all (`notElem` M.keys (getHypixelGuildMemberMap gmems)) sel -> case arg of
+      Nothing -> return (gmems, LeaderboardPage 0, [])
+      Just _ -> throwError thePlayerIsntOnThisLeaderboardMessage
+    _ -> return (gmems, res, filter (`elem` M.keys (getHypixelGuildMemberMap gmems)) sel)
+
+generateLeaderboardLinesGuild :: LeaderboardType -> [UUID] -> HypixelGuildMembers -> CommandHandler [(UUID, String)]
+generateLeaderboardLinesGuild LeaderboardType {..} selected gmems = do
+  lb <- HM.toList . HM.filterWithKey (\k _ -> k `elem` M.keys (getHypixelGuildMemberMap gmems)) <$> getCacheMap
+  names <- getCacheMap
+  return $ zipWith (\index (_, (uuid, str)) -> (uuid, pad 5 (show index ++ ".") ++ str)) [1 :: Integer ..] $ sortOn fst $ mapMaybe (\(uuid, lbe) -> (\(score, str) -> let MinecraftAccount {..} = names HM.! uuid in (-score, (mcUUID, (if mcUUID `elem` selected then "*" else " ") ++ pad 20 (head mcNames) ++ " ( " ++ str ++ " " ++ leaderboardStatName ++ " )"))) <$> leaderboardParser lbe) lb
+
+
+leaderboardGuildCommand :: LeaderboardType -> String -> Command
+leaderboardGuildCommand lbt@LeaderboardType {..} name = Command CommandInfo
+  { commandName = name
+  , commandHelpEntries =
+    [ HelpEntry { helpUsage = name ++ " [name|page|\"all\"]", helpDescription = "show Bow Duels " ++ leaderboardName ++ " guild leaderboard", helpGroup = "normal" } ]
+  , commandPerms = DefaultLevel
+  , commandTimeout = 15
+  } $ oneOptionalArgument (leaderboardArgumentGuild leaderboardParser) $ \case
+    (gmems, LeaderboardPage pagenum, selected) -> do
+      lb <- generateLeaderboardLinesGuild lbt selected gmems
+      let pages = chunksOf 20 (map snd lb)
+      respond $ if pagenum < 0 || pagenum >= length pages
+        then "*Wrong page number, it has to be between **1** and **" ++ show (length pages) ++ "**.*"
+        else leaderboardName ++ " Guild Leaderboard (page **" ++ show (pagenum + 1) ++ "/" ++ show (length pages) ++ "**):\n```\n" ++ unlines (pages !! pagenum) ++ "```"
+    (gmems, LeaderboardFind rt ra nm, selected) -> do
+      let didYouMean = case (rt, ra) of
+            (CurrentResponse, ResponseAutocorrect) -> "*Did you mean* **" ++ discordEscape nm ++ "**:\n"
+            (OldResponse o, ResponseAutocorrect) -> "*Did you mean* **" ++ discordEscape o ++ "** (" ++ discordEscape nm ++ "):"
+            (_, _) -> ""
+      lb <- generateLeaderboardLinesGuild lbt selected gmems
+      let pages = chunksOf 20 lb
+      let pagenum = fromJust $ findIndex (any ((`elem` selected) . fst)) pages
+      respond $ leaderboardName ++ " Guild Leaderboard (page **" ++ show (pagenum + 1) ++ "/" ++ show (length pages) ++ "**):\n" ++ didYouMean ++ "```\n" ++ unlines (map snd $ pages !! pagenum) ++ "```"
+    (gmems, LeaderboardAll, selected) -> do
+      lb <- generateLeaderboardLinesGuild lbt selected gmems
+      respondFile "lbg.txt" $ unlines (map snd lb)
+
 winsLeaderboardType :: LeaderboardType
-winsLeaderboardType = LeaderboardType "Hypixel Bow Duels Wins Leaderboard" "Wins" $ \case
+winsLeaderboardType = LeaderboardType "Hypixel Bow Duels Wins" "Wins" $ \case
   HypixelBowLeaderboardEntry {..} | bowLbWins >= 500 -> Just (bowLbWins, show bowLbWins)
   _ -> Nothing
 
 lossesLeaderboardType :: LeaderboardType
-lossesLeaderboardType = LeaderboardType "Hypixel Bow Duels Losses Leaderboard" "Losses" $ \case
+lossesLeaderboardType = LeaderboardType "Hypixel Bow Duels Losses" "Losses" $ \case
   HypixelBowLeaderboardEntry {..} | bowLbWins >= 500 -> Just (bowLbLosses, show bowLbLosses)
   _ -> Nothing
 
 winstreakLeaderboardType :: LeaderboardType
-winstreakLeaderboardType = LeaderboardType "Hypixel Bow Duels Winstreak Leaderboard" "Winstreak" $ \case
+winstreakLeaderboardType = LeaderboardType "Hypixel Bow Duels Winstreak" "Winstreak" $ \case
   HypixelBowLeaderboardEntry { bowLbWinstreak = (Just ws) } | ws >= 50 -> Just (ws, show ws)
   _ -> Nothing
 
 wlrLeaderboardType :: LeaderboardType
-wlrLeaderboardType = LeaderboardType "Hypixel Bow Duels WLR Leaderboard" "WLR" $ \case
+wlrLeaderboardType = LeaderboardType "Hypixel Bow Duels WLR" "WLR" $ \case
   HypixelBowLeaderboardEntry {..} | bowLbWins >= bowLbLosses, bowLbWins >= 150 -> Just (if bowLbLosses == 0 then bowLbWins*100000000 else (bowLbWins*10000) `div` bowLbLosses, showWLR bowLbWins bowLbLosses)
   _ -> Nothing

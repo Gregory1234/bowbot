@@ -23,6 +23,12 @@ data CacheResponse a
   | CacheFresh a
   | CacheOld a
 
+cacheResponseToMaybe :: CacheResponse a -> Maybe a
+cacheResponseToMaybe CacheBusy = Nothing
+cacheResponseToMaybe CacheFailed = Nothing
+cacheResponseToMaybe (CacheFresh a) = Just a
+cacheResponseToMaybe (CacheOld a) = Just a
+
 data CacheResponseDirect a
   = CacheDirectBusy
   | CacheDirectNothing
