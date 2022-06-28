@@ -23,6 +23,7 @@ import BowBot.BotData.Cached
 import BowBot.DB.Basic
 import BowBot.Utils
 import BowBot.Settings.Basic
+import Data.Time.Clock (UTCTime)
 
 data StatsTimeRange = DailyStats | WeeklyStats | MonthlyStats deriving (Show, Eq)
 
@@ -45,7 +46,8 @@ instance Default (SStatsTimeRange 'MonthlyStats) where def = SMonthlyStats
 
 data HypixelBowTimeStats (t :: StatsTimeRange) = HypixelBowTimeStats
   { bowTimeWins :: Integer,
-    bowTimeLosses :: Integer
+    bowTimeLosses :: Integer,
+    bowTimeTimestamp :: Maybe UTCTime
   } deriving (Show, Eq)
 
 statsTimeRangeName :: StatsTimeRange -> String
@@ -54,18 +56,18 @@ statsTimeRangeName WeeklyStats = "Week"
 statsTimeRangeName MonthlyStats = "Month"
 
 hypixelBowStatsToTimeStats :: HypixelBowStats -> HypixelBowTimeStats t
-hypixelBowStatsToTimeStats HypixelBowStats {..} = HypixelBowTimeStats { bowTimeWins = bowWins, bowTimeLosses = bowLosses }
+hypixelBowStatsToTimeStats HypixelBowStats {..} = HypixelBowTimeStats { bowTimeWins = bowWins, bowTimeLosses = bowLosses, bowTimeTimestamp = bowStatsTimestamp }
 
 hypixelBowLeaderboardToTimeStats :: HypixelBowLeaderboardEntry -> HypixelBowTimeStats t
-hypixelBowLeaderboardToTimeStats HypixelBowLeaderboardEntry {..} = HypixelBowTimeStats { bowTimeWins = bowLbWins, bowTimeLosses = bowLbLosses }
+hypixelBowLeaderboardToTimeStats HypixelBowLeaderboardEntry {..} = HypixelBowTimeStats { bowTimeWins = bowLbWins, bowTimeLosses = bowLbLosses, bowTimeTimestamp = bowLbTimestamp }
 
 
 instance (Default (SStatsTimeRange t)) => Cached (HypixelBowTimeStats t) where
   type CacheIndex (HypixelBowTimeStats t) = UUID
   refreshCache conn = do
     cache <- getCache @(HypixelBowTimeStats t)
-    res :: [(String, Integer, Integer)] <- queryLog conn (replaceQuery "TIME" (statsTimeRangeName $ sStatsTimeRangeGet (def :: SStatsTimeRange t)) "SELECT `minecraft`, `lastTIMEWins`, `lastTIMELosses` FROM `statsDEV` WHERE `lastTIMEWins` >= 0 AND `lastTIMELosses` >= 0") ()
-    let newValues = HM.fromList $ flip fmap res $ \(UUID -> uuid, bowTimeWins, bowTimeLosses) -> (uuid, HypixelBowTimeStats {..})
+    res :: [(String, Integer, Integer, Maybe UTCTime)] <- queryLog conn (replaceQuery "TIME" (statsTimeRangeName $ sStatsTimeRangeGet (def :: SStatsTimeRange t)) "SELECT `minecraft`, `lastTIMEWins`, `lastTIMELosses`, `lastTIMEUpdate` FROM `statsDEV` WHERE `lastTIMEWins` >= 0 AND `lastTIMELosses` >= 0") ()
+    let newValues = HM.fromList $ flip fmap res $ \(UUID -> uuid, bowTimeWins, bowTimeLosses, bowTimeTimestamp) -> (uuid, HypixelBowTimeStats {..})
     liftIO $ atomically $ writeTVar cache newValues
 
 showHypixelBowTimeStats :: forall t. Default (SStatsTimeRange t) => Settings -> HypixelBowStats -> HypixelBowTimeStats t -> String
@@ -105,9 +107,9 @@ showMaybeHypixelBowTimeStats s t (Just v) = showHypixelBowTimeStats s t v
 instance (Default (SStatsTimeRange t)) => CachedStorable (HypixelBowTimeStats t) where
   storeInCacheIndexed accs = do
     cacheMap <- getCacheMap
-    let toQueryParams (uuid, lbe) = if Just lbe == cacheMap HM.!? uuid then Nothing else Just (uuidString uuid, bowTimeWins lbe, bowTimeLosses lbe)
+    let toQueryParams (uuid, lbe) = if Just lbe == cacheMap HM.!? uuid then Nothing else Just (uuidString uuid, bowTimeWins lbe, bowTimeLosses lbe, bowTimeTimestamp lbe)
     let queryParams = mapMaybe toQueryParams accs
-    success <- liftIO $ withDB $ \conn -> (>0) <$> executeManyLog conn (replaceQuery "TIME" (statsTimeRangeName $ sStatsTimeRangeGet (def :: SStatsTimeRange t)) "INSERT INTO `statsDEV` (`minecraft`, `lastTIMEWins`, `lastTIMELosses`) VALUES (?,?,?) ON DUPLICATE KEY UPDATE `lastTIMEWins`=VALUES(`lastTIMEWins`), `lastTIMELosses`=VALUES(`lastTIMELosses`)") queryParams
+    success <- liftIO $ withDB $ \conn -> (>0) <$> executeManyLog conn (replaceQuery "TIME" (statsTimeRangeName $ sStatsTimeRangeGet (def :: SStatsTimeRange t)) "INSERT INTO `statsDEV` (`minecraft`, `lastTIMEWins`, `lastTIMELosses`, `lastTIMEUpdate`) VALUES (?,?,?,?) ON DUPLICATE KEY UPDATE `lastTIMEWins`=VALUES(`lastTIMEWins`), `lastTIMELosses`=VALUES(`lastTIMELosses`), `lastTIMEUpdate`=VALUES(`lastTIMEUpdate`)") queryParams
     when success $ do
       cache <- getCache
       liftIO $ atomically $ modifyTVar cache (insertMany accs)

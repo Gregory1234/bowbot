@@ -15,7 +15,7 @@ import System.Environment.Blank (getEnv)
 import Text.Printf (printf)
 import Data.Ratio ((%))
 import Data.Time.Format (formatTime, defaultTimeLocale)
-import Data.Time.Clock.POSIX (getCurrentTime)
+import Data.Time.Clock.POSIX (getCurrentTime, posixSecondsToUTCTime, utcTimeToPOSIXSeconds)
 import Data.Traversable (for)
 import Data.Foldable (for_)
 import Text.Read (readMaybe)
@@ -33,6 +33,8 @@ import Data.Functor (($>))
 import Data.List.Split (splitOn, chunksOf)
 import Data.Kind (Type, Constraint)
 import Data.Has
+import Data.Time.Clock (UTCTime, nominalDiffTimeToSeconds)
+import Data.Fixed (Fixed(..), resolution)
 
 dist :: Eq a => [a] -> [a] -> Int
 dist a b =
@@ -122,3 +124,12 @@ type family HasAll (as :: [Type]) r :: Constraint where
 
 orElseError :: (MonadError e m) => m a -> m a -> m a
 orElseError a b = catchError a $ const b
+
+timestampFromUnixSecond :: Integer -> UTCTime
+timestampFromUnixSecond = posixSecondsToUTCTime . fromInteger
+
+timestampToUnixSecond :: UTCTime -> Integer
+timestampToUnixSecond timestamp = fullseconds
+  where
+    seconds = nominalDiffTimeToSeconds $ utcTimeToPOSIXSeconds timestamp
+    fullseconds = let (MkFixed picoseconds) = seconds in picoseconds `div` resolution seconds

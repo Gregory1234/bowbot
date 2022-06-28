@@ -11,8 +11,10 @@ import BowBot.Hypixel.Basic
 import BowBot.Utils
 import BowBot.Hypixel.Division
 import Data.Ratio ((%))
+import Data.Time.Clock.POSIX (getCurrentTime)
+import Data.Time.Clock (UTCTime)
 
-data CachedMaybe a = NewJust a | CachedJust a | CachedNothing deriving (Show, Eq)
+data CachedMaybe a = NewJust a | CachedJust (Maybe UTCTime) a | CachedNothing deriving (Show, Eq)
 
 isCachedNothing :: CachedMaybe a -> Bool
 isCachedNothing CachedNothing = True
@@ -24,11 +26,16 @@ isAnyJust = not . isCachedNothing
 cachedMaybe :: a -> (b -> a) -> (b -> a) -> CachedMaybe b -> a
 cachedMaybe n _ _ CachedNothing = n
 cachedMaybe _ f _ (NewJust a) = f a
-cachedMaybe _ _ f (CachedJust a) = f a
+cachedMaybe _ _ f (CachedJust _ a) = f a
 
-completeCachedMaybe :: CachedMaybe a -> Maybe a -> CachedMaybe a
-completeCachedMaybe CachedNothing (Just a) = CachedJust a
-completeCachedMaybe c _ = c
+completeCachedMaybe :: Maybe UTCTime -> CachedMaybe a -> Maybe a -> CachedMaybe a
+completeCachedMaybe time CachedNothing (Just a) = CachedJust time a
+completeCachedMaybe _ c _ = c
+
+cachedTimestamp :: Maybe UTCTime -> CachedMaybe a -> Maybe UTCTime
+cachedTimestamp time (NewJust _) = time
+cachedTimestamp _ (CachedJust time _) = time
+cachedTimestamp _ CachedNothing = Nothing
 
 cachedToMaybe :: CachedMaybe a -> Maybe a
 cachedToMaybe = cachedMaybe Nothing Just Just
@@ -40,12 +47,15 @@ data HypixelBowStats = HypixelBowStats
     currentWinstreak :: Maybe Integer,
     bestDailyWinstreak :: Maybe Integer,
     bowHits :: Integer,
-    bowShots :: Integer
+    bowShots :: Integer,
+    bowStatsTimestamp :: Maybe UTCTime
   } deriving (Show)
 
 
 requestHypixelBowStats :: (MonadIOReader m r, Has Manager r) => UUID -> m (Maybe HypixelBowStats)
-requestHypixelBowStats uuid = hypixelWithPlayerData uuid $ \o -> do
+requestHypixelBowStats uuid = do
+  bowStatsTimestamp <- Just <$> liftIO getCurrentTime
+  hypixelWithPlayerData uuid $ \o -> do
     pl <- o .: "player"
     stats <- pl .: "stats"
     duelsStats <- stats .:? "Duels"

@@ -29,10 +29,7 @@ fromPingDiscordUser str | "<@" `isPrefixOf` str && ">" `isSuffixOf` str = readMa
 fromPingDiscordUser _ = Nothing
 
 discordFormatTimestamp :: Maybe String -> UTCTime -> String
-discordFormatTimestamp style timestamp = "<t:" ++ show fullseconds ++ maybe "" (':':) style ++ ">"
-  where
-    seconds = nominalDiffTimeToSeconds $ utcTimeToPOSIXSeconds timestamp
-    fullseconds = let (MkFixed picoseconds) = seconds in picoseconds `div` resolution seconds
+discordFormatTimestamp style timestamp = "<t:" ++ show (timestampToUnixSecond timestamp) ++ maybe "" (':':) style ++ ">"
 
 discordFormatTimestampFull :: UTCTime -> String
 discordFormatTimestampFull time = discordFormatTimestamp (Just "R") time ++ " (" ++ discordFormatTimestamp Nothing time ++ ")"

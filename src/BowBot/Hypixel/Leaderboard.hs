@@ -21,33 +21,36 @@ import BowBot.Network.Basic
 import BowBot.BotData.Counter
 import Control.Concurrent (threadDelay)
 import Control.Concurrent.Async (mapConcurrently)
+import Data.Time.Clock (UTCTime)
 
 data HypixelBowLeaderboardEntry = HypixelBowLeaderboardEntry
   { bowLbWins :: Integer,
     bowLbLosses :: Integer,
-    bowLbWinstreak :: Maybe Integer
+    bowLbWinstreak :: Maybe Integer,
+    bowLbTimestamp :: Maybe UTCTime,
+    bowLbWinstreakTimestamp :: Maybe UTCTime
   } deriving (Show, Eq)
 
 instance Cached HypixelBowLeaderboardEntry where
   type CacheIndex HypixelBowLeaderboardEntry = UUID
   refreshCache conn = do
     cache <- getCache
-    res :: [(String, Integer, Integer, Integer)] <- queryLog conn "SELECT `minecraft`, `bowWins`, `bowLosses`, `bowWinstreak` FROM `statsDEV`" ()
+    res :: [(String, Integer, Integer, Integer, Maybe UTCTime, Maybe UTCTime)] <- queryLog conn "SELECT `minecraft`, `bowWins`, `bowLosses`, `bowWinstreak`, `lastUpdate`, `lastWinstreakUpdate` FROM `statsDEV`" ()
     let newValues = HM.fromList $ flip fmap res $ \case
-          (UUID -> uuid, bowLbWins, bowLbLosses, (\x -> if x == 0 then Nothing else Just x) -> bowLbWinstreak) -> (uuid, HypixelBowLeaderboardEntry {..})
+          (UUID -> uuid, bowLbWins, bowLbLosses, (\x -> if x == 0 then Nothing else Just x) -> bowLbWinstreak, bowLbTimestamp, bowLbWinstreakTimestamp) -> (uuid, HypixelBowLeaderboardEntry {..})
     liftIO $ atomically $ writeTVar cache newValues
 
 hypixelBowStatsToLeaderboards :: HypixelBowStats -> HypixelBowLeaderboardEntry
 hypixelBowStatsToLeaderboards HypixelBowStats {..} = HypixelBowLeaderboardEntry
-  { bowLbWins = bowWins, bowLbLosses = bowLosses, bowLbWinstreak = cachedToMaybe bestWinstreak }
+  { bowLbWins = bowWins, bowLbLosses = bowLosses, bowLbWinstreak = cachedToMaybe bestWinstreak, bowLbTimestamp = bowStatsTimestamp, bowLbWinstreakTimestamp = cachedTimestamp bowStatsTimestamp bestWinstreak }
 
 instance CachedStorable HypixelBowLeaderboardEntry where
   storeInCacheIndexed accs = do
     cacheMap <- getCacheMap
-    let fixed = map (\(uuid, lbe) -> (uuid, let old = cacheMap HM.!? uuid; winstreak = bowLbWinstreak lbe <|> (bowLbWinstreak =<< old) in lbe { bowLbWinstreak = winstreak })) accs
-    let toQueryParams (uuid, lbe) = if Just lbe == cacheMap HM.!? uuid then Nothing else Just (uuidString uuid, bowLbWins lbe, bowLbLosses lbe, fromMaybe 0 $ bowLbWinstreak lbe)
+    let fixed = map (\(uuid, lbe) -> (uuid, let old = cacheMap HM.!? uuid; winstreak = bowLbWinstreak lbe <|> (bowLbWinstreak =<< old); winstreakTimestamp = bowLbWinstreakTimestamp lbe <|> (bowLbWinstreakTimestamp =<< old) in lbe { bowLbWinstreak = winstreak, bowLbWinstreakTimestamp = winstreakTimestamp })) accs
+    let toQueryParams (uuid, lbe) = if Just lbe == cacheMap HM.!? uuid then Nothing else Just (uuidString uuid, bowLbWins lbe, bowLbLosses lbe, fromMaybe 0 $ bowLbWinstreak lbe, bowLbTimestamp lbe, bowLbWinstreakTimestamp lbe)
     let queryParams = mapMaybe toQueryParams fixed
-    success <- liftIO $ withDB $ \conn -> (>0) <$> executeManyLog conn "INSERT INTO `statsDEV` (`minecraft`, `bowWins`, `bowLosses`, `bowWinstreak`) VALUES (?,?,?,?) ON DUPLICATE KEY UPDATE `bowWins`=VALUES(`bowWins`), `bowLosses`=VALUES(`bowLosses`), `bowWinstreak`=VALUES(`bowWinstreak`)" queryParams
+    success <- liftIO $ withDB $ \conn -> (>0) <$> executeManyLog conn "INSERT INTO `statsDEV` (`minecraft`, `bowWins`, `bowLosses`, `bowWinstreak`, `lastUpdate`, `lastWinstreakUpdate`) VALUES (?,?,?,?,?,?) ON DUPLICATE KEY UPDATE `bowWins`=VALUES(`bowWins`), `bowLosses`=VALUES(`bowLosses`), `bowWinstreak`=VALUES(`bowWinstreak`), `lastUpdate`=VALUES(`lastUpdate`), `lastWinstreakUpdate`=VALUES(`lastWinstreakUpdate`)" queryParams
     when success $ do
       cache <- getCache
       liftIO $ atomically $ modifyTVar cache (insertMany fixed)
@@ -76,4 +79,4 @@ updateHypixelLeaderboardCache = do
 
 completeHypixelBowStats :: HypixelBowStats -> Maybe HypixelBowLeaderboardEntry -> HypixelBowStats
 completeHypixelBowStats s Nothing = s
-completeHypixelBowStats s (Just HypixelBowLeaderboardEntry {..}) = s { bestWinstreak = bestWinstreak s `completeCachedMaybe` bowLbWinstreak}
+completeHypixelBowStats s (Just HypixelBowLeaderboardEntry {..}) = s { bestWinstreak = completeCachedMaybe bowLbWinstreakTimestamp (bestWinstreak s) bowLbWinstreak }
