@@ -11,6 +11,9 @@ import Discord.Types
 import qualified Discord.Requests as R
 import BowBot.Utils
 import BowBot.DB.Basic
+import Data.Time.Clock.POSIX (utcTimeToPOSIXSeconds)
+import Data.Time.Clock (nominalDiffTimeToSeconds)
+import Data.Fixed (Fixed(..), resolution)
 
 discordGuildMembers :: (MonadIOReader m r, Has DiscordHandle r) => GuildId -> m [GuildMember]
 discordGuildMembers gid = do
@@ -24,3 +27,12 @@ discordGuildMembers gid = do
 fromPingDiscordUser :: String -> Maybe UserId
 fromPingDiscordUser str | "<@" `isPrefixOf` str && ">" `isSuffixOf` str = readMaybe $ filter isDigit str
 fromPingDiscordUser _ = Nothing
+
+discordFormatTimestamp :: Maybe String -> UTCTime -> String
+discordFormatTimestamp style timestamp = "<t:" ++ show fullseconds ++ maybe "" (':':) style ++ ">"
+  where
+    seconds = nominalDiffTimeToSeconds $ utcTimeToPOSIXSeconds timestamp
+    fullseconds = let (MkFixed picoseconds) = seconds in picoseconds `div` resolution seconds
+
+discordFormatTimestampFull :: UTCTime -> String
+discordFormatTimestampFull time = discordFormatTimestamp (Just "R") time ++ " (" ++ discordFormatTimestamp Nothing time ++ ")"

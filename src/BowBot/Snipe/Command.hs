@@ -6,6 +6,7 @@ import BowBot.Command
 import BowBot.Snipe.Basic
 import BowBot.Discord.Account
 import BowBot.BotData.Cached
+import BowBot.Discord.Utils
 
 snipeCommand :: Command
 snipeCommand = Command CommandInfo
@@ -22,4 +23,4 @@ snipeCommand = Command CommandInfo
         snipeAuthor' <- getFromCache snipeMessageAuthor
         case snipeAuthor' of
           Nothing -> respond somethingWentWrongMessage
-          Just snipeAuthor -> respond $ showDiscordAccountDiscord snipeAuthor ++ " *wrote:* \n" ++ snipeMessageContent
+          Just snipeAuthor -> respond $ showDiscordAccountDiscord snipeAuthor ++ " *wrote " ++ discordFormatTimestampFull snipeMessageTimestamp ++ ":* \n" ++ snipeMessageContent

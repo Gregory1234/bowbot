@@ -21,8 +21,11 @@ detectDeleteMessage m
     Nothing -> pure ()
     Just embed -> case words (head $ lines embed) of
       ("**Message":"sent":"by":(readMaybe . filter isDigit -> Just sender):"deleted":"in":(readMaybe . filter isDigit -> Just channel):_) -> do
-        let content = tail $ dropWhile (/='\n') embed
-        void $ storeInCacheIndexed [(channel, SnipeMessage { snipeMessageAuthor = sender, snipeMessageContent = content, snipeMessageWasEdited = False, snipeMessageTimestamp = messageTimestamp m })]
+        let content' = dropWhile (/='\n') embed
+        case content' of
+          [] -> pure () -- TODO: it was probably an image, do something
+          _:content -> 
+            void $ storeInCacheIndexed [(channel, SnipeMessage { snipeMessageAuthor = sender, snipeMessageContent = content, snipeMessageWasEdited = False, snipeMessageTimestamp = messageTimestamp m })]
       ("**Message":"edited":"in":(readMaybe . filter isDigit -> Just channel):"[Jump":"to":_) -> do
         case (>>=readMaybe . filter isDigit . unpack . embedFooterText) $ embedFooter $ head (messageEmbeds m) of
           Nothing -> pure ()
