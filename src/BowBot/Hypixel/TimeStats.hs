@@ -24,6 +24,7 @@ import BowBot.DB.Basic
 import BowBot.Utils
 import BowBot.Settings.Basic
 import Data.Time.Clock (UTCTime)
+import BowBot.Discord.Utils
 
 data StatsTimeRange = DailyStats | WeeklyStats | MonthlyStats deriving (Show, Eq)
 
@@ -72,7 +73,8 @@ instance (Default (SStatsTimeRange t)) => Cached (HypixelBowTimeStats t) where
 
 showHypixelBowTimeStats :: forall t. Default (SStatsTimeRange t) => Settings -> HypixelBowStats -> HypixelBowTimeStats t -> String
 showHypixelBowTimeStats Settings {..} HypixelBowStats {..} HypixelBowTimeStats {..} = unlines $ catMaybes
-  [ onlyIf sWins
+  [ ((" - *Last " ++ time ++ " Update:* ") ++) . discordFormatTimestampFull <$> bowTimeTimestamp
+  , onlyIf sWins
   $ " - *Bow Duels " ++ time ++ " Wins:* **"
   ++ show (bowWins - bowTimeWins)
   ++ "**"

@@ -13,6 +13,7 @@ import BowBot.Hypixel.Division
 import Data.Ratio ((%))
 import Data.Time.Clock.POSIX (getCurrentTime)
 import Data.Time.Clock (UTCTime)
+import BowBot.Discord.Utils (discordFormatTimestampFull)
 
 data CachedMaybe a = NewJust a | CachedJust (Maybe UTCTime) a | CachedNothing deriving (Show, Eq)
 
@@ -23,10 +24,10 @@ isCachedNothing _ = False
 isAnyJust :: CachedMaybe a -> Bool
 isAnyJust = not . isCachedNothing
 
-cachedMaybe :: a -> (b -> a) -> (b -> a) -> CachedMaybe b -> a
+cachedMaybe :: a -> (b -> a) -> (Maybe UTCTime -> b -> a) -> CachedMaybe b -> a
 cachedMaybe n _ _ CachedNothing = n
 cachedMaybe _ f _ (NewJust a) = f a
-cachedMaybe _ _ f (CachedJust _ a) = f a
+cachedMaybe _ _ f (CachedJust t a) = f t a
 
 completeCachedMaybe :: Maybe UTCTime -> CachedMaybe a -> Maybe a -> CachedMaybe a
 completeCachedMaybe time CachedNothing (Just a) = CachedJust time a
@@ -38,7 +39,7 @@ cachedTimestamp _ (CachedJust time _) = time
 cachedTimestamp _ CachedNothing = Nothing
 
 cachedToMaybe :: CachedMaybe a -> Maybe a
-cachedToMaybe = cachedMaybe Nothing Just Just
+cachedToMaybe = cachedMaybe Nothing Just (const Just)
 
 data HypixelBowStats = HypixelBowStats
   { bowWins :: Integer,
@@ -91,7 +92,7 @@ showHypixelBowStats Settings {..} HypixelBowStats {..} = unlines $ catMaybes
   ++ "**"
   , onlyIf (sense sBestStreak (isAnyJust bestWinstreak))
   $ " - *Best Bow Duels Winstreak:* **"
-  ++ cachedMaybe "API DISABLED" show ((++" (CACHED)") . show) bestWinstreak
+  ++ cachedMaybe "API DISABLED" show (\t -> (++" (CACHED" ++ maybe "" ((' ':) . discordFormatTimestampFull) t ++ ")") . show) bestWinstreak
   ++ "**"
   , onlyIf (sense sCurrentStreak (isJust currentWinstreak))
   $ " - *Current Bow Duels Winstreak:* **"
