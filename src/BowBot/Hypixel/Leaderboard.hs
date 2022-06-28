@@ -21,7 +21,7 @@ import BowBot.Network.Basic
 import BowBot.BotData.Counter
 import Control.Concurrent (threadDelay)
 import Control.Concurrent.Async (mapConcurrently)
-import Data.Time.Clock (UTCTime)
+import Data.Time.Clock (UTCTime(..))
 
 data HypixelBowLeaderboardEntry = HypixelBowLeaderboardEntry
   { bowLbWins :: Integer,
@@ -35,9 +35,10 @@ instance Cached HypixelBowLeaderboardEntry where
   type CacheIndex HypixelBowLeaderboardEntry = UUID
   refreshCache conn = do
     cache <- getCache
-    res :: [(String, Integer, Integer, Integer, Maybe UTCTime, Maybe UTCTime)] <- queryLog conn "SELECT `minecraft`, `bowWins`, `bowLosses`, `bowWinstreak`, `lastUpdate`, `lastWinstreakUpdate` FROM `statsDEV`" ()
+    res :: [(String, Integer, Integer, Integer, UTCTime, UTCTime)] <- queryLog conn "SELECT `minecraft`, `bowWins`, `bowLosses`, `bowWinstreak`, `lastUpdate`, `lastWinstreakUpdate` FROM `statsDEV`" ()
     let newValues = HM.fromList $ flip fmap res $ \case
-          (UUID -> uuid, bowLbWins, bowLbLosses, (\x -> if x == 0 then Nothing else Just x) -> bowLbWinstreak, bowLbTimestamp, bowLbWinstreakTimestamp) -> (uuid, HypixelBowLeaderboardEntry {..})
+          (UUID -> uuid, bowLbWins, bowLbLosses, (\x -> if x == 0 then Nothing else Just x) -> bowLbWinstreak, nullZeroTime -> bowLbTimestamp, nullZeroTime -> bowLbWinstreakTimestamp) -> (uuid, HypixelBowLeaderboardEntry {..})
+    liftIO $ print $ map (fmap (\UTCTime {..} -> (fromEnum utctDay, utctDayTime)) . bowLbWinstreakTimestamp . snd) $ HM.toList newValues
     liftIO $ atomically $ writeTVar cache newValues
 
 hypixelBowStatsToLeaderboards :: HypixelBowStats -> HypixelBowLeaderboardEntry
@@ -48,7 +49,7 @@ instance CachedStorable HypixelBowLeaderboardEntry where
   storeInCacheIndexed accs = do
     cacheMap <- getCacheMap
     let fixed = map (\(uuid, lbe) -> (uuid, let old = cacheMap HM.!? uuid; winstreak = bowLbWinstreak lbe <|> (bowLbWinstreak =<< old); winstreakTimestamp = bowLbWinstreakTimestamp lbe <|> (bowLbWinstreakTimestamp =<< old) in lbe { bowLbWinstreak = winstreak, bowLbWinstreakTimestamp = winstreakTimestamp })) accs
-    let toQueryParams (uuid, lbe) = if Just lbe == cacheMap HM.!? uuid then Nothing else Just (uuidString uuid, bowLbWins lbe, bowLbLosses lbe, fromMaybe 0 $ bowLbWinstreak lbe, bowLbTimestamp lbe, bowLbWinstreakTimestamp lbe)
+    let toQueryParams (uuid, lbe) = if Just lbe == cacheMap HM.!? uuid then Nothing else Just (uuidString uuid, bowLbWins lbe, bowLbLosses lbe, fromMaybe 0 $ bowLbWinstreak lbe, unNullZeroTime $ bowLbTimestamp lbe, unNullZeroTime $ bowLbWinstreakTimestamp lbe)
     let queryParams = mapMaybe toQueryParams fixed
     success <- liftIO $ withDB $ \conn -> (>0) <$> executeManyLog conn "INSERT INTO `statsDEV` (`minecraft`, `bowWins`, `bowLosses`, `bowWinstreak`, `lastUpdate`, `lastWinstreakUpdate`) VALUES (?,?,?,?,?,?) ON DUPLICATE KEY UPDATE `bowWins`=VALUES(`bowWins`), `bowLosses`=VALUES(`bowLosses`), `bowWinstreak`=VALUES(`bowWinstreak`), `lastUpdate`=VALUES(`lastUpdate`), `lastWinstreakUpdate`=VALUES(`lastWinstreakUpdate`)" queryParams
     when success $ do

@@ -92,7 +92,7 @@ showHypixelBowStats Settings {..} HypixelBowStats {..} = unlines $ catMaybes
   ++ "**"
   , onlyIf (sense sBestStreak (isAnyJust bestWinstreak))
   $ " - *Best Bow Duels Winstreak:* **"
-  ++ cachedMaybe "API DISABLED" show (\t -> (++" (CACHED" ++ maybe "" ((' ':) . discordFormatTimestampFull) t ++ ")") . show) bestWinstreak
+  ++ cachedMaybe "API DISABLED" show (\t -> (++" (CACHED**" ++ maybe "" ((' ':) . discordFormatTimestampFull) t ++ "**)") . show) bestWinstreak
   ++ "**"
   , onlyIf (sense sCurrentStreak (isJust currentWinstreak))
   $ " - *Current Bow Duels Winstreak:* **"

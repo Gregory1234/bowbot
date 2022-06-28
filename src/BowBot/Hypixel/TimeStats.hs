@@ -67,8 +67,8 @@ instance (Default (SStatsTimeRange t)) => Cached (HypixelBowTimeStats t) where
   type CacheIndex (HypixelBowTimeStats t) = UUID
   refreshCache conn = do
     cache <- getCache @(HypixelBowTimeStats t)
-    res :: [(String, Integer, Integer, Maybe UTCTime)] <- queryLog conn (replaceQuery "TIME" (statsTimeRangeName $ sStatsTimeRangeGet (def :: SStatsTimeRange t)) "SELECT `minecraft`, `lastTIMEWins`, `lastTIMELosses`, `lastTIMEUpdate` FROM `statsDEV` WHERE `lastTIMEWins` >= 0 AND `lastTIMELosses` >= 0") ()
-    let newValues = HM.fromList $ flip fmap res $ \(UUID -> uuid, bowTimeWins, bowTimeLosses, bowTimeTimestamp) -> (uuid, HypixelBowTimeStats {..})
+    res :: [(String, Integer, Integer, UTCTime)] <- queryLog conn (replaceQuery "TIME" (statsTimeRangeName $ sStatsTimeRangeGet (def :: SStatsTimeRange t)) "SELECT `minecraft`, `lastTIMEWins`, `lastTIMELosses`, `lastTIMEUpdate` FROM `statsDEV` WHERE `lastTIMEWins` >= 0 AND `lastTIMELosses` >= 0") ()
+    let newValues = HM.fromList $ flip fmap res $ \(UUID -> uuid, bowTimeWins, bowTimeLosses, nullZeroTime -> bowTimeTimestamp) -> (uuid, HypixelBowTimeStats {..})
     liftIO $ atomically $ writeTVar cache newValues
 
 showHypixelBowTimeStats :: forall t. Default (SStatsTimeRange t) => Settings -> HypixelBowStats -> HypixelBowTimeStats t -> String
@@ -109,7 +109,7 @@ showMaybeHypixelBowTimeStats s t (Just v) = showHypixelBowTimeStats s t v
 instance (Default (SStatsTimeRange t)) => CachedStorable (HypixelBowTimeStats t) where
   storeInCacheIndexed accs = do
     cacheMap <- getCacheMap
-    let toQueryParams (uuid, lbe) = if Just lbe == cacheMap HM.!? uuid then Nothing else Just (uuidString uuid, bowTimeWins lbe, bowTimeLosses lbe, bowTimeTimestamp lbe)
+    let toQueryParams (uuid, lbe) = if Just lbe == cacheMap HM.!? uuid then Nothing else Just (uuidString uuid, bowTimeWins lbe, bowTimeLosses lbe, unNullZeroTime $ bowTimeTimestamp lbe)
     let queryParams = mapMaybe toQueryParams accs
     success <- liftIO $ withDB $ \conn -> (>0) <$> executeManyLog conn (replaceQuery "TIME" (statsTimeRangeName $ sStatsTimeRangeGet (def :: SStatsTimeRange t)) "INSERT INTO `statsDEV` (`minecraft`, `lastTIMEWins`, `lastTIMELosses`, `lastTIMEUpdate`) VALUES (?,?,?,?) ON DUPLICATE KEY UPDATE `lastTIMEWins`=VALUES(`lastTIMEWins`), `lastTIMELosses`=VALUES(`lastTIMELosses`), `lastTIMEUpdate`=VALUES(`lastTIMEUpdate`)") queryParams
     when success $ do

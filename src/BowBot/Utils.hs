@@ -33,7 +33,7 @@ import Data.Functor (($>))
 import Data.List.Split (splitOn, chunksOf)
 import Data.Kind (Type, Constraint)
 import Data.Has
-import Data.Time.Clock (UTCTime, nominalDiffTimeToSeconds)
+import Data.Time.Clock (UTCTime(..), nominalDiffTimeToSeconds)
 import Data.Fixed (Fixed(..), resolution)
 
 dist :: Eq a => [a] -> [a] -> Int
@@ -133,3 +133,14 @@ timestampToUnixSecond timestamp = fullseconds
   where
     seconds = nominalDiffTimeToSeconds $ utcTimeToPOSIXSeconds timestamp
     fullseconds = let (MkFixed picoseconds) = seconds in picoseconds `div` resolution seconds
+
+zeroTimestamp :: UTCTime
+zeroTimestamp = UTCTime { utctDay = toEnum (-678941), utctDayTime = 0 }
+
+nullZeroTime :: UTCTime -> Maybe UTCTime
+nullZeroTime x
+  | x == zeroTimestamp = Nothing
+  | otherwise = Just x
+
+unNullZeroTime :: Maybe UTCTime -> UTCTime
+unNullZeroTime = fromMaybe zeroTimestamp
