@@ -73,7 +73,7 @@ instance (Default (SStatsTimeRange t)) => Cached (HypixelBowTimeStats t) where
 
 showHypixelBowTimeStats :: forall t. Default (SStatsTimeRange t) => Settings -> HypixelBowStats -> HypixelBowTimeStats t -> String
 showHypixelBowTimeStats Settings {..} HypixelBowStats {..} HypixelBowTimeStats {..} = unlines $ catMaybes
-  [ ((" - *Last " ++ time ++ " Update:* ") ++) . discordFormatTimestampFull <$> bowTimeTimestamp
+  [ ("*Since:* " ++) . discordFormatTimestampFull <$> bowTimeTimestamp
   , onlyIf sWins
   $ " - *Bow Duels " ++ time ++ " Wins:* **"
   ++ show (bowWins - bowTimeWins)
