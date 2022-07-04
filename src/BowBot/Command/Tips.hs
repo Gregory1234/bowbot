@@ -18,13 +18,13 @@ minecraftArgFullConstraintWithSkipTip constraint s = do
   acc <- getBowBotAccountByDiscord did
   ret <- minecraftArgFullConstraint constraint did s
   if isJust s && fmap accountSelectedMinecraft acc == Just (mcUUID . mcResponseAccount . fst $ ret)
-    then respond "*Tip: you can use most BowBot commands on yourself by not providing your username!*"
+    then respond "*Tip: you can use most Bow Bot's commands on yourself by not providing your username!*"
     else do
       prefix <- askInfo discordCommandPrefixInfo
-      when (isJust s && (mcUUID . mcResponseAccount . fst $ ret) `elem` maybe [] accountMinecrafts acc) $ respond $ "*Tip: you can select this account (for use in BowBot commands without providing a username) using `" ++ prefix ++ "with " ++ (head . mcNames . mcResponseAccount . fst $ ret) ++ "`!*"
+      when (isJust s && (mcUUID . mcResponseAccount . fst $ ret) `elem` maybe [] accountMinecrafts acc) $ respond $ "*Tip: you can select this account (for use in Bow Bot's commands without providing a username) using `" ++ prefix ++ "with " ++ (head . mcNames . mcResponseAccount . fst $ ret) ++ "`!*"
   return ret
 
 minecraftNewAccountTip :: MinecraftAccount -> CommandHandler ()
 minecraftNewAccountTip MinecraftAccount {..} = do
   acc <- getFromCache @MinecraftAccount mcUUID
-  when (isNothing acc) $ respond "**A new minecraft player discovered! 🥳**"
+  when (isNothing acc) $ respond "**A new Minecraft player discovered! 🥳**"
