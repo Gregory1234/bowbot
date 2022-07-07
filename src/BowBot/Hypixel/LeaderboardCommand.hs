@@ -171,7 +171,7 @@ lossesLeaderboardTypeUnrestricted :: LeaderboardType
 lossesLeaderboardTypeUnrestricted = LeaderboardType "Hypixel Bow Duels Losses" "Losses" $ \HypixelBowLeaderboardEntry {..} -> Just (bowLbLosses, show bowLbLosses)
 
 winstreakLeaderboardTypeUnrestricted :: LeaderboardType
-winstreakLeaderboardTypeUnrestricted = LeaderboardType "Hypixel Bow Duels Winstreak" "Winstreak" $ \HypixelBowLeaderboardEntry { bowLbWinstreak = (Just ws) } -> Just (ws, show ws)
+winstreakLeaderboardTypeUnrestricted = LeaderboardType "Hypixel Bow Duels Winstreak" "Winstreak" $ \HypixelBowLeaderboardEntry {..} -> fmap (\ws -> (ws, show ws)) bowLbWinstreak
 
 wlrLeaderboardTypeUnrestricted :: LeaderboardType
 wlrLeaderboardTypeUnrestricted = LeaderboardType "Hypixel Bow Duels WLR" "WLR" $ \HypixelBowLeaderboardEntry {..} -> Just (if bowLbLosses == 0 then bowLbWins*100000000 else (bowLbWins*10000) `div` bowLbLosses, showWLR bowLbWins bowLbLosses)
