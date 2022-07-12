@@ -21,7 +21,7 @@ minecraftArgFullConstraintWithSkipTip constraint s = do
     then respond "*Tip: you can use most Bow Bot's commands on yourself by not providing your username!*"
     else do
       prefix <- askInfo discordCommandPrefixInfo
-      when (isJust s && (mcUUID . mcResponseAccount . fst $ ret) `elem` maybe [] accountMinecrafts acc) $ respond $ "*Tip: you can select this account (for use in Bow Bot's commands without providing a username) using `" ++ prefix ++ "with " ++ (head . mcNames . mcResponseAccount . fst $ ret) ++ "`!*"
+      when (isJust s && (mcUUID . mcResponseAccount . fst $ ret) `elem` maybe [] accountMinecrafts acc) $ respond $ "*Tip: you can select this account (for use in Bow Bot's commands without providing a username) using `" ++ prefix ++ "selectmc " ++ (head . mcNames . mcResponseAccount . fst $ ret) ++ "`!*"
   return ret
 
 minecraftNewAccountTip :: MinecraftAccount -> CommandHandler ()
