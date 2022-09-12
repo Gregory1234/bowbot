@@ -32,9 +32,3 @@ mojangNameToUUID name = do
   let url = "https://api.mojang.com/users/profiles/minecraft/" ++ name
   res <- sendRequestTo url url
   decodeParse res $ \o -> UUID <$> o .: "id"
-
-mojangUUIDToNames :: (MonadIOReader m r, Has Manager r) => UUID -> m (Maybe [String])
-mojangUUIDToNames (UUID uuid) = do
-  let url = "https://api.mojang.com/user/profiles/" ++ uuid ++ "/names"
-  res <- sendRequestTo url url
-  decodeParse res $ \o -> fmap reverse . for o $ \n -> n .: "name"

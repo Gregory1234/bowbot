@@ -63,6 +63,8 @@ instance CachedIndexed MinecraftAccount where
 
 updateMinecraftAccountCache :: (MonadIOBotData m d r, Has Manager r, HasCache MinecraftAccount d) => m ()
 updateMinecraftAccountCache = do
+  pure () -- TODO: update the names
+  {-
   ctx <- ask
   let helper MinecraftAccount {..} = do
         newNames <- mojangUUIDToNames mcUUID
@@ -73,6 +75,7 @@ updateMinecraftAccountCache = do
     let chunked = chunksOf 10 bigchunk
     fmap concat $ for chunked $ mapConcurrently (fmap (`runReaderT` ctx) helper)
   void $ storeInCache updatedAccounts
+  -}
 
 mcNameToUUID :: (MonadIOBotData m d r, Has Manager r, HasCache MinecraftAccount d) => String -> m (Maybe UUID)
 mcNameToUUID name = do
@@ -86,7 +89,7 @@ mcUUIDToNames uuid = do
   goodAcc <- getFromCache uuid
   case goodAcc of
     Just MinecraftAccount {mcNames} -> return (Just mcNames)
-    _ -> mojangUUIDToNames uuid
+    _ -> pure Nothing -- TODO: try to get the names some other way?
 
 getMinecraftAccountByCurrentNameFromCache :: (MonadIOBotData m d r, HasCache MinecraftAccount d) => String -> m (Maybe MinecraftAccount)
 getMinecraftAccountByCurrentNameFromCache name = find ((==map toLower name) . map toLower . head . mcNames) . HM.elems <$> getCacheMap
