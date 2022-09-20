@@ -11,12 +11,10 @@ module BowBot.Minecraft.Account where
 
 import BowBot.Minecraft.Basic
 import BowBot.BotData.Cached
-import BowBot.DB.Basic (queryLog, executeManyLog, withDB, logInfo)
+import BowBot.DB.Basic (queryLog, executeManyLog, withDB)
 import BowBot.Network.Basic
 import BowBot.Utils
 import qualified Data.HashMap.Strict as HM
-import Control.Concurrent.Async (mapConcurrently)
-import Control.Concurrent (threadDelay)
 
 data IsBanned
   = NotBanned
@@ -84,7 +82,9 @@ mcUUIDToNames uuid = do
   goodAcc <- getFromCache uuid
   case goodAcc of
     Just MinecraftAccount {mcNames} -> return (Just mcNames)
-    _ -> pure Nothing -- TODO: try to get the names some other way?
+    _ -> do
+      current <- mojangUUIDToCurrentName uuid
+      return $ fmap (\x -> [x, x ++ "OldNamesCurrentlyNotKnown"]) current
 
 getMinecraftAccountByCurrentNameFromCache :: (MonadIOBotData m d r, HasCache MinecraftAccount d) => String -> m (Maybe MinecraftAccount)
 getMinecraftAccountByCurrentNameFromCache name = find ((==map toLower name) . map toLower . head . mcNames) . HM.elems <$> getCacheMap

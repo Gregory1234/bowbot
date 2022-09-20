@@ -43,6 +43,8 @@ dependencies:
 - hashable
 - data-default
 - data-has
+- regex-compat
+- regex-base
 
 library:
   source-dirs: src

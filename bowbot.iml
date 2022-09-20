@@ -10,24 +10,35 @@
     </content>
     <orderEntry type="inheritedJdk" />
     <orderEntry type="sourceFolder" forTests="false" />
-    <orderEntry type="library" name="aeson-2.0.3.0" level="project" />
-    <orderEntry type="library" name="async-2.2.4" level="project" />
     <orderEntry type="library" name="base-4.15.1.0" level="project" />
-    <orderEntry type="library" name="base64-0.4.2.4" level="project" />
     <orderEntry type="library" name="bytestring-0.10.12.1" level="project" />
     <orderEntry type="library" name="containers-0.6.4.1" level="project" />
     <orderEntry type="library" name="deepseq-1.4.5.0" level="project" />
-    <orderEntry type="library" name="discord-haskell-1.12.5" level="project" />
-    <orderEntry type="library" name="http-client-tls-0.3.6.1" level="project" />
-    <orderEntry type="library" name="http-conduit-2.3.8" level="project" />
     <orderEntry type="library" name="mtl-2.2.2" level="project" />
-    <orderEntry type="library" name="mysql-simple-0.4.7.2" level="project" />
-    <orderEntry type="library" name="split-0.2.3.4" level="project" />
     <orderEntry type="library" name="stm-2.5.0.0" level="project" />
-    <orderEntry type="library" name="stringsearch-0.3.6.6" level="project" />
     <orderEntry type="library" name="text-1.2.5.0" level="project" />
     <orderEntry type="library" name="time-1.9.3" level="project" />
     <orderEntry type="library" name="transformers-0.5.6.2" level="project" />
+    <orderEntry type="library" name="ghc-prim-0.7.0" level="project" />
+    <orderEntry type="library" name="template-haskell-2.17.0.0" level="project" />
+    <orderEntry type="library" name="ghc-bignum-1.1" level="project" />
+    <orderEntry type="library" name="array-0.5.4.0" level="project" />
+    <orderEntry type="library" name="binary-0.8.8.0" level="project" />
+    <orderEntry type="library" name="ghc-boot-th-9.0.2" level="project" />
+    <orderEntry type="library" name="pretty-1.1.3.6" level="project" />
+    <orderEntry type="library" name="aeson-2.0.3.0" level="project" />
+    <orderEntry type="library" name="async-2.2.4" level="project" />
+    <orderEntry type="library" name="base64-0.4.2.4" level="project" />
+    <orderEntry type="library" name="data-default-0.7.1.1" level="project" />
+    <orderEntry type="library" name="data-has-0.4.0.0" level="project" />
+    <orderEntry type="library" name="discord-haskell-1.12.5" level="project" />
+    <orderEntry type="library" name="hashable-1.3.5.0" level="project" />
+    <orderEntry type="library" name="http-client-tls-0.3.6.1" level="project" />
+    <orderEntry type="library" name="http-conduit-2.3.8" level="project" />
+    <orderEntry type="library" name="mysql-simple-0.4.7.2" level="project" />
+    <orderEntry type="library" name="regex-compat-0.95.2.1" level="project" />
+    <orderEntry type="library" name="split-0.2.3.4" level="project" />
+    <orderEntry type="library" name="stringsearch-0.3.6.6" level="project" />
     <orderEntry type="library" name="unordered-containers-0.2.17.0" level="project" />
     <orderEntry type="library" name="vector-0.12.3.1" level="project" />
     <orderEntry type="library" name="OneTuple-0.3.1" level="project" />
@@ -36,27 +47,25 @@
     <orderEntry type="library" name="base-compat-batteries-0.11.2" level="project" />
     <orderEntry type="library" name="data-fix-0.3.2" level="project" />
     <orderEntry type="library" name="dlist-1.0" level="project" />
-    <orderEntry type="library" name="ghc-prim-0.7.0" level="project" />
-    <orderEntry type="library" name="hashable-1.3.5.0" level="project" />
     <orderEntry type="library" name="indexed-traversable-0.1.2" level="project" />
     <orderEntry type="library" name="primitive-0.7.3.0" level="project" />
     <orderEntry type="library" name="scientific-0.3.7.0" level="project" />
     <orderEntry type="library" name="semialign-1.2.0.1" level="project" />
     <orderEntry type="library" name="strict-0.4.0.1" level="project" />
     <orderEntry type="library" name="tagged-0.8.6.1" level="project" />
-    <orderEntry type="library" name="template-haskell-2.17.0.0" level="project" />
     <orderEntry type="library" name="text-short-0.1.5" level="project" />
     <orderEntry type="library" name="th-abstraction-0.4.3.0" level="project" />
     <orderEntry type="library" name="these-1.1.1.1" level="project" />
     <orderEntry type="library" name="time-compat-1.9.6.1" level="project" />
     <orderEntry type="library" name="uuid-types-1.0.5" level="project" />
     <orderEntry type="library" name="witherable-0.4.2" level="project" />
-    <orderEntry type="library" name="ghc-bignum-1.1" level="project" />
-    <orderEntry type="library" name="array-0.5.4.0" level="project" />
+    <orderEntry type="library" name="data-default-class-0.1.2.0" level="project" />
+    <orderEntry type="library" name="data-default-instances-containers-0.0.1" level="project" />
+    <orderEntry type="library" name="data-default-instances-dlist-0.0.1" level="project" />
+    <orderEntry type="library" name="data-default-instances-old-locale-0.0.1" level="project" />
     <orderEntry type="library" name="JuicyPixels-3.3.7" level="project" />
     <orderEntry type="library" name="MonadRandom-0.5.3" level="project" />
     <orderEntry type="library" name="base64-bytestring-1.2.1.0" level="project" />
-    <orderEntry type="library" name="data-default-0.7.1.1" level="project" />
     <orderEntry type="library" name="emoji-0.1.0.2" level="project" />
     <orderEntry type="library" name="http-client-0.7.11" level="project" />
     <orderEntry type="library" name="iso8601-time-0.1.5" level="project" />
@@ -68,7 +77,6 @@
     <orderEntry type="library" name="case-insensitive-1.2.1.0" level="project" />
     <orderEntry type="library" name="connection-0.3.1" level="project" />
     <orderEntry type="library" name="cryptonite-0.29" level="project" />
-    <orderEntry type="library" name="data-default-class-0.1.2.0" level="project" />
     <orderEntry type="library" name="exceptions-0.10.4" level="project" />
     <orderEntry type="library" name="http-types-0.12.3" level="project" />
     <orderEntry type="library" name="memory-0.16.0" level="project" />
@@ -84,7 +92,8 @@
     <orderEntry type="library" name="mysql-0.2.1" level="project" />
     <orderEntry type="library" name="old-locale-1.0.0.7" level="project" />
     <orderEntry type="library" name="pcre-light-0.4.1.0" level="project" />
-    <orderEntry type="library" name="binary-0.8.8.0" level="project" />
+    <orderEntry type="library" name="regex-base-0.94.0.2" level="project" />
+    <orderEntry type="library" name="regex-posix-0.96.0.1" level="project" />
     <orderEntry type="library" name="base-orphans-0.8.6" level="project" />
     <orderEntry type="library" name="random-1.2.1" level="project" />
     <orderEntry type="library" name="splitmix-0.1.0.4" level="project" />
@@ -93,13 +102,8 @@
     <orderEntry type="library" name="indexed-traversable-instances-0.1.1" level="project" />
     <orderEntry type="library" name="semigroupoids-5.3.7" level="project" />
     <orderEntry type="library" name="assoc-1.0.2" level="project" />
-    <orderEntry type="library" name="ghc-boot-th-9.0.2" level="project" />
-    <orderEntry type="library" name="pretty-1.1.3.6" level="project" />
     <orderEntry type="library" name="zlib-0.6.2.3" level="project" />
     <orderEntry type="library" name="transformers-compat-0.6.6" level="project" />
-    <orderEntry type="library" name="data-default-instances-containers-0.0.1" level="project" />
-    <orderEntry type="library" name="data-default-instances-dlist-0.0.1" level="project" />
-    <orderEntry type="library" name="data-default-instances-old-locale-0.0.1" level="project" />
     <orderEntry type="library" name="cookie-0.4.5" level="project" />
     <orderEntry type="library" name="filepath-1.4.2.1" level="project" />
     <orderEntry type="library" name="iproute-1.7.12" level="project" />
@@ -152,6 +156,5 @@
     <orderEntry type="library" name="StateVar-1.2.2" level="project" />
     <orderEntry type="library" name="crypto-api-0.13.3" level="project" />
     <orderEntry type="library" name="parser-combinators-1.3.0" level="project" />
-    <orderEntry type="library" name="data-has-0.4.0.0" level="project" />
   </component>
 </module>
