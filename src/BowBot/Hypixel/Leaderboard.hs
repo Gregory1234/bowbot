@@ -38,7 +38,6 @@ instance Cached HypixelBowLeaderboardEntry where
     res :: [(String, Integer, Integer, Integer, UTCTime, UTCTime)] <- queryLog conn "SELECT `minecraft`, `bowWins`, `bowLosses`, `bowWinstreak`, `lastUpdate`, `lastWinstreakUpdate` FROM `statsDEV`" ()
     let newValues = HM.fromList $ flip fmap res $ \case
           (UUID -> uuid, bowLbWins, bowLbLosses, (\x -> if x == 0 then Nothing else Just x) -> bowLbWinstreak, nullZeroTime -> bowLbTimestamp, nullZeroTime -> bowLbWinstreakTimestamp) -> (uuid, HypixelBowLeaderboardEntry {..})
-    liftIO $ print $ map (fmap (\UTCTime {..} -> (fromEnum utctDay, utctDayTime)) . bowLbWinstreakTimestamp . snd) $ HM.toList newValues
     liftIO $ atomically $ writeTVar cache newValues
 
 hypixelBowStatsToLeaderboards :: HypixelBowStats -> HypixelBowLeaderboardEntry

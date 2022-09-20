@@ -61,21 +61,16 @@ instance CachedIndexed MinecraftAccount where
       liftIO $ atomically $ modifyTVar cache (insertMany (map (\x -> (mcUUID x, x)) accs))
     return success
 
-updateMinecraftAccountCache :: (MonadIOBotData m d r, Has Manager r, HasCache MinecraftAccount d) => m ()
-updateMinecraftAccountCache = do
-  pure () -- TODO: update the names
-  {-
-  ctx <- ask
+updateMinecraftAccountCache :: (MonadIOBotData m d r, Has Manager r, HasCache MinecraftAccount d) => Int -> m ()
+updateMinecraftAccountCache index = do
   let helper MinecraftAccount {..} = do
-        newNames <- mojangUUIDToNames mcUUID
-        return MinecraftAccount {mcNames = fromMaybe mcNames newNames, ..}
+        newName <- mojangUUIDToCurrentName mcUUID
+        return MinecraftAccount {mcNames = if newName == listToMaybe mcNames then mcNames else maybeToList newName ++ mcNames , ..}
   cache <- HM.elems <$> getCacheMap
-  let bigchunked = chunksOf 400 cache
-  updatedAccounts <- liftIO $ fmap concat $ sequence $ intersperse (([] <$) $ logInfo "Started 10 minute wait in Minecraft update" >> threadDelay 600000000) $ flip map bigchunked $ \bigchunk -> do
-    let chunked = chunksOf 10 bigchunk
-    fmap concat $ for chunked $ mapConcurrently (fmap (`runReaderT` ctx) helper)
+  let bigchunked = chunksOf 150 $ sortOn (uuidString . mcUUID) cache
+  let chunk = if index >= length bigchunked then [] else bigchunked !! index
+  updatedAccounts <- for chunk helper
   void $ storeInCache updatedAccounts
-  -}
 
 mcNameToUUID :: (MonadIOBotData m d r, Has Manager r, HasCache MinecraftAccount d) => String -> m (Maybe UUID)
 mcNameToUUID name = do

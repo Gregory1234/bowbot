@@ -32,3 +32,9 @@ mojangNameToUUID name = do
   let url = "https://api.mojang.com/users/profiles/minecraft/" ++ name
   res <- sendRequestTo url url
   decodeParse res $ \o -> UUID <$> o .: "id"
+
+mojangUUIDToCurrentName :: (MonadIOReader m r, Has Manager r) => UUID -> m (Maybe String)
+mojangUUIDToCurrentName (UUID uuid) = do
+  let url = "https://sessionserver.mojang.com/session/minecraft/profile/" ++ uuid
+  res <- sendRequestTo url url
+  decodeParse res $ \o -> o .: "name"

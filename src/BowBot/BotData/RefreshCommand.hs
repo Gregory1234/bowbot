@@ -7,6 +7,9 @@ import BowBot.Hypixel.TimeStats
 import BowBot.Hypixel.Announce
 import BowBot.Discord.Utils
 import BowBot.BotData.Cached (getCacheMap)
+import BowBot.Minecraft.Account
+import Control.Monad.Error.Class (liftEither)
+import Text.Read (readEither)
 
 adminCommand :: Int -> String -> String -> CommandHandler () -> Command
 adminCommand timeout name desc body = Command CommandInfo
@@ -33,3 +36,14 @@ updateDataCommand times name = adminCommand 3600 name ("update Bow Bot data" ++ 
   oldDaily <- getCacheMap
   updateBotData times
   when (DailyStats `elem` times) $ announceMilestones oldDaily
+
+updateNamesCommand :: Command
+updateNamesCommand = Command CommandInfo
+  { commandName = "namesupdate"
+  , commandHelpEntries = [HelpEntry { helpUsage = "namesupdate [hour]", helpDescription = "update Bow Bot Minecraft username data", helpGroup = "normal" }]
+  , commandPerms = AdminLevel
+  , commandTimeout = 3600
+  } $ oneArgument (liftEither . readEither) $ \hour -> do
+    respond "Received"
+    updateMinecraftAccountCache hour
+    respond "Done"

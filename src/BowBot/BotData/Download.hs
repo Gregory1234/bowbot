@@ -71,8 +71,7 @@ refreshBotData conn = do
 updateBotData :: (MonadIOBotData m BotData r, HasAll [Manager, DiscordHandle] r) => [StatsTimeRange] -> m ()
 updateBotData times = (ask >>=) $ \ctx -> liftIO $ foldl1 concurrently_ $
   map (`runReaderT` ctx)
-    [ updateMinecraftAccountCache
-    , updateDiscordAccountCache
+    [ updateDiscordAccountCache
     , do
       updateHypixelLeaderboardCache
       forM_ times updateHypixelTimeStatsCache'

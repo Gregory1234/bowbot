@@ -35,6 +35,7 @@ import BowBot.Discord.Account
 import BowBot.Account.Basic
 import BowBot.Command.HelpCommand
 import BowBot.Minecraft.Basic
+import BowBot.Minecraft.Account
 import BowBot.Minecraft.UrlCommand
 import BowBot.Minecraft.NameCommand
 import BowBot.Account.InfoCommand
@@ -89,6 +90,7 @@ backgroundMinutely mint = do
     when (hour == 0) $ announceMilestones oldDaily
     storeNewSavedRolesAll
     updateRolesAll
+    updateMinecraftAccountCache hour
     dev <- ifDev False $ return True
     unless dev $ when (hour `mod` 8 == 0) clearLogs
     logInfoDB conn "finished update"
@@ -223,6 +225,7 @@ commands =
   , updateDataCommand [DailyStats, WeeklyStats] "dataupdateweek"
   , updateDataCommand [DailyStats, MonthlyStats] "dataupdatemonth"
   , updateDataCommand [DailyStats, WeeklyStats, MonthlyStats] "dataupdateweekmonth"
+  , updateNamesCommand
   , adminCommand 15 "clearLogs" "clear Bow Bot's logs" clearLogs
   , adminCommand 120 "rolesupdate" "update everyone's discord roles" updateRolesAll
   , adminCommand 120 "savedrolesstore" "store everyone's saved roles" storeNewSavedRolesAll
