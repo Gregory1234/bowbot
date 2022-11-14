@@ -31,9 +31,11 @@ logInfoDB :: MonadIO m => Connection -> String -> m ()
 logInfoDB conn msg = liftIO $ void $ do
   putStrLn msg
   execute conn "INSERT INTO `logs`(`message`) VALUES (?)" (Only msg)
--- TODO: logs are sometimes out of order
+
 logInfo :: MonadIO m => String -> m ()
-logInfo msg = void $ liftIO $ forkIO $ withDB $ \conn -> logInfoDB conn msg
+logInfo msg = void $ liftIO $ do
+  putStrLn msg
+  forkIO $ withDB $ \conn -> void $ execute conn "INSERT INTO `logs`(`message`) VALUES (?)" (Only msg)
 
 logErrorDB :: MonadIO m => Connection -> String -> m ()
 logErrorDB conn msg = liftIO $ void $ do
@@ -41,7 +43,9 @@ logErrorDB conn msg = liftIO $ void $ do
   execute conn "INSERT INTO `logs`(`message`,`type`) VALUES (?,'error')" (Only msg)
 
 logError :: MonadIO m => String -> m ()
-logError msg = void $ liftIO $ forkIO $ withDB $ \conn -> logErrorDB conn msg
+logError msg = void $ liftIO $ do
+  putStrLn msg
+  forkIO $ withDB $ \conn -> void $ execute conn "INSERT INTO `logs`(`message`,`type`) VALUES (?,'error')" (Only msg)
 
 replaceQuery :: String -> String -> Query -> Query
 replaceQuery from to q = Query $ BS.toStrict $ BS.replace (fromString from) (fromString to :: BS.ByteString) (fromQuery q)
