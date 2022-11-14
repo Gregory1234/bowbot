@@ -2,4 +2,7 @@
 .idea/
 out/
 *~
+*.iml
+stack.yaml.lock
+bowbot.cabal
 run.sh

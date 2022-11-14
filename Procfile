@@ -1,1 +1,0 @@
-worker: bowbot-exe

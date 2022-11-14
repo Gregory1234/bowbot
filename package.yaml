@@ -1,23 +1,12 @@
 name:                bowbot
 version:             0.1.0.0
-github:              "Github username here/bowbot"
-license:             BSD3
-author:              "Author name here"
-maintainer:          "Author email here"
-copyright:           "2019 Author name here"
+github:              "Gregory1234/bowbot"
+author:              "Greg C"
 
 extra-source-files:
 - README.md
-- ChangeLog.md
 
-# Metadata used when publishing your package
-# synopsis:            Short description of your package
-# category:            App category here
-
-# To avoid duplicated efforts in documentation and dealing with the
-# complications of embedding Haddock markup inside cabal files, it is
-# common to point users to the README.md file.
-description:         Please see the README on GitHub at <https://github.com/Github username here/bowbot#readme>
+description:         Please see the README on GitHub at <https://github.com/Gregory1234/bowbot#readme>
 
 dependencies:
 - base >= 4.7 && < 5
@@ -53,17 +42,6 @@ executables:
   bowbot-exe:
     main:                Main.hs
     source-dirs:         app
-    ghc-options:
-    - -threaded
-    - -rtsopts
-    - -with-rtsopts=-N
-    dependencies:
-    - bowbot
-
-tests:
-  bowbot-test:
-    main:                Spec.hs
-    source-dirs:         test
     ghc-options:
     - -threaded
     - -rtsopts
