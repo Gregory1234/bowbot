@@ -26,9 +26,9 @@ data MinecraftResponseTime = CurrentResponse | OldResponse Text deriving (Show, 
 data MinecraftResponseAutocorrect = ResponseAutocorrect | ResponseTrue | ResponseNew deriving (Show, Eq)
 
 data MinecraftResponse = MinecraftResponse
-  { mcResponseTime :: MinecraftResponseTime
-  , mcResponseAutocorrect :: MinecraftResponseAutocorrect
-  , mcResponseAccount :: MinecraftAccount
+  { mcResponseTime :: !MinecraftResponseTime
+  , mcResponseAutocorrect :: !MinecraftResponseAutocorrect
+  , mcResponseAccount :: !MinecraftAccount
   } deriving (Show, Eq)
 
 thePlayerDoesNotExistMessage :: Text

@@ -43,14 +43,14 @@ cachedToMaybe :: CachedMaybe a -> Maybe a
 cachedToMaybe = cachedMaybe Nothing Just (const Just)
 
 data HypixelBowStats = HypixelBowStats
-  { bowWins :: Integer,
-    bowLosses :: Integer,
-    bestWinstreak :: CachedMaybe Integer,
-    currentWinstreak :: Maybe Integer,
-    bestDailyWinstreak :: Maybe Integer,
-    bowHits :: Integer,
-    bowShots :: Integer,
-    bowStatsTimestamp :: Maybe UTCTime
+  { bowWins :: !Integer,
+    bowLosses :: !Integer,
+    bestWinstreak :: !(CachedMaybe Integer),
+    currentWinstreak :: !(Maybe Integer),
+    bestDailyWinstreak :: !(Maybe Integer),
+    bowHits :: !Integer,
+    bowShots :: !Integer,
+    bowStatsTimestamp :: !(Maybe UTCTime)
   } deriving (Show)
 
 

@@ -18,9 +18,9 @@ import BowBot.Utils
 data BoolSense = Never | WhenSensible | Always deriving (Show, Eq, Ord, Enum)
 
 data Settings = Settings
-  { sWins :: Bool, sLosses :: Bool, sWLR :: BoolSense, sWinsUntil :: BoolSense
-  , sBestStreak :: BoolSense, sCurrentStreak :: BoolSense, sBestDailyStreak :: BoolSense
-  , sBowHits :: Bool, sBowShots :: Bool, sAccuracy :: BoolSense
+  { sWins :: !Bool, sLosses :: !Bool, sWLR :: !BoolSense, sWinsUntil :: !BoolSense
+  , sBestStreak :: !BoolSense, sCurrentStreak :: !BoolSense, sBestDailyStreak :: !BoolSense
+  , sBowHits :: !Bool, sBowShots :: !Bool, sAccuracy :: !BoolSense
   } deriving (Show, Eq)
 
 parseBool :: Text -> Maybe Bool

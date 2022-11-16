@@ -15,7 +15,7 @@ import BowBot.Network.Basic
 import Control.Monad.Reader (runReaderT)
 import BowBot.Discord.Utils (Text)
   
-data Command = Command { commandInfo :: CommandInfo, commandHandler :: CommandHandler () }
+data Command = Command { commandInfo :: !CommandInfo, commandHandler :: CommandHandler () }
 
 runCommand :: Command -> Message -> Bot ()
 runCommand Command {..} m = do

@@ -25,11 +25,11 @@ import Control.Concurrent.Async (mapConcurrently)
 import Data.Time.Clock (UTCTime(..))
 
 data HypixelBowLeaderboardEntry = HypixelBowLeaderboardEntry
-  { bowLbWins :: Integer,
-    bowLbLosses :: Integer,
-    bowLbWinstreak :: Maybe Integer,
-    bowLbTimestamp :: Maybe UTCTime,
-    bowLbWinstreakTimestamp :: Maybe UTCTime
+  { bowLbWins :: !Integer,
+    bowLbLosses :: !Integer,
+    bowLbWinstreak :: !(Maybe Integer),
+    bowLbTimestamp :: !(Maybe UTCTime),
+    bowLbWinstreakTimestamp :: !(Maybe UTCTime)
   } deriving (Show, Eq)
 
 instance Cached HypixelBowLeaderboardEntry where

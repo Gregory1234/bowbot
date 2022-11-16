@@ -18,7 +18,7 @@ import BowBot.BotData.Info
 import qualified Discord.Requests as R
 import Data.List (deleteFirstsBy)
 
-data DiscordAccount = DiscordAccount { discordId :: UserId, discordName :: Text, discordDiscrim :: Text, discordNickname :: Maybe Text, discordIsMember :: Bool } deriving (Show, Eq)
+data DiscordAccount = DiscordAccount { discordId :: !UserId, discordName :: !Text, discordDiscrim :: !Text, discordNickname :: !(Maybe Text), discordIsMember :: !Bool } deriving (Show, Eq)
 
 instance Cached DiscordAccount where
   type CacheIndex DiscordAccount = UserId

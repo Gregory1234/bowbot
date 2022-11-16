@@ -25,7 +25,7 @@ import BowBot.BotData.CachedSingle
 import BowBot.Hypixel.Guild
 import qualified Data.Text as T
 
-data LeaderboardType = LeaderboardType { leaderboardName :: Text, leaderboardStatName :: Text, leaderboardParser :: HypixelBowLeaderboardEntry -> Maybe (Integer, Text) }
+data LeaderboardType = LeaderboardType { leaderboardName :: !Text, leaderboardStatName :: !Text, leaderboardParser :: HypixelBowLeaderboardEntry -> Maybe (Integer, Text) }
 
 data LeaderboardResponse = LeaderboardPage Int | LeaderboardFind MinecraftResponseTime MinecraftResponseAutocorrect Text | LeaderboardAll
 

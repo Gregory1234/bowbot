@@ -21,13 +21,13 @@ import qualified Data.Text as T
 newtype CommandArgs = CommandMessageArgs [Text]
 
 data CommandEnvironment = CommandEnvironment
-  { envSender :: User
-  , envSenderMember :: Maybe GuildMember
-  , envChannel :: ChannelId
-  , envGuild :: GuildId
+  { envSender :: !User
+  , envSenderMember :: !(Maybe GuildMember)
+  , envChannel :: !ChannelId
+  , envGuild :: !GuildId
   , envRespond :: forall m r. (MonadIOReader m r, Has DiscordHandle r) => Text -> m ()
   , envRespondFile :: forall m r. (MonadIOReader m r, Has DiscordHandle r) => Text -> Text -> m ()
-  , envArgs :: CommandArgs
+  , envArgs :: !CommandArgs
   }
 
 commandEnvFromMessage :: Message -> CommandEnvironment
@@ -42,12 +42,12 @@ commandEnvFromMessage m = CommandEnvironment
   }
 
 data CommandHandlerContext = CommandHandlerContext
-  { cctxEnv :: CommandEnvironment
-  , cctxManager :: Manager
-  , cctxConnection :: Connection
-  , cctxDiscord :: DiscordHandle
-  , cctxCounter :: CounterState
-  , cctxData :: BotData
+  { cctxEnv :: !CommandEnvironment
+  , cctxManager :: !Manager
+  , cctxConnection :: !Connection
+  , cctxDiscord :: !DiscordHandle
+  , cctxCounter :: !CounterState
+  , cctxData :: !BotData
   }
 
 instance Has CommandEnvironment CommandHandlerContext where

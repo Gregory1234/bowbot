@@ -32,10 +32,10 @@ isBannedToString NotBanned = "normal"
 isBannedToString Banned = "ban"
 
 data MinecraftAccount = MinecraftAccount
-  { mcUUID :: UUID
-  , mcNames :: [Text]
-  , mcHypixelBow :: IsBanned
-  , mcHypixelWatchlist :: Bool
+  { mcUUID :: !UUID
+  , mcNames :: ![Text]
+  , mcHypixelBow :: !IsBanned
+  , mcHypixelWatchlist :: !Bool
   } deriving (Show, Eq)
 
 instance Cached MinecraftAccount where

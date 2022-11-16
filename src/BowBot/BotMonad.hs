@@ -12,11 +12,11 @@ import BowBot.Counter.Basic
 import BowBot.DB.Basic (Connection)
 
 data BotContext = BotContext
-  { bctxManager :: Manager
-  , bctxConnection :: Connection
-  , bctxDiscord :: DiscordHandle
-  , bctxCounter :: CounterState
-  , bctxData :: BotData
+  { bctxManager :: !Manager
+  , bctxConnection :: !Connection
+  , bctxDiscord :: !DiscordHandle
+  , bctxCounter :: !CounterState
+  , bctxData :: !BotData
   }
 
 instance Has Manager BotContext where

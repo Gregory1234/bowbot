@@ -16,7 +16,7 @@ import BowBot.BotData.Cached
 import Text.Read (readEither)
 import Data.Bifunctor (first)
 
-data InfoField = InfoField { infoFieldName :: Text, infoFieldValue :: Text } deriving (Show, Eq)
+data InfoField = InfoField { infoFieldName :: !Text, infoFieldValue :: !Text } deriving (Show, Eq)
 
 instance Cached InfoField where
   type CacheIndex InfoField = Text
@@ -51,7 +51,7 @@ askInfo InfoType {..} = do
       logErrorFork $ "Info not found: " <> infoName
       return infoDefault
 
-data InfoType a = InfoType { infoName :: Text, infoDefault :: a, infoParse :: Text -> Either Text a }
+data InfoType a = InfoType { infoName :: !Text, infoDefault :: !a, infoParse :: Text -> Either Text a }
 
 discordCommandPrefixInfo :: InfoType Text
 discordCommandPrefixInfo = InfoType { infoName = "command_prefix", infoDefault = "???", infoParse = Right }

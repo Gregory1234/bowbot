@@ -17,7 +17,7 @@ import BowBot.Account.Basic
 import qualified Data.Text as T
 
 
-data BirthdayDate = BirthdayDate { birthdayDay :: Int, birthdayMonth :: Int } deriving (Show, Eq)
+data BirthdayDate = BirthdayDate { birthdayDay :: !Int, birthdayMonth :: !Int } deriving (Show, Eq)
 
 birthdayString :: BirthdayDate -> Text
 birthdayString BirthdayDate {..} = pad' False '0' 2 (showt birthdayDay) <> "." <> pad' False '0' 2 (showt birthdayMonth)

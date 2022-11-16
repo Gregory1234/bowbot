@@ -16,9 +16,9 @@ import BowBot.DB.Basic (queryLog, Only(..))
 import BowBot.Utils
 
 data BowBotAccount = BowBotAccount
-  { accountId :: Integer
+  { accountId :: !Integer
   , accountDiscords :: [UserId]
-  , accountSelectedMinecraft :: UUID
+  , accountSelectedMinecraft :: !UUID
   , accountMinecrafts :: [UUID]
   } deriving (Show, Eq)
 
