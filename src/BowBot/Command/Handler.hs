@@ -66,10 +66,10 @@ envs f = asks $ f . getter
 
 respond :: (MonadIOReader m r, HasAll [CommandEnvironment, DiscordHandle] r) => String -> m ()
 respond m = do
-  res <- envs envRespond
+  res <- envs (\x -> envRespond x)
   res m
 
 respondFile :: (MonadIOReader m r, HasAll [CommandEnvironment, DiscordHandle] r) => String -> String -> m ()
 respondFile n m = do
-  res <- envs envRespondFile
+  res <- envs (\x -> envRespondFile x)
   res n m
