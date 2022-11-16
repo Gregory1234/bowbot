@@ -1,5 +1,6 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE DataKinds #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 module BowBot.Command.Args where
 
@@ -8,7 +9,7 @@ import Control.Monad.Except (ExceptT(..), runExceptT, throwError, MonadError)
 import BowBot.Utils
 import Discord (DiscordHandle)
 
-withArguments :: (MonadIOReader m r, HasAll [CommandEnvironment, DiscordHandle] r) => (CommandArgs -> ExceptT String m a) -> (a -> m ()) -> m ()
+withArguments :: (MonadIOReader m r, HasAll [CommandEnvironment, DiscordHandle] r) => (CommandArgs -> ExceptT Text m a) -> (a -> m ()) -> m ()
 withArguments parser body = do
   args <- envs envArgs
   v <- runExceptT (parser args)
@@ -16,7 +17,7 @@ withArguments parser body = do
     Left e -> respond e
     Right a -> body a
 
-withArguments' :: (MonadIOReader m r, HasAll [CommandEnvironment, DiscordHandle] r) => (CommandArgs -> ExceptT String m ()) -> m ()
+withArguments' :: (MonadIOReader m r, HasAll [CommandEnvironment, DiscordHandle] r) => (CommandArgs -> ExceptT Text m ()) -> m ()
 withArguments' body = do
   args <- envs envArgs
   v <- runExceptT (body args)
@@ -27,28 +28,28 @@ withArguments' body = do
 noArguments :: (MonadIOReader m r, HasAll [CommandEnvironment, DiscordHandle] r) => m () -> m ()
 noArguments body = withArguments (\(CommandMessageArgs args) -> assertArgumentsCount 0 0 args) $ \() -> body
 
-oneArgument :: (MonadIOReader m r, HasAll [CommandEnvironment, DiscordHandle] r) => (String -> ExceptT String m a) -> (a -> m ()) -> m ()
+oneArgument :: (MonadIOReader m r, HasAll [CommandEnvironment, DiscordHandle] r) => (Text -> ExceptT Text m a) -> (a -> m ()) -> m ()
 oneArgument parser = withArguments (\(CommandMessageArgs args) -> assertArgumentsCount 1 1 args >> parser (head args))
 
-oneArgument' :: (MonadIOReader m r, HasAll [CommandEnvironment, DiscordHandle] r) => (String -> ExceptT String m ()) -> m ()
+oneArgument' :: (MonadIOReader m r, HasAll [CommandEnvironment, DiscordHandle] r) => (Text -> ExceptT Text m ()) -> m ()
 oneArgument' body = withArguments' (\(CommandMessageArgs args) -> assertArgumentsCount 1 1 args >> body (head args))
 
-oneOptionalArgument :: (MonadIOReader m r, HasAll [CommandEnvironment, DiscordHandle] r) => (Maybe String -> ExceptT String m a) -> (a -> m ()) -> m ()
+oneOptionalArgument :: (MonadIOReader m r, HasAll [CommandEnvironment, DiscordHandle] r) => (Maybe Text -> ExceptT Text m a) -> (a -> m ()) -> m ()
 oneOptionalArgument parser = withArguments (\(CommandMessageArgs args) -> assertArgumentsCount 0 1 args >> parser (listToMaybe args))
 
-twoArguments' :: (MonadIOReader m r, HasAll [CommandEnvironment, DiscordHandle] r) => (String -> String -> ExceptT String m ()) -> m ()
+twoArguments' :: (MonadIOReader m r, HasAll [CommandEnvironment, DiscordHandle] r) => (Text -> Text -> ExceptT Text m ()) -> m ()
 twoArguments' body = withArguments' (\(CommandMessageArgs args) -> assertArgumentsCount 2 2 args >> body (head args) (args !! 1))
 
-twoArguments :: (MonadIOReader m r, HasAll [CommandEnvironment, DiscordHandle] r) => (String -> String -> ExceptT String m a) -> (a -> m ()) -> m ()
+twoArguments :: (MonadIOReader m r, HasAll [CommandEnvironment, DiscordHandle] r) => (Text -> Text -> ExceptT Text m a) -> (a -> m ()) -> m ()
 twoArguments parser = withArguments (\(CommandMessageArgs args) -> assertArgumentsCount 2 2 args >> parser (head args) (args !! 1))
 
-argumentsCountMsg :: Int -> Int -> Int -> String
+argumentsCountMsg :: Int -> Int -> Int -> Text
 argumentsCountMsg mina maxa args
-  | mina == maxa = "Got " ++ show args ++ " arguments, " ++ show mina ++ " expected"
-  | mina == 0 = "Got " ++ show args ++ " arguments, at most " ++ show maxa ++ " expected"
-  | otherwise = "Got " ++ show args ++ " arguments, between " ++ show mina ++ " and " ++ show maxa ++ " expected"
+  | mina == maxa = "Got " <> pack (show args) <> " arguments, " <> pack (show mina) <> " expected"
+  | mina == 0 = "Got " <> pack (show args) <> " arguments, at most " <> pack (show maxa) <> " expected"
+  | otherwise = "Got " <> pack (show args) <> " arguments, between " <> pack (show mina) <> " and " <> pack (show maxa) <> " expected"
 
-assertArgumentsCount :: MonadError String m => Int -> Int -> [String] -> m ()
+assertArgumentsCount :: MonadError Text m => Int -> Int -> [Text] -> m ()
 assertArgumentsCount mina maxa args
   | mina <= length args, maxa >= length args = pure ()
   | otherwise = throwError $ argumentsCountMsg mina maxa (length args)

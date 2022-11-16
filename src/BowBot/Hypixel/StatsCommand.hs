@@ -1,5 +1,6 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 module BowBot.Hypixel.StatsCommand where
 
@@ -21,10 +22,10 @@ import BowBot.Account.Basic
 import BowBot.Discord.Utils (discordGuildMembers)
 import BowBot.Command.Tips
 
-hypixelStatsCommand :: SettingsSource -> String -> String -> Command
+hypixelStatsCommand :: SettingsSource -> Text -> Text -> Command
 hypixelStatsCommand src name desc = Command CommandInfo
   { commandName = name
-  , commandHelpEntries = [HelpEntry { helpUsage = name ++ " [name]", helpDescription = desc, helpGroup = "normal" }]
+  , commandHelpEntries = [HelpEntry { helpUsage = name <> " [name]", helpDescription = desc, helpGroup = "normal" }]
   , commandPerms = DefaultLevel
   , commandTimeout = 15
   } $ oneOptionalArgument (minecraftArgFullConstraintWithSkipTip helper) $ \(MinecraftResponse {mcResponseAccount = mcResponseAccount@MinecraftAccount {..}, ..}, stats) -> do
@@ -33,7 +34,7 @@ hypixelStatsCommand src name desc = Command CommandInfo
     settings <- getSettingsFromSource src (userId user)
     when (bowWins stats >= 50 && mcResponseAutocorrect == ResponseNew) $ do -- TODO: remove repetition?
       minecraftNewAccountTip mcResponseAccount
-    respond $ didYouMean ++ renderedName ++ ":\n" ++ showHypixelBowStats settings stats
+    respond $ didYouMean <> renderedName <> ":\n" <> showHypixelBowStats settings stats
     when (bowWins stats >= 50 && mcResponseAutocorrect == ResponseNew) $ do
       a <- storeInCache [mcResponseAccount]
       when a $ void $ storeInCacheIndexed [(mcUUID, hypixelBowStatsToLeaderboards stats)]
@@ -50,4 +51,4 @@ hypixelStatsCommand src name desc = Command CommandInfo
           stats <- liftMaybe "*The player has never joined Hypixel!*" =<< requestHypixelBowStats mcUUID
           oldstats <- getFromCache mcUUID
           return (if bowWins stats + bowLosses stats /= 0 then ResponseGood else ResponseFindBetter, completeHypixelBowStats stats oldstats)
-        Just sec -> throwError $ "*Too many requests! Wait another " ++ show sec ++ " seconds!*"
+        Just sec -> throwError $ "*Too many requests! Wait another " <> pack (show sec) <> " seconds!*"

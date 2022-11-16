@@ -1,5 +1,6 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE TupleSections #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 module BowBot.Discord.RoleCommand where
 
@@ -9,6 +10,7 @@ import qualified Discord.Requests as R
 import BowBot.BotData.Info
 import BowBot.Discord.Roles
 import BowBot.Discord.Utils
+import qualified Data.Text as T
 
 roleCommand :: Command
 roleCommand = Command CommandInfo
@@ -31,10 +33,10 @@ roleCommand = Command CommandInfo
           case maybeRoles of
             Left _ -> respond somethingWentWrongMessage
             Right roleList -> do
-              respond $ "Toggleable roles: ```\n" ++ intercalate ", " (map (\(n,r) ->
-                (if r `elem` memberRoles mem then "*" else "") ++ n
-                  ++ " (@" ++ head (unpack . roleName <$> filter ((==r) . roleId) roleList) ++ ")") (M.toList allRoles)
-                ) ++ "```"
+              respond $ "Toggleable roles: ```\n" <> T.intercalate ", " (map (\(n,r) ->
+                (if r `elem` memberRoles mem then "*" else "") <> n
+                  <> " (@" <> head (roleName <$> filter ((==r) . roleId) roleList) <> ")") (M.toList allRoles)
+                ) <> "```"
     Just (rid, role) -> do
       gid <- askInfo discordGuildIdInfo
       sender <- userId <$> envs envSender
@@ -45,7 +47,7 @@ roleCommand = Command CommandInfo
           if rid `notElem` memberRoles mem
           then do
             call_ $ R.AddGuildMemberRole gid sender rid
-            respond $ "Added role " ++ role
+            respond $ "Added role " <> role
           else do
             call_ $ R.RemoveGuildMemberRole gid sender rid
-            respond $ "Removed role " ++ role
+            respond $ "Removed role " <> role

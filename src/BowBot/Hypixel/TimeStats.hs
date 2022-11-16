@@ -24,6 +24,7 @@ import BowBot.DB.Basic
 import BowBot.Utils
 import BowBot.Settings.Basic
 import BowBot.Discord.Utils
+import qualified Data.Text as T
 
 data StatsTimeRange = DailyStats | WeeklyStats | MonthlyStats deriving (Show, Eq)
 
@@ -50,7 +51,7 @@ data HypixelBowTimeStats (t :: StatsTimeRange) = HypixelBowTimeStats
     bowTimeTimestamp :: Maybe UTCTime
   } deriving (Show, Eq)
 
-statsTimeRangeName :: StatsTimeRange -> String
+statsTimeRangeName :: StatsTimeRange -> Text
 statsTimeRangeName DailyStats = "Day"
 statsTimeRangeName WeeklyStats = "Week"
 statsTimeRangeName MonthlyStats = "Month"
@@ -66,25 +67,25 @@ instance (Default (SStatsTimeRange t)) => Cached (HypixelBowTimeStats t) where
   type CacheIndex (HypixelBowTimeStats t) = UUID
   refreshCache = do
     cache <- getCache @(HypixelBowTimeStats t)
-    res :: [(String, Integer, Integer, UTCTime)] <- queryLog (replaceQuery "TIME" (statsTimeRangeName $ sStatsTimeRangeGet (def :: SStatsTimeRange t)) "SELECT `minecraft`, `lastTIMEWins`, `lastTIMELosses`, `lastTIMEUpdate` FROM `stats` WHERE `lastTIMEWins` >= 0 AND `lastTIMELosses` >= 0") ()
+    res :: [(Text, Integer, Integer, UTCTime)] <- queryLog (replaceQuery "TIME" (statsTimeRangeName $ sStatsTimeRangeGet (def :: SStatsTimeRange t)) "SELECT `minecraft`, `lastTIMEWins`, `lastTIMELosses`, `lastTIMEUpdate` FROM `stats` WHERE `lastTIMEWins` >= 0 AND `lastTIMELosses` >= 0") ()
     let newValues = HM.fromList $ flip fmap res $ \(UUID -> uuid, bowTimeWins, bowTimeLosses, nullZeroTime -> bowTimeTimestamp) -> (uuid, HypixelBowTimeStats {..})
     liftIO $ atomically $ writeTVar cache newValues
 
-showHypixelBowTimeStats :: forall t. Default (SStatsTimeRange t) => Settings -> HypixelBowStats -> HypixelBowTimeStats t -> String
-showHypixelBowTimeStats Settings {..} HypixelBowStats {..} HypixelBowTimeStats {..} = unlines $ catMaybes
-  [ ("*Since:* " ++) . discordFormatTimestampFull <$> bowTimeTimestamp
+showHypixelBowTimeStats :: forall t. Default (SStatsTimeRange t) => Settings -> HypixelBowStats -> HypixelBowTimeStats t -> Text
+showHypixelBowTimeStats Settings {..} HypixelBowStats {..} HypixelBowTimeStats {..} = T.unlines $ catMaybes
+  [ ("*Since:* " <>) . discordFormatTimestampFull <$> bowTimeTimestamp
   , onlyIf sWins
-  $ " - *Bow Duels " ++ time ++ " Wins:* **"
-  ++ show (bowWins - bowTimeWins)
-  ++ "**"
+  $ " - *Bow Duels " <> time <> " Wins:* **"
+  <> pack (show (bowWins - bowTimeWins))
+  <> "**"
   , onlyIf sLosses
-  $ " - *Bow Duels " ++ time ++ " Losses:* **"
-  ++ show (bowLosses - bowTimeLosses)
-  ++ "**"
+  $ " - *Bow Duels " <> time <> " Losses:* **"
+  <> pack (show (bowLosses - bowTimeLosses))
+  <> "**"
   , onlyIf (sense sWLR (bowWins - bowTimeWins + bowLosses - bowTimeLosses /= 0))
-  $ " - *Bow Duels " ++ time ++ " Win/Loss Ratio:* **"
-  ++ winLossRatio
-  ++ "**"
+  $ " - *Bow Duels " <> time <> " Win/Loss Ratio:* **"
+  <> winLossRatio
+  <> "**"
   ]
   where
     time = timeStatsTypeShowName (sStatsTimeRangeGet (def :: SStatsTimeRange t))
@@ -98,7 +99,7 @@ showHypixelBowTimeStats Settings {..} HypixelBowStats {..} HypixelBowTimeStats {
     onlyIf False _ = Nothing
     winLossRatio = showWLR (bowWins - bowTimeWins) (bowLosses - bowTimeLosses)
 
-showMaybeHypixelBowTimeStats :: forall t. Default (SStatsTimeRange t) => Settings -> HypixelBowStats -> Maybe (HypixelBowTimeStats t) -> String
+showMaybeHypixelBowTimeStats :: forall t. Default (SStatsTimeRange t) => Settings -> HypixelBowStats -> Maybe (HypixelBowTimeStats t) -> Text
 showMaybeHypixelBowTimeStats _ _ Nothing = case def :: SStatsTimeRange t of
   SDailyStats -> "**Daily data isn't avaliable yet for this player! Wait until tomorrow!**"
   SWeeklyStats -> "**Weekly data isn't avaliable yet for this player! Wait until next week!**"

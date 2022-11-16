@@ -1,6 +1,7 @@
 {-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 module BowBot.Network.Basic(
   module BowBot.Network.Basic, Manager, newManager, MonadIO(..), MonadReader(..), asks, Has(..),
@@ -24,23 +25,23 @@ import BowBot.Utils
 managerSettings :: ManagerSettings
 managerSettings = tlsManagerSettings { managerResponseTimeout = responseTimeoutMicro 15000000 }
 
-sendRequestTo' :: Manager -> String -> String -> IO ByteString
+sendRequestTo' :: Manager -> Text -> Text -> IO ByteString
 sendRequestTo' manager url cleanUrl = do
   _ <- evaluate $ force url
   _ <- evaluate $ force cleanUrl
   logInfoFork cleanUrl
-  request <- parseRequest url
+  request <- parseRequest (unpack url)
   res <- try $ httpLbs request manager
   case res of
     (Left (e :: SomeException)) -> do
-      logErrorFork $ show e
+      logErrorFork $ pack $ show e
       threadDelay 3000000
       sendRequestTo' manager url cleanUrl
     (Right v) -> do
-      logInfoFork $ "Received response from: " ++ cleanUrl
+      logInfoFork $ "Received response from: " <> cleanUrl
       return $ responseBody v
 
-sendRequestTo :: (MonadIOReader m r, Has Manager r) => String -> String -> m ByteString
+sendRequestTo :: (MonadIOReader m r, Has Manager r) => Text -> Text -> m ByteString
 sendRequestTo url cleanUrl = do
   manager <- asks getter
   liftIO $ sendRequestTo' manager url cleanUrl
@@ -48,9 +49,9 @@ sendRequestTo url cleanUrl = do
 decodeParse :: (FromJSON o, MonadIO m) => ByteString -> (o -> Parser a) -> m (Maybe a)
 decodeParse (decode -> Just str) parser = liftIO $ case parseEither parser str of
   Left e -> do
-    logErrorFork $ show e
+    logErrorFork $ pack $ show e
     return Nothing
   Right a -> return $ Just a
 decodeParse str _ = liftIO $ do
-  logErrorFork $ "Decoding failed in " ++ show str ++ "!"
+  logErrorFork $ "Decoding failed in " <> pack (show str) <> "!"
   return Nothing

@@ -16,16 +16,17 @@ import BowBot.BotData.Basic
 import BowBot.BotData.HasData
 import BowBot.Counter.Basic
 import BowBot.DB.Basic (Connection)
+import qualified Data.Text as T
 
-newtype CommandArgs = CommandMessageArgs [String]
+newtype CommandArgs = CommandMessageArgs [Text]
 
 data CommandEnvironment = CommandEnvironment
   { envSender :: User
   , envSenderMember :: Maybe GuildMember
   , envChannel :: ChannelId
   , envGuild :: GuildId
-  , envRespond :: forall m r. (MonadIOReader m r, Has DiscordHandle r) => String -> m ()
-  , envRespondFile :: forall m r. (MonadIOReader m r, Has DiscordHandle r) => String -> String -> m ()
+  , envRespond :: forall m r. (MonadIOReader m r, Has DiscordHandle r) => Text -> m ()
+  , envRespondFile :: forall m r. (MonadIOReader m r, Has DiscordHandle r) => Text -> Text -> m ()
   , envArgs :: CommandArgs
   }
 
@@ -35,9 +36,9 @@ commandEnvFromMessage m = CommandEnvironment
   , envSenderMember = messageMember m
   , envChannel = messageChannelId m
   , envGuild = fromMaybe 0 $ messageGuildId m
-  , envRespond = call_ . R.CreateMessage (messageChannelId m) . pack
-  , envRespondFile = \n s -> call_ $ R.CreateMessageDetailed (messageChannelId m) def { R.messageDetailedFile = Just (pack n, encodeUtf8 $ pack s) }
-  , envArgs = CommandMessageArgs $ tail $ words $ unpack $ messageContent m
+  , envRespond = call_ . R.CreateMessage (messageChannelId m)
+  , envRespondFile = \n s -> call_ $ R.CreateMessageDetailed (messageChannelId m) def { R.messageDetailedFile = Just (n, encodeUtf8 s) }
+  , envArgs = CommandMessageArgs $ tail $ T.words $ messageContent m
   }
 
 data CommandHandlerContext = CommandHandlerContext
@@ -74,12 +75,12 @@ type CommandHandler = ReaderT CommandHandlerContext IO
 envs :: (MonadReader r m, Has CommandEnvironment r) => (CommandEnvironment -> v) -> m v
 envs f = asks $ f . getter
 
-respond :: (MonadIOReader m r, HasAll [CommandEnvironment, DiscordHandle] r) => String -> m ()
+respond :: (MonadIOReader m r, HasAll [CommandEnvironment, DiscordHandle] r) => Text -> m ()
 respond m = do
   res <- envs (\x -> envRespond x)
   res m
 
-respondFile :: (MonadIOReader m r, HasAll [CommandEnvironment, DiscordHandle] r) => String -> String -> m ()
+respondFile :: (MonadIOReader m r, HasAll [CommandEnvironment, DiscordHandle] r) => Text -> Text -> m ()
 respondFile n m = do
   res <- envs (\x -> envRespondFile x)
   res n m

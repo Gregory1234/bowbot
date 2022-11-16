@@ -11,9 +11,9 @@ data Counter = Counter { counterMain :: TVar Integer, counterBorder :: TVar Inte
 
 class Counted c where
   counterLimit :: c -> Integer
-  counterName :: c -> String
+  counterName :: c -> Text
 
-newtype CounterState = CounterState { counterState :: TVar (M.Map String Counter) }
+newtype CounterState = CounterState { counterState :: TVar (M.Map Text Counter) }
 
 getCounter :: (MonadIOReader m r, Has CounterState r, Counted c) => c -> m Counter
 getCounter c = do

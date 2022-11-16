@@ -18,13 +18,13 @@ import BowBot.BotData.Info
 import qualified Discord.Requests as R
 import Data.List (deleteFirstsBy)
 
-data DiscordAccount = DiscordAccount { discordId :: UserId, discordName :: String, discordDiscrim :: String, discordNickname :: Maybe String, discordIsMember :: Bool } deriving (Show, Eq)
+data DiscordAccount = DiscordAccount { discordId :: UserId, discordName :: Text, discordDiscrim :: Text, discordNickname :: Maybe Text, discordIsMember :: Bool } deriving (Show, Eq)
 
 instance Cached DiscordAccount where
   type CacheIndex DiscordAccount = UserId
   refreshCache = do
     cache <- getCache
-    res :: [(Integer, String, String, Maybe String, Bool)] <- queryLog "SELECT `id`, `name`, `discriminator`, `nickname`, `member` FROM `discord`" ()
+    res :: [(Integer, Text, Text, Maybe Text, Bool)] <- queryLog "SELECT `id`, `name`, `discriminator`, `nickname`, `member` FROM `discord`" ()
     let newValues = HM.fromList $ flip fmap res $ \(fromIntegral -> discordId, discordName, discordDiscrim, discordNickname, discordIsMember) -> (discordId, DiscordAccount {..})
     liftIO $ atomically $ writeTVar cache newValues
 
@@ -41,25 +41,25 @@ instance CachedIndexed DiscordAccount where
     return success
 
 guildMemberToDiscordAccount :: GuildMember -> DiscordAccount
-guildMemberToDiscordAccount GuildMember { memberUser = Just user, .. } = (userToDiscordAccount user) { discordNickname = unpack <$> memberNick, discordIsMember = True }
+guildMemberToDiscordAccount GuildMember { memberUser = Just user, .. } = (userToDiscordAccount user) { discordNickname = memberNick, discordIsMember = True }
 guildMemberToDiscordAccount _ = DiscordAccount 0 "" "0000" Nothing True
 
 userToDiscordAccount :: User -> DiscordAccount
 userToDiscordAccount User {..} = DiscordAccount
   { discordId = userId
-  , discordName = unpack userName
-  , discordDiscrim = maybe "0000" unpack userDiscrim
+  , discordName = userName
+  , discordDiscrim = fromMaybe "0000" userDiscrim
   , discordNickname = Nothing
   , discordIsMember = False
   }
 
-showDiscordAccount :: DiscordAccount -> String
-showDiscordAccount DiscordAccount { discordNickname = Nothing, ..} = discordName ++ "#" ++ discordDiscrim
-showDiscordAccount DiscordAccount { discordNickname = Just nick, ..} = nick ++ " (" ++ discordName ++ "#" ++ discordDiscrim ++ ")"
+showDiscordAccount :: DiscordAccount -> Text
+showDiscordAccount DiscordAccount { discordNickname = Nothing, ..} = discordName <> "#" <> discordDiscrim
+showDiscordAccount DiscordAccount { discordNickname = Just nick, ..} = nick <> " (" <> discordName <> "#" <> discordDiscrim <> ")"
 
-showDiscordAccountDiscord :: DiscordAccount -> String
-showDiscordAccountDiscord DiscordAccount { discordNickname = Nothing, ..} = "**" ++ discordEscape discordName ++ "**#" ++ discordDiscrim
-showDiscordAccountDiscord DiscordAccount { discordNickname = Just nick, ..} = "**" ++ discordEscape nick ++ "** (" ++ discordEscape discordName ++ "#" ++ discordDiscrim ++ ")"
+showDiscordAccountDiscord :: DiscordAccount -> Text
+showDiscordAccountDiscord DiscordAccount { discordNickname = Nothing, ..} = "**" <> discordEscape discordName <> "**#" <> discordDiscrim
+showDiscordAccountDiscord DiscordAccount { discordNickname = Just nick, ..} = "**" <> discordEscape nick <> "** (" <> discordEscape discordName <> "#" <> discordDiscrim <> ")"
 
 updateDiscordAccountCache :: (MonadIOBotData m d r, Has DiscordHandle r, HasCaches [InfoField, DiscordAccount] d) => m ()
 updateDiscordAccountCache = do
@@ -70,7 +70,7 @@ updateDiscordAccountCache = do
     u' <- call $ R.GetUser (discordId du)
     case u' of
       Left e -> do
-        logErrorFork $ show e
+        logErrorFork $ pack $ show e
         return du
       Right u -> return $ userToDiscordAccount u
   void $ storeInCache $ members ++ updatedNonMembers

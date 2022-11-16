@@ -1,4 +1,5 @@
 {-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 module BowBot.Snipe.Command where
 
@@ -23,4 +24,4 @@ snipeCommand = Command CommandInfo
         snipeAuthor' <- getFromCache snipeMessageAuthor
         case snipeAuthor' of
           Nothing -> respond somethingWentWrongMessage
-          Just snipeAuthor -> respond $ showDiscordAccountDiscord snipeAuthor ++ " *wrote " ++ discordFormatTimestampFull snipeMessageTimestamp ++ ":* \n" ++ snipeMessageContent
+          Just snipeAuthor -> respond $ showDiscordAccountDiscord snipeAuthor <> " *wrote " <> discordFormatTimestampFull snipeMessageTimestamp <> ":* \n" <> snipeMessageContent

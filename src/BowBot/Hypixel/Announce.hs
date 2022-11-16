@@ -2,6 +2,7 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 module BowBot.Hypixel.Announce where
 
@@ -15,12 +16,14 @@ import BowBot.Discord.Account
 import BowBot.Hypixel.TimeStats
 import BowBot.Minecraft.Basic
 import BowBot.Minecraft.Account
+import Data.Bifunctor (first)
+import qualified Data.Text as T
 
 milestonesChannelInfo :: InfoType ChannelId
-milestonesChannelInfo = InfoType { infoName = "milestones_channel", infoDefault = 0, infoParse = readEither }
+milestonesChannelInfo = InfoType { infoName = "milestones_channel", infoDefault = 0, infoParse = first pack . readEither . unpack }
 
-milestoneNamesInfo :: InfoType [(Integer, String)]
-milestoneNamesInfo = InfoType { infoName = "division_title_milestones", infoDefault = [], infoParse = \s -> for (lines s) $ \l -> case splitOn "->" l of [a, b] -> (,b) <$> fmap fromInteger (readEither a); _ -> Left "wrong format" }
+milestoneNamesInfo :: InfoType [(Integer, Text)]
+milestoneNamesInfo = InfoType { infoName = "division_title_milestones", infoDefault = [], infoParse = \s -> for (T.lines s) $ \l -> case T.splitOn "->" l of [a, b] -> (,b) <$> fmap fromInteger ((first pack . readEither . unpack) a); _ -> Left "wrong format" }
 
 announceMilestones :: (MonadIOBotData m d r, Has DiscordHandle r, HasCaches [HypixelBowTimeStats 'DailyStats, BowBotAccount, DiscordAccount, InfoField, MinecraftAccount] d) => HM.HashMap UUID (HypixelBowTimeStats 'DailyStats) -> m ()
 announceMilestones oldvals = do
@@ -38,4 +41,4 @@ announceMilestones oldvals = do
           dcaccounts <- getCacheMap
           let p = map (\x -> x { discordNickname = Nothing}) $ filter discordIsMember $ map (dcaccounts HM.!) accountDiscords
           unless (null p) $ do
-            call_ $ R.CreateMessage milestonesChannel $ pack $ "**Congratulations** to **" ++ head (mcNames mcacc) ++ "** (" ++ intercalate ", " (map showDiscordAccountDiscord p) ++ ") for reaching " ++ name ++ "!"
+            call_ $ R.CreateMessage milestonesChannel $ "**Congratulations** to **" <> head (mcNames mcacc) <> "** (" <> T.intercalate ", " (map showDiscordAccountDiscord p) <> ") for reaching " <> name <> "!"

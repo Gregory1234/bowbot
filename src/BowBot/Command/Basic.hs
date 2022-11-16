@@ -2,10 +2,12 @@ module BowBot.Command.Basic(module BowBot.Command.Basic, module BowBot.Perms.Bas
 
 import BowBot.Perms.Basic
 
-data HelpEntry = HelpEntry { helpUsage :: String, helpDescription :: String, helpGroup :: String } deriving (Show)
+import Data.Text (Text)
+
+data HelpEntry = HelpEntry { helpUsage :: Text, helpDescription :: Text, helpGroup :: Text } deriving (Show)
 
 data CommandInfo = CommandInfo
-  { commandName :: String
+  { commandName :: Text
   , commandHelpEntries :: [HelpEntry]
   , commandPerms :: PermissionLevel
   , commandTimeout :: Int

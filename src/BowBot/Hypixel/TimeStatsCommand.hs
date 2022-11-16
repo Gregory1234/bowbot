@@ -2,6 +2,7 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 module BowBot.Hypixel.TimeStatsCommand where
 
@@ -23,10 +24,10 @@ import BowBot.Account.Basic
 import BowBot.Command.Tips
 
 
-hypixelTimeStatsCommand :: SettingsSource -> String -> String -> Command
+hypixelTimeStatsCommand :: SettingsSource -> Text -> Text -> Command
 hypixelTimeStatsCommand src name desc = Command CommandInfo
   { commandName = name
-  , commandHelpEntries = [HelpEntry { helpUsage = name ++ " [name]", helpDescription = desc, helpGroup = "normal" }]
+  , commandHelpEntries = [HelpEntry { helpUsage = name <> " [name]", helpDescription = desc, helpGroup = "normal" }]
   , commandPerms = DefaultLevel
   , commandTimeout = 15
   } $ oneOptionalArgument (minecraftArgFullConstraintWithSkipTip helper) $ \(MinecraftResponse {mcResponseAccount = mcResponseAccount@MinecraftAccount {..}, ..}, stats) -> do
@@ -38,7 +39,7 @@ hypixelTimeStatsCommand src name desc = Command CommandInfo
     monthlyStats <- getFromCache @(HypixelBowTimeStats 'MonthlyStats) mcUUID
     when (bowWins stats >= 50 && mcResponseAutocorrect == ResponseNew) $ do -- TODO: remove repetition?
       minecraftNewAccountTip mcResponseAccount
-    respond $ didYouMean ++ renderedName ++ ":\n" ++ showMaybeHypixelBowTimeStats settings stats dailyStats ++ "\n" ++ showMaybeHypixelBowTimeStats settings stats weeklyStats ++ "\n" ++ showMaybeHypixelBowTimeStats settings stats monthlyStats
+    respond $ didYouMean <> renderedName <> ":\n" <> showMaybeHypixelBowTimeStats settings stats dailyStats <> "\n" <> showMaybeHypixelBowTimeStats settings stats weeklyStats <> "\n" <> showMaybeHypixelBowTimeStats settings stats monthlyStats
     when (bowWins stats >= 50 && mcResponseAutocorrect == ResponseNew) $ do
       a <- storeInCache [mcResponseAccount]
       when a $ void $ storeInCacheIndexed [(mcUUID, hypixelBowStatsToLeaderboards stats)]
@@ -54,4 +55,4 @@ hypixelTimeStatsCommand src name desc = Command CommandInfo
         Nothing -> do
           stats <- liftMaybe "*The player has never joined Hypixel!*" =<< requestHypixelBowStats mcUUID
           return (if bowWins stats + bowLosses stats /= 0 then ResponseGood else ResponseFindBetter, stats)
-        Just sec -> throwError $ "*Too many requests! Wait another " ++ show sec ++ " seconds!*"
+        Just sec -> throwError $ "*Too many requests! Wait another " <> pack (show sec) <> " seconds!*"

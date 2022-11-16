@@ -2,6 +2,7 @@
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE DataKinds #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 module BowBot.Birthday.Announce where
 
@@ -16,9 +17,11 @@ import BowBot.BotData.Info
 import BowBot.DB.Basic
 import BowBot.Discord.Account
 import Data.List (partition)
+import Data.Bifunctor (first)
+import qualified Data.Text as T
 
 birthdayChannelInfo :: InfoType ChannelId
-birthdayChannelInfo = InfoType { infoName = "birthday_channel", infoDefault = 0, infoParse = readEither }
+birthdayChannelInfo = InfoType { infoName = "birthday_channel", infoDefault = 0, infoParse = first pack . readEither . unpack }
 
 announceBirthdays :: (MonadIOBotData m d r, Has DiscordHandle r, HasCaches [BirthdayDate, BowBotAccount, DiscordAccount, InfoField] d) => m ()
 announceBirthdays = do
@@ -26,10 +29,10 @@ announceBirthdays = do
   birthdays <- getBirthdayPeople currentDay
   birthdayChannel <- askInfo birthdayChannelInfo
   dcaccounts <- getCacheMap
-  logInfoFork $ "Announcing birthdays: " ++ intercalate ", " (map showDiscordAccount . filter discordIsMember . map (dcaccounts HM.!) $ birthdays)
+  logInfoFork $ "Announcing birthdays: " <> T.intercalate ", " (map showDiscordAccount . filter discordIsMember . map (dcaccounts HM.!) $ birthdays)
   pns <- HM.fromList . ((\BowBotAccount {..} -> (,accountId) <$> accountDiscords) <=< HM.elems) <$> getCacheMap
   let (registered, unregistered) = partition (isJust . (pns HM.!?)) birthdays
   let peopleMap = M.toList $ M.filter (not . null) $ M.map (filter discordIsMember . map (dcaccounts HM.!)) $ groupByToMap (pns HM.!) registered
-  for_ peopleMap $ \(_, p) -> call $ R.CreateMessage birthdayChannel $ pack $ "**Happy birthday** to " ++ intercalate ", " (map showDiscordAccountDiscord p) ++ "!"
+  for_ peopleMap $ \(_, p) -> call $ R.CreateMessage birthdayChannel $ "**Happy birthday** to " <> T.intercalate ", " (map showDiscordAccountDiscord p) <> "!"
   let unregisteredMap = filter discordIsMember . map (dcaccounts HM.!) $ unregistered
-  for_ unregisteredMap $ \p -> call $ R.CreateMessage birthdayChannel $ pack $ "**Happy birthday** to " ++ showDiscordAccountDiscord p ++ "!"
+  for_ unregisteredMap $ \p -> call $ R.CreateMessage birthdayChannel $ "**Happy birthday** to " <> showDiscordAccountDiscord p <> "!"

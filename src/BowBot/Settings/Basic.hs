@@ -23,22 +23,22 @@ data Settings = Settings
   , sBowHits :: Bool, sBowShots :: Bool, sAccuracy :: BoolSense
   } deriving (Show, Eq)
 
-parseBool :: String -> Maybe Bool
+parseBool :: Text -> Maybe Bool
 parseBool "yes" = Just True
 parseBool "no" = Just False
 parseBool _ = Nothing
 
-parseSense :: String -> Maybe BoolSense
+parseSense :: Text -> Maybe BoolSense
 parseSense "always" = Just Always
 parseSense "never" = Just Never
 parseSense "sensibly" = Just WhenSensible
 parseSense _ = Nothing
 
-stringBool :: Bool -> String
+stringBool :: Bool -> Text
 stringBool True = "yes"
 stringBool False = "no"
 
-stringSense :: BoolSense -> String
+stringSense :: BoolSense -> Text
 stringSense Always = "always"
 stringSense Never = "never"
 stringSense WhenSensible = "sensibly"
@@ -47,7 +47,7 @@ instance Cached Settings where
   type CacheIndex Settings = UserId
   refreshCache = do
     cache <- getCache
-    res :: [(Integer, String, String, String, String, String, String, String, String, String, String)] <-
+    res :: [(Integer, Text, Text, Text, Text, Text, Text, Text, Text, Text, Text)] <-
       queryLog "SELECT `discord`, `wins`, `losses`, `wlr`, `winsUntil`, `bestStreak`, `currentStreak`, `bestDailyStreak`, `bowHits`, `bowShots`, `accuracy` FROM `settings`" ()
     let newValues = HM.fromList $ flip fmap res $ \case
           (fromInteger -> discord,
@@ -105,7 +105,7 @@ getSettingsFromSource UserSettings user = fromMaybe defSettings <$> getFromCache
 
 data SingleSetting = SingleSettingBool (Settings -> Bool) (Settings -> Bool -> Settings) | SingleSettingSense (Settings -> BoolSense) (Settings -> BoolSense -> Settings)
 
-getSingleSettingByName :: String -> Maybe SingleSetting
+getSingleSettingByName :: Text -> Maybe SingleSetting
 getSingleSettingByName "wins" = Just $ SingleSettingBool sWins $ \s b -> s { sWins = b }
 getSingleSettingByName "losses" = Just $ SingleSettingBool sLosses $ \s b -> s { sLosses = b }
 getSingleSettingByName "wlr" = Just $ SingleSettingSense sWLR $ \s b -> s { sWLR = b }

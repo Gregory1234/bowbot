@@ -1,14 +1,14 @@
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 module BowBot.Settings.Commands where
 
 import BowBot.Command
 import BowBot.Settings.Basic
-import BowBot.Discord.Utils (liftMaybe, fromMaybe)
+import BowBot.Discord.Utils
 import BowBot.BotData.Cached
-import Discord.Types (userId)
 
-boolArg :: String -> Maybe Bool
+boolArg :: Text -> Maybe Bool
 boolArg "yes" = Just True
 boolArg "show" = Just True
 boolArg "always" = Just True
@@ -17,7 +17,7 @@ boolArg "hide" = Just False
 boolArg "never" = Just False
 boolArg _ = Nothing
 
-senseArg :: String -> Maybe BoolSense
+senseArg :: Text -> Maybe BoolSense
 senseArg "yes" = Just Always
 senseArg "show" = Just Always
 senseArg "always" = Just Always
@@ -28,16 +28,16 @@ senseArg "maybe" = Just WhenSensible
 senseArg "defined" = Just WhenSensible
 senseArg _ = Nothing
 
-wrongSettingValueMessage :: String
+wrongSettingValueMessage :: Text
 wrongSettingValueMessage = "*Wrong setting value!*"
 
-wrongSettingNameMessage :: String
+wrongSettingNameMessage :: Text
 wrongSettingNameMessage = "*Wrong setting name!*"
 
-successfullyUpdatedMessage :: String
+successfullyUpdatedMessage :: Text
 successfullyUpdatedMessage = "*Successfully updated!*"
 
-settingHasThatValueAlreadyMessage :: String
+settingHasThatValueAlreadyMessage :: Text
 settingHasThatValueAlreadyMessage = "*The setting has this value already!*"
 
 setSettingCommand :: Command
@@ -55,10 +55,10 @@ setSettingCommand = Command CommandInfo
         a <- storeInCacheIndexed [(sender, set setting)]
         respond $ if a then successfullyUpdatedMessage else somethingWentWrongMessage
 
-constSettingCommand :: Bool -> BoolSense -> String -> String -> Command
+constSettingCommand :: Bool -> BoolSense -> Text -> Text -> Command
 constSettingCommand boolVal senseVal name desc = Command CommandInfo
   { commandName = name
-  , commandHelpEntries = [HelpEntry { helpUsage = name ++ " [stat]", helpDescription = desc, helpGroup = "settings" }]
+  , commandHelpEntries = [HelpEntry { helpUsage = name <> " [stat]", helpDescription = desc, helpGroup = "settings" }]
   , commandPerms = DefaultLevel
   , commandTimeout = 15
   } $ oneArgument (\sn -> (\case SingleSettingBool get set -> (flip set boolVal, (== boolVal) . get); SingleSettingSense get set -> (flip set senseVal, (== senseVal) . get)) <$> liftMaybe wrongSettingNameMessage (getSingleSettingByName sn)) $ \(set, check) -> do

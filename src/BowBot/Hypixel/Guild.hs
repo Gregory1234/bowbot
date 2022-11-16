@@ -1,5 +1,6 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE DataKinds #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 module BowBot.Hypixel.Guild where
 
@@ -11,13 +12,13 @@ import BowBot.BotData.Cached
 import BowBot.Counter.Basic
 import BowBot.Network.Basic
 import BowBot.Hypixel.Basic
-import BowBot.Discord.Utils (HasAll)
+import BowBot.Discord.Utils
 
 
-hypixelGuildIdInfo :: InfoType String
+hypixelGuildIdInfo :: InfoType Text
 hypixelGuildIdInfo = InfoType { infoName = "hypixel_guild_id", infoDefault = "", infoParse = Right }
 
-newtype HypixelGuildMembers = HypixelGuildMembers { getHypixelGuildMemberMap :: M.Map UUID String }
+newtype HypixelGuildMembers = HypixelGuildMembers { getHypixelGuildMemberMap :: M.Map UUID Text }
 
 getHypixelGuildMembers :: (MonadHoistIOBotData m d r, HasAll '[Manager, CounterState] r, HasCachedData HypixelGuildMembers d, HasCache InfoField d) => m (CacheResponse HypixelGuildMembers)
 getHypixelGuildMembers = getOrCalculateCacheSingle $ do

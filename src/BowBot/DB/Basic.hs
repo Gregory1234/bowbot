@@ -14,8 +14,8 @@ import Database.MySQL.Simple.QueryResults (QueryResults)
 import Database.MySQL.Simple.Types (Query(..))
 import Data.Int (Int64)
 import qualified Data.ByteString.Lazy as BS
+import qualified Data.Text.Encoding as T
 import qualified Data.ByteString.Search as BS
-import Data.String (fromString)
 import Control.Exception.Base (bracket)
 import Control.Concurrent (forkIO)
 
@@ -29,58 +29,58 @@ withDB f = do
   connectDatabase <- liftIO $ getEnvOrThrow "DB_NAME"
   hoistIOWithArg (bracket (liftIO $ connect $ defaultConnectInfo { connectHost, connectUser, connectPassword, connectDatabase }) close) f
 
-logInfo' :: MonadIO m => Connection -> String -> m ()
+logInfo' :: MonadIO m => Connection -> Text -> m ()
 logInfo' conn msg = liftIO $ void $ do
-  putStrLn msg
+  putStrLn (unpack msg)
   execute conn "INSERT INTO `logs`(`message`) VALUES (?)" (Only msg)
 
-logInfo :: (MonadIOReader m r, Has Connection r) => String -> m ()
+logInfo :: (MonadIOReader m r, Has Connection r) => Text -> m ()
 logInfo msg = do
   conn <- asks getter
   logInfo' conn msg
 
-logInfoFork :: MonadIO m => String -> m ()
+logInfoFork :: MonadIO m => Text -> m ()
 logInfoFork msg = void $ liftIO $ do
-  putStrLn msg
+  putStrLn (unpack msg)
   forkIO $ withDB $ \conn -> void $ execute conn "INSERT INTO `logs`(`message`) VALUES (?)" (Only msg)
 
-logError' :: MonadIO m => Connection -> String -> m ()
+logError' :: MonadIO m => Connection -> Text -> m ()
 logError' conn msg = liftIO $ void $ do
-  putStrLn msg
+  putStrLn (unpack msg)
   execute conn "INSERT INTO `logs`(`message`,`type`) VALUES (?,'error')" (Only msg)
 
-logError :: (MonadIOReader m r, Has Connection r) => String -> m ()
+logError :: (MonadIOReader m r, Has Connection r) => Text -> m ()
 logError msg = do
   conn <- asks getter
   logError' conn msg
 
-logErrorFork :: MonadIO m => String -> m ()
+logErrorFork :: MonadIO m => Text -> m ()
 logErrorFork msg = void $ liftIO $ do
-  putStrLn msg
+  putStrLn (unpack msg)
   forkIO $ withDB $ \conn -> void $ execute conn "INSERT INTO `logs`(`message`,`type`) VALUES (?,'error')" (Only msg)
 
-replaceQuery :: String -> String -> Query -> Query
-replaceQuery from to q = Query $ BS.toStrict $ BS.replace (fromString from) (fromString to :: BS.ByteString) (fromQuery q)
+replaceQuery :: Text -> Text -> Query -> Query
+replaceQuery from to q = Query $ BS.toStrict $ BS.replace (T.encodeUtf8 from) (BS.fromStrict $ T.encodeUtf8 to :: BS.ByteString) (fromQuery q)
 
 queryLog' :: (QueryParams q, QueryResults r, MonadIO m) => Connection -> Query -> q -> m [r]
 queryLog' conn q d = do
   trueQuery <- liftIO $ formatQuery conn q d
-  logInfo' conn $ "Executing query: " ++ show trueQuery
+  logInfo' conn $ "Executing query: " <> pack (show trueQuery)
   liftIO $ query conn q d
 
 executeLog' :: (QueryParams q, MonadIO m) => Connection -> Query -> q -> m Int64
 executeLog' conn q d = do
   trueQuery <- liftIO $ formatQuery conn q d
-  logInfo' conn $ "Executing query: " ++ show trueQuery
+  logInfo' conn $ "Executing query: " <> pack (show trueQuery)
   liftIO $ execute conn q d
 
 executeManyLog' :: (QueryParams q, MonadIO m) => Connection -> Query -> [q] -> m Int64
 executeManyLog' conn q [] = do
-  logInfo' conn $ "Tried executing query with no data: " ++ show q
+  logInfo' conn $ "Tried executing query with no data: " <> pack (show q)
   return 0
 executeManyLog' conn q d = do
   trueQuery <- liftIO $ formatMany conn q d
-  logInfo' conn $ "Executing query: " ++ show trueQuery
+  logInfo' conn $ "Executing query: " <> pack (show trueQuery)
   liftIO $ executeMany conn q d
 
 queryLog :: (QueryParams q, QueryResults r, MonadIOReader m rd, Has Connection rd) => Query -> q -> m [r]

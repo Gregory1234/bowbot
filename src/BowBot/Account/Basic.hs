@@ -27,7 +27,7 @@ instance Cached BowBotAccount where
   refreshCache = do
     cache <- getCache
     ids :: [Only Integer] <- queryLog "SELECT `id` FROM `people`" ()
-    minecrafts :: [(Integer, String, Bool)] <- queryLog "SELECT `id`, `minecraft`, `selected` FROM `peopleMinecraft`" ()
+    minecrafts :: [(Integer, Text, Bool)] <- queryLog "SELECT `id`, `minecraft`, `selected` FROM `peopleMinecraft`" ()
     discords :: [(Integer, Integer)] <- queryLog "SELECT `id`, `discord` FROM `peopleDiscord`" ()
     let minecraftsMap = M.map (\l -> let u = map (\(_,b,c) -> (UUID b,c)) l in (fst $ head $ filter snd u, map fst u)) $ groupByToMap (\(a,_,_) -> a) minecrafts
     let discordsMap = M.map (map (fromIntegral . snd)) $ groupByToMap fst discords

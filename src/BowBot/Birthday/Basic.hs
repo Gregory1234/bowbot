@@ -14,26 +14,27 @@ import BowBot.Discord.Utils
 import qualified Data.HashMap.Strict as HM
 import BowBot.DB.Basic (queryLog, executeManyLog', withDB)
 import BowBot.Account.Basic
+import qualified Data.Text as T
 
 
 data BirthdayDate = BirthdayDate { birthdayDay :: Int, birthdayMonth :: Int } deriving (Show, Eq)
 
-birthdayString :: BirthdayDate -> String
-birthdayString BirthdayDate {..} = pad' False '0' 2 (show birthdayDay) ++ "." ++ pad' False '0' 2 (show birthdayMonth)
+birthdayString :: BirthdayDate -> Text
+birthdayString BirthdayDate {..} = pad' False '0' 2 (pack $ show birthdayDay) <> "." <> pad' False '0' 2 (pack $ show birthdayMonth)
 
-birthdayFromString :: String -> Maybe BirthdayDate
-birthdayFromString str = case splitOn "." str of
-  [readMaybe -> Just a, readMaybe -> Just b] -> Just $ BirthdayDate a b
+birthdayFromString :: Text -> Maybe BirthdayDate
+birthdayFromString str = case T.splitOn "." str of
+  [readMaybe . unpack -> Just a, readMaybe . unpack -> Just b] -> Just $ BirthdayDate a b
   _ -> Nothing
 
 currentBirthdayDate :: IO BirthdayDate
-currentBirthdayDate = fromJust . birthdayFromString <$> getTime "%d.%m"
+currentBirthdayDate = fromJust . birthdayFromString . pack <$> getTime "%d.%m"
 
 instance Cached BirthdayDate where
   type CacheIndex BirthdayDate = UserId
   refreshCache = do
     cache <- getCache
-    res :: [(Integer, Maybe String)] <- queryLog "SELECT `discord`, `birthday` FROM `unregistered` UNION SELECT `peopleDiscord`.`discord`, `people`.`birthday` FROM `peopleDiscord` JOIN `people` ON `people`.`id`=`peopleDiscord`.`id`" ()
+    res :: [(Integer, Maybe Text)] <- queryLog "SELECT `discord`, `birthday` FROM `unregistered` UNION SELECT `peopleDiscord`.`discord`, `people`.`birthday` FROM `peopleDiscord` JOIN `people` ON `people`.`id`=`peopleDiscord`.`id`" ()
     let newValues = HM.fromList $ flip mapMaybe res $ \(fromInteger -> did, (>>= birthdayFromString) -> bd) -> (did,) <$> bd
     liftIO $ atomically $ writeTVar cache newValues
 

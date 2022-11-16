@@ -14,6 +14,7 @@ import Data.Ratio ((%))
 import Data.Time.Clock.POSIX (getCurrentTime)
 import Data.Time.Clock (UTCTime)
 import BowBot.Discord.Utils (discordFormatTimestampFull)
+import qualified Data.Text as T
 
 data CachedMaybe a = NewJust a | CachedJust (Maybe UTCTime) a | CachedNothing deriving (Show, Eq)
 
@@ -70,50 +71,50 @@ requestHypixelBowStats uuid = do
     return HypixelBowStats {..}
 
 
-showHypixelBowStats :: Settings -> HypixelBowStats -> String
-showHypixelBowStats Settings {..} HypixelBowStats {..} = unlines $ catMaybes
+showHypixelBowStats :: Settings -> HypixelBowStats -> Text
+showHypixelBowStats Settings {..} HypixelBowStats {..} = T.unlines $ catMaybes
   [ onlyIf sWins
   $ " - *Bow Duels Wins:* **"
-  ++ show bowWins
-  ++ "**" ++ maybe "" (\x -> " (**Bow " ++ divisionRankName x ++ "**)") (divisionRankFromWins bowWins)
+  <> pack (show bowWins)
+  <> "**" <> maybe "" (\x -> " (**Bow " <> divisionRankName x <> "**)") (divisionRankFromWins bowWins)
   , onlyIf sLosses
   $ " - *Bow Duels Losses:* **"
-  ++ show bowLosses
-  ++ "**"
+  <> pack (show bowLosses)
+  <> "**"
   , onlyIf (sense sWLR (bowWins + bowLosses /= 0))
   $ " - *Bow Duels Win/Loss Ratio:* **"
-  ++ winLossRatio
-  ++ "**"
+  <> winLossRatio
+  <> "**"
   , onlyIf (sense sWinsUntil (bowLosses /= 0))
   $ " - *Bow Duels Wins until "
-  ++ nextWinLossRatio
-  ++ " WLR:* **"
-  ++ winsRemaining
-  ++ "**"
+  <> nextWinLossRatio
+  <> " WLR:* **"
+  <> winsRemaining
+  <> "**"
   , onlyIf (sense sBestStreak (isAnyJust bestWinstreak))
   $ " - *Best Bow Duels Winstreak:* **"
-  ++ cachedMaybe "API DISABLED" show (\t -> (++" (CACHED" ++ maybe "" ((\s -> " **" ++ s ++ "**") . discordFormatTimestampFull) t ++ ")") . show) bestWinstreak
-  ++ "**"
+  <> cachedMaybe "API DISABLED" (pack . show) (\t -> (<>" (CACHED" <> maybe "" ((\s -> " **" <> s <> "**") . discordFormatTimestampFull) t <> ")") . pack . show) bestWinstreak
+  <> "**"
   , onlyIf (sense sCurrentStreak (isJust currentWinstreak))
   $ " - *Current Bow Duels Winstreak:* **"
-  ++ maybe "API DISABLED" show currentWinstreak
-  ++ "**"
+  <> maybe "API DISABLED" (pack . show) currentWinstreak
+  <> "**"
   , onlyIf (sense sBestDailyStreak (isJust bestDailyWinstreak))
   $ " - *Best Daily Bow Duels Winstreak(?):* **"
-  ++ maybe "API DISABLED" show bestDailyWinstreak
-  ++ "**"
+  <> maybe "API DISABLED" (pack . show) bestDailyWinstreak
+  <> "**"
   , onlyIf sBowHits
   $ " - *Bow Hits in Bow Duels:* **"
-  ++ show bowHits
-  ++ "**"
+  <> pack (show bowHits)
+  <> "**"
   , onlyIf sBowShots
   $ " - *Bow Shots in Bow Duels:* **"
-  ++ show bowShots
-  ++ "**"
+  <> pack (show bowShots)
+  <> "**"
   , onlyIf (sense sAccuracy (bowShots /= 0))
   $ " - *Bow Accuracy:* **"
-  ++ accuracy
-  ++ "**"
+  <> accuracy
+  <> "**"
   ]
   where
     sense Always _ = True
@@ -124,11 +125,11 @@ showHypixelBowStats Settings {..} HypixelBowStats {..} = unlines $ catMaybes
     winLossRatio = showWLR bowWins bowLosses
     nextWinLossRatio
       | bowLosses == 0 = "∞"
-      | otherwise = show $ (bowWins `div` bowLosses) + 1
+      | otherwise = pack $ show $ (bowWins `div` bowLosses) + 1
     winsRemaining
       | bowWins == 0, bowLosses == 0 = "1"
       | bowLosses == 0 = "N/A"
-      | otherwise = show (bowLosses - (bowWins `mod` bowLosses))
+      | otherwise = pack $ show (bowLosses - (bowWins `mod` bowLosses))
     accuracy
       | bowShots == 0 = "N/A"
-      | otherwise = show (round ((bowHits*100) % bowShots) :: Integer) ++ "%"
+      | otherwise = pack $ show (round ((bowHits*100) % bowShots) :: Integer) ++ "%"

@@ -25,7 +25,7 @@ newtype HypixelOnlinePlayers = HypixelOnlinePlayers { getHypixelOnlinePlayersLis
 isInBowDuels :: (MonadIOReader m r, Has Manager r) => UUID -> m (Maybe Bool)
 isInBowDuels uuid = hypixelWithPlayerStatus uuid $ \o -> do
   session <- o .: "session"
-  mode :: Maybe String <- session .:? "mode"
+  mode :: Maybe Text <- session .:? "mode"
   return $ mode == Just "DUELS_BOW_DUEL"
 
 getHypixelOnlinePlayers :: (MonadHoistIOBotData m d r, HasAll '[Manager, CounterState] r, HasCachedData HypixelOnlinePlayers d, HasCache MinecraftAccount d) => m (CacheResponse HypixelOnlinePlayers)

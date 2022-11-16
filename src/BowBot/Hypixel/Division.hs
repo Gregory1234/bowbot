@@ -1,5 +1,8 @@
+{-# LANGUAGE OverloadedStrings #-}
+
 module BowBot.Hypixel.Division where
 
+import BowBot.Utils
 
 data HypixelDivisionRankName
   = HRookie | HIron | HGold | HDiamond | HMaster | HLegend | HGrandmaster | HGodlike | HCelestial | HDivine | HAscended
@@ -9,8 +12,8 @@ data HypixelDivisionRankLevel = HL1 | HL2 | HL3 | HL4 | HL5 deriving (Show, Enum
 
 data HypixelDivisionRank = HypixelDivisionRank HypixelDivisionRankName HypixelDivisionRankLevel deriving (Show)
 
-divisionRankName :: HypixelDivisionRank -> String
-divisionRankName (HypixelDivisionRank n l) = showName n ++ showLevel l
+divisionRankName :: HypixelDivisionRank -> Text
+divisionRankName (HypixelDivisionRank n l) = showName n <> showLevel l
   where
     showName HRookie = "Rookie"
     showName HIron = "Iron"

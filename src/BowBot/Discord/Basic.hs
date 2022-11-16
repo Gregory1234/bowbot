@@ -22,5 +22,5 @@ call r = liftDiscord $ liftIO (evaluate (force r)) >>= restCall
 
 call_ :: (FromJSON a, R.Request (rq a), NFData (rq a), MonadIOReader m r, Has DiscordHandle r) => rq a -> m ()
 call_ r = (call r >>=) $ \case
-  Left e -> logErrorFork $ show e
+  Left e -> logErrorFork $ pack $ show e
   Right _ -> pure ()

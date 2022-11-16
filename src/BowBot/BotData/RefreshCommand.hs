@@ -1,3 +1,5 @@
+{-# LANGUAGE OverloadedStrings #-}
+
 module BowBot.BotData.RefreshCommand where
 
 import BowBot.Command
@@ -9,8 +11,10 @@ import BowBot.BotData.Cached (getCacheMap)
 import BowBot.Minecraft.Account
 import Control.Monad.Error.Class (liftEither)
 import Text.Read (readEither)
+import Data.Bifunctor (first)
+import qualified Data.Text as T
 
-adminCommand :: Int -> String -> String -> CommandHandler () -> Command
+adminCommand :: Int -> Text -> Text -> CommandHandler () -> Command
 adminCommand timeout name desc body = Command CommandInfo
   { commandName = name
   , commandHelpEntries = [HelpEntry { helpUsage = name, helpDescription = desc, helpGroup = "normal" }]
@@ -21,7 +25,7 @@ adminCommand timeout name desc body = Command CommandInfo
     body
     respond "Done"
 
-quietAdminCommand :: Int -> String -> String -> CommandHandler () -> Command
+quietAdminCommand :: Int -> Text -> Text -> CommandHandler () -> Command
 quietAdminCommand timeout name desc body = Command CommandInfo
   { commandName = name
   , commandHelpEntries = [HelpEntry { helpUsage = name, helpDescription = desc, helpGroup = "normal" }]
@@ -29,8 +33,8 @@ quietAdminCommand timeout name desc body = Command CommandInfo
   , commandTimeout = timeout
   } $ noArguments body
 
-updateDataCommand :: [StatsTimeRange] -> String -> Command
-updateDataCommand times name = adminCommand 3600 name ("update Bow Bot data" ++ if null times then "" else " as if it was the beginning of: " ++ intercalate ", " (map (map toLower . statsTimeRangeName) times)) $ do
+updateDataCommand :: [StatsTimeRange] -> Text -> Command
+updateDataCommand times name = adminCommand 3600 name ("update Bow Bot data" <> if null times then "" else " as if it was the beginning of: " <> T.intercalate ", " (map (T.toLower . statsTimeRangeName) times)) $ do
   refreshBotData
   oldDaily <- getCacheMap
   updateBotData times
@@ -42,7 +46,7 @@ updateNamesCommand = Command CommandInfo
   , commandHelpEntries = [HelpEntry { helpUsage = "namesupdate [hour]", helpDescription = "update Bow Bot Minecraft username data", helpGroup = "normal" }]
   , commandPerms = AdminLevel
   , commandTimeout = 3600
-  } $ oneArgument (liftEither . readEither) $ \hour -> do
+  } $ oneArgument (liftEither . (first pack . readEither . unpack)) $ \hour -> do
     respond "Received"
     updateMinecraftAccountCache hour
     respond "Done"

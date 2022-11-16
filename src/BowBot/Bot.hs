@@ -69,7 +69,7 @@ runBowBot = do
           discordOnLog = putStrLn . unpack,
           discordGatewayIntent = def { gatewayIntentMembers = True }
         }
-  logErrorFork $ unpack userFacingError
+  logErrorFork userFacingError
 
 backgroundMinutely :: Int -> Bot ()
 backgroundMinutely mint = do
@@ -114,13 +114,13 @@ updateDiscordStatus = do
   discordStatus <- askInfo discordStatusInfo
   liftDiscord $ sendCommand (UpdateStatus $ UpdateStatusOpts {
         updateStatusOptsSince = Nothing,
-        updateStatusOptsGame = Just (def {activityName = pack discordStatus}),
+        updateStatusOptsGame = Just (def {activityName = discordStatus}),
         updateStatusOptsNewStatus = UpdateStatusOnline,
         updateStatusOptsAFK = False
       })
 
-respond' :: (MonadIOReader m r, Has DiscordHandle r) => Message -> String -> m ()
-respond' m = call_ . CreateMessage (messageChannelId m) . pack
+respond' :: (MonadIOReader m r, Has DiscordHandle r) => Message -> Text -> m ()
+respond' m = call_ . CreateMessage (messageChannelId m)
 
 eventHandler :: Event -> Bot ()
 eventHandler (MessageCreate m) = do
@@ -128,11 +128,11 @@ eventHandler (MessageCreate m) = do
   -- liftIO $ detectRTWData man bdt m
   unless (userIsBot (messageAuthor m)) $ do
     prefix <- askInfo discordCommandPrefixInfo
-    when (pack prefix `T.isPrefixOf` messageContent m) $ do
-      let n = unpack $ T.toLower . T.drop (length prefix) . T.takeWhile (/= ' ') $ messageContent m
+    when (prefix `T.isPrefixOf` messageContent m) $ do
+      let n = T.toLower . T.drop (T.length prefix) . T.takeWhile (/= ' ') $ messageContent m
       for_ (filter ((==n) . commandName . commandInfo) commands) $ \c ->
         commandTimeoutRun (commandTimeout $ commandInfo c) m $ do
-          logInfo $ "recieved " ++ unpack (messageContent m)
+          logInfo $ "recieved " <> messageContent m
           ifDev () $ do
             testDiscordId <- askInfo discordGuildIdInfo
             when (messageGuildId m /= Just testDiscordId) $
@@ -143,7 +143,7 @@ eventHandler (MessageCreate m) = do
           else if perms >= commandPerms (commandInfo c)
             then runCommand c m
             else respond' m "You don't have the permission to do that!"
-          logInfo $ "finished " ++ unpack (messageContent m)
+          logInfo $ "finished " <> messageContent m
 eventHandler (GuildMemberAdd gid gmem) = do
   maingid <- askInfo discordGuildIdInfo
   when (gid == maingid && not (maybe True userIsBot (memberUser gmem))) $ do
@@ -153,7 +153,7 @@ eventHandler (GuildMemberAdd gid gmem) = do
 eventHandler (GuildMemberUpdate gid roles usr newname) = do
   maingid <- askInfo discordGuildIdInfo
   when (gid == maingid && not (userIsBot usr)) $ do
-    void $ storeInCache [(userToDiscordAccount usr) { discordNickname = fmap unpack newname, discordIsMember = True }]
+    void $ storeInCache [(userToDiscordAccount usr) { discordNickname = newname, discordIsMember = True }]
     unless (null roles) $ storeNewRolesSaved (userId usr) roles
 eventHandler (GuildMemberRemove gid usr) = do
   maingid <- askInfo discordGuildIdInfo
@@ -166,11 +166,11 @@ commandTimeoutRun n msg x = do
   tm <- hoistIO (try @SomeException . timeout (n * 1000000)) x
   case tm of
     Left e -> do
-      logErrorFork $ "Exception happened in command: " ++ show e
+      logErrorFork $ "Exception happened in command: " <> pack (show e)
       respond' msg "Something went horribly wrong! Please report this!"
       throw e
     Right Nothing -> do
-      logErrorFork $ "Timed out: " ++ show n ++ "s"
+      logErrorFork $ "Timed out: " <> pack (show n) <> "s"
       respond' msg "Timed out! Please report this!"
     Right (Just ()) -> pure ()
 
@@ -179,10 +179,10 @@ backgroundTimeoutRun n x = do
   tm <- hoistIO (try @SomeException . timeout (n * 1000000)) x
   case tm of
     Left e -> do
-      logErrorFork $ "Exception happened in command: " ++ show e
+      logErrorFork $ "Exception happened in command: " <> pack (show e)
       throw e
     Right Nothing -> do
-      logErrorFork $ "Timed out: " ++ show n ++ "s"
+      logErrorFork $ "Timed out: " <> pack (show n) <> "s"
     Right (Just ()) -> pure ()
 
 commands :: [Command]
@@ -205,13 +205,13 @@ commands =
   , snipeCommand
   , roleCommand
   , nameCommand
-  , urlCommand "head" "show player's head" $ \s -> "https://crafatar.com/avatars/" ++ uuidString s ++ "?overlay"
-  , urlCommand "skin" "show player's full skin" $ \s -> "https://crafatar.com/renders/body/" ++ uuidString s ++ "?overlay"
+  , urlCommand "head" "show player's head" $ \s -> "https://crafatar.com/avatars/" <> uuidString s <> "?overlay"
+  , urlCommand "skin" "show player's full skin" $ \s -> "https://crafatar.com/renders/body/" <> uuidString s <> "?overlay"
   , listCommand
   , onlineCommand
   , helpCommand commands DefaultLevel (Just $ \prefix -> "*Visibility 'maybe' and 'defined' hide the stat when the value is undefined.*\n"
-                                                ++ "**Stat names:** wins, losses, wlr, winsuntil, beststreak, currentstreak, bestdailystreak, bowhits, bowshots, accuracy\n"
-                                                ++ "**Example:** `" ++ prefix ++ "show accuracy` makes accuracy visible in the `" ++ prefix ++ "s` command\n" ) "settings" "settings"
+                                                <> "**Stat names:** wins, losses, wlr, winsuntil, beststreak, currentstreak, bestdailystreak, bowhits, bowshots, accuracy\n"
+                                                <> "**Example:** `" <> prefix <> "show accuracy` makes accuracy visible in the `" <> prefix <> "s` command\n" ) "settings" "settings"
   , setSettingCommand
   , constSettingCommand True Always "show" "makes the stat visible"
   , constSettingCommand False Never "hide" "makes the stat hidden"
@@ -233,8 +233,8 @@ commands =
   , adminCommand 120 "rolesupdate" "update everyone's discord roles" updateRolesAll
   , adminCommand 120 "savedrolesstore" "store everyone's saved roles" storeNewSavedRolesAll
   , adminCommand 15 "statusupdate" "update Bow Bot's discord status" updateDiscordStatus
-  , quietAdminCommand 5 "throw" "throw an error" $ respond $ show ((1 :: Integer) `div` 0)
-  , quietAdminCommand 5 "time" "display Bow Bot's time" $ respond =<< liftIO (getTime "Month: %m, Day: %d, Weekday: %u, Hour: %k, Minute: %M, Second %S")
+  , quietAdminCommand 5 "throw" "throw an error" $ respond $ pack $ show ((1 :: Integer) `div` 0)
+  , quietAdminCommand 5 "time" "display Bow Bot's time" $ respond . pack =<< liftIO (getTime "Month: %m, Day: %d, Weekday: %u, Hour: %k, Minute: %M, Second %S")
   , adminCommand 15 "bdsay" "announce today's birthdays" announceBirthdays
   , quietAdminCommand 5 "evacuate" "leaves the discord server" $ envs envGuild >>= call_ . LeaveGuild
   , Command CommandInfo { commandName = "gregc", commandHelpEntries = [], commandPerms = DefaultLevel, commandTimeout = 2 } $ noArguments $ respond "<:gregc:904127204865228851>"

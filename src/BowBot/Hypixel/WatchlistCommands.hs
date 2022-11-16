@@ -1,3 +1,5 @@
+{-# LANGUAGE OverloadedStrings #-}
+
 module BowBot.Hypixel.WatchlistCommands where
 
 import BowBot.Command
@@ -6,6 +8,7 @@ import qualified Data.HashMap.Strict as HM
 import BowBot.BotData.Cached
 import BowBot.Hypixel.Watchlist
 import BowBot.BotData.CachedSingle
+import qualified Data.Text as T
 
 listCommand :: Command
 listCommand = Command CommandInfo
@@ -15,7 +18,7 @@ listCommand = Command CommandInfo
   , commandTimeout = 2
   } $ noArguments $ do
     watchlist <- getWatchlist
-    respond $ "**Players in watchList:**\n```\n" ++ unwords (map (head . mcNames) watchlist) ++ "```"
+    respond $ "**Players in watchList:**\n```\n" <> T.unwords (map (head . mcNames) watchlist) <> "```"
 
 onlineCommand :: Command
 onlineCommand = Command CommandInfo
@@ -26,11 +29,11 @@ onlineCommand = Command CommandInfo
   } $ noArguments $ do
     res <- getHypixelOnlinePlayers
     cache <- getCacheMap
-    let showOnline online = case unwords (map (head . mcNames . (cache HM.!)) (getHypixelOnlinePlayersList online)) of
-          [] -> "None of the watchListed players are currently in bow duels."
+    let showOnline online = case T.unwords (map (head . mcNames . (cache HM.!)) (getHypixelOnlinePlayersList online)) of
+          "" -> "None of the watchListed players are currently in bow duels."
           str -> str
     case res of
-      CacheFresh online -> respond $ "**Players in watchList:**\n```\n" ++ showOnline online ++ "```"
-      CacheOld online -> respond $ "**Players in watchList:** (cached response)\n```\n" ++ showOnline online ++ "```"
+      CacheFresh online -> respond $ "**Players in watchList:**\n```\n" <> showOnline online <> "```"
+      CacheOld online -> respond $ "**Players in watchList:** (cached response)\n```\n" <> showOnline online <> "```"
       CacheBusy -> respond "**Processing list of online players. Please send command again later.**"
       CacheFailed -> respond somethingWentWrongMessage

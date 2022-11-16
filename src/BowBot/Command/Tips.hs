@@ -1,5 +1,6 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 module BowBot.Command.Tips where
 
@@ -12,7 +13,7 @@ import Control.Monad.Except
 import BowBot.BotData.Info
 import BowBot.BotData.Cached
 
-minecraftArgFullConstraintWithSkipTip :: (MinecraftAccount -> ExceptT String CommandHandler (MinecraftConstraintResponse, a)) -> Maybe String -> ExceptT String CommandHandler (MinecraftResponse, a)
+minecraftArgFullConstraintWithSkipTip :: (MinecraftAccount -> ExceptT Text CommandHandler (MinecraftConstraintResponse, a)) -> Maybe Text -> ExceptT Text CommandHandler (MinecraftResponse, a)
 minecraftArgFullConstraintWithSkipTip constraint s = do
   did <- userId <$> lift (envs envSender)
   acc <- getBowBotAccountByDiscord did
@@ -21,7 +22,7 @@ minecraftArgFullConstraintWithSkipTip constraint s = do
     then respond "*Tip: you can use most Bow Bot's commands on yourself by not providing your username!*"
     else do
       prefix <- askInfo discordCommandPrefixInfo
-      when (isJust s && (mcUUID . mcResponseAccount . fst $ ret) `elem` maybe [] accountMinecrafts acc) $ respond $ "*Tip: you can select this account (for use in Bow Bot's commands without providing a username) using `" ++ prefix ++ "selectmc " ++ (head . mcNames . mcResponseAccount . fst $ ret) ++ "`!*"
+      when (isJust s && (mcUUID . mcResponseAccount . fst $ ret) `elem` maybe [] accountMinecrafts acc) $ respond $ "*Tip: you can select this account (for use in Bow Bot's commands without providing a username) using `" <> prefix <> "selectmc " <> (head . mcNames . mcResponseAccount . fst $ ret) <> "`!*"
   return ret
 
 minecraftNewAccountTip :: MinecraftAccount -> CommandHandler ()

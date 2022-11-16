@@ -7,7 +7,7 @@ import BowBot.Discord.Utils
 
 data SnipeMessage = SnipeMessage
   { snipeMessageAuthor :: UserId
-  , snipeMessageContent :: String
+  , snipeMessageContent :: Text
   , snipeMessageWasEdited :: Bool
   , snipeMessageTimestamp :: UTCTime
   } deriving Show

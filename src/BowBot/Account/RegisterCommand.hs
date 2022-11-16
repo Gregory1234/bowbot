@@ -1,4 +1,5 @@
 {-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 module BowBot.Account.RegisterCommand where
 
@@ -20,9 +21,9 @@ import Control.Monad.Except
 import BowBot.Discord.Account
 import BowBot.Discord.Arg
 
-data RegisterCommandMessages = RegisterCommandMessages { registerAlreadyBelongsMessage :: String, registerAlreadyBelongsSomeoneElseMessage :: String, registerAlreadyRegisteredMessage :: String }
+data RegisterCommandMessages = RegisterCommandMessages { registerAlreadyBelongsMessage :: Text, registerAlreadyBelongsSomeoneElseMessage :: Text, registerAlreadyRegisteredMessage :: Text }
 
-registerCommandBody :: RegisterCommandMessages -> String -> UserId -> ExceptT String CommandHandler ()
+registerCommandBody :: RegisterCommandMessages -> Text -> UserId -> ExceptT Text CommandHandler ()
 registerCommandBody RegisterCommandMessages {..} name did = do
   uuid <- liftMaybe thePlayerDoesNotExistMessage =<< mcNameToUUID name
   bacc <- getBowBotAccountByMinecraft uuid
@@ -32,7 +33,7 @@ registerCommandBody RegisterCommandMessages {..} name did = do
   cv <- tryIncreaseCounter HypixelApi 1
   stats <- case cv of
     Nothing -> liftMaybe "*The player has never joined Hypixel!*" =<< requestHypixelBowStats uuid
-    Just sec -> throwError $ "*Too many requests! Wait another " ++ show sec ++ " seconds!*"
+    Just sec -> throwError $ "*Too many requests! Wait another " <> pack (show sec) <> " seconds!*"
   saved <- getFromCache uuid
   mc <- case saved of
     Nothing -> do
@@ -93,7 +94,7 @@ addaltCommand = Command CommandInfo
     cv <- tryIncreaseCounter HypixelApi 1
     stats <- case cv of
       Nothing -> liftMaybe "*The player has never joined Hypixel!*" =<< requestHypixelBowStats uuid
-      Just sec -> throwError $ "*Too many requests! Wait another " ++ show sec ++ " seconds!*"
+      Just sec -> throwError $ "*Too many requests! Wait another " <> pack (show sec) <> " seconds!*"
     saved <- getFromCache uuid
     case saved of -- TODO: remove repetition!
       Nothing -> do

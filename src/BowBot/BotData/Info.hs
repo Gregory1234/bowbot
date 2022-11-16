@@ -14,14 +14,15 @@ import BowBot.Utils
 import qualified Data.HashMap.Strict as HM
 import BowBot.BotData.Cached
 import Text.Read (readEither)
+import Data.Bifunctor (first)
 
-data InfoField = InfoField { infoFieldName :: String, infoFieldValue :: String } deriving (Show, Eq)
+data InfoField = InfoField { infoFieldName :: Text, infoFieldValue :: Text } deriving (Show, Eq)
 
 instance Cached InfoField where
-  type CacheIndex InfoField = String
+  type CacheIndex InfoField = Text
   refreshCache = do
     cache <- getCache
-    res :: [(String, String)] <- queryLog "SELECT `name`, `value` FROM `botInfo`" ()
+    res :: [(Text, Text)] <- queryLog "SELECT `name`, `value` FROM `botInfo`" ()
     let newValues = HM.fromList $ flip fmap res $ \(infoFieldName, infoFieldValue) -> (infoFieldName, InfoField {..})
     liftIO $ atomically $ writeTVar cache newValues
 
@@ -44,19 +45,19 @@ askInfo InfoType {..} = do
     Just InfoField { infoFieldValue = r } -> case infoParse r of
       Right v -> return v
       Left e -> do
-        logErrorFork $ "Info perser error in " ++ infoName ++ ": " ++ e
+        logErrorFork $ "Info perser error in " <> infoName <> ": " <> e
         return infoDefault
     _ -> do
-      logErrorFork $ "Info not found: " ++ infoName
+      logErrorFork $ "Info not found: " <> infoName
       return infoDefault
 
-data InfoType a = InfoType { infoName :: String, infoDefault :: a, infoParse :: String -> Either String a }
+data InfoType a = InfoType { infoName :: Text, infoDefault :: a, infoParse :: Text -> Either Text a }
 
-discordCommandPrefixInfo :: InfoType String
+discordCommandPrefixInfo :: InfoType Text
 discordCommandPrefixInfo = InfoType { infoName = "command_prefix", infoDefault = "???", infoParse = Right }
 
 discordGuildIdInfo :: InfoType GuildId
-discordGuildIdInfo = InfoType { infoName = "discord_guild_id", infoDefault = 0, infoParse = readEither }
+discordGuildIdInfo = InfoType { infoName = "discord_guild_id", infoDefault = 0, infoParse = first pack . readEither . unpack }
 
-discordStatusInfo :: InfoType String
+discordStatusInfo :: InfoType Text
 discordStatusInfo = InfoType { infoName = "discord_status", infoDefault = "", infoParse = Right }

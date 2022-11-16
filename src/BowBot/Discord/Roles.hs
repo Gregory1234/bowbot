@@ -23,30 +23,31 @@ import qualified Discord.Requests as R
 import BowBot.DB.Basic (queryLog, withDB, executeManyLog')
 import BowBot.Hypixel.Guild
 import BowBot.Network.Basic
-import BowBot.Hypixel.Basic
+import qualified Data.Text as T
+import Data.Bifunctor (first)
 
 
 
 divisionTitleRolesInfo :: InfoType [(Integer, RoleId)]
-divisionTitleRolesInfo = InfoType { infoName = "division_title_roles", infoDefault = [], infoParse = \s -> for (lines s) $ \l -> case splitOn "->" l of [a, b] -> (,) <$> readEither a <*> fmap fromInteger (readEither b); _ -> Left "wrong format" }
+divisionTitleRolesInfo = InfoType { infoName = "division_title_roles", infoDefault = [], infoParse = \s -> for (T.lines s) $ \l -> case T.splitOn "->" l of [a, b] -> (,) <$> (first pack . readEither . unpack) a <*> fmap fromInteger ((first pack . readEither . unpack) b); _ -> Left "wrong format" }
 
-toggleableRolesInfo :: InfoType (M.Map String RoleId)
-toggleableRolesInfo = InfoType { infoName = "toggleable_roles", infoDefault = M.empty, infoParse = \s -> fmap M.fromList $ for (lines s) $ \l -> case splitOn "->" l of [a, b] -> (a,) <$> fmap fromInteger (readEither b); _ -> Left "wrong format" }
+toggleableRolesInfo :: InfoType (M.Map Text RoleId)
+toggleableRolesInfo = InfoType { infoName = "toggleable_roles", infoDefault = M.empty, infoParse = \s -> fmap M.fromList $ for (T.lines s) $ \l -> case T.splitOn "->" l of [a, b] -> (a,) <$> fmap fromInteger ((first pack . readEither . unpack) b); _ -> Left "wrong format" }
 
-savedRolesInfo :: InfoType (M.Map String RoleId)
-savedRolesInfo = InfoType { infoName = "saved_roles", infoDefault = M.empty, infoParse = \s -> fmap M.fromList $ for (lines s) $ \l -> case splitOn "->" l of [a, b] -> (a,) <$> fmap fromInteger (readEither b); _ -> Left "wrong format" }
+savedRolesInfo :: InfoType (M.Map Text RoleId)
+savedRolesInfo = InfoType { infoName = "saved_roles", infoDefault = M.empty, infoParse = \s -> fmap M.fromList $ for (T.lines s) $ \l -> case T.splitOn "->" l of [a, b] -> (a,) <$> fmap fromInteger ((first pack . readEither . unpack) b); _ -> Left "wrong format" }
 
-savedHypixelRolesInfo :: InfoType (M.Map String ([String], RoleId))
-savedHypixelRolesInfo = InfoType { infoName = "hypixel_roles", infoDefault = M.empty, infoParse = \s -> fmap M.fromList $ for (lines s) $ \l -> case splitOn "->" l of [a, b, c] -> (a,) . (splitOn "|" b,) <$> fmap fromInteger (readEither c); _ -> Left "wrong format" }
+savedHypixelRolesInfo :: InfoType (M.Map Text ([Text], RoleId))
+savedHypixelRolesInfo = InfoType { infoName = "hypixel_roles", infoDefault = M.empty, infoParse = \s -> fmap M.fromList $ for (T.lines s) $ \l -> case T.splitOn "->" l of [a, b, c] -> (a,) . (T.splitOn "|" b,) <$> fmap fromInteger ((first pack . readEither . unpack) c); _ -> Left "wrong format" }
 
 illegalRoleInfo :: InfoType RoleId
-illegalRoleInfo = InfoType { infoName = "illegal_role", infoDefault = 0, infoParse = fmap fromInteger . readEither }
+illegalRoleInfo = InfoType { infoName = "illegal_role", infoDefault = 0, infoParse = fmap fromInteger . (first pack . readEither . unpack) }
 
 memberRoleInfo :: InfoType RoleId
-memberRoleInfo = InfoType { infoName = "member_role", infoDefault = 0, infoParse = fmap fromInteger . readEither }
+memberRoleInfo = InfoType { infoName = "member_role", infoDefault = 0, infoParse = fmap fromInteger . (first pack . readEither . unpack) }
 
 visitorRoleInfo :: InfoType RoleId
-visitorRoleInfo = InfoType { infoName = "visitor_role", infoDefault = 0, infoParse = fmap fromInteger . readEither }
+visitorRoleInfo = InfoType { infoName = "visitor_role", infoDefault = 0, infoParse = fmap fromInteger . (first pack . readEither . unpack) }
 
 addRemoveDiscordRoles :: (MonadIOReader m r, Has DiscordHandle r) => GuildId -> GuildMember -> [RoleId] -> [RoleId] -> m ()
 addRemoveDiscordRoles gid GuildMember {..} universe correct = do
@@ -67,14 +68,14 @@ updateRolesDivisionTitle gmem (Just BowBotAccount {..}) = do
   addRemoveDiscordRoles gid gmem (map snd divisionTitles) correctRole
 updateRolesDivisionTitle _ Nothing = pure ()
 
-newtype SavedRoles = SavedRoles { getSavedRoleNames :: [String] } deriving (Show, Eq)
+newtype SavedRoles = SavedRoles { getSavedRoleNames :: [Text] } deriving (Show, Eq)
 
 instance Cached SavedRoles where
   type CacheIndex SavedRoles = UserId
   refreshCache = do
     cache <- getCache
-    res :: [(Integer, String)] <- queryLog "SELECT `discord`, `roles` FROM `unregistered` UNION SELECT `peopleDiscord`.`discord`, `people`.`roles` FROM `peopleDiscord` JOIN `people` ON `people`.`id`=`peopleDiscord`.`id`" ()
-    let newValues = HM.fromList $ flip fmap res $ \(fromInteger -> did, SavedRoles . splitOn "," -> roles) -> (did, roles)
+    res :: [(Integer, Text)] <- queryLog "SELECT `discord`, `roles` FROM `unregistered` UNION SELECT `peopleDiscord`.`discord`, `people`.`roles` FROM `peopleDiscord` JOIN `people` ON `people`.`id`=`peopleDiscord`.`id`" ()
+    let newValues = HM.fromList $ flip fmap res $ \(fromInteger -> did, SavedRoles . T.splitOn "," -> roles) -> (did, roles)
     liftIO $ atomically $ writeTVar cache newValues
 
 storeNewRolesSaved :: (MonadIOBotData m d r, HasCaches [InfoField, SavedRoles, BowBotAccount] d) => UserId -> [RoleId] -> m ()
@@ -85,7 +86,7 @@ storeNewRolesSaved did roles = do
   savedHypixelRolesAll <- askInfo savedHypixelRolesInfo
   let rolesAll = M.fromList . map (\(x,y) -> (y,x)) . M.toList $ toggleableRolesAll <> savedRolesAll <> M.map snd savedHypixelRolesAll
   let savedRoles = SavedRoles $ mapMaybe (rolesAll M.!?) roles
-  let rolesStr = intercalate "," $ getSavedRoleNames savedRoles
+  let rolesStr = T.intercalate "," $ getSavedRoleNames savedRoles
   when (old /= Just savedRoles) $ do
     acc <- getBowBotAccountByDiscord did
     case acc of

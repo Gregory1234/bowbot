@@ -3,10 +3,11 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 module BowBot.Utils(
   module BowBot.Utils, module BowBot.HoistIO, getEnv, for, for_, readMaybe, (<|>), ($>),
-  STM, atomically, TVar, newTVar, readTVar, writeTVar, modifyTVar, pack, unpack, Has(..),
+  STM, atomically, TVar, newTVar, readTVar, writeTVar, modifyTVar, pack, unpack, Has(..), Text,
   module Data.Char, module Data.List, module Data.List.Split, module Data.Maybe, module Control.Monad.Reader
 ) where
 
@@ -21,7 +22,8 @@ import Data.Foldable (for_)
 import Text.Read (readMaybe)
 import Control.Concurrent.STM (STM, atomically)
 import Control.Concurrent.STM.TVar (TVar, newTVar, readTVar, writeTVar, modifyTVar)
-import Data.Text (pack, unpack)
+import Data.Text (pack, unpack, Text)
+import qualified Data.Text as T
 import BowBot.HoistIO
 import qualified Data.Map as M
 import Control.Monad.Error.Class (MonadError, throwError, catchError)
@@ -36,7 +38,7 @@ import Data.Has
 import Data.Time.Clock (UTCTime(..), nominalDiffTimeToSeconds)
 import Data.Fixed (Fixed(..), resolution)
 
-dist :: Eq a => [a] -> [a] -> Int
+dist :: Text -> Text -> Int
 dist a b =
   last
     ( if lab == 0
@@ -50,20 +52,20 @@ dist a b =
     mainDiag = oneDiag a b (head uppers) (-1 : head lowers)
     uppers = eachDiag a b (mainDiag : uppers) -- upper diagonals
     lowers = eachDiag b a (mainDiag : lowers) -- lower diagonals
-    eachDiag a [] diags = []
-    eachDiag a (bch : bs) (lastDiag : diags) = oneDiag a bs nextDiag lastDiag : eachDiag a bs diags
+    eachDiag a "" diags = []
+    eachDiag a (T.uncons -> Just (bch, bs)) (lastDiag : diags) = oneDiag a bs nextDiag lastDiag : eachDiag a bs diags
       where
         nextDiag = head (tail diags)
     oneDiag a b diagAbove diagBelow = thisdiag
       where
-        doDiag [] b nw n w = []
-        doDiag a [] nw n w = []
-        doDiag (ach : as) (bch : bs) nw n w = me : (doDiag as bs me (tail n) (tail w))
+        doDiag "" b nw n w = []
+        doDiag a "" nw n w = []
+        doDiag (T.uncons -> Just (ach, as)) (T.uncons -> Just (bch, bs)) nw n w = me : (doDiag as bs me (tail n) (tail w))
           where
             me = if ach == bch then nw else 1 + min3 (head w) nw (head n)
         firstelt = 1 + head diagBelow
         thisdiag = firstelt : doDiag a b firstelt diagAbove (tail diagBelow)
-    lab = length a - length b
+    lab = T.length a - T.length b
     min3 x y z = if x < y then x else min y z
 
 getTime :: String -> IO String
@@ -81,11 +83,11 @@ ifDev v action = do
   devmode <- liftIO $ fromMaybe "" <$> getEnv "IS_DEV"
   if devmode == "1" then action else return v
 
-showWLR :: Integral a => a -> a -> String
+showWLR :: Integral a => a -> a -> Text
 showWLR (fromIntegral -> bowWins) (fromIntegral -> bowLosses)
   | bowWins == 0, bowLosses == 0 = "NaN"
   | bowLosses == 0 = "∞"
-  | otherwise = printf "%.04f" (fromRational (bowWins % bowLosses) :: Double)
+  | otherwise = pack $ printf "%.04f" (fromRational (bowWins % bowLosses) :: Double)
 
 liftMaybe :: MonadError e m => e -> Maybe a -> m a
 liftMaybe _ (Just a) = return a
@@ -100,20 +102,20 @@ groupByToMap :: Ord k => (v -> k) -> [v] -> M.Map k [v]
 groupByToMap _ [] = M.empty
 groupByToMap f (x:xs) = M.insertWith (++) (f x) [x] $ groupByToMap f xs
 
-pad' :: Bool -> Char -> Int -> String -> String
-pad' d c l x = if d then x ++ replicate (l - length x) c else replicate (l - length x) c ++ x
+pad' :: Bool -> Char -> Int -> Text -> Text
+pad' d c l x = if d then x <> T.replicate (l - T.length x) (T.singleton c) else T.replicate (l - T.length x) (T.singleton c) <> x
 
-pad :: Int -> String -> String
+pad :: Int -> Text -> Text
 pad = pad' True ' '
 
 catchErrorEither :: MonadError e m => m a -> m (Either e a)
 catchErrorEither body = catchError (Right <$> body) (return . Left)
 
-discordEscape :: String -> String
-discordEscape [] = ""
-discordEscape (x:xs)
-  | x `elem` "_*~`>" = '\\':x:discordEscape xs
-  | otherwise = x:discordEscape xs
+discordEscape :: Text -> Text
+discordEscape = helper ("_*~`>" :: String)
+  where
+    helper (c:cs) = helper cs . T.replace (T.singleton c) (T.pack ['\\', c])
+    helper [] = id
 
 type MonadIOReader m r = (MonadIO m, MonadReader r m)
 type MonadHoistIOReader m r = (MonadHoistIO m, MonadReader r m)

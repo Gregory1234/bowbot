@@ -20,14 +20,14 @@ data PermissionLevel
   | AdminLevel
   deriving (Eq, Ord, Enum, Bounded, Show)
 
-stringToPermissionLevel :: String -> Maybe PermissionLevel
+stringToPermissionLevel :: Text -> Maybe PermissionLevel
 stringToPermissionLevel "ban" = Just BanLevel
 stringToPermissionLevel "default" = Just DefaultLevel
 stringToPermissionLevel "mod" = Just ModLevel
 stringToPermissionLevel "admin" = Just AdminLevel
 stringToPermissionLevel _ = Nothing
 
-permissionLevelToString :: PermissionLevel -> String
+permissionLevelToString :: PermissionLevel -> Text
 permissionLevelToString BanLevel = "ban"
 permissionLevelToString DefaultLevel = "default"
 permissionLevelToString ModLevel = "mod"
@@ -37,7 +37,7 @@ instance Cached PermissionLevel where
   type CacheIndex PermissionLevel = UserId
   refreshCache = do
     cache <- getCache
-    res :: [(Integer, String)] <- queryLog "SELECT `id`, `level` FROM `permissions`" ()
+    res :: [(Integer, Text)] <- queryLog "SELECT `id`, `level` FROM `permissions`" ()
     let newValues = HM.fromList $ flip fmap res $ \case
           (fromInteger -> discord, stringToPermissionLevel -> Just level) -> (discord, level)
           (fromInteger -> discord, _) -> (discord, DefaultLevel)
