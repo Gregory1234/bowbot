@@ -50,19 +50,21 @@ import BowBot.Snipe.Detect
 import BowBot.Snipe.Command
 import BowBot.Hypixel.Announce
 import BowBot.BotData.Basic
+import BowBot.Counter.Basic
 
 runBowBot :: IO ()
 runBowBot = do
   discordKey <- getEnvOrThrow "API_KEY"
   ifDev () $ putStrLn "this is dev version of the bot"
   bctxManager <- newManager managerSettings
+  bctxCounter <- atomically newCounterState
   bctxData <- downloadBotData
   logInfoFork "bot started"
   userFacingError <-
     runDiscord $
       def
         { discordToken = pack discordKey,
-          discordOnStart = ReaderT $ onStartup bctxManager bctxData,
+          discordOnStart = ReaderT $ onStartup bctxManager bctxCounter bctxData,
           discordOnEvent = \e -> ReaderT $ \bctxDiscord -> withDB $ \bctxConnection -> runReaderT (eventHandler e) BotContext {..},
           discordOnLog = putStrLn . unpack,
           discordGatewayIntent = def { gatewayIntentMembers = True }
@@ -96,8 +98,8 @@ backgroundMinutely mint = do
     unless dev $ when (hour `mod` 8 == 0) clearLogs
     logInfo "finished update"
 
-onStartup :: Manager -> BotData -> DiscordHandle -> IO ()
-onStartup bctxManager bctxData bctxDiscord = void $ forkIO $ do
+onStartup :: Manager -> CounterState -> BotData -> DiscordHandle -> IO ()
+onStartup bctxManager bctxCounter bctxData bctxDiscord = void $ forkIO $ do
   withDB $ \bctxConnection -> runReaderT updateDiscordStatus BotContext {..}
   sec <- read @Int <$> getTime "%S"
   liftIO $ threadDelay ((65 - sec `mod` 60) * 1000000)

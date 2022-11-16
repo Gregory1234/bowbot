@@ -11,7 +11,7 @@ import BowBot.Discord.Utils
 import BowBot.BotData.Cached (storeInCache, getFromCache, storeInCacheIndexed)
 import BowBot.Hypixel.Basic (HypixelApi(..))
 import BowBot.Hypixel.Leaderboard (hypixelBowStatsToLeaderboards)
-import BowBot.BotData.Counter (tryIncreaseCounter)
+import BowBot.Counter.Basic (tryIncreaseCounter)
 import BowBot.Account.Register
 import BowBot.Discord.Roles (updateRoles)
 import BowBot.BotData.Info (askInfo, discordGuildIdInfo)

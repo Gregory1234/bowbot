@@ -1,6 +1,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE DataKinds #-}
 
 module BowBot.Hypixel.Watchlist where
 
@@ -10,7 +11,7 @@ import qualified Data.HashMap.Strict as HM
 import BowBot.Minecraft.Basic
 import BowBot.Network.Basic
 import BowBot.BotData.CachedSingle
-import BowBot.BotData.Counter
+import BowBot.Counter.Basic
 import BowBot.Hypixel.Basic
 import Control.Concurrent.Async (mapConcurrently)
 import BowBot.Utils
@@ -27,7 +28,7 @@ isInBowDuels uuid = hypixelWithPlayerStatus uuid $ \o -> do
   mode :: Maybe String <- session .:? "mode"
   return $ mode == Just "DUELS_BOW_DUEL"
 
-getHypixelOnlinePlayers :: (MonadHoistIOBotData m d r, Has Manager r, HasCachedData HypixelOnlinePlayers d, HasCache MinecraftAccount d, HasCounter' HypixelApi d) => m (CacheResponse HypixelOnlinePlayers)
+getHypixelOnlinePlayers :: (MonadHoistIOBotData m d r, HasAll '[Manager, CounterState] r, HasCachedData HypixelOnlinePlayers d, HasCache MinecraftAccount d) => m (CacheResponse HypixelOnlinePlayers)
 getHypixelOnlinePlayers = getOrCalculateCacheSingle $ do
   watchlist <- getWatchlist
   cv <- tryIncreaseCounter HypixelApi (fromIntegral $ length watchlist)

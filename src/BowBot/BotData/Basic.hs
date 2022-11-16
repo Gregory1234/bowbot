@@ -14,7 +14,6 @@ import BowBot.BotData.Cached
 import BowBot.Minecraft.Account
 import BowBot.Command.Basic
 import BowBot.Account.Basic
-import BowBot.BotData.Counter
 import BowBot.Hypixel.Basic
 import BowBot.Settings.Basic
 import BowBot.Hypixel.Leaderboard
@@ -34,7 +33,6 @@ data BotData = BotData
   , minecraftAccountCache :: DatabaseCache MinecraftAccount
   , permissionCache :: DatabaseCache PermissionLevel
   , bowBotAccountCache :: DatabaseCache BowBotAccount
-  , hypixelApiCounter :: Counter HypixelApi
   , settingsCache :: DatabaseCache Settings
   , hypixelLeaderboardCache :: DatabaseCache HypixelBowLeaderboardEntry
   , savedRolesCache :: DatabaseCache SavedRoles
@@ -63,10 +61,6 @@ instance Has (DatabaseCache PermissionLevel) BotData where
 instance Has (DatabaseCache BowBotAccount) BotData where
   getter = bowBotAccountCache
   modifier f x = x { bowBotAccountCache = f $ bowBotAccountCache x }
-
-instance Has (Counter HypixelApi) BotData where
-  getter = hypixelApiCounter
-  modifier f x = x { hypixelApiCounter = f $ hypixelApiCounter x }
 
 instance Has (DatabaseCache Settings) BotData where
   getter = settingsCache

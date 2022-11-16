@@ -7,6 +7,7 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE DataKinds #-}
 
 module BowBot.Hypixel.Leaderboard where
 
@@ -18,7 +19,7 @@ import BowBot.DB.Basic (queryLog, executeManyLog', withDB, logInfoFork)
 import BowBot.Utils
 import BowBot.Hypixel.Basic (HypixelApi(..))
 import BowBot.Network.Basic
-import BowBot.BotData.Counter
+import BowBot.Counter.Basic
 import Control.Concurrent (threadDelay)
 import Control.Concurrent.Async (mapConcurrently)
 import Data.Time.Clock (UTCTime(..))
@@ -56,7 +57,7 @@ instance CachedStorable HypixelBowLeaderboardEntry where
       liftIO $ atomically $ modifyTVar cache (insertMany fixed)
     return success
 
-updateHypixelLeaderboardCache :: (MonadIOBotData m d r, Has Manager r, HasCounter HypixelApi d, HasCache HypixelBowLeaderboardEntry d) => m ()
+updateHypixelLeaderboardCache :: (MonadIOBotData m d r, HasAll '[Manager, CounterState] r, HasCache HypixelBowLeaderboardEntry d) => m ()
 updateHypixelLeaderboardCache = do
   ctx <- ask
   let helper (uuid, old) = do

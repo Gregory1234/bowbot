@@ -14,6 +14,7 @@ import Data.Text.Encoding (encodeUtf8)
 import BowBot.Discord.DiscordNFData ()
 import BowBot.BotData.Basic
 import BowBot.BotData.HasData
+import BowBot.Counter.Basic
 import BowBot.DB.Basic (Connection)
 
 newtype CommandArgs = CommandMessageArgs [String]
@@ -44,6 +45,7 @@ data CommandHandlerContext = CommandHandlerContext
   , cctxManager :: Manager
   , cctxConnection :: Connection
   , cctxDiscord :: DiscordHandle
+  , cctxCounter :: CounterState
   , cctxData :: BotData
   }
 
@@ -59,6 +61,9 @@ instance Has Connection CommandHandlerContext where
 instance Has DiscordHandle CommandHandlerContext where
   getter = cctxDiscord
   modifier f x = x { cctxDiscord = f $ cctxDiscord x }
+instance Has CounterState CommandHandlerContext where
+  getter = cctxCounter
+  modifier f x = x { cctxCounter = f $ cctxCounter x }
 instance Has BotData CommandHandlerContext where
   getter = cctxData
   modifier f x = x { cctxData = f $ cctxData x }

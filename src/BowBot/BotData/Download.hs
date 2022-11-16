@@ -16,7 +16,7 @@ import BowBot.BotData.Cached
 import BowBot.BotData.CachedSingle
 import BowBot.DB.Basic (withDB, queryLog)
 import BowBot.Command.Basic (PermissionLevel)
-import BowBot.BotData.Counter
+import BowBot.Counter.Basic
 import BowBot.Hypixel.Basic
 import BowBot.Settings.Basic
 import Network.HTTP.Conduit (Manager)
@@ -70,7 +70,7 @@ refreshBotData = do
   refreshCache @BirthdayDate
   refreshCache @SnipeMessage -- TODO: this is meaningless...
 
-updateBotData :: (MonadIOBotData m BotData r, HasAll [Manager, DiscordHandle] r) => [StatsTimeRange] -> m ()
+updateBotData :: (MonadIOBotData m BotData r, HasAll [Manager, DiscordHandle, CounterState] r) => [StatsTimeRange] -> m ()
 updateBotData times = (ask >>=) $ \ctx -> liftIO $ foldl1 concurrently_ $
   map (`runReaderT` ctx)
     [ updateDiscordAccountCache
@@ -79,7 +79,7 @@ updateBotData times = (ask >>=) $ \ctx -> liftIO $ foldl1 concurrently_ $
       forM_ times updateHypixelTimeStatsCache'
     ]
 
-clearBotDataCaches :: (MonadIOBotData m BotData r) => m ()
+clearBotDataCaches :: (MonadIOBotData m BotData r, Has CounterState r) => m ()
 clearBotDataCaches = do
   clearCounter HypixelApi
   clearCacheSingle @HypixelGuildMembers

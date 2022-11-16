@@ -10,7 +10,7 @@ import BowBot.Hypixel.Stats
 import BowBot.Settings.Basic
 import BowBot.Utils
 import BowBot.Hypixel.Basic (HypixelApi(..))
-import BowBot.BotData.Counter
+import BowBot.Counter.Basic
 import Control.Monad.Error.Class (throwError)
 import Discord.Types
 import BowBot.Hypixel.Leaderboard

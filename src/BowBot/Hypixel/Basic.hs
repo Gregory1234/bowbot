@@ -6,12 +6,13 @@ module BowBot.Hypixel.Basic where
 import BowBot.Minecraft.Basic (UUID(..))
 import BowBot.Network.Basic
 import BowBot.Utils
-import BowBot.BotData.Counter
+import BowBot.Counter.Basic
 
 data HypixelApi = HypixelApi
 
 instance Counted HypixelApi where
   counterLimit _ = 100
+  counterName _ = "Hypixel"
 
 hypixelWithPlayerData :: (MonadIOReader m r, Has Manager r) => UUID -> (Object -> Parser a) -> m (Maybe a)
 hypixelWithPlayerData (UUID uuid) f = do
