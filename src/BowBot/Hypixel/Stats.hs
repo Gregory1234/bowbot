@@ -75,11 +75,11 @@ showHypixelBowStats :: Settings -> HypixelBowStats -> Text
 showHypixelBowStats Settings {..} HypixelBowStats {..} = T.unlines $ catMaybes
   [ onlyIf sWins
   $ " - *Bow Duels Wins:* **"
-  <> pack (show bowWins)
+  <> showt bowWins
   <> "**" <> maybe "" (\x -> " (**Bow " <> divisionRankName x <> "**)") (divisionRankFromWins bowWins)
   , onlyIf sLosses
   $ " - *Bow Duels Losses:* **"
-  <> pack (show bowLosses)
+  <> showt bowLosses
   <> "**"
   , onlyIf (sense sWLR (bowWins + bowLosses /= 0))
   $ " - *Bow Duels Win/Loss Ratio:* **"
@@ -93,23 +93,23 @@ showHypixelBowStats Settings {..} HypixelBowStats {..} = T.unlines $ catMaybes
   <> "**"
   , onlyIf (sense sBestStreak (isAnyJust bestWinstreak))
   $ " - *Best Bow Duels Winstreak:* **"
-  <> cachedMaybe "API DISABLED" (pack . show) (\t -> (<>" (CACHED" <> maybe "" ((\s -> " **" <> s <> "**") . discordFormatTimestampFull) t <> ")") . pack . show) bestWinstreak
+  <> cachedMaybe "API DISABLED" showt (\t -> (<>" (CACHED" <> maybe "" ((\s -> " **" <> s <> "**") . discordFormatTimestampFull) t <> ")") . pack . show) bestWinstreak
   <> "**"
   , onlyIf (sense sCurrentStreak (isJust currentWinstreak))
   $ " - *Current Bow Duels Winstreak:* **"
-  <> maybe "API DISABLED" (pack . show) currentWinstreak
+  <> maybe "API DISABLED" showt currentWinstreak
   <> "**"
   , onlyIf (sense sBestDailyStreak (isJust bestDailyWinstreak))
   $ " - *Best Daily Bow Duels Winstreak(?):* **"
-  <> maybe "API DISABLED" (pack . show) bestDailyWinstreak
+  <> maybe "API DISABLED" showt bestDailyWinstreak
   <> "**"
   , onlyIf sBowHits
   $ " - *Bow Hits in Bow Duels:* **"
-  <> pack (show bowHits)
+  <> showt bowHits
   <> "**"
   , onlyIf sBowShots
   $ " - *Bow Shots in Bow Duels:* **"
-  <> pack (show bowShots)
+  <> showt bowShots
   <> "**"
   , onlyIf (sense sAccuracy (bowShots /= 0))
   $ " - *Bow Accuracy:* **"
@@ -125,11 +125,11 @@ showHypixelBowStats Settings {..} HypixelBowStats {..} = T.unlines $ catMaybes
     winLossRatio = showWLR bowWins bowLosses
     nextWinLossRatio
       | bowLosses == 0 = "∞"
-      | otherwise = pack $ show $ (bowWins `div` bowLosses) + 1
+      | otherwise = showt $ (bowWins `div` bowLosses) + 1
     winsRemaining
       | bowWins == 0, bowLosses == 0 = "1"
       | bowLosses == 0 = "N/A"
-      | otherwise = pack $ show (bowLosses - (bowWins `mod` bowLosses))
+      | otherwise = showt (bowLosses - (bowWins `mod` bowLosses))
     accuracy
       | bowShots == 0 = "N/A"
-      | otherwise = pack $ show (round ((bowHits*100) % bowShots) :: Integer) ++ "%"
+      | otherwise = showt (round ((bowHits*100) % bowShots) :: Integer) <> "%"

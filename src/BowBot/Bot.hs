@@ -166,11 +166,11 @@ commandTimeoutRun n msg x = do
   tm <- hoistIO (try @SomeException . timeout (n * 1000000)) x
   case tm of
     Left e -> do
-      logErrorFork $ "Exception happened in command: " <> pack (show e)
+      logErrorFork $ "Exception happened in command: " <> showt e
       respond' msg "Something went horribly wrong! Please report this!"
       throw e
     Right Nothing -> do
-      logErrorFork $ "Timed out: " <> pack (show n) <> "s"
+      logErrorFork $ "Timed out: " <> showt n <> "s"
       respond' msg "Timed out! Please report this!"
     Right (Just ()) -> pure ()
 
@@ -179,10 +179,10 @@ backgroundTimeoutRun n x = do
   tm <- hoistIO (try @SomeException . timeout (n * 1000000)) x
   case tm of
     Left e -> do
-      logErrorFork $ "Exception happened in command: " <> pack (show e)
+      logErrorFork $ "Exception happened in command: " <> showt e
       throw e
     Right Nothing -> do
-      logErrorFork $ "Timed out: " <> pack (show n) <> "s"
+      logErrorFork $ "Timed out: " <> showt n <> "s"
     Right (Just ()) -> pure ()
 
 commands :: [Command]
@@ -233,7 +233,7 @@ commands =
   , adminCommand 120 "rolesupdate" "update everyone's discord roles" updateRolesAll
   , adminCommand 120 "savedrolesstore" "store everyone's saved roles" storeNewSavedRolesAll
   , adminCommand 15 "statusupdate" "update Bow Bot's discord status" updateDiscordStatus
-  , quietAdminCommand 5 "throw" "throw an error" $ respond $ pack $ show ((1 :: Integer) `div` 0)
+  , quietAdminCommand 5 "throw" "throw an error" $ respond $ showt ((1 :: Integer) `div` 0)
   , quietAdminCommand 5 "time" "display Bow Bot's time" $ respond . pack =<< liftIO (getTime "Month: %m, Day: %d, Weekday: %u, Hour: %k, Minute: %M, Second %S")
   , adminCommand 15 "bdsay" "announce today's birthdays" announceBirthdays
   , quietAdminCommand 5 "evacuate" "leaves the discord server" $ envs envGuild >>= call_ . LeaveGuild

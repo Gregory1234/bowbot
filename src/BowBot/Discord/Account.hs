@@ -70,7 +70,7 @@ updateDiscordAccountCache = do
     u' <- call $ R.GetUser (discordId du)
     case u' of
       Left e -> do
-        logErrorFork $ pack $ show e
+        logErrorFork $ showt e
         return du
       Right u -> return $ userToDiscordAccount u
   void $ storeInCache $ members ++ updatedNonMembers

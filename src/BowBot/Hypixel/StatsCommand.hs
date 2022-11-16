@@ -51,4 +51,4 @@ hypixelStatsCommand src name desc = Command CommandInfo
           stats <- liftMaybe "*The player has never joined Hypixel!*" =<< requestHypixelBowStats mcUUID
           oldstats <- getFromCache mcUUID
           return (if bowWins stats + bowLosses stats /= 0 then ResponseGood else ResponseFindBetter, completeHypixelBowStats stats oldstats)
-        Just sec -> throwError $ "*Too many requests! Wait another " <> pack (show sec) <> " seconds!*"
+        Just sec -> throwError $ "*Too many requests! Wait another " <> showt sec <> " seconds!*"

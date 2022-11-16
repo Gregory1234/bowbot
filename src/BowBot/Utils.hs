@@ -7,7 +7,7 @@
 
 module BowBot.Utils(
   module BowBot.Utils, module BowBot.HoistIO, getEnv, for, for_, readMaybe, (<|>), ($>),
-  STM, atomically, TVar, newTVar, readTVar, writeTVar, modifyTVar, pack, unpack, Has(..), Text,
+  STM, atomically, TVar, newTVar, readTVar, writeTVar, modifyTVar, pack, unpack, Has(..), Text, TextShow(..),
   module Data.Char, module Data.List, module Data.List.Split, module Data.Maybe, module Control.Monad.Reader
 ) where
 
@@ -37,6 +37,7 @@ import Data.Kind (Type, Constraint)
 import Data.Has
 import Data.Time.Clock (UTCTime(..), nominalDiffTimeToSeconds)
 import Data.Fixed (Fixed(..), resolution)
+import TextShow
 
 dist :: Text -> Text -> Int
 dist a b =

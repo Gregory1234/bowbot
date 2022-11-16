@@ -33,7 +33,7 @@ registerCommandBody RegisterCommandMessages {..} name did = do
   cv <- tryIncreaseCounter HypixelApi 1
   stats <- case cv of
     Nothing -> liftMaybe "*The player has never joined Hypixel!*" =<< requestHypixelBowStats uuid
-    Just sec -> throwError $ "*Too many requests! Wait another " <> pack (show sec) <> " seconds!*"
+    Just sec -> throwError $ "*Too many requests! Wait another " <> showt sec <> " seconds!*"
   saved <- getFromCache uuid
   mc <- case saved of
     Nothing -> do
@@ -94,7 +94,7 @@ addaltCommand = Command CommandInfo
     cv <- tryIncreaseCounter HypixelApi 1
     stats <- case cv of
       Nothing -> liftMaybe "*The player has never joined Hypixel!*" =<< requestHypixelBowStats uuid
-      Just sec -> throwError $ "*Too many requests! Wait another " <> pack (show sec) <> " seconds!*"
+      Just sec -> throwError $ "*Too many requests! Wait another " <> showt sec <> " seconds!*"
     saved <- getFromCache uuid
     case saved of -- TODO: remove repetition!
       Nothing -> do

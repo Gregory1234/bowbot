@@ -45,9 +45,9 @@ twoArguments parser = withArguments (\(CommandMessageArgs args) -> assertArgumen
 
 argumentsCountMsg :: Int -> Int -> Int -> Text
 argumentsCountMsg mina maxa args
-  | mina == maxa = "Got " <> pack (show args) <> " arguments, " <> pack (show mina) <> " expected"
-  | mina == 0 = "Got " <> pack (show args) <> " arguments, at most " <> pack (show maxa) <> " expected"
-  | otherwise = "Got " <> pack (show args) <> " arguments, between " <> pack (show mina) <> " and " <> pack (show maxa) <> " expected"
+  | mina == maxa = "Got " <> showt args <> " arguments, " <> showt mina <> " expected"
+  | mina == 0 = "Got " <> showt args <> " arguments, at most " <> showt maxa <> " expected"
+  | otherwise = "Got " <> showt args <> " arguments, between " <> showt mina <> " and " <> showt maxa <> " expected"
 
 assertArgumentsCount :: MonadError Text m => Int -> Int -> [Text] -> m ()
 assertArgumentsCount mina maxa args

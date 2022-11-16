@@ -20,7 +20,7 @@ import qualified Data.Text as T
 data BirthdayDate = BirthdayDate { birthdayDay :: Int, birthdayMonth :: Int } deriving (Show, Eq)
 
 birthdayString :: BirthdayDate -> Text
-birthdayString BirthdayDate {..} = pad' False '0' 2 (pack $ show birthdayDay) <> "." <> pad' False '0' 2 (pack $ show birthdayMonth)
+birthdayString BirthdayDate {..} = pad' False '0' 2 (showt birthdayDay) <> "." <> pad' False '0' 2 (showt birthdayMonth)
 
 birthdayFromString :: Text -> Maybe BirthdayDate
 birthdayFromString str = case T.splitOn "." str of

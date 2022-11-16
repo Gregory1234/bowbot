@@ -76,11 +76,11 @@ showHypixelBowTimeStats Settings {..} HypixelBowStats {..} HypixelBowTimeStats {
   [ ("*Since:* " <>) . discordFormatTimestampFull <$> bowTimeTimestamp
   , onlyIf sWins
   $ " - *Bow Duels " <> time <> " Wins:* **"
-  <> pack (show (bowWins - bowTimeWins))
+  <> showt (bowWins - bowTimeWins)
   <> "**"
   , onlyIf sLosses
   $ " - *Bow Duels " <> time <> " Losses:* **"
-  <> pack (show (bowLosses - bowTimeLosses))
+  <> showt (bowLosses - bowTimeLosses)
   <> "**"
   , onlyIf (sense sWLR (bowWins - bowTimeWins + bowLosses - bowTimeLosses /= 0))
   $ " - *Bow Duels " <> time <> " Win/Loss Ratio:* **"

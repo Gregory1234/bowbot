@@ -65,22 +65,22 @@ replaceQuery from to q = Query $ BS.toStrict $ BS.replace (T.encodeUtf8 from) (B
 queryLog' :: (QueryParams q, QueryResults r, MonadIO m) => Connection -> Query -> q -> m [r]
 queryLog' conn q d = do
   trueQuery <- liftIO $ formatQuery conn q d
-  logInfo' conn $ "Executing query: " <> pack (show trueQuery)
+  logInfo' conn $ "Executing query: " <> showt trueQuery
   liftIO $ query conn q d
 
 executeLog' :: (QueryParams q, MonadIO m) => Connection -> Query -> q -> m Int64
 executeLog' conn q d = do
   trueQuery <- liftIO $ formatQuery conn q d
-  logInfo' conn $ "Executing query: " <> pack (show trueQuery)
+  logInfo' conn $ "Executing query: " <> showt trueQuery
   liftIO $ execute conn q d
 
 executeManyLog' :: (QueryParams q, MonadIO m) => Connection -> Query -> [q] -> m Int64
 executeManyLog' conn q [] = do
-  logInfo' conn $ "Tried executing query with no data: " <> pack (show q)
+  logInfo' conn $ "Tried executing query with no data: " <> showt (fromQuery q)
   return 0
 executeManyLog' conn q d = do
   trueQuery <- liftIO $ formatMany conn q d
-  logInfo' conn $ "Executing query: " <> pack (show trueQuery)
+  logInfo' conn $ "Executing query: " <> showt trueQuery
   liftIO $ executeMany conn q d
 
 queryLog :: (QueryParams q, QueryResults r, MonadIOReader m rd, Has Connection rd) => Query -> q -> m [r]

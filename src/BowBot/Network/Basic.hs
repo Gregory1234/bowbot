@@ -34,7 +34,7 @@ sendRequestTo' manager url cleanUrl = do
   res <- try $ httpLbs request manager
   case res of
     (Left (e :: SomeException)) -> do
-      logErrorFork $ pack $ show e
+      logErrorFork $ showt e
       threadDelay 3000000
       sendRequestTo' manager url cleanUrl
     (Right v) -> do
@@ -49,9 +49,9 @@ sendRequestTo url cleanUrl = do
 decodeParse :: (FromJSON o, MonadIO m) => ByteString -> (o -> Parser a) -> m (Maybe a)
 decodeParse (decode -> Just str) parser = liftIO $ case parseEither parser str of
   Left e -> do
-    logErrorFork $ pack $ show e
+    logErrorFork $ showt e
     return Nothing
   Right a -> return $ Just a
 decodeParse str _ = liftIO $ do
-  logErrorFork $ "Decoding failed in " <> pack (show str) <> "!"
+  logErrorFork $ "Decoding failed in " <> showt str <> "!"
   return Nothing

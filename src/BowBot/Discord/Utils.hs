@@ -19,7 +19,7 @@ discordGuildMembers gid = do
   members <- call $ R.ListGuildMembers gid R.GuildMembersTiming { R.guildMembersTimingLimit = Just 500, R.guildMembersTimingAfter = Nothing } -- TODO: what if there are more?
   case members of
     Left e -> do
-      logErrorFork $ pack $ show e
+      logErrorFork $ showt e
       return []
     Right m -> return (filter (maybe False (not . userIsBot) . memberUser) m)
 
@@ -28,7 +28,7 @@ fromPingDiscordUser str | "<@" `T.isPrefixOf` str && ">" `T.isSuffixOf` str = re
 fromPingDiscordUser _ = Nothing
 
 discordFormatTimestamp :: Maybe Text -> UTCTime -> Text
-discordFormatTimestamp style timestamp = "<t:" <> pack (show (timestampToUnixSecond timestamp)) <> maybe "" (T.cons ':') style <> ">"
+discordFormatTimestamp style timestamp = "<t:" <> showt (timestampToUnixSecond timestamp) <> maybe "" (T.cons ':') style <> ">"
 
 discordFormatTimestampFull :: UTCTime -> Text
 discordFormatTimestampFull time = discordFormatTimestamp (Just "R") time <> " (" <> discordFormatTimestamp Nothing time <> ")"
