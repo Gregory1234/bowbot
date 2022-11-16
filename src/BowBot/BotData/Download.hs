@@ -2,6 +2,8 @@
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
 module BowBot.BotData.Download where
 
@@ -12,7 +14,7 @@ import BowBot.Account.Basic
 import Database.MySQL.Simple (Connection)
 import BowBot.BotData.Cached
 import BowBot.BotData.CachedSingle
-import BowBot.DB.Basic (withDB)
+import BowBot.DB.Basic (withDB, queryLog)
 import BowBot.Command.Basic (PermissionLevel)
 import BowBot.BotData.Counter
 import BowBot.Hypixel.Basic

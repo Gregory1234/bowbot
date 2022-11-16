@@ -62,41 +62,26 @@ logErrorFork msg = void $ liftIO $ do
 replaceQuery :: String -> String -> Query -> Query
 replaceQuery from to q = Query $ BS.toStrict $ BS.replace (fromString from) (fromString to :: BS.ByteString) (fromQuery q)
 
-optionalQueryFilters :: [(String, Bool)] -> Query -> Query
-optionalQueryFilters [] q = q
-optionalQueryFilters as q = Query $ (<>fromString ("WHERE " ++ intercalate " AND " (helper <$> as))) $ fromQuery q
-  where
-    helper (a, True) = a ++ " = ?"
-    helper (a, False) = "(1 OR " ++ a ++ " = ?)"
-
 queryLog' :: (QueryParams q, QueryResults r, MonadIO m) => Connection -> Query -> q -> m [r]
 queryLog' conn q d = do
-  dev <- ifDev "" (return "Dev")
-  let nq = replaceQuery "DEV" dev q
-  trueQuery <- liftIO $ formatQuery conn nq d
+  trueQuery <- liftIO $ formatQuery conn q d
   logInfo' conn $ "Executing query: " ++ show trueQuery
-  liftIO $ query conn nq d
+  liftIO $ query conn q d
 
 executeLog' :: (QueryParams q, MonadIO m) => Connection -> Query -> q -> m Int64
 executeLog' conn q d = do
-  dev <- ifDev "" (return "Dev")
-  let nq = replaceQuery "DEV" dev q
-  trueQuery <- liftIO $ formatQuery conn nq d
+  trueQuery <- liftIO $ formatQuery conn q d
   logInfo' conn $ "Executing query: " ++ show trueQuery
-  liftIO $ execute conn nq d
+  liftIO $ execute conn q d
 
 executeManyLog' :: (QueryParams q, MonadIO m) => Connection -> Query -> [q] -> m Int64
 executeManyLog' conn q [] = do
-  dev <- ifDev "" (return "Dev")
-  let nq = replaceQuery "DEV" dev q
-  logInfo' conn $ "Tried executing query with no data: " ++ show nq
+  logInfo' conn $ "Tried executing query with no data: " ++ show q
   return 0
 executeManyLog' conn q d = do
-  dev <- ifDev "" (return "Dev")
-  let nq = replaceQuery "DEV" dev q
-  trueQuery <- liftIO $ formatMany conn nq d
+  trueQuery <- liftIO $ formatMany conn q d
   logInfo' conn $ "Executing query: " ++ show trueQuery
-  liftIO $ executeMany conn nq d
+  liftIO $ executeMany conn q d
 
 queryLog :: (QueryParams q, QueryResults r, MonadIOReader m rd, Has Connection rd) => Query -> q -> m [r]
 queryLog q d = do

@@ -21,13 +21,13 @@ createNewBowBotAccount name did uuid = do
   birthday <- getFromCache did
   r <- ask
   ret <- liftIO $ flip runReaderT r $ withTransaction $ (either (const $ rollback $> Nothing) (pure . Just) =<<) $ runExceptT $ do
-    void $ executeLog "DELETE FROM `unregisteredDEV` WHERE `discord` = ?" (Only (toInteger did))
-    c1 <- executeLog "INSERT INTO `peopleDEV`(`name`, `roles`, `birthday`) VALUES (?,?,?)" (name, maybe "" (intercalate "," . getSavedRoleNames) savedRoles, birthdayString <$> birthday)
+    void $ executeLog "DELETE FROM `unregistered` WHERE `discord` = ?" (Only (toInteger did))
+    c1 <- executeLog "INSERT INTO `people`(`name`, `roles`, `birthday`) VALUES (?,?,?)" (name, maybe "" (intercalate "," . getSavedRoleNames) savedRoles, birthdayString <$> birthday)
     when (c1 <= 0) $ throwError ()
     bid <- insertID
-    c2 <- executeLog "INSERT INTO `peopleMinecraftDEV`(`id`, `minecraft`,`status`, `selected`, `verified`) VALUES (?,?, 'main', 1, 0)" (bid, uuidString uuid)
+    c2 <- executeLog "INSERT INTO `peopleMinecraft`(`id`, `minecraft`,`status`, `selected`, `verified`) VALUES (?,?, 'main', 1, 0)" (bid, uuidString uuid)
     when (c2 <= 0) $ throwError ()
-    c3 <- executeLog "INSERT INTO `peopleDiscordDEV`(`id`, `discord`) VALUES (?,?)" (bid, toInteger did)
+    c3 <- executeLog "INSERT INTO `peopleDiscord`(`id`, `discord`) VALUES (?,?)" (bid, toInteger did)
     when (c3 <= 0) $ throwError ()
     pure $ BowBotAccount { accountId = bid, accountDiscords = [did], accountSelectedMinecraft = uuid, accountMinecrafts = [uuid] }
   liftIO $ atomically $ for_ ret $ \bacc -> modifyTVar cache (insertMany [(accountId bacc, bacc)])
@@ -36,7 +36,7 @@ createNewBowBotAccount name did uuid = do
 addAltToBowBotAccount :: (MonadIOBotData m d r, HasCache BowBotAccount d) => Integer -> UUID -> m (Maybe BowBotAccount)
 addAltToBowBotAccount bid uuid = do
   acc <- fromJust <$> getFromCache bid
-  success <- liftIO $ withDB $ \conn -> (>0) <$> executeLog' conn "INSERT INTO `peopleMinecraftDEV`(`id`, `minecraft`,`status`, `selected`, `verified`) VALUES (?,?, 'alt', 0, 0)" (bid, uuidString uuid)
+  success <- liftIO $ withDB $ \conn -> (>0) <$> executeLog' conn "INSERT INTO `peopleMinecraft`(`id`, `minecraft`,`status`, `selected`, `verified`) VALUES (?,?, 'alt', 0, 0)" (bid, uuidString uuid)
   let newacc = acc { accountMinecrafts = accountMinecrafts acc ++ [uuid] }
   when success $ do
     cache <- getCache

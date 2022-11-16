@@ -48,7 +48,7 @@ instance Cached Settings where
   refreshCache = do
     cache <- getCache
     res :: [(Integer, String, String, String, String, String, String, String, String, String, String)] <-
-      queryLog "SELECT `discord`, `wins`, `losses`, `wlr`, `winsUntil`, `bestStreak`, `currentStreak`, `bestDailyStreak`, `bowHits`, `bowShots`, `accuracy` FROM `settingsDEV`" ()
+      queryLog "SELECT `discord`, `wins`, `losses`, `wlr`, `winsUntil`, `bestStreak`, `currentStreak`, `bestDailyStreak`, `bowHits`, `bowShots`, `accuracy` FROM `settings`" ()
     let newValues = HM.fromList $ flip fmap res $ \case
           (fromInteger -> discord,
             parseBool -> Just sWins, parseBool -> Just sLosses, parseSense -> Just sWLR, parseSense -> Just sWinsUntil,
@@ -62,7 +62,7 @@ instance CachedStorable Settings where
     cacheMap <- getCacheMap
     let toQueryParams (d, set@Settings {..}) = if Just set == cacheMap HM.!? d then Nothing else Just (toInteger d, stringBool sWins, stringBool sLosses, stringSense sWLR, stringSense sWinsUntil, stringSense sBestStreak, stringSense sCurrentStreak, stringSense sBestDailyStreak, stringBool sBowHits, stringBool sBowShots, stringSense sAccuracy)
     let queryParams = mapMaybe toQueryParams accs
-    success <- liftIO $ withDB $ \conn -> (>0) <$> executeManyLog' conn "INSERT INTO `settingsDEV` (`discord`, `wins`, `losses`, `wlr`, `winsUntil`, `bestStreak`, `currentStreak`, `bestDailyStreak`, `bowHits`, `bowShots`, `accuracy`) VALUES (?,?,?,?,?,?,?,?,?,?,?) ON DUPLICATE KEY UPDATE `wins`=VALUES(`wins`), `losses`=VALUES(`losses`), `wlr`=VALUES(`wlr`), `winsUntil`=VALUES(`winsUntil`), `bestStreak`=VALUES(`bestStreak`), `currentStreak`=VALUES(`currentStreak`), `bestDailyStreak`=VALUES(`bestDailyStreak`), `bowHits`=VALUES(`bowHits`), `bowShots`=VALUES(`bowShots`), `accuracy`=VALUES(`accuracy`)"  queryParams
+    success <- liftIO $ withDB $ \conn -> (>0) <$> executeManyLog' conn "INSERT INTO `settings` (`discord`, `wins`, `losses`, `wlr`, `winsUntil`, `bestStreak`, `currentStreak`, `bestDailyStreak`, `bowHits`, `bowShots`, `accuracy`) VALUES (?,?,?,?,?,?,?,?,?,?,?) ON DUPLICATE KEY UPDATE `wins`=VALUES(`wins`), `losses`=VALUES(`losses`), `wlr`=VALUES(`wlr`), `winsUntil`=VALUES(`winsUntil`), `bestStreak`=VALUES(`bestStreak`), `currentStreak`=VALUES(`currentStreak`), `bestDailyStreak`=VALUES(`bestDailyStreak`), `bowHits`=VALUES(`bowHits`), `bowShots`=VALUES(`bowShots`), `accuracy`=VALUES(`accuracy`)"  queryParams
     when success $ do
       cache <- getCache
       liftIO $ atomically $ modifyTVar cache (insertMany accs)

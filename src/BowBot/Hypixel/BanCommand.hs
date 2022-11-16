@@ -25,6 +25,6 @@ hypixelBanCommand = Command CommandInfo
       then respond "*The player is already banned!*"
       else do
         a <- storeInCache [ mc { mcHypixelBow = Banned} ]
-        b <- liftIO $ withDB $ \conn -> (>0) <$> executeLog' conn "DELETE FROM `statsDEV` WHERE `minecraft` = ?" (Only (uuidString (mcUUID mc)))
+        b <- liftIO $ withDB $ \conn -> (>0) <$> executeLog' conn "DELETE FROM `stats` WHERE `minecraft` = ?" (Only (uuidString (mcUUID mc)))
         when b $ getCache @HypixelBowLeaderboardEntry >>= liftIO . atomically . flip modifyTVar (HM.delete (mcUUID mc))
         respond $ if a then "*Success, player got banned!*" else somethingWentWrongMessage

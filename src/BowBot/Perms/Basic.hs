@@ -37,7 +37,7 @@ instance Cached PermissionLevel where
   type CacheIndex PermissionLevel = UserId
   refreshCache = do
     cache <- getCache
-    res :: [(Integer, String)] <- queryLog "SELECT `id`, `level` FROM `permissionsDEV`" ()
+    res :: [(Integer, String)] <- queryLog "SELECT `id`, `level` FROM `permissions`" ()
     let newValues = HM.fromList $ flip fmap res $ \case
           (fromInteger -> discord, stringToPermissionLevel -> Just level) -> (discord, level)
           (fromInteger -> discord, _) -> (discord, DefaultLevel)
@@ -48,7 +48,7 @@ instance CachedStorable PermissionLevel where
     cacheMap <- getCacheMap
     let toQueryParams (did, lvl) = if Just lvl == cacheMap HM.!? did then Nothing else Just (toInteger did, permissionLevelToString lvl)
     let queryParams = mapMaybe toQueryParams accs
-    success <- liftIO $ withDB $ \conn -> (>0) <$> executeManyLog' conn "INSERT INTO `permissionsDEV` (`id`, `level`) VALUES (?,?) ON DUPLICATE KEY UPDATE `level`=VALUES(`level`)" queryParams
+    success <- liftIO $ withDB $ \conn -> (>0) <$> executeManyLog' conn "INSERT INTO `permissions` (`id`, `level`) VALUES (?,?) ON DUPLICATE KEY UPDATE `level`=VALUES(`level`)" queryParams
     when success $ do
       cache <- getCache
       liftIO $ atomically $ modifyTVar cache (insertMany accs)

@@ -21,7 +21,7 @@ instance Cached InfoField where
   type CacheIndex InfoField = String
   refreshCache = do
     cache <- getCache
-    res :: [(String, String)] <- queryLog "SELECT `name`, `value` FROM `botInfoDEV`" ()
+    res :: [(String, String)] <- queryLog "SELECT `name`, `value` FROM `botInfo`" ()
     let newValues = HM.fromList $ flip fmap res $ \(infoFieldName, infoFieldValue) -> (infoFieldName, InfoField {..})
     liftIO $ atomically $ writeTVar cache newValues
 
@@ -31,7 +31,7 @@ instance CachedIndexed InfoField where
     cacheMap <- getCacheMap
     let toQueryParams f@InfoField {..} = if Just f == cacheMap HM.!? infoFieldName then Nothing else Just (infoFieldName, infoFieldValue)
     let queryParams = mapMaybe toQueryParams accs
-    success <- liftIO $ withDB $ \conn -> (>0) <$> executeManyLog' conn "INSERT INTO `botInfoDEV` (`name`, `value`) VALUES (?,?) ON DUPLICATE KEY UPDATE `value`=VALUES(`value`)" queryParams
+    success <- liftIO $ withDB $ \conn -> (>0) <$> executeManyLog' conn "INSERT INTO `botInfo` (`name`, `value`) VALUES (?,?) ON DUPLICATE KEY UPDATE `value`=VALUES(`value`)" queryParams
     when success $ do
       cache <- getCache
       liftIO $ atomically $ modifyTVar cache (insertMany $ map (\x -> (infoFieldValue x, x)) accs)
