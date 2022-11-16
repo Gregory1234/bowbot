@@ -14,7 +14,7 @@ data SnipeMessage = SnipeMessage
 
 instance Cached SnipeMessage where -- TODO: not really...
   type CacheIndex SnipeMessage = ChannelId
-  refreshCache _ = pure ()
+  refreshCache = pure ()
 
 instance CachedStorable SnipeMessage where
   storeInCacheIndexed snipes = do

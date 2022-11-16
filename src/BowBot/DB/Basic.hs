@@ -1,12 +1,14 @@
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE FlexibleContexts #-}
 
 module BowBot.DB.Basic(
-  module BowBot.DB.Basic, Connection, Only(..), withTransaction, commit, rollback, insertID
+  module BowBot.DB.Basic, Connection, Only(..)
 ) where
 
 import BowBot.Utils
-import Database.MySQL.Simple
+import Database.MySQL.Simple hiding (withTransaction, commit, rollback, insertID)
+import qualified Database.MySQL.Simple as M (withTransaction, commit, rollback, insertID)
 import Database.MySQL.Simple.QueryParams (QueryParams)
 import Database.MySQL.Simple.QueryResults (QueryResults)
 import Database.MySQL.Simple.Types (Query(..))
@@ -27,23 +29,33 @@ withDB f = do
   connectDatabase <- liftIO $ getEnvOrThrow "DB_NAME"
   hoistIOWithArg (bracket (liftIO $ connect $ defaultConnectInfo { connectHost, connectUser, connectPassword, connectDatabase }) close) f
 
-logInfoDB :: MonadIO m => Connection -> String -> m ()
-logInfoDB conn msg = liftIO $ void $ do
+logInfo' :: MonadIO m => Connection -> String -> m ()
+logInfo' conn msg = liftIO $ void $ do
   putStrLn msg
   execute conn "INSERT INTO `logs`(`message`) VALUES (?)" (Only msg)
 
-logInfo :: MonadIO m => String -> m ()
-logInfo msg = void $ liftIO $ do
+logInfo :: (MonadIOReader m r, Has Connection r) => String -> m ()
+logInfo msg = do
+  conn <- asks getter
+  logInfo' conn msg
+
+logInfoFork :: MonadIO m => String -> m ()
+logInfoFork msg = void $ liftIO $ do
   putStrLn msg
   forkIO $ withDB $ \conn -> void $ execute conn "INSERT INTO `logs`(`message`) VALUES (?)" (Only msg)
 
-logErrorDB :: MonadIO m => Connection -> String -> m ()
-logErrorDB conn msg = liftIO $ void $ do
+logError' :: MonadIO m => Connection -> String -> m ()
+logError' conn msg = liftIO $ void $ do
   putStrLn msg
   execute conn "INSERT INTO `logs`(`message`,`type`) VALUES (?,'error')" (Only msg)
 
-logError :: MonadIO m => String -> m ()
-logError msg = void $ liftIO $ do
+logError :: (MonadIOReader m r, Has Connection r) => String -> m ()
+logError msg = do
+  conn <- asks getter
+  logError' conn msg
+
+logErrorFork :: MonadIO m => String -> m ()
+logErrorFork msg = void $ liftIO $ do
   putStrLn msg
   forkIO $ withDB $ \conn -> void $ execute conn "INSERT INTO `logs`(`message`,`type`) VALUES (?,'error')" (Only msg)
 
@@ -57,32 +69,79 @@ optionalQueryFilters as q = Query $ (<>fromString ("WHERE " ++ intercalate " AND
     helper (a, True) = a ++ " = ?"
     helper (a, False) = "(1 OR " ++ a ++ " = ?)"
 
-queryLog :: (QueryParams q, QueryResults r, MonadIO m) => Connection -> Query -> q -> m [r]
-queryLog conn q d = do
+queryLog' :: (QueryParams q, QueryResults r, MonadIO m) => Connection -> Query -> q -> m [r]
+queryLog' conn q d = do
   dev <- ifDev "" (return "Dev")
   let nq = replaceQuery "DEV" dev q
   trueQuery <- liftIO $ formatQuery conn nq d
-  logInfoDB conn $ "Executing query: " ++ show trueQuery
+  logInfo' conn $ "Executing query: " ++ show trueQuery
   liftIO $ query conn nq d
 
-executeLog :: (QueryParams q, MonadIO m) => Connection -> Query -> q -> m Int64
-executeLog conn q d = do
+executeLog' :: (QueryParams q, MonadIO m) => Connection -> Query -> q -> m Int64
+executeLog' conn q d = do
   dev <- ifDev "" (return "Dev")
   let nq = replaceQuery "DEV" dev q
   trueQuery <- liftIO $ formatQuery conn nq d
-  logInfoDB conn $ "Executing query: " ++ show trueQuery
+  logInfo' conn $ "Executing query: " ++ show trueQuery
   liftIO $ execute conn nq d
 
-executeManyLog :: (QueryParams q, MonadIO m) => Connection -> Query -> [q] -> m Int64
-executeManyLog conn q [] = do
+executeManyLog' :: (QueryParams q, MonadIO m) => Connection -> Query -> [q] -> m Int64
+executeManyLog' conn q [] = do
   dev <- ifDev "" (return "Dev")
   let nq = replaceQuery "DEV" dev q
-  logInfoDB conn $ "Tried executing query with no data: " ++ show nq
+  logInfo' conn $ "Tried executing query with no data: " ++ show nq
   return 0
-executeManyLog conn q d = do
+executeManyLog' conn q d = do
   dev <- ifDev "" (return "Dev")
   let nq = replaceQuery "DEV" dev q
   trueQuery <- liftIO $ formatMany conn nq d
-  logInfoDB conn $ "Executing query: " ++ show trueQuery
+  logInfo' conn $ "Executing query: " ++ show trueQuery
   liftIO $ executeMany conn nq d
-  
+
+queryLog :: (QueryParams q, QueryResults r, MonadIOReader m rd, Has Connection rd) => Query -> q -> m [r]
+queryLog q d = do
+  conn <- asks getter
+  queryLog' conn q d
+
+executeLog :: (QueryParams q, MonadIOReader m r, Has Connection r) => Query -> q -> m Int64
+executeLog q d = do
+  conn <- asks getter
+  executeLog' conn q d
+
+executeManyLog :: (QueryParams q, MonadIOReader m r, Has Connection r) => Query -> [q] -> m Int64
+executeManyLog q d = do
+  conn <- asks getter
+  executeManyLog' conn q d
+
+withTransaction' :: (MonadHoistIO m) => Connection -> m a -> m a
+withTransaction' conn a = do
+  hoistIO (M.withTransaction conn) a
+
+withTransaction :: (MonadHoistIOReader m r, Has Connection r) => m a -> m a
+withTransaction a = do
+  conn <- asks getter
+  withTransaction' conn a
+
+commit' :: (MonadIO m) => Connection -> m ()
+commit' conn = liftIO $ M.commit conn
+
+commit :: (MonadIOReader m r, Has Connection r) => m ()
+commit = do
+  conn <- asks getter
+  commit' conn
+
+rollback' :: (MonadIO m) => Connection -> m ()
+rollback' conn = liftIO $ M.rollback conn
+
+rollback :: (MonadIOReader m r, Has Connection r) => m ()
+rollback = do
+  conn <- asks getter
+  rollback' conn
+
+insertID' :: (MonadIO m, Num a) => Connection -> m a
+insertID' conn = liftIO $ fromIntegral <$> M.insertID conn
+
+insertID :: (MonadIOReader m r, Has Connection r, Num a) => m a
+insertID = do
+  conn <- asks getter
+  insertID' conn

@@ -22,9 +22,9 @@ data DiscordAccount = DiscordAccount { discordId :: UserId, discordName :: Strin
 
 instance Cached DiscordAccount where
   type CacheIndex DiscordAccount = UserId
-  refreshCache conn = do
+  refreshCache = do
     cache <- getCache
-    res :: [(Integer, String, String, Maybe String, Bool)] <- queryLog conn "SELECT `id`, `name`, `discriminator`, `nickname`, `member` FROM `discordDEV`" ()
+    res :: [(Integer, String, String, Maybe String, Bool)] <- queryLog "SELECT `id`, `name`, `discriminator`, `nickname`, `member` FROM `discordDEV`" ()
     let newValues = HM.fromList $ flip fmap res $ \(fromIntegral -> discordId, discordName, discordDiscrim, discordNickname, discordIsMember) -> (discordId, DiscordAccount {..})
     liftIO $ atomically $ writeTVar cache newValues
 
@@ -34,7 +34,7 @@ instance CachedIndexed DiscordAccount where
     cacheMap <- getCacheMap
     let toQueryParams acc@DiscordAccount {..} = if Just acc == cacheMap HM.!? discordId then Nothing else Just (toInteger discordId, discordName, discordDiscrim, discordNickname, discordIsMember)
     let queryParams = mapMaybe toQueryParams accs
-    success <- liftIO $ withDB $ \conn -> (>0) <$> executeManyLog conn "INSERT INTO `discordDEV` (`id`, `name`, `discriminator`, `nickname`, `member`) VALUES (?,?,?,?,?) ON DUPLICATE KEY UPDATE `name`=VALUES(`name`), `discriminator`=VALUES(`discriminator`), `nickname`=VALUES(`nickname`), `member`=VALUES(`member`)" queryParams
+    success <- liftIO $ withDB $ \conn -> (>0) <$> executeManyLog' conn "INSERT INTO `discordDEV` (`id`, `name`, `discriminator`, `nickname`, `member`) VALUES (?,?,?,?,?) ON DUPLICATE KEY UPDATE `name`=VALUES(`name`), `discriminator`=VALUES(`discriminator`), `nickname`=VALUES(`nickname`), `member`=VALUES(`member`)" queryParams
     when success $ do
       cache <- getCache
       liftIO $ atomically $ modifyTVar cache (insertMany (map (\x -> (discordId x, x)) accs))
@@ -70,7 +70,7 @@ updateDiscordAccountCache = do
     u' <- call $ R.GetUser (discordId du)
     case u' of
       Left e -> do
-        logError $ show e
+        logErrorFork $ show e
         return du
       Right u -> return $ userToDiscordAccount u
   void $ storeInCache $ members ++ updatedNonMembers

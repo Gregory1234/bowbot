@@ -49,6 +49,7 @@ import BowBot.Birthday.SetCommand
 import BowBot.Snipe.Detect
 import BowBot.Snipe.Command
 import BowBot.Hypixel.Announce
+import BowBot.BotData.Basic
 
 runBowBot :: IO ()
 runBowBot = do
@@ -56,25 +57,25 @@ runBowBot = do
   ifDev () $ putStrLn "this is dev version of the bot"
   bctxManager <- newManager managerSettings
   bctxData <- downloadBotData
-  logInfo "bot started"
+  logInfoFork "bot started"
   userFacingError <-
     runDiscord $
       def
         { discordToken = pack discordKey,
-          discordOnStart = ReaderT $ \bctxDiscord -> runReaderT onStartup BotContext {..},
-          discordOnEvent = \e -> ReaderT $ \bctxDiscord -> runReaderT (eventHandler e) BotContext {..},
+          discordOnStart = ReaderT $ onStartup bctxManager bctxData,
+          discordOnEvent = \e -> ReaderT $ \bctxDiscord -> withDB $ \bctxConnection -> runReaderT (eventHandler e) BotContext {..},
           discordOnLog = putStrLn . unpack,
           discordGatewayIntent = def { gatewayIntentMembers = True }
         }
-  logError $ unpack userFacingError
+  logErrorFork $ unpack userFacingError
 
 backgroundMinutely :: Int -> Bot ()
 backgroundMinutely mint = do
   clearBotDataCaches
-  when (mint == 0) $ withDB $ \conn -> do
-    logInfoDB conn "started update"
+  when (mint == 0) $ do
+    logInfo "started update"
     updateDiscordStatus
-    refreshBotData conn
+    refreshBotData
     hour <- liftIO $ read @Int <$> getTime "%k"
     weekday <- liftIO $ read @Int <$> getTime "%u"
     monthday <- liftIO $ read @Int <$> getTime "%d"
@@ -93,17 +94,17 @@ backgroundMinutely mint = do
     updateMinecraftAccountCache hour
     dev <- ifDev False $ return True
     unless dev $ when (hour `mod` 8 == 0) clearLogs
-    logInfoDB conn "finished update"
+    logInfo "finished update"
 
-onStartup :: Bot ()
-onStartup = void $ hoistIO forkIO $ do
-  updateDiscordStatus
-  sec <- liftIO $ read @Int <$> getTime "%S"
+onStartup :: Manager -> BotData -> DiscordHandle -> IO ()
+onStartup bctxManager bctxData bctxDiscord = void $ forkIO $ do
+  withDB $ \bctxConnection -> runReaderT updateDiscordStatus BotContext {..}
+  sec <- read @Int <$> getTime "%S"
   liftIO $ threadDelay ((65 - sec `mod` 60) * 1000000)
   void $ forever $ do
-    _ <- hoistIO forkIO $ backgroundTimeoutRun 6000 $ do
+    _ <- forkIO $ backgroundTimeoutRun 6000 $ do
       mint <- liftIO $ read @Int <$> getTime "%M"
-      backgroundMinutely mint
+      withDB $ \bctxConnection -> runReaderT (backgroundMinutely mint) BotContext {..}
     liftIO $ threadDelay 60000000
 
 updateDiscordStatus :: (MonadIOBotData m d r, Has DiscordHandle r, HasCache InfoField d) => m ()
@@ -163,11 +164,11 @@ commandTimeoutRun n msg x = do
   tm <- hoistIO (try @SomeException . timeout (n * 1000000)) x
   case tm of
     Left e -> do
-      logError $ "Exception happened in command: " ++ show e
+      logErrorFork $ "Exception happened in command: " ++ show e
       respond' msg "Something went horribly wrong! Please report this!"
       throw e
     Right Nothing -> do
-      logError $ "Timed out: " ++ show n ++ "s"
+      logErrorFork $ "Timed out: " ++ show n ++ "s"
       respond' msg "Timed out! Please report this!"
     Right (Just ()) -> pure ()
 
@@ -176,10 +177,10 @@ backgroundTimeoutRun n x = do
   tm <- hoistIO (try @SomeException . timeout (n * 1000000)) x
   case tm of
     Left e -> do
-      logError $ "Exception happened in command: " ++ show e
+      logErrorFork $ "Exception happened in command: " ++ show e
       throw e
     Right Nothing -> do
-      logError $ "Timed out: " ++ show n ++ "s"
+      logErrorFork $ "Timed out: " ++ show n ++ "s"
     Right (Just ()) -> pure ()
 
 commands :: [Command]
@@ -219,7 +220,7 @@ commands =
   , hypixelBanCommand
   , setBirthdayCommand
   , helpCommand commands AdminLevel Nothing "normal" "adminhelp"
-  , adminCommand 30 "datarefresh" "sync Bow Bot's data from the database" $ withDB $ \conn -> refreshBotData conn
+  , adminCommand 30 "datarefresh" "sync Bow Bot's data from the database" refreshBotData
   , updateDataCommand [] "dataupdate"
   , updateDataCommand [DailyStats] "dataupdateday"
   , updateDataCommand [DailyStats, WeeklyStats] "dataupdateweek"

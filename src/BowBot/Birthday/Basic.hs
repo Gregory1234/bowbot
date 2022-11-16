@@ -12,7 +12,7 @@ module BowBot.Birthday.Basic where
 import BowBot.BotData.Cached
 import BowBot.Discord.Utils
 import qualified Data.HashMap.Strict as HM
-import BowBot.DB.Basic (queryLog, executeManyLog, withDB)
+import BowBot.DB.Basic (queryLog, executeManyLog', withDB)
 import BowBot.Account.Basic
 
 
@@ -31,9 +31,9 @@ currentBirthdayDate = fromJust . birthdayFromString <$> getTime "%d.%m"
 
 instance Cached BirthdayDate where
   type CacheIndex BirthdayDate = UserId
-  refreshCache conn = do
+  refreshCache = do
     cache <- getCache
-    res :: [(Integer, Maybe String)] <- queryLog conn "SELECT `discord`, `birthday` FROM `unregisteredDEV` UNION SELECT `peopleDiscordDEV`.`discord`, `peopleDEV`.`birthday` FROM `peopleDiscordDEV` JOIN `peopleDEV` ON `peopleDEV`.`id`=`peopleDiscordDEV`.`id`" ()
+    res :: [(Integer, Maybe String)] <- queryLog "SELECT `discord`, `birthday` FROM `unregisteredDEV` UNION SELECT `peopleDiscordDEV`.`discord`, `peopleDEV`.`birthday` FROM `peopleDiscordDEV` JOIN `peopleDEV` ON `peopleDEV`.`id`=`peopleDiscordDEV`.`id`" ()
     let newValues = HM.fromList $ flip mapMaybe res $ \(fromInteger -> did, (>>= birthdayFromString) -> bd) -> (did,) <$> bd
     liftIO $ atomically $ writeTVar cache newValues
 
@@ -42,13 +42,13 @@ setBirthday did bd = do
   acc <- getBowBotAccountByDiscord did
   case acc of
     Nothing -> do
-      success <- liftIO $ withDB $ \conn -> (>0) <$> executeManyLog conn "INSERT INTO `unregisteredDEV` (`discord`, `birthday`) VALUES (?,?) ON DUPLICATE KEY UPDATE `birthday`=VALUES(`birthday`)" [(toInteger did, birthdayString bd)]
+      success <- liftIO $ withDB $ \conn -> (>0) <$> executeManyLog' conn "INSERT INTO `unregisteredDEV` (`discord`, `birthday`) VALUES (?,?) ON DUPLICATE KEY UPDATE `birthday`=VALUES(`birthday`)" [(toInteger did, birthdayString bd)]
       when success $ do
         cache <- getCache
         liftIO $ atomically $ modifyTVar cache (insertMany [(did, bd)])
       return success
     Just a -> do
-      success <- liftIO $ withDB $ \conn -> (>0) <$> executeManyLog conn "INSERT INTO `peopleDEV` (`id`, `birthday`) VALUES (?,?) ON DUPLICATE KEY UPDATE `birthday`=VALUES(`birthday`)" [(BowBot.Account.Basic.accountId a, birthdayString bd)]
+      success <- liftIO $ withDB $ \conn -> (>0) <$> executeManyLog' conn "INSERT INTO `peopleDEV` (`id`, `birthday`) VALUES (?,?) ON DUPLICATE KEY UPDATE `birthday`=VALUES(`birthday`)" [(BowBot.Account.Basic.accountId a, birthdayString bd)]
       when success $ do
         cache <- getCache
         liftIO $ atomically $ modifyTVar cache (insertMany $ map (,bd) (accountDiscords a))

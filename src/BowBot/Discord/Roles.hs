@@ -20,7 +20,7 @@ import BowBot.BotData.Counter
 import BowBot.Account.Basic
 import qualified Data.HashMap.Strict as HM
 import qualified Discord.Requests as R
-import BowBot.DB.Basic (queryLog, withDB, executeManyLog)
+import BowBot.DB.Basic (queryLog, withDB, executeManyLog')
 import BowBot.Hypixel.Guild
 import BowBot.Network.Basic
 import BowBot.Hypixel.Basic
@@ -71,9 +71,9 @@ newtype SavedRoles = SavedRoles { getSavedRoleNames :: [String] } deriving (Show
 
 instance Cached SavedRoles where
   type CacheIndex SavedRoles = UserId
-  refreshCache conn = do
+  refreshCache = do
     cache <- getCache
-    res :: [(Integer, String)] <- queryLog conn "SELECT `discord`, `roles` FROM `unregisteredDEV` UNION SELECT `peopleDiscordDEV`.`discord`, `peopleDEV`.`roles` FROM `peopleDiscordDEV` JOIN `peopleDEV` ON `peopleDEV`.`id`=`peopleDiscordDEV`.`id`" ()
+    res :: [(Integer, String)] <- queryLog "SELECT `discord`, `roles` FROM `unregisteredDEV` UNION SELECT `peopleDiscordDEV`.`discord`, `peopleDEV`.`roles` FROM `peopleDiscordDEV` JOIN `peopleDEV` ON `peopleDEV`.`id`=`peopleDiscordDEV`.`id`" ()
     let newValues = HM.fromList $ flip fmap res $ \(fromInteger -> did, SavedRoles . splitOn "," -> roles) -> (did, roles)
     liftIO $ atomically $ writeTVar cache newValues
 
@@ -90,12 +90,12 @@ storeNewRolesSaved did roles = do
     acc <- getBowBotAccountByDiscord did
     case acc of
       Nothing -> do
-        success <- liftIO $ withDB $ \conn -> (>0) <$> executeManyLog conn "INSERT INTO `unregisteredDEV` (`discord`, `roles`) VALUES (?,?) ON DUPLICATE KEY UPDATE `roles`=VALUES(`roles`)" [(toInteger did, rolesStr)]
+        success <- liftIO $ withDB $ \conn -> (>0) <$> executeManyLog' conn "INSERT INTO `unregisteredDEV` (`discord`, `roles`) VALUES (?,?) ON DUPLICATE KEY UPDATE `roles`=VALUES(`roles`)" [(toInteger did, rolesStr)]
         when success $ do
           cache <- getCache
           liftIO $ atomically $ modifyTVar cache (insertMany [(did, savedRoles)])
       Just a -> do
-        success <- liftIO $ withDB $ \conn -> (>0) <$> executeManyLog conn "INSERT INTO `peopleDEV` (`id`, `roles`) VALUES (?,?) ON DUPLICATE KEY UPDATE `roles`=VALUES(`roles`)" [(BowBot.Account.Basic.accountId a, rolesStr)]
+        success <- liftIO $ withDB $ \conn -> (>0) <$> executeManyLog' conn "INSERT INTO `peopleDEV` (`id`, `roles`) VALUES (?,?) ON DUPLICATE KEY UPDATE `roles`=VALUES(`roles`)" [(BowBot.Account.Basic.accountId a, rolesStr)]
         when success $ do
           cache <- getCache
           liftIO $ atomically $ modifyTVar cache (insertMany $ map (,savedRoles) (accountDiscords a))

@@ -26,7 +26,7 @@ announceBirthdays = do
   birthdays <- getBirthdayPeople currentDay
   birthdayChannel <- askInfo birthdayChannelInfo
   dcaccounts <- getCacheMap
-  logInfo $ "Announcing birthdays: " ++ intercalate ", " (map showDiscordAccount . filter discordIsMember . map (dcaccounts HM.!) $ birthdays)
+  logInfoFork $ "Announcing birthdays: " ++ intercalate ", " (map showDiscordAccount . filter discordIsMember . map (dcaccounts HM.!) $ birthdays)
   pns <- HM.fromList . ((\BowBotAccount {..} -> (,accountId) <$> accountDiscords) <=< HM.elems) <$> getCacheMap
   let (registered, unregistered) = partition (isJust . (pns HM.!?)) birthdays
   let peopleMap = M.toList $ M.filter (not . null) $ M.map (filter discordIsMember . map (dcaccounts HM.!)) $ groupByToMap (pns HM.!) registered

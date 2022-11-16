@@ -11,7 +11,7 @@ module BowBot.Minecraft.Account where
 
 import BowBot.Minecraft.Basic
 import BowBot.BotData.Cached
-import BowBot.DB.Basic (queryLog, executeManyLog, withDB)
+import BowBot.DB.Basic (queryLog, executeManyLog', withDB)
 import BowBot.Network.Basic
 import BowBot.Utils
 import qualified Data.HashMap.Strict as HM
@@ -39,9 +39,9 @@ data MinecraftAccount = MinecraftAccount
 
 instance Cached MinecraftAccount where
   type CacheIndex MinecraftAccount = UUID
-  refreshCache conn = do
+  refreshCache = do
     cache <- getCache
-    res :: [(String, String, String, Bool)] <- queryLog conn "SELECT `uuid`, `names`, `hypixel`, `watchlist` FROM `minecraftDEV`" ()
+    res :: [(String, String, String, Bool)] <- queryLog "SELECT `uuid`, `names`, `hypixel`, `watchlist` FROM `minecraftDEV`" ()
     let newValues = HM.fromList $ flip fmap res $ \case
           (UUID -> mcUUID, splitOn "," -> mcNames, stringToIsBanned -> Just mcHypixelBow, mcHypixelWatchlist) -> (mcUUID, MinecraftAccount {..})
           (UUID -> mcUUID, splitOn "," -> mcNames, _, mcHypixelWatchlist) -> (mcUUID, MinecraftAccount {mcHypixelBow = NotBanned, ..})
@@ -53,7 +53,7 @@ instance CachedIndexed MinecraftAccount where
     cacheMap <- getCacheMap
     let toQueryParams acc@MinecraftAccount {..} = if Just acc == cacheMap HM.!? mcUUID then Nothing else Just (uuidString mcUUID, head mcNames, intercalate "," mcNames, isBannedToString mcHypixelBow, if mcHypixelWatchlist then 1 :: Integer else 0)
     let queryParams = mapMaybe toQueryParams accs
-    success <- liftIO $ withDB $ \conn -> (>0) <$> executeManyLog conn "INSERT INTO `minecraftDEV` (`uuid`, `name`, `names`, `hypixel`, `watchlist`) VALUES (?,?,?,?,?) ON DUPLICATE KEY UPDATE `name`=VALUES(`name`), `names`=VALUES(`names`), `hypixel`=VALUES(`hypixel`), `watchlist`=VALUES(`watchlist`)" queryParams
+    success <- liftIO $ withDB $ \conn -> (>0) <$> executeManyLog' conn "INSERT INTO `minecraftDEV` (`uuid`, `name`, `names`, `hypixel`, `watchlist`) VALUES (?,?,?,?,?) ON DUPLICATE KEY UPDATE `name`=VALUES(`name`), `names`=VALUES(`names`), `hypixel`=VALUES(`hypixel`), `watchlist`=VALUES(`watchlist`)" queryParams
     when success $ do
       cache <- getCache
       liftIO $ atomically $ modifyTVar cache (insertMany (map (\x -> (mcUUID x, x)) accs))

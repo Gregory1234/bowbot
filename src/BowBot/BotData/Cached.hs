@@ -31,7 +31,7 @@ getCache = asks (unDatabaseCache . getterData)
 
 class (Eq (CacheIndex a), Hashable (CacheIndex a)) => Cached a where
   type CacheIndex a
-  refreshCache :: (HasCache a d, MonadIOBotData m d r) => Connection -> m ()
+  refreshCache :: (HasCache a d, MonadIOBotData m d r, Has Connection r) => m ()
 
 class Cached a => CachedStorable a where
   storeInCacheIndexed :: (HasCache a d, MonadIOBotData m d r) => [(CacheIndex a, a)] -> m Bool

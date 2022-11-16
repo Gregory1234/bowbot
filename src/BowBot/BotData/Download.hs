@@ -52,21 +52,21 @@ emptyBotData = do
   snipeCache <- newCache
   return BotData {..}
 
-refreshBotData :: (MonadIOBotData m BotData r) => Connection -> m ()
-refreshBotData conn = do
-  refreshCache @InfoField conn
-  refreshCache @MinecraftAccount conn
-  refreshCache @PermissionLevel conn
-  refreshCache @BowBotAccount conn
-  refreshCache @Settings conn
-  refreshCache @HypixelBowLeaderboardEntry conn
-  refreshCache @SavedRoles conn
-  refreshCache @DiscordAccount conn
-  refreshCache @(HypixelBowTimeStats 'DailyStats) conn
-  refreshCache @(HypixelBowTimeStats 'WeeklyStats) conn
-  refreshCache @(HypixelBowTimeStats 'MonthlyStats) conn
-  refreshCache @BirthdayDate conn
-  refreshCache @SnipeMessage conn -- TODO: this is meaningless...
+refreshBotData :: (MonadIOBotData m BotData r, Has Connection r) => m ()
+refreshBotData = do
+  refreshCache @InfoField
+  refreshCache @MinecraftAccount
+  refreshCache @PermissionLevel
+  refreshCache @BowBotAccount
+  refreshCache @Settings
+  refreshCache @HypixelBowLeaderboardEntry
+  refreshCache @SavedRoles
+  refreshCache @DiscordAccount
+  refreshCache @(HypixelBowTimeStats 'DailyStats)
+  refreshCache @(HypixelBowTimeStats 'WeeklyStats)
+  refreshCache @(HypixelBowTimeStats 'MonthlyStats)
+  refreshCache @BirthdayDate
+  refreshCache @SnipeMessage -- TODO: this is meaningless...
 
 updateBotData :: (MonadIOBotData m BotData r, HasAll [Manager, DiscordHandle] r) => [StatsTimeRange] -> m ()
 updateBotData times = (ask >>=) $ \ctx -> liftIO $ foldl1 concurrently_ $
@@ -86,5 +86,5 @@ clearBotDataCaches = do
 downloadBotData :: IO BotData
 downloadBotData = do
   bdt <- atomically emptyBotData
-  withDB $ \conn -> runReaderT (refreshBotData conn) bdt
+  withDB $ \conn -> runReaderT refreshBotData (conn, bdt)
   return bdt

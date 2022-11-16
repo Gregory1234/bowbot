@@ -7,7 +7,7 @@ module BowBot.Snipe.Detect where
 import BowBot.Discord.Utils
 import BowBot.Snipe.Basic
 import BowBot.BotData.Cached
-import BowBot.DB.Basic (logInfo)
+import BowBot.DB.Basic (logInfoFork)
 
 detectDeleteMessage :: (MonadIOBotData m d r, HasCache SnipeMessage d) => Message -> m ()
 detectDeleteMessage m
@@ -23,7 +23,7 @@ detectDeleteMessage m
     Just embed -> case words (head $ lines embed) of
       ("**Message":"sent":"by":(readMaybe . filter isDigit -> Just sender):"deleted":"in":(readMaybe . filter isDigit -> Just channel):_) -> do
         let content' = dropWhile (/='\n') embed
-        logInfo $ "New snipe delete message: " ++ show content'
+        logInfoFork $ "New snipe delete message: " ++ show content'
         case content' of
           [] -> pure () -- TODO: it was probably an image, do something
           _:content -> 

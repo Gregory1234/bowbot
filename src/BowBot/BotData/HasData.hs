@@ -2,6 +2,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE ConstraintKinds #-}
+{-# LANGUAGE FlexibleInstances #-}
 
 module BowBot.BotData.HasData where
 
@@ -10,6 +11,8 @@ import Control.Monad.Reader (MonadReader, MonadIO)
 import BowBot.HoistIO (MonadHoistIO)
 
 class Has d r => HasBotData d r | r -> d
+
+instance HasBotData d (a, d)
 
 getterData :: forall a d r. (HasBotData d r, Has a d) => r -> a
 getterData = getter @a . getter @d

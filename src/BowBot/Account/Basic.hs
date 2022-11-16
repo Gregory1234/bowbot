@@ -24,11 +24,11 @@ data BowBotAccount = BowBotAccount
 
 instance Cached BowBotAccount where
   type CacheIndex BowBotAccount = Integer
-  refreshCache conn = do
+  refreshCache = do
     cache <- getCache
-    ids :: [Only Integer] <- queryLog conn "SELECT `id` FROM `peopleDEV`" ()
-    minecrafts :: [(Integer, String, Bool)] <- queryLog conn "SELECT `id`, `minecraft`, `selected` FROM `peopleMinecraftDEV`" ()
-    discords :: [(Integer, Integer)] <- queryLog conn "SELECT `id`, `discord` FROM `peopleDiscordDEV`" ()
+    ids :: [Only Integer] <- queryLog "SELECT `id` FROM `peopleDEV`" ()
+    minecrafts :: [(Integer, String, Bool)] <- queryLog "SELECT `id`, `minecraft`, `selected` FROM `peopleMinecraftDEV`" ()
+    discords :: [(Integer, Integer)] <- queryLog "SELECT `id`, `discord` FROM `peopleDiscordDEV`" ()
     let minecraftsMap = M.map (\l -> let u = map (\(_,b,c) -> (UUID b,c)) l in (fst $ head $ filter snd u, map fst u)) $ groupByToMap (\(a,_,_) -> a) minecrafts
     let discordsMap = M.map (map (fromIntegral . snd)) $ groupByToMap fst discords
     let newValues = HM.fromList $ flip mapMaybe ids $ \(Only i) -> (i,) <$> do

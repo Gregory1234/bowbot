@@ -28,16 +28,16 @@ sendRequestTo' :: Manager -> String -> String -> IO ByteString
 sendRequestTo' manager url cleanUrl = do
   _ <- evaluate $ force url
   _ <- evaluate $ force cleanUrl
-  logInfo cleanUrl
+  logInfoFork cleanUrl
   request <- parseRequest url
   res <- try $ httpLbs request manager
   case res of
     (Left (e :: SomeException)) -> do
-      logError $ show e
+      logErrorFork $ show e
       threadDelay 3000000
       sendRequestTo' manager url cleanUrl
     (Right v) -> do
-      logInfo $ "Received response from: " ++ cleanUrl
+      logInfoFork $ "Received response from: " ++ cleanUrl
       return $ responseBody v
 
 sendRequestTo :: (MonadIOReader m r, Has Manager r) => String -> String -> m ByteString
@@ -48,9 +48,9 @@ sendRequestTo url cleanUrl = do
 decodeParse :: (FromJSON o, MonadIO m) => ByteString -> (o -> Parser a) -> m (Maybe a)
 decodeParse (decode -> Just str) parser = liftIO $ case parseEither parser str of
   Left e -> do
-    logError $ show e
+    logErrorFork $ show e
     return Nothing
   Right a -> return $ Just a
 decodeParse str _ = liftIO $ do
-  logError $ "Decoding failed in " ++ show str ++ "!"
+  logErrorFork $ "Decoding failed in " ++ show str ++ "!"
   return Nothing

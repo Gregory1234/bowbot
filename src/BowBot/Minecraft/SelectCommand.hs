@@ -28,7 +28,7 @@ selectMinecraftCommand = Command CommandInfo
           else if mcUUID mc == accountSelectedMinecraft acc
             then respond "*This account is selected already!*"
             else do
-              a <- liftIO $ withDB $ \conn -> (>0) <$> executeLog conn "INSERT INTO `peopleMinecraftDEV` (`minecraft`, `selected`) VALUES (?,0),(?,1) ON DUPLICATE KEY UPDATE `selected`=VALUES(`selected`)" (uuidString $ accountSelectedMinecraft acc, uuidString $ mcUUID mc)
+              a <- liftIO $ withDB $ \conn -> (>0) <$> executeLog' conn "INSERT INTO `peopleMinecraftDEV` (`minecraft`, `selected`) VALUES (?,0),(?,1) ON DUPLICATE KEY UPDATE `selected`=VALUES(`selected`)" (uuidString $ accountSelectedMinecraft acc, uuidString $ mcUUID mc)
               if a then do
                 cache <- getCache
                 liftIO $ atomically $ modifyTVar cache (insertMany [(BowBot.Account.Basic.accountId acc, acc { accountSelectedMinecraft = mcUUID mc})])

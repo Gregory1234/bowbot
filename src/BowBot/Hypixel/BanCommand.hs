@@ -10,7 +10,7 @@ import BowBot.Minecraft.Arg
 import BowBot.BotData.Cached
 import BowBot.Hypixel.Leaderboard
 import qualified Data.HashMap.Strict as HM
-import BowBot.DB.Basic (withDB, executeLog)
+import BowBot.DB.Basic (withDB, executeLog')
 import BowBot.Minecraft.Basic (uuidString)
 import Database.MySQL.Simple.Types
   
@@ -25,6 +25,6 @@ hypixelBanCommand = Command CommandInfo
       then respond "*The player is already banned!*"
       else do
         a <- storeInCache [ mc { mcHypixelBow = Banned} ]
-        b <- liftIO $ withDB $ \conn -> (>0) <$> executeLog conn "DELETE FROM `statsDEV` WHERE `minecraft` = ?" (Only (uuidString (mcUUID mc)))
+        b <- liftIO $ withDB $ \conn -> (>0) <$> executeLog' conn "DELETE FROM `statsDEV` WHERE `minecraft` = ?" (Only (uuidString (mcUUID mc)))
         when b $ getCache @HypixelBowLeaderboardEntry >>= liftIO . atomically . flip modifyTVar (HM.delete (mcUUID mc))
         respond $ if a then "*Success, player got banned!*" else somethingWentWrongMessage

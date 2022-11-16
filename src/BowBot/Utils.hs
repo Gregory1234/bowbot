@@ -116,7 +116,7 @@ discordEscape (x:xs)
   | otherwise = x:discordEscape xs
 
 type MonadIOReader m r = (MonadIO m, MonadReader r m)
-type MonadHoistIOReader m r = (MonadIO m, MonadReader r m)
+type MonadHoistIOReader m r = (MonadHoistIO m, MonadReader r m)
 
 type family HasAll (as :: [Type]) r :: Constraint where
   HasAll '[] r = ()
