@@ -11,7 +11,7 @@ import qualified Discord.Requests as R
 import BowBot.Network.Basic
 import BowBot.Discord.Basic
 import Data.Text.Encoding (encodeUtf8)
-import BowBot.Discord.DiscordNFData ()
+import BowBot.Discord.Orphans ()
 import BowBot.BotData.Basic
 import BowBot.BotData.HasData
 import BowBot.Counter.Basic

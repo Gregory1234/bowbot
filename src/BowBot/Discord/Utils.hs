@@ -5,7 +5,7 @@ module BowBot.Discord.Utils(
   module BowBot.Discord.Utils, module BowBot.Discord.Basic, module Discord, module Discord.Types, module BowBot.Utils
 ) where
 
-import BowBot.Discord.DiscordNFData ()
+import BowBot.Discord.Orphans ()
 import BowBot.Discord.Basic
 import Discord
 import Discord.Types

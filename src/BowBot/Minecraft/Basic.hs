@@ -5,14 +5,15 @@
 
 module BowBot.Minecraft.Basic where
 
-import BowBot.Network.Basic
+import BowBot.Network.Basic hiding (Result)
 import Data.Hashable (Hashable)
 import BowBot.Utils
 import qualified Data.Text as T
+import Database.MySQL.Simple (Param, Result)
 
 newtype UUID = UUID { uuidString :: Text }
   deriving (Show, Eq, Ord)
-  deriving newtype (Hashable)
+  deriving newtype (Hashable, Param, Result)
 
 uuidFromString :: Text -> Maybe UUID
 uuidFromString str

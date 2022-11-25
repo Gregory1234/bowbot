@@ -2,11 +2,11 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE DeriveGeneric #-}
-{-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE DerivingVia #-}
 
-module BowBot.Discord.DiscordNFData() where
+module BowBot.Discord.Orphans() where
 
 import qualified Discord.Requests as R
 import qualified Discord.Internal.Rest as R
@@ -14,6 +14,10 @@ import Discord.Types
 import Control.DeepSeq (NFData(..), deepseq)
 import GHC.Generics (Generic)
 import Data.Hashable (Hashable)
+import Database.MySQL.Simple (Param, Result)
+import TextShow (TextShow(..))
+import TextShow.Generic (FromGeneric(..))
+import Discord (RestCallErrorCode(..))
 
 deriving stock instance Generic Snowflake
 deriving anyclass instance NFData Snowflake
@@ -181,3 +185,9 @@ instance NFData (R.GuildRequest a) where
   rnf (R.GetGuildVanityURL a) = a `deepseq` ()
 
 deriving newtype instance Hashable Snowflake
+deriving newtype instance TextShow Snowflake
+deriving newtype instance Param Snowflake
+deriving newtype instance Result Snowflake
+
+deriving stock instance Generic RestCallErrorCode
+deriving via (FromGeneric RestCallErrorCode) instance TextShow RestCallErrorCode

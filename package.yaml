@@ -35,6 +35,7 @@ dependencies:
 - regex-compat
 - regex-base
 - text-show
+- mysql
 
 library:
   source-dirs: src

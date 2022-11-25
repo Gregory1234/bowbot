@@ -24,15 +24,15 @@ instance Cached DiscordAccount where
   type CacheIndex DiscordAccount = UserId
   refreshCache = do
     cache <- getCache
-    res :: [(Integer, Text, Text, Maybe Text, Bool)] <- queryLog "SELECT `id`, `name`, `discriminator`, `nickname`, `member` FROM `discord`" ()
-    let newValues = HM.fromList $ flip fmap res $ \(fromIntegral -> discordId, discordName, discordDiscrim, discordNickname, discordIsMember) -> (discordId, DiscordAccount {..})
+    res :: [(UserId, Text, Text, Maybe Text, Bool)] <- queryLog "SELECT `id`, `name`, `discriminator`, `nickname`, `member` FROM `discord`" ()
+    let newValues = HM.fromList $ flip fmap res $ \(discordId, discordName, discordDiscrim, discordNickname, discordIsMember) -> (discordId, DiscordAccount {..})
     liftIO $ atomically $ writeTVar cache newValues
 
 instance CachedIndexed DiscordAccount where
   cacheIndex = discordId
   storeInCache accs = do
     cacheMap <- getCacheMap
-    let toQueryParams acc@DiscordAccount {..} = if Just acc == cacheMap HM.!? discordId then Nothing else Just (toInteger discordId, discordName, discordDiscrim, discordNickname, discordIsMember)
+    let toQueryParams acc@DiscordAccount {..} = if Just acc == cacheMap HM.!? discordId then Nothing else Just (discordId, discordName, discordDiscrim, discordNickname, discordIsMember)
     let queryParams = mapMaybe toQueryParams accs
     success <- liftIO $ withDB $ \conn -> (>0) <$> executeManyLog' conn "INSERT INTO `discord` (`id`, `name`, `discriminator`, `nickname`, `member`) VALUES (?,?,?,?,?) ON DUPLICATE KEY UPDATE `name`=VALUES(`name`), `discriminator`=VALUES(`discriminator`), `nickname`=VALUES(`nickname`), `member`=VALUES(`member`)" queryParams
     when success $ do

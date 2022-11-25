@@ -42,10 +42,10 @@ instance Cached MinecraftAccount where
   type CacheIndex MinecraftAccount = UUID
   refreshCache = do
     cache <- getCache
-    res :: [(Text, Text, Text, Bool)] <- queryLog "SELECT `uuid`, `names`, `hypixel`, `watchlist` FROM `minecraft`" ()
+    res :: [(UUID, Text, Text, Bool)] <- queryLog "SELECT `uuid`, `names`, `hypixel`, `watchlist` FROM `minecraft`" ()
     let newValues = HM.fromList $ flip fmap res $ \case
-          (UUID -> mcUUID, T.splitOn "," -> mcNames, stringToIsBanned -> Just mcHypixelBow, mcHypixelWatchlist) -> (mcUUID, MinecraftAccount {..})
-          (UUID -> mcUUID, T.splitOn "," -> mcNames, _, mcHypixelWatchlist) -> (mcUUID, MinecraftAccount {mcHypixelBow = NotBanned, ..})
+          (mcUUID, T.splitOn "," -> mcNames, stringToIsBanned -> Just mcHypixelBow, mcHypixelWatchlist) -> (mcUUID, MinecraftAccount {..})
+          (mcUUID, T.splitOn "," -> mcNames, _, mcHypixelWatchlist) -> (mcUUID, MinecraftAccount {mcHypixelBow = NotBanned, ..})
     liftIO $ atomically $ writeTVar cache newValues
 
 instance CachedIndexed MinecraftAccount where

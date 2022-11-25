@@ -8,7 +8,7 @@ module BowBot.Perms.Basic where
 
 import BowBot.BotData.Cached
 import Discord.Types (UserId)
-import BowBot.Discord.DiscordNFData ()
+import BowBot.Discord.Orphans ()
 import qualified Data.HashMap.Strict as HM
 import BowBot.Utils
 import BowBot.DB.Basic (queryLog, withDB, executeManyLog')
@@ -37,10 +37,10 @@ instance Cached PermissionLevel where
   type CacheIndex PermissionLevel = UserId
   refreshCache = do
     cache <- getCache
-    res :: [(Integer, Text)] <- queryLog "SELECT `id`, `level` FROM `permissions`" ()
+    res :: [(UserId, Text)] <- queryLog "SELECT `id`, `level` FROM `permissions`" ()
     let newValues = HM.fromList $ flip fmap res $ \case
-          (fromInteger -> discord, stringToPermissionLevel -> Just level) -> (discord, level)
-          (fromInteger -> discord, _) -> (discord, DefaultLevel)
+          (discord, stringToPermissionLevel -> Just level) -> (discord, level)
+          (discord, _) -> (discord, DefaultLevel)
     liftIO $ atomically $ writeTVar cache newValues
 
 instance CachedStorable PermissionLevel where

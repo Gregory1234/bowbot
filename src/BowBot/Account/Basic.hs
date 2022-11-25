@@ -14,6 +14,7 @@ import qualified Data.HashMap.Strict as HM
 import qualified Data.Map as M
 import BowBot.DB.Basic (queryLog, Only(..))
 import BowBot.Utils
+import BowBot.Discord.Orphans ()
 
 data BowBotAccount = BowBotAccount
   { accountId :: !Integer
@@ -27,10 +28,10 @@ instance Cached BowBotAccount where
   refreshCache = do
     cache <- getCache
     ids :: [Only Integer] <- queryLog "SELECT `id` FROM `people`" ()
-    minecrafts :: [(Integer, Text, Bool)] <- queryLog "SELECT `id`, `minecraft`, `selected` FROM `peopleMinecraft`" ()
-    discords :: [(Integer, Integer)] <- queryLog "SELECT `id`, `discord` FROM `peopleDiscord`" ()
-    let minecraftsMap = M.map (\l -> let u = map (\(_,b,c) -> (UUID b,c)) l in (fst $ head $ filter snd u, map fst u)) $ groupByToMap (\(a,_,_) -> a) minecrafts
-    let discordsMap = M.map (map (fromIntegral . snd)) $ groupByToMap fst discords
+    minecrafts :: [(Integer, UUID, Bool)] <- queryLog "SELECT `id`, `minecraft`, `selected` FROM `peopleMinecraft`" ()
+    discords :: [(Integer, UserId)] <- queryLog "SELECT `id`, `discord` FROM `peopleDiscord`" ()
+    let minecraftsMap = M.map (\l -> let u = map (\(_,b,c) -> (b,c)) l in (fst $ head $ filter snd u, map fst u)) $ groupByToMap (\(a,_,_) -> a) minecrafts
+    let discordsMap = M.map (map snd) $ groupByToMap fst discords
     let newValues = HM.fromList $ flip mapMaybe ids $ \(Only i) -> (i,) <$> do
           (accountSelectedMinecraft, accountMinecrafts) <- minecraftsMap M.!? i
           accountDiscords <- discordsMap M.!? i

@@ -74,8 +74,8 @@ instance Cached SavedRoles where
   type CacheIndex SavedRoles = UserId
   refreshCache = do
     cache <- getCache
-    res :: [(Integer, Text)] <- queryLog "SELECT `discord`, `roles` FROM `unregistered` UNION SELECT `peopleDiscord`.`discord`, `people`.`roles` FROM `peopleDiscord` JOIN `people` ON `people`.`id`=`peopleDiscord`.`id`" ()
-    let newValues = HM.fromList $ flip fmap res $ \(fromInteger -> did, SavedRoles . T.splitOn "," -> roles) -> (did, roles)
+    res :: [(UserId, Text)] <- queryLog "SELECT `discord`, `roles` FROM `unregistered` UNION SELECT `peopleDiscord`.`discord`, `people`.`roles` FROM `peopleDiscord` JOIN `people` ON `people`.`id`=`peopleDiscord`.`id`" ()
+    let newValues = HM.fromList $ flip fmap res $ \(did, SavedRoles . T.splitOn "," -> roles) -> (did, roles)
     liftIO $ atomically $ writeTVar cache newValues
 
 storeNewRolesSaved :: (MonadIOBotData m d r, HasCaches [InfoField, SavedRoles, BowBotAccount] d) => UserId -> [RoleId] -> m ()

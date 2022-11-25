@@ -67,8 +67,8 @@ instance (Default (SStatsTimeRange t)) => Cached (HypixelBowTimeStats t) where
   type CacheIndex (HypixelBowTimeStats t) = UUID
   refreshCache = do
     cache <- getCache @(HypixelBowTimeStats t)
-    res :: [(Text, Integer, Integer, UTCTime)] <- queryLog (replaceQuery "TIME" (statsTimeRangeName $ sStatsTimeRangeGet (def :: SStatsTimeRange t)) "SELECT `minecraft`, `lastTIMEWins`, `lastTIMELosses`, `lastTIMEUpdate` FROM `stats` WHERE `lastTIMEWins` >= 0 AND `lastTIMELosses` >= 0") ()
-    let newValues = HM.fromList $ flip fmap res $ \(UUID -> uuid, bowTimeWins, bowTimeLosses, nullZeroTime -> bowTimeTimestamp) -> (uuid, HypixelBowTimeStats {..})
+    res :: [(UUID, Integer, Integer, UTCTime)] <- queryLog (replaceQuery "TIME" (statsTimeRangeName $ sStatsTimeRangeGet (def :: SStatsTimeRange t)) "SELECT `minecraft`, `lastTIMEWins`, `lastTIMELosses`, `lastTIMEUpdate` FROM `stats` WHERE `lastTIMEWins` >= 0 AND `lastTIMELosses` >= 0") ()
+    let newValues = HM.fromList $ flip fmap res $ \(uuid, bowTimeWins, bowTimeLosses, nullZeroTime -> bowTimeTimestamp) -> (uuid, HypixelBowTimeStats {..})
     liftIO $ atomically $ writeTVar cache newValues
 
 showHypixelBowTimeStats :: forall t. Default (SStatsTimeRange t) => Settings -> HypixelBowStats -> HypixelBowTimeStats t -> Text

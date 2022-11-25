@@ -36,9 +36,9 @@ instance Cached HypixelBowLeaderboardEntry where
   type CacheIndex HypixelBowLeaderboardEntry = UUID
   refreshCache = do
     cache <- getCache
-    res :: [(Text, Integer, Integer, Integer, UTCTime, UTCTime)] <- queryLog "SELECT `minecraft`, `bowWins`, `bowLosses`, `bowWinstreak`, `lastUpdate`, `lastWinstreakUpdate` FROM `stats`" ()
+    res :: [(UUID, Integer, Integer, Integer, UTCTime, UTCTime)] <- queryLog "SELECT `minecraft`, `bowWins`, `bowLosses`, `bowWinstreak`, `lastUpdate`, `lastWinstreakUpdate` FROM `stats`" ()
     let newValues = HM.fromList $ flip fmap res $ \case
-          (UUID -> uuid, bowLbWins, bowLbLosses, (\x -> if x == 0 then Nothing else Just x) -> bowLbWinstreak, nullZeroTime -> bowLbTimestamp, nullZeroTime -> bowLbWinstreakTimestamp) -> (uuid, HypixelBowLeaderboardEntry {..})
+          (uuid, bowLbWins, bowLbLosses, (\x -> if x == 0 then Nothing else Just x) -> bowLbWinstreak, nullZeroTime -> bowLbTimestamp, nullZeroTime -> bowLbWinstreakTimestamp) -> (uuid, HypixelBowLeaderboardEntry {..})
     liftIO $ atomically $ writeTVar cache newValues
 
 hypixelBowStatsToLeaderboards :: HypixelBowStats -> HypixelBowLeaderboardEntry

@@ -10,7 +10,7 @@ module BowBot.Settings.Basic where
 
 import BowBot.BotData.Cached
 import Discord.Types (UserId)
-import BowBot.Discord.DiscordNFData ()
+import BowBot.Discord.Orphans ()
 import qualified Data.HashMap.Strict as HM
 import BowBot.DB.Basic
 import BowBot.Utils
