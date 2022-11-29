@@ -30,8 +30,8 @@ createNewBowBotAccount name did uuid = do
     when (c2 <= 0) $ throwError ()
     c3 <- executeLog "INSERT INTO `peopleDiscord`(`id`, `discord`) VALUES (?,?)" (bid, toInteger did)
     when (c3 <= 0) $ throwError ()
-    pure $ BowBotAccount { accountId = bid, accountDiscords = [did], accountSelectedMinecraft = uuid, accountMinecrafts = [uuid] }
-  liftIO $ atomically $ for_ ret $ \bacc -> modifyTVar cache (insertMany [(accountId bacc, bacc)])
+    pure $ BowBotAccount { accountBotId = bid, accountDiscords = [did], accountSelectedMinecraft = uuid, accountMinecrafts = [uuid] }
+  liftIO $ atomically $ for_ ret $ \bacc -> modifyTVar cache (insertMany [(accountBotId bacc, bacc)])
   return ret
 
 addAltToBowBotAccount :: (MonadIOBotData m d r, HasCache BowBotAccount d) => Integer -> UUID -> m (Maybe BowBotAccount)

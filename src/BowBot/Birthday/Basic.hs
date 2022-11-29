@@ -49,7 +49,7 @@ setBirthday did bd = do
         liftIO $ atomically $ modifyTVar cache (insertMany [(did, bd)])
       return success
     Just a -> do
-      success <- liftIO $ withDB $ \conn -> (>0) <$> executeManyLog' conn "INSERT INTO `people` (`id`, `birthday`) VALUES (?,?) ON DUPLICATE KEY UPDATE `birthday`=VALUES(`birthday`)" [(BowBot.Account.Basic.accountId a, birthdayString bd)]
+      success <- liftIO $ withDB $ \conn -> (>0) <$> executeManyLog' conn "INSERT INTO `people` (`id`, `birthday`) VALUES (?,?) ON DUPLICATE KEY UPDATE `birthday`=VALUES(`birthday`)" [(accountBotId a, birthdayString bd)]
       when success $ do
         cache <- getCache
         liftIO $ atomically $ modifyTVar cache (insertMany $ map (,bd) (accountDiscords a))

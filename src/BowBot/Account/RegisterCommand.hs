@@ -105,7 +105,7 @@ addaltCommand = Command CommandInfo
         when a $ void $ storeInCacheIndexed [(uuid, hypixelBowStatsToLeaderboards stats)]
       Just MinecraftAccount { mcHypixelBow = NotBanned } -> void $ storeInCacheIndexed [(uuid, hypixelBowStatsToLeaderboards stats)]
       _ -> pure ()
-    newacc <- liftMaybe somethingWentWrongMessage =<< addAltToBowBotAccount (BowBot.Account.Basic.accountId bacc) uuid
+    newacc <- liftMaybe somethingWentWrongMessage =<< addAltToBowBotAccount (accountBotId bacc) uuid
     gid <- askInfo discordGuildIdInfo
     gmems <- discordGuildMembers gid
     for_ gmems $ \gmem -> when (maybe 0 userId (memberUser gmem) `elem` accountDiscords bacc) $ lift $ updateRoles gmem (Just newacc)

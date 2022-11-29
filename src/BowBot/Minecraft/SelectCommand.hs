@@ -31,6 +31,6 @@ selectMinecraftCommand = Command CommandInfo
               a <- liftIO $ withDB $ \conn -> (>0) <$> executeLog' conn "INSERT INTO `peopleMinecraft` (`minecraft`, `selected`) VALUES (?,0),(?,1) ON DUPLICATE KEY UPDATE `selected`=VALUES(`selected`)" (uuidString $ accountSelectedMinecraft acc, uuidString $ mcUUID mc)
               if a then do
                 cache <- getCache
-                liftIO $ atomically $ modifyTVar cache (insertMany [(BowBot.Account.Basic.accountId acc, acc { accountSelectedMinecraft = mcUUID mc})])
+                liftIO $ atomically $ modifyTVar cache (insertMany [(accountBotId acc, acc { accountSelectedMinecraft = mcUUID mc})])
                 respond "*Selected account updated!*"
               else respond somethingWentWrongMessage

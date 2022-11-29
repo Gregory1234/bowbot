@@ -96,7 +96,7 @@ storeNewRolesSaved did roles = do
           cache <- getCache
           liftIO $ atomically $ modifyTVar cache (insertMany [(did, savedRoles)])
       Just a -> do
-        success <- liftIO $ withDB $ \conn -> (>0) <$> executeManyLog' conn "INSERT INTO `people` (`id`, `roles`) VALUES (?,?) ON DUPLICATE KEY UPDATE `roles`=VALUES(`roles`)" [(BowBot.Account.Basic.accountId a, rolesStr)]
+        success <- liftIO $ withDB $ \conn -> (>0) <$> executeManyLog' conn "INSERT INTO `people` (`id`, `roles`) VALUES (?,?) ON DUPLICATE KEY UPDATE `roles`=VALUES(`roles`)" [(accountBotId a, rolesStr)]
         when success $ do
           cache <- getCache
           liftIO $ atomically $ modifyTVar cache (insertMany $ map (,savedRoles) (accountDiscords a))

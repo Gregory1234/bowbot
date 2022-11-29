@@ -30,7 +30,7 @@ announceBirthdays = do
   birthdayChannel <- askInfo birthdayChannelInfo
   dcaccounts <- getCacheMap
   logInfoFork $ "Announcing birthdays: " <> T.intercalate ", " (map showDiscordAccount . filter discordIsMember . map (dcaccounts HM.!) $ birthdays)
-  pns <- HM.fromList . ((\BowBotAccount {..} -> (,accountId) <$> accountDiscords) <=< HM.elems) <$> getCacheMap
+  pns <- HM.fromList . ((\BowBotAccount {..} -> (,accountBotId) <$> accountDiscords) <=< HM.elems) <$> getCacheMap
   let (registered, unregistered) = partition (isJust . (pns HM.!?)) birthdays
   let peopleMap = M.toList $ M.filter (not . null) $ M.map (filter discordIsMember . map (dcaccounts HM.!)) $ groupByToMap (pns HM.!) registered
   for_ peopleMap $ \(_, p) -> call $ R.CreateMessage birthdayChannel $ "**Happy birthday** to " <> T.intercalate ", " (map showDiscordAccountDiscord p) <> "!"

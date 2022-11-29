@@ -17,7 +17,7 @@ import BowBot.Utils
 import BowBot.Discord.Orphans ()
 
 data BowBotAccount = BowBotAccount
-  { accountId :: !Integer
+  { accountBotId :: !Integer
   , accountDiscords :: [UserId]
   , accountSelectedMinecraft :: !UUID
   , accountMinecrafts :: [UUID]
@@ -35,7 +35,7 @@ instance Cached BowBotAccount where
     let newValues = HM.fromList $ flip mapMaybe ids $ \(Only i) -> (i,) <$> do
           (accountSelectedMinecraft, accountMinecrafts) <- minecraftsMap M.!? i
           accountDiscords <- discordsMap M.!? i
-          return BowBotAccount { accountId = i, ..}
+          return BowBotAccount { accountBotId = i, ..}
     liftIO $ atomically $ writeTVar cache newValues
 
 getBowBotAccountByDiscord :: (MonadIOBotData m d r, HasCache BowBotAccount d) => UserId -> m (Maybe BowBotAccount)
