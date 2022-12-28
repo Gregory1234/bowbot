@@ -12,7 +12,7 @@ import BowBot.Discord.Utils
 snipeCommand :: Command
 snipeCommand = Command CommandInfo
   { commandName = "snipe"
-  , commandHelpEntries = [HelpEntry { helpUsage = "snipe", helpDescription = "show the last deleted message from this channel", helpGroup = "normal" }]
+  , commandHelpEntries = [HelpEntry { helpUsage = "snipe", helpDescription = "show the last deleted or edited message from this channel", helpGroup = "normal" }]
   , commandPerms = DefaultLevel
   , commandTimeout = 10
   } $ noArguments $ do
@@ -24,4 +24,6 @@ snipeCommand = Command CommandInfo
         snipeAuthor' <- getFromCache snipeMessageAuthor
         case snipeAuthor' of
           Nothing -> respond somethingWentWrongMessage
-          Just snipeAuthor -> respond $ showDiscordAccountDiscord snipeAuthor <> " *wrote " <> discordFormatTimestampFull snipeMessageTimestamp <> ":* \n" <> snipeMessageContent
+          Just snipeAuthor -> respond $ if snipeMessageWasEdited
+              then showDiscordAccountDiscord snipeAuthor <> " *edited " <> discordFormatTimestampFull snipeMessageTimestamp <> ":* \n" <> snipeMessageContent
+              else showDiscordAccountDiscord snipeAuthor <> " *deleted " <> discordFormatTimestampFull snipeMessageTimestamp <> ":* \n" <> snipeMessageContent

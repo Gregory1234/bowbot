@@ -33,6 +33,6 @@ detectDeleteMessage m
           Nothing -> pure ()
           Just sender -> do
             let content = embedFieldValue $ head $ embedFields $ head (messageEmbeds m)
-            void $ storeInCacheIndexed [(channel, SnipeMessage { snipeMessageAuthor = sender, snipeMessageContent = content, snipeMessageWasEdited = False, snipeMessageTimestamp = messageTimestamp m })]
+            void $ storeInCacheIndexed [(channel, SnipeMessage { snipeMessageAuthor = sender, snipeMessageContent = content, snipeMessageWasEdited = True, snipeMessageTimestamp = messageTimestamp m })]
       _ -> pure ()
 detectDeleteMessage _ = pure ()
