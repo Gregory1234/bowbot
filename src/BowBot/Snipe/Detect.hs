@@ -21,14 +21,14 @@ detectDeleteMessage m
   , length (messageEmbeds m) == 1 = case embedDescription $ head (messageEmbeds m) of
     Nothing -> pure ()
     Just embed -> case T.words (head $ T.lines embed) of
-      ("**Message":"sent":"by":(readMaybe . unpack . T.filter isDigit -> Just sender):"deleted":"in":(readMaybe . unpack . T.filter isDigit -> Just channel):_) -> do
+      ("**Message":"sent":"by":(readMaybe . unpack . T.filter isDigit -> Just sender):"Deleted":"in":(readMaybe . unpack . T.filter isDigit -> Just channel):_) -> do
         let content' = T.dropWhile (/='\n') embed
         --logInfoFork $ "New snipe delete message: " <> pack (show content')
         case T.uncons content' of
           Nothing -> pure () -- TODO: it was probably an image, do something
           Just (_, content) -> 
             void $ storeInCacheIndexed [(channel, SnipeMessage { snipeMessageAuthor = sender, snipeMessageContent = content, snipeMessageWasEdited = False, snipeMessageTimestamp = messageTimestamp m })]
-      ("**Message":"edited":"in":(readMaybe . unpack . T.filter isDigit -> Just channel):"[Jump":"to":_) -> do
+      ("**Message":"Edited":"in":(readMaybe . unpack . T.filter isDigit -> Just channel):"[Jump":"to":_) -> do
         case (>>=readMaybe . unpack . T.filter isDigit . embedFooterText) $ embedFooter $ head (messageEmbeds m) of
           Nothing -> pure ()
           Just sender -> do
