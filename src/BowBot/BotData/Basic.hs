@@ -31,7 +31,6 @@ import BowBot.BotData.HasData
 data BotData = BotData
   { infoFieldCache :: DatabaseCache InfoField
   , minecraftAccountCache :: DatabaseCache MinecraftAccount
-  , permissionCache :: DatabaseCache PermissionLevel
   , bowBotAccountCache :: DatabaseCache BowBotAccount
   , settingsCache :: DatabaseCache Settings
   , hypixelLeaderboardCache :: DatabaseCache HypixelBowLeaderboardEntry
@@ -53,10 +52,6 @@ instance Has (DatabaseCache InfoField) BotData where
 instance Has (DatabaseCache MinecraftAccount) BotData where
   getter = minecraftAccountCache
   modifier f x = x { minecraftAccountCache = f $ minecraftAccountCache x }
-
-instance Has (DatabaseCache PermissionLevel) BotData where
-  getter = permissionCache
-  modifier f x = x { permissionCache = f $ permissionCache x }
 
 instance Has (DatabaseCache BowBotAccount) BotData where
   getter = bowBotAccountCache

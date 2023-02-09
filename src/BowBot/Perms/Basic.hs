@@ -1,6 +1,6 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE LambdaCase #-}
-{-# LANGUAGE ViewPatterns #-}
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE OverloadedStrings #-}
 
@@ -9,9 +9,10 @@ module BowBot.Perms.Basic where
 import BowBot.BotData.Cached
 import Discord.Types (UserId)
 import BowBot.Discord.Orphans ()
-import qualified Data.HashMap.Strict as HM
 import BowBot.Utils
-import BowBot.DB.Basic (queryLog, withDB, executeManyLog')
+import BowBot.DB.Basic (queryLog, withDB, executeManyLog', Connection, Only(..))
+import Database.MySQL.Simple (Param, Result, ToField(..), FromField(..))
+import qualified Database.MySQL.Base.Types as T
 
 data PermissionLevel
   = BanLevel
@@ -20,36 +21,26 @@ data PermissionLevel
   | AdminLevel
   deriving (Eq, Ord, Enum, Bounded, Show)
 
-stringToPermissionLevel :: Text -> Maybe PermissionLevel
-stringToPermissionLevel "ban" = Just BanLevel
-stringToPermissionLevel "default" = Just DefaultLevel
-stringToPermissionLevel "mod" = Just ModLevel
-stringToPermissionLevel "admin" = Just AdminLevel
-stringToPermissionLevel _ = Nothing
+instance Param PermissionLevel
+instance Result PermissionLevel
 
-permissionLevelToString :: PermissionLevel -> Text
-permissionLevelToString BanLevel = "ban"
-permissionLevelToString DefaultLevel = "default"
-permissionLevelToString ModLevel = "mod"
-permissionLevelToString AdminLevel = "admin"
+instance ToField PermissionLevel where
+  toField BanLevel = "ban"
+  toField DefaultLevel = "default"
+  toField ModLevel = "mod"
+  toField AdminLevel = "admin"
 
-instance Cached PermissionLevel where
-  type CacheIndex PermissionLevel = UserId
-  refreshCache = do
-    cache <- getCache
-    res :: [(UserId, Text)] <- queryLog "SELECT `id`, `level` FROM `permissions`" ()
-    let newValues = HM.fromList $ flip fmap res $ \case
-          (discord, stringToPermissionLevel -> Just level) -> (discord, level)
-          (discord, _) -> (discord, DefaultLevel)
-    liftIO $ atomically $ writeTVar cache newValues
+instance FromField PermissionLevel where
+  fromField = ([T.Enum, T.String], \case
+    "ban" -> Right BanLevel
+    "default" -> Right DefaultLevel
+    "mod" -> Right ModLevel
+    "admin" -> Right AdminLevel
+    _ -> Left "Wrong permission level")
 
-instance CachedStorable PermissionLevel where
-  storeInCacheIndexed accs = do
-    cacheMap <- getCacheMap
-    let toQueryParams (did, lvl) = if Just lvl == cacheMap HM.!? did then Nothing else Just (toInteger did, permissionLevelToString lvl)
-    let queryParams = mapMaybe toQueryParams accs
-    success <- liftIO $ withDB $ \conn -> (>0) <$> executeManyLog' conn "INSERT INTO `permissions` (`id`, `level`) VALUES (?,?) ON DUPLICATE KEY UPDATE `level`=VALUES(`level`)" queryParams
-    when success $ do
-      cache <- getCache
-      liftIO $ atomically $ modifyTVar cache (insertMany accs)
-    return success
+getPermissionLevelByDiscord :: (MonadIOReader m r, Has Connection r) => UserId -> m PermissionLevel
+getPermissionLevelByDiscord discord = do
+  res :: [Only PermissionLevel] <- queryLog "SELECT `level` FROM `permissions` WHERE `id` = ?" (Only discord)
+  return $ case res of
+    [Only level] -> level
+    _ -> DefaultLevel

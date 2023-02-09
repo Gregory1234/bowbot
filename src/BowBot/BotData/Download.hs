@@ -58,7 +58,6 @@ refreshBotData :: (MonadIOBotData m BotData r, Has Connection r) => m ()
 refreshBotData = do
   refreshCache @InfoField
   refreshCache @MinecraftAccount
-  refreshCache @PermissionLevel
   refreshCache @BowBotAccount
   refreshCache @Settings
   refreshCache @HypixelBowLeaderboardEntry
