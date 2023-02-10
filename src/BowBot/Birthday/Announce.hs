@@ -23,10 +23,10 @@ import qualified Data.Text as T
 birthdayChannelInfo :: InfoType ChannelId
 birthdayChannelInfo = InfoType { infoName = "birthday_channel", infoDefault = 0, infoParse = first pack . readEither . unpack }
 
-announceBirthdays :: (MonadIOBotData m d r, Has DiscordHandle r, HasCaches [BirthdayDate, BowBotAccount, DiscordAccount, InfoField] d) => m ()
+announceBirthdays :: (MonadIOBotData m d r, HasAll [DiscordHandle, Connection] r, HasCaches [BowBotAccount, DiscordAccount, InfoField] d) => m ()
 announceBirthdays = do
   currentDay <- liftIO currentBirthdayDate
-  birthdays <- getBirthdayPeople currentDay
+  birthdays <- getBirthdaysByDate currentDay
   birthdayChannel <- askInfo birthdayChannelInfo
   dcaccounts <- getCacheMap
   logInfoFork $ "Announcing birthdays: " <> T.intercalate ", " (map showDiscordAccount . filter discordIsMember . map (dcaccounts HM.!) $ birthdays)

@@ -15,13 +15,13 @@ import BowBot.Birthday.Basic
 import Control.Monad.Except (runExceptT, throwError)
 import qualified Data.Text as T
 
-createNewBowBotAccount :: (MonadIOBotData m d r, HasCaches [BowBotAccount, SavedRoles, BirthdayDate] d, Has Connection r) => Text -> UserId -> UUID -> m (Maybe BowBotAccount)
+createNewBowBotAccount :: (MonadIOBotData m d r, HasCaches [BowBotAccount, SavedRoles] d, Has Connection r) => Text -> UserId -> UUID -> m (Maybe BowBotAccount)
 createNewBowBotAccount name did uuid = do
   cache <- getCache
   savedRoles <- getFromCache did
-  birthday <- getFromCache did
   r <- ask
   ret <- liftIO $ flip runReaderT r $ withTransaction $ (either (const $ rollback $> Nothing) (pure . Just) =<<) $ runExceptT $ do
+    birthday <- getBirthdayByDiscord did
     void $ executeLog "DELETE FROM `unregistered` WHERE `discord` = ?" (Only (toInteger did))
     c1 <- executeLog "INSERT INTO `people`(`name`, `roles`, `birthday`) VALUES (?,?,?)" (name, maybe "" (T.intercalate "," . getSavedRoleNames) savedRoles, birthdayString <$> birthday)
     when (c1 <= 0) $ throwError ()

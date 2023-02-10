@@ -65,7 +65,6 @@ refreshBotData = do
   refreshCache @(HypixelBowTimeStats 'DailyStats)
   refreshCache @(HypixelBowTimeStats 'WeeklyStats)
   refreshCache @(HypixelBowTimeStats 'MonthlyStats)
-  refreshCache @BirthdayDate
   refreshCache @SnipeMessage -- TODO: this is meaningless...
 
 updateBotData :: (MonadIOBotData m BotData r, HasAll [Manager, DiscordHandle, CounterState] r) => [StatsTimeRange] -> m ()

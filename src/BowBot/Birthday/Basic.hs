@@ -1,7 +1,6 @@
 {-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TupleSections #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE FlexibleContexts #-}
@@ -12,8 +11,7 @@ module BowBot.Birthday.Basic where
 
 import BowBot.BotData.Cached
 import BowBot.Discord.Utils
-import qualified Data.HashMap.Strict as HM
-import BowBot.DB.Basic (queryLog, executeManyLog', withDB)
+import BowBot.DB.Basic (queryLog, executeManyLog', withDB, Connection, Only(..))
 import BowBot.Account.Basic
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
@@ -46,30 +44,21 @@ birthdayFromString str = case T.splitOn "." str of
 currentBirthdayDate :: IO BirthdayDate
 currentBirthdayDate = fromJust . birthdayFromString . pack <$> getTime "%d.%m"
 
-instance Cached BirthdayDate where
-  type CacheIndex BirthdayDate = UserId
-  refreshCache = do
-    cache <- getCache
-    res :: [(UserId, Maybe BirthdayDate)] <- queryLog "SELECT `discord`, `birthday` FROM `unregistered` UNION SELECT `peopleDiscord`.`discord`, `people`.`birthday` FROM `peopleDiscord` JOIN `people` ON `people`.`id`=`peopleDiscord`.`id`" ()
-    let newValues = HM.fromList $ flip mapMaybe res $ \(did, bd) -> (did,) <$> bd
-    liftIO $ atomically $ writeTVar cache newValues
-
-setBirthday :: (MonadIOBotData m d r, HasCaches [BowBotAccount, BirthdayDate] d) => UserId -> BirthdayDate -> m Bool
+setBirthday :: (MonadIOBotData m d r, HasCache BowBotAccount d) => UserId -> BirthdayDate -> m Bool
 setBirthday did bd = do
   acc <- getBowBotAccountByDiscord did
-  case acc of
-    Nothing -> do
-      success <- liftIO $ withDB $ \conn -> (>0) <$> executeManyLog' conn "INSERT INTO `unregistered` (`discord`, `birthday`) VALUES (?,?) ON DUPLICATE KEY UPDATE `birthday`=VALUES(`birthday`)" [(did, bd)]
-      when success $ do
-        cache <- getCache
-        liftIO $ atomically $ modifyTVar cache (insertMany [(did, bd)])
-      return success
-    Just a -> do
-      success <- liftIO $ withDB $ \conn -> (>0) <$> executeManyLog' conn "INSERT INTO `people` (`id`, `birthday`) VALUES (?,?) ON DUPLICATE KEY UPDATE `birthday`=VALUES(`birthday`)" [(accountBotId a, bd)]
-      when success $ do
-        cache <- getCache
-        liftIO $ atomically $ modifyTVar cache (insertMany $ map (,bd) (accountDiscords a))
-      return success
+  liftIO $ withDB $ \conn -> (>0) <$> case acc of
+    Nothing -> executeManyLog' conn "INSERT INTO `unregistered` (`discord`, `birthday`) VALUES (?,?) ON DUPLICATE KEY UPDATE `birthday`=VALUES(`birthday`)" [(did, bd)]
+    Just a -> executeManyLog' conn "INSERT INTO `people` (`id`, `birthday`) VALUES (?,?) ON DUPLICATE KEY UPDATE `birthday`=VALUES(`birthday`)" [(accountBotId a, bd)]
 
-getBirthdayPeople :: (MonadIOBotData m d r, HasCache BirthdayDate d) => BirthdayDate -> m [UserId]
-getBirthdayPeople date = HM.keys . HM.filter (== date) <$> getCacheMap
+getBirthdaysByDate :: (MonadIOReader m r, Has Connection r) => BirthdayDate -> m [UserId]
+getBirthdaysByDate date = do
+  res :: [Only UserId] <- queryLog "SELECT `discord` FROM `unregistered` WHERE `birthday` = ? UNION SELECT `peopleDiscord`.`discord` FROM `peopleDiscord` JOIN `people` ON `people`.`id`=`peopleDiscord`.`id` WHERE `birthday` = ?" (date, date)
+  return $ map fromOnly res
+
+getBirthdayByDiscord :: (MonadIOReader m r, Has Connection r) => UserId -> m (Maybe BirthdayDate)
+getBirthdayByDiscord discord = do
+  res :: [Only (Maybe BirthdayDate)] <- queryLog "SELECT `birthday` FROM `unregistered` WHERE `discord` = ? UNION SELECT `birthday` FROM `peopleDiscord` JOIN `people` ON `people`.`id`=`peopleDiscord`.`id` WHERE `peopleDiscord`.`discord` = ?" (discord, discord)
+  return $ case res of
+    [Only (Just date)] -> Just date
+    _ -> Nothing

@@ -40,7 +40,6 @@ data BotData = BotData
   , hypixelWeeklyStatsCache :: DatabaseCache (HypixelBowTimeStats 'WeeklyStats)
   , hypixelMonthlyStatsCache :: DatabaseCache (HypixelBowTimeStats 'MonthlyStats)
   , hypixelOnlinePlayersCache :: CachedData HypixelOnlinePlayers
-  , birthdayCache :: DatabaseCache BirthdayDate
   , snipeCache :: DatabaseCache SnipeMessage
   }
 
@@ -85,10 +84,6 @@ instance (Default (SStatsTimeRange t)) => Has (DatabaseCache (HypixelBowTimeStat
 instance Has (CachedData HypixelOnlinePlayers) BotData where
   getter = hypixelOnlinePlayersCache
   modifier f x = x { hypixelOnlinePlayersCache = f $ hypixelOnlinePlayersCache x }
-
-instance Has (DatabaseCache BirthdayDate) BotData where
-  getter = birthdayCache
-  modifier f x = x { birthdayCache = f $ birthdayCache x }
 
 instance Has (DatabaseCache SnipeMessage) BotData where
   getter = snipeCache
