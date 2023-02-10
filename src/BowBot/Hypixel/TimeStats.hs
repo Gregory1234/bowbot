@@ -74,15 +74,15 @@ instance (Default (SStatsTimeRange t)) => Cached (HypixelBowTimeStats t) where
 showHypixelBowTimeStats :: forall t. Default (SStatsTimeRange t) => Settings -> HypixelBowStats -> HypixelBowTimeStats t -> Text
 showHypixelBowTimeStats Settings {..} HypixelBowStats {..} HypixelBowTimeStats {..} = T.unlines $ catMaybes
   [ ("*Since:* " <>) . discordFormatTimestampFull <$> bowTimeTimestamp
-  , onlyIf sWins
+  , onlyIfBin sWins
   $ " - *Bow Duels " <> time <> " Wins:* **"
   <> showt (bowWins - bowTimeWins)
   <> "**"
-  , onlyIf sLosses
+  , onlyIfBin sLosses
   $ " - *Bow Duels " <> time <> " Losses:* **"
   <> showt (bowLosses - bowTimeLosses)
   <> "**"
-  , onlyIf (sense sWLR (bowWins - bowTimeWins + bowLosses - bowTimeLosses /= 0))
+  , onlyIfTer sWLR (bowWins - bowTimeWins + bowLosses - bowTimeLosses /= 0)
   $ " - *Bow Duels " <> time <> " Win/Loss Ratio:* **"
   <> winLossRatio
   <> "**"
@@ -92,11 +92,6 @@ showHypixelBowTimeStats Settings {..} HypixelBowStats {..} HypixelBowTimeStats {
     timeStatsTypeShowName DailyStats = "Daily"
     timeStatsTypeShowName WeeklyStats = "Weekly"
     timeStatsTypeShowName MonthlyStats = "Monthly"
-    sense Always _ = True
-    sense Never _ = False
-    sense WhenSensible x = x
-    onlyIf True a = Just a
-    onlyIf False _ = Nothing
     winLossRatio = showWLR (bowWins - bowTimeWins) (bowLosses - bowTimeLosses)
 
 showMaybeHypixelBowTimeStats :: forall t. Default (SStatsTimeRange t) => Settings -> HypixelBowStats -> Maybe (HypixelBowTimeStats t) -> Text

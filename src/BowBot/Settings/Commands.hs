@@ -8,25 +8,25 @@ import BowBot.Settings.Basic
 import BowBot.Discord.Utils
 import BowBot.BotData.Cached
 
-boolArg :: Text -> Maybe Bool
-boolArg "yes" = Just True
-boolArg "show" = Just True
-boolArg "always" = Just True
-boolArg "no" = Just False
-boolArg "hide" = Just False
-boolArg "never" = Just False
-boolArg _ = Nothing
+settingBinArg :: Text -> Maybe SettingBin
+settingBinArg "yes" = Just Yes
+settingBinArg "show" = Just Yes
+settingBinArg "always" = Just Yes
+settingBinArg "no" = Just No
+settingBinArg "hide" = Just No
+settingBinArg "never" = Just No
+settingBinArg _ = Nothing
 
-senseArg :: Text -> Maybe BoolSense
-senseArg "yes" = Just Always
-senseArg "show" = Just Always
-senseArg "always" = Just Always
-senseArg "no" = Just Never
-senseArg "hide" = Just Never
-senseArg "never" = Just Never
-senseArg "maybe" = Just WhenSensible
-senseArg "defined" = Just WhenSensible
-senseArg _ = Nothing
+settingTerArg :: Text -> Maybe SettingTer
+settingTerArg "yes" = Just Always
+settingTerArg "show" = Just Always
+settingTerArg "always" = Just Always
+settingTerArg "no" = Just Never
+settingTerArg "hide" = Just Never
+settingTerArg "never" = Just Never
+settingTerArg "maybe" = Just WhenSensible
+settingTerArg "defined" = Just WhenSensible
+settingTerArg _ = Nothing
 
 wrongSettingValueMessage :: Text
 wrongSettingValueMessage = "*Wrong setting value!*"
@@ -46,7 +46,7 @@ setSettingCommand = Command CommandInfo
   , commandHelpEntries = [HelpEntry { helpUsage = "set [stat] [yes|always|show|no|never|hide|maybe|defined] ", helpDescription = "sets the visibility of the stat", helpGroup = "settings" }]
   , commandPerms = DefaultLevel
   , commandTimeout = 15
-  } $ twoArguments (\sn val -> liftMaybe wrongSettingNameMessage (getSingleSettingByName sn) >>= (\case SingleSettingBool get set -> (\v -> (flip set v, (== v) . get)) <$> liftMaybe wrongSettingValueMessage (boolArg val); SingleSettingSense get set -> (\v -> (flip set v, (== v) . get)) <$> liftMaybe wrongSettingValueMessage (senseArg val) )) $ \(set, check) -> do
+  } $ twoArguments (\sn val -> liftMaybe wrongSettingNameMessage (getSingleSettingByName sn) >>= (\case SingleSettingBin get set -> (\v -> (flip set v, (== v) . get)) <$> liftMaybe wrongSettingValueMessage (settingBinArg val); SingleSettingTer get set -> (\v -> (flip set v, (== v) . get)) <$> liftMaybe wrongSettingValueMessage (settingTerArg val) )) $ \(set, check) -> do
     sender <- userId <$> envs envSender
     setting <- fromMaybe defSettings <$> getFromCache sender
     if check setting
@@ -55,13 +55,13 @@ setSettingCommand = Command CommandInfo
         a <- storeInCacheIndexed [(sender, set setting)]
         respond $ if a then successfullyUpdatedMessage else somethingWentWrongMessage
 
-constSettingCommand :: Bool -> BoolSense -> Text -> Text -> Command
-constSettingCommand boolVal senseVal name desc = Command CommandInfo
+constSettingCommand :: SettingBin -> SettingTer -> Text -> Text -> Command
+constSettingCommand binVal terVal name desc = Command CommandInfo
   { commandName = name
   , commandHelpEntries = [HelpEntry { helpUsage = name <> " [stat]", helpDescription = desc, helpGroup = "settings" }]
   , commandPerms = DefaultLevel
   , commandTimeout = 15
-  } $ oneArgument (\sn -> (\case SingleSettingBool get set -> (flip set boolVal, (== boolVal) . get); SingleSettingSense get set -> (flip set senseVal, (== senseVal) . get)) <$> liftMaybe wrongSettingNameMessage (getSingleSettingByName sn)) $ \(set, check) -> do
+  } $ oneArgument (\sn -> (\case SingleSettingBin get set -> (flip set binVal, (== binVal) . get); SingleSettingTer get set -> (flip set terVal, (== terVal) . get)) <$> liftMaybe wrongSettingNameMessage (getSingleSettingByName sn)) $ \(set, check) -> do
     sender <- userId <$> envs envSender
     setting <- fromMaybe defSettings <$> getFromCache sender
     if check setting

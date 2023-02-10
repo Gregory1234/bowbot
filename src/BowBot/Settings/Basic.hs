@@ -15,33 +15,45 @@ import qualified Data.HashMap.Strict as HM
 import BowBot.DB.Basic
 import BowBot.Utils
 
-data BoolSense = Never | WhenSensible | Always deriving (Show, Eq, Ord, Enum)
+data SettingBin = Yes | No deriving (Show, Eq, Ord, Enum)
+
+data SettingTer = Never | WhenSensible | Always deriving (Show, Eq, Ord, Enum)
 
 data Settings = Settings
-  { sWins :: !Bool, sLosses :: !Bool, sWLR :: !BoolSense, sWinsUntil :: !BoolSense
-  , sBestStreak :: !BoolSense, sCurrentStreak :: !BoolSense, sBestDailyStreak :: !BoolSense
-  , sBowHits :: !Bool, sBowShots :: !Bool, sAccuracy :: !BoolSense
+  { sWins :: !SettingBin, sLosses :: !SettingBin, sWLR :: !SettingTer, sWinsUntil :: !SettingTer
+  , sBestStreak :: !SettingTer, sCurrentStreak :: !SettingTer, sBestDailyStreak :: !SettingTer
+  , sBowHits :: !SettingBin, sBowShots :: !SettingBin, sAccuracy :: !SettingTer
   } deriving (Show, Eq)
 
-parseBool :: Text -> Maybe Bool
-parseBool "yes" = Just True
-parseBool "no" = Just False
-parseBool _ = Nothing
+parseBin :: Text -> Maybe SettingBin
+parseBin "yes" = Just Yes
+parseBin "no" = Just No
+parseBin _ = Nothing
 
-parseSense :: Text -> Maybe BoolSense
-parseSense "always" = Just Always
-parseSense "never" = Just Never
-parseSense "sensibly" = Just WhenSensible
-parseSense _ = Nothing
+parseTer :: Text -> Maybe SettingTer
+parseTer "always" = Just Always
+parseTer "never" = Just Never
+parseTer "sensibly" = Just WhenSensible
+parseTer _ = Nothing
 
-stringBool :: Bool -> Text
-stringBool True = "yes"
-stringBool False = "no"
+stringBin :: SettingBin -> Text
+stringBin Yes = "yes"
+stringBin No = "no"
 
-stringSense :: BoolSense -> Text
-stringSense Always = "always"
-stringSense Never = "never"
-stringSense WhenSensible = "sensibly"
+stringTer :: SettingTer -> Text
+stringTer Always = "always"
+stringTer Never = "never"
+stringTer WhenSensible = "sensibly"
+
+onlyIfBin :: SettingBin -> a -> Maybe a
+onlyIfBin Yes a = Just a
+onlyIfBin No _ = Nothing
+
+onlyIfTer :: SettingTer -> Bool -> a -> Maybe a
+onlyIfTer Always _ a = Just a
+onlyIfTer Never _ _ = Nothing
+onlyIfTer WhenSensible True a = Just a
+onlyIfTer WhenSensible False _ = Nothing
 
 instance Cached Settings where
   type CacheIndex Settings = UserId
@@ -51,16 +63,16 @@ instance Cached Settings where
       queryLog "SELECT `discord`, `wins`, `losses`, `wlr`, `winsUntil`, `bestStreak`, `currentStreak`, `bestDailyStreak`, `bowHits`, `bowShots`, `accuracy` FROM `settings`" ()
     let newValues = HM.fromList $ flip fmap res $ \case
           (fromInteger -> discord,
-            parseBool -> Just sWins, parseBool -> Just sLosses, parseSense -> Just sWLR, parseSense -> Just sWinsUntil,
-            parseSense -> Just sBestStreak, parseSense -> Just sCurrentStreak, parseSense -> Just sBestDailyStreak,
-            parseBool -> Just sBowHits, parseBool -> Just sBowShots, parseSense -> Just sAccuracy) -> (discord, Settings {..})
+            parseBin -> Just sWins, parseBin -> Just sLosses, parseTer -> Just sWLR, parseTer -> Just sWinsUntil,
+            parseTer -> Just sBestStreak, parseTer -> Just sCurrentStreak, parseTer -> Just sBestDailyStreak,
+            parseBin -> Just sBowHits, parseBin -> Just sBowShots, parseTer -> Just sAccuracy) -> (discord, Settings {..})
           (fromInteger -> discord, _, _, _, _, _, _, _, _, _, _) -> (discord, defSettings)
     liftIO $ atomically $ writeTVar cache newValues
 
 instance CachedStorable Settings where
   storeInCacheIndexed accs = do
     cacheMap <- getCacheMap
-    let toQueryParams (d, set@Settings {..}) = if Just set == cacheMap HM.!? d then Nothing else Just (toInteger d, stringBool sWins, stringBool sLosses, stringSense sWLR, stringSense sWinsUntil, stringSense sBestStreak, stringSense sCurrentStreak, stringSense sBestDailyStreak, stringBool sBowHits, stringBool sBowShots, stringSense sAccuracy)
+    let toQueryParams (d, set@Settings {..}) = if Just set == cacheMap HM.!? d then Nothing else Just (toInteger d, stringBin sWins, stringBin sLosses, stringTer sWLR, stringTer sWinsUntil, stringTer sBestStreak, stringTer sCurrentStreak, stringTer sBestDailyStreak, stringBin sBowHits, stringBin sBowShots, stringTer sAccuracy)
     let queryParams = mapMaybe toQueryParams accs
     success <- liftIO $ withDB $ \conn -> (>0) <$> executeManyLog' conn "INSERT INTO `settings` (`discord`, `wins`, `losses`, `wlr`, `winsUntil`, `bestStreak`, `currentStreak`, `bestDailyStreak`, `bowHits`, `bowShots`, `accuracy`) VALUES (?,?,?,?,?,?,?,?,?,?,?) ON DUPLICATE KEY UPDATE `wins`=VALUES(`wins`), `losses`=VALUES(`losses`), `wlr`=VALUES(`wlr`), `winsUntil`=VALUES(`winsUntil`), `bestStreak`=VALUES(`bestStreak`), `currentStreak`=VALUES(`currentStreak`), `bestDailyStreak`=VALUES(`bestDailyStreak`), `bowHits`=VALUES(`bowHits`), `bowShots`=VALUES(`bowShots`), `accuracy`=VALUES(`accuracy`)"  queryParams
     when success $ do
@@ -70,29 +82,29 @@ instance CachedStorable Settings where
 
 defSettings :: Settings
 defSettings = Settings
-  { sWins = True
-  , sLosses = True
+  { sWins = Yes
+  , sLosses = Yes
   , sWLR = Always
   , sWinsUntil = Always
   , sBestStreak = Always
   , sCurrentStreak = Always
   , sBestDailyStreak = Never
-  , sBowHits = False
-  , sBowShots = False
+  , sBowHits = No
+  , sBowShots = No
   , sAccuracy = Never
   }
 
 allSettings :: Settings
 allSettings = Settings
-  { sWins = True
-  , sLosses = True
+  { sWins = Yes
+  , sLosses = Yes
   , sWLR = Always
   , sWinsUntil = Always
   , sBestStreak = Always
   , sCurrentStreak = Always
   , sBestDailyStreak = Always
-  , sBowHits = True
-  , sBowShots = True
+  , sBowHits = Yes
+  , sBowShots = Yes
   , sAccuracy = Always
   }
 
@@ -103,17 +115,17 @@ getSettingsFromSource DefSettings _ = return defSettings
 getSettingsFromSource AllSettings _ = return allSettings
 getSettingsFromSource UserSettings user = fromMaybe defSettings <$> getFromCache user
 
-data SingleSetting = SingleSettingBool (Settings -> Bool) (Settings -> Bool -> Settings) | SingleSettingSense (Settings -> BoolSense) (Settings -> BoolSense -> Settings)
+data SingleSetting = SingleSettingBin (Settings -> SettingBin) (Settings -> SettingBin -> Settings) | SingleSettingTer (Settings -> SettingTer) (Settings -> SettingTer -> Settings)
 
 getSingleSettingByName :: Text -> Maybe SingleSetting
-getSingleSettingByName "wins" = Just $ SingleSettingBool sWins $ \s b -> s { sWins = b }
-getSingleSettingByName "losses" = Just $ SingleSettingBool sLosses $ \s b -> s { sLosses = b }
-getSingleSettingByName "wlr" = Just $ SingleSettingSense sWLR $ \s b -> s { sWLR = b }
-getSingleSettingByName "winsuntil" = Just $ SingleSettingSense sWinsUntil $ \s b -> s { sWinsUntil = b }
-getSingleSettingByName "beststreak" = Just $ SingleSettingSense sBestStreak $ \s b -> s { sBestStreak = b }
-getSingleSettingByName "currentstreak" = Just $ SingleSettingSense sCurrentStreak $ \s b -> s { sCurrentStreak = b }
-getSingleSettingByName "bestdailystreak" = Just $ SingleSettingSense sBestDailyStreak $ \s b -> s { sBestDailyStreak = b }
-getSingleSettingByName "bowhits" = Just $ SingleSettingBool sBowHits $ \s b -> s { sBowHits = b }
-getSingleSettingByName "bowshots" = Just $ SingleSettingBool sBowShots $ \s b -> s { sBowShots = b }
-getSingleSettingByName "accuracy" = Just $ SingleSettingSense sAccuracy $ \s b -> s { sAccuracy = b }
+getSingleSettingByName "wins" = Just $ SingleSettingBin sWins $ \s b -> s { sWins = b }
+getSingleSettingByName "losses" = Just $ SingleSettingBin sLosses $ \s b -> s { sLosses = b }
+getSingleSettingByName "wlr" = Just $ SingleSettingTer sWLR $ \s b -> s { sWLR = b }
+getSingleSettingByName "winsuntil" = Just $ SingleSettingTer sWinsUntil $ \s b -> s { sWinsUntil = b }
+getSingleSettingByName "beststreak" = Just $ SingleSettingTer sBestStreak $ \s b -> s { sBestStreak = b }
+getSingleSettingByName "currentstreak" = Just $ SingleSettingTer sCurrentStreak $ \s b -> s { sCurrentStreak = b }
+getSingleSettingByName "bestdailystreak" = Just $ SingleSettingTer sBestDailyStreak $ \s b -> s { sBestDailyStreak = b }
+getSingleSettingByName "bowhits" = Just $ SingleSettingBin sBowHits $ \s b -> s { sBowHits = b }
+getSingleSettingByName "bowshots" = Just $ SingleSettingBin sBowShots $ \s b -> s { sBowShots = b }
+getSingleSettingByName "accuracy" = Just $ SingleSettingTer sAccuracy $ \s b -> s { sAccuracy = b }
 getSingleSettingByName _ = Nothing

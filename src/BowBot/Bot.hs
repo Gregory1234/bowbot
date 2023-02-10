@@ -213,8 +213,8 @@ commands =
                                                 <> "**Stat names:** wins, losses, wlr, winsuntil, beststreak, currentstreak, bestdailystreak, bowhits, bowshots, accuracy\n"
                                                 <> "**Example:** `" <> prefix <> "show accuracy` makes accuracy visible in the `" <> prefix <> "s` command\n" ) "settings" "settings"
   , setSettingCommand
-  , constSettingCommand True Always "show" "makes the stat visible"
-  , constSettingCommand False Never "hide" "makes the stat hidden"
+  , constSettingCommand Yes Always "show" "makes the stat visible"
+  , constSettingCommand No Never "hide" "makes the stat hidden"
   , selectMinecraftCommand
   , helpCommand commands ModLevel Nothing "normal" "modhelp"
   , addCommand

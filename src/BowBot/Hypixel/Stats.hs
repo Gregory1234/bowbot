@@ -73,55 +73,50 @@ requestHypixelBowStats uuid = do
 
 showHypixelBowStats :: Settings -> HypixelBowStats -> Text
 showHypixelBowStats Settings {..} HypixelBowStats {..} = T.unlines $ catMaybes
-  [ onlyIf sWins
+  [ onlyIfBin sWins
   $ " - *Bow Duels Wins:* **"
   <> showt bowWins
   <> "**" <> maybe "" (\x -> " (**Bow " <> divisionRankName x <> "**)") (divisionRankFromWins bowWins)
-  , onlyIf sLosses
+  , onlyIfBin sLosses
   $ " - *Bow Duels Losses:* **"
   <> showt bowLosses
   <> "**"
-  , onlyIf (sense sWLR (bowWins + bowLosses /= 0))
+  , onlyIfTer sWLR (bowWins + bowLosses /= 0)
   $ " - *Bow Duels Win/Loss Ratio:* **"
   <> winLossRatio
   <> "**"
-  , onlyIf (sense sWinsUntil (bowLosses /= 0))
+  , onlyIfTer sWinsUntil (bowLosses /= 0)
   $ " - *Bow Duels Wins until "
   <> nextWinLossRatio
   <> " WLR:* **"
   <> winsRemaining
   <> "**"
-  , onlyIf (sense sBestStreak (isAnyJust bestWinstreak))
+  , onlyIfTer sBestStreak (isAnyJust bestWinstreak)
   $ " - *Best Bow Duels Winstreak:* **"
   <> cachedMaybe "API DISABLED" showt (\t -> (<>" (CACHED" <> maybe "" ((\s -> " **" <> s <> "**") . discordFormatTimestampFull) t <> ")") . pack . show) bestWinstreak
   <> "**"
-  , onlyIf (sense sCurrentStreak (isJust currentWinstreak))
+  , onlyIfTer sCurrentStreak (isJust currentWinstreak)
   $ " - *Current Bow Duels Winstreak:* **"
   <> maybe "API DISABLED" showt currentWinstreak
   <> "**"
-  , onlyIf (sense sBestDailyStreak (isJust bestDailyWinstreak))
+  , onlyIfTer sBestDailyStreak (isJust bestDailyWinstreak)
   $ " - *Best Daily Bow Duels Winstreak(?):* **"
   <> maybe "API DISABLED" showt bestDailyWinstreak
   <> "**"
-  , onlyIf sBowHits
+  , onlyIfBin sBowHits
   $ " - *Bow Hits in Bow Duels:* **"
   <> showt bowHits
   <> "**"
-  , onlyIf sBowShots
+  , onlyIfBin sBowShots
   $ " - *Bow Shots in Bow Duels:* **"
   <> showt bowShots
   <> "**"
-  , onlyIf (sense sAccuracy (bowShots /= 0))
+  , onlyIfTer sAccuracy (bowShots /= 0)
   $ " - *Bow Accuracy:* **"
   <> accuracy
   <> "**"
   ]
   where
-    sense Always _ = True
-    sense Never _ = False
-    sense WhenSensible x = x
-    onlyIf True a = Just a
-    onlyIf False _ = Nothing
     winLossRatio = showWLR bowWins bowLosses
     nextWinLossRatio
       | bowLosses == 0 = "∞"
