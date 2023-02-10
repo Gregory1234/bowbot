@@ -38,6 +38,8 @@ import Data.Has
 import Data.Time.Clock (UTCTime(..), nominalDiffTimeToSeconds)
 import Data.Fixed (Fixed(..), resolution)
 import TextShow
+import Data.ByteString.Char8 (ByteString)
+import qualified Data.ByteString.Char8 as BS
 
 dist :: Text -> Text -> Int
 dist a b =
@@ -108,6 +110,12 @@ pad' d c l x = if d then x <> T.replicate (l - T.length x) (T.singleton c) else 
 
 pad :: Int -> Text -> Text
 pad = pad' True ' '
+
+padbs' :: Bool -> Char -> Int -> ByteString -> ByteString
+padbs' d c l x = if d then x <> BS.replicate (l - BS.length x) c else BS.replicate (l - BS.length x) c <> x
+
+padbs :: Int -> Text -> Text
+padbs = pad' True ' '
 
 catchErrorEither :: MonadError e m => m a -> m (Either e a)
 catchErrorEither body = catchError (Right <$> body) (return . Left)
