@@ -25,6 +25,7 @@ import BowBot.Hypixel.Guild
 import BowBot.Network.Basic
 import qualified Data.Text as T
 import Data.Bifunctor (first)
+import BowBot.Minecraft.Basic (UUID)
 
 
 
@@ -67,6 +68,13 @@ updateRolesDivisionTitle gmem (Just BowBotAccount {..}) = do
   gid <- askInfo discordGuildIdInfo
   addRemoveDiscordRoles gid gmem (map snd divisionTitles) correctRole
 updateRolesDivisionTitle _ Nothing = pure ()
+
+updateRolesDivisionTitleByUUID :: (MonadIOBotData m d r, Has DiscordHandle r, HasCaches [InfoField, HypixelBowLeaderboardEntry, BowBotAccount] d) => UUID -> m ()
+updateRolesDivisionTitleByUUID mcUUID = do
+  gid <- askInfo discordGuildIdInfo
+  gmems <- discordGuildMembers gid
+  acc' <- getBowBotAccountByMinecraft mcUUID
+  for_ acc' $ \acc -> for_ gmems $ \gmem -> when (maybe 0 userId (memberUser gmem) `elem` accountDiscords acc) $ updateRolesDivisionTitle gmem (Just acc)
 
 newtype SavedRoles = SavedRoles { getSavedRoleNames :: [Text] } deriving (Show, Eq)
 

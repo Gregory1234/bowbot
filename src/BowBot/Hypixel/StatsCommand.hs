@@ -32,17 +32,15 @@ hypixelStatsCommand src name desc = Command CommandInfo
     let (didYouMean, renderedName) = (if mcResponseAutocorrect == ResponseAutocorrect then "*Did you mean* " else "", showMinecraftAccountDiscord mcResponseTime mcResponseAccount)
     user <- envs envSender
     settings <- getSettingsFromSource src (userId user)
-    when (bowWins stats >= 50 && mcResponseAutocorrect == ResponseNew) $ do -- TODO: remove repetition?
-      minecraftNewAccountTip mcResponseAccount
+    let addAccount = bowWins stats >= 50 && mcResponseAutocorrect == ResponseNew
+    when addAccount $ minecraftNewAccountTip mcResponseAccount
     respond $ didYouMean <> renderedName <> ":\n" <> showHypixelBowStats settings stats
-    when (bowWins stats >= 50 && mcResponseAutocorrect == ResponseNew) $ do
+    when addAccount $ do
       a <- storeInCache [mcResponseAccount]
       when a $ void $ storeInCacheIndexed [(mcUUID, hypixelBowStatsToLeaderboards stats)]
-    when (mcResponseAutocorrect == ResponseTrue) $ void $ storeInCacheIndexed [(mcUUID, hypixelBowStatsToLeaderboards stats)]
-    gid <- askInfo discordGuildIdInfo
-    gmems <- discordGuildMembers gid
-    acc' <- getBowBotAccountByMinecraft mcUUID
-    for_ acc' $ \acc -> for_ gmems $ \gmem -> when (maybe 0 userId (memberUser gmem) `elem` accountDiscords acc) $ updateRolesDivisionTitle gmem (Just acc)
+    when (mcResponseAutocorrect /= ResponseNew) $ do
+      void $ storeInCacheIndexed [(mcUUID, hypixelBowStatsToLeaderboards stats)]
+      updateRolesDivisionTitleByUUID mcUUID
   where
     helper MinecraftAccount {..} = do
       cv <- tryIncreaseCounter HypixelApi 1

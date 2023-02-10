@@ -37,17 +37,15 @@ hypixelTimeStatsCommand src name desc = Command CommandInfo
     dailyStats <- getFromCache @(HypixelBowTimeStats 'DailyStats) mcUUID
     weeklyStats <- getFromCache @(HypixelBowTimeStats 'WeeklyStats) mcUUID
     monthlyStats <- getFromCache @(HypixelBowTimeStats 'MonthlyStats) mcUUID
-    when (bowWins stats >= 50 && mcResponseAutocorrect == ResponseNew) $ do -- TODO: remove repetition?
-      minecraftNewAccountTip mcResponseAccount
+    let addAccount = bowWins stats >= 50 && mcResponseAutocorrect == ResponseNew
+    when addAccount $ minecraftNewAccountTip mcResponseAccount
     respond $ didYouMean <> renderedName <> ":\n" <> showMaybeHypixelBowTimeStats settings stats dailyStats <> "\n" <> showMaybeHypixelBowTimeStats settings stats weeklyStats <> "\n" <> showMaybeHypixelBowTimeStats settings stats monthlyStats
-    when (bowWins stats >= 50 && mcResponseAutocorrect == ResponseNew) $ do
+    when addAccount $ do
       a <- storeInCache [mcResponseAccount]
       when a $ void $ storeInCacheIndexed [(mcUUID, hypixelBowStatsToLeaderboards stats)]
-    when (mcResponseAutocorrect == ResponseTrue) $ void $ storeInCacheIndexed [(mcUUID, hypixelBowStatsToLeaderboards stats)]
-    gid <- askInfo discordGuildIdInfo
-    gmems <- discordGuildMembers gid
-    acc' <- getBowBotAccountByMinecraft mcUUID
-    for_ acc' $ \acc -> for_ gmems $ \gmem -> when (maybe 0 userId (memberUser gmem) `elem` accountDiscords acc) $ updateRolesDivisionTitle gmem (Just acc)
+    when (mcResponseAutocorrect /= ResponseNew) $ do
+      void $ storeInCacheIndexed [(mcUUID, hypixelBowStatsToLeaderboards stats)]
+      updateRolesDivisionTitleByUUID mcUUID
   where
     helper MinecraftAccount {..} = do
       cv <- tryIncreaseCounter HypixelApi 1
