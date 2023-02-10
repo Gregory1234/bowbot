@@ -18,6 +18,7 @@ import qualified Data.Text.Encoding as T
 import qualified Data.ByteString.Search as BS
 import Control.Exception.Base (bracket)
 import Control.Concurrent (forkIO)
+import Data.Time (getCurrentTime)
 
 
 withDB :: MonadHoistIO m => (Connection -> m a) -> m a -- TODO: report connection errors
@@ -32,7 +33,8 @@ withDB f = do
 logInfo' :: MonadIO m => Connection -> Text -> m ()
 logInfo' conn msg = liftIO $ void $ do
   putStrLn (unpack msg)
-  execute conn "INSERT INTO `logs`(`message`) VALUES (?)" (Only msg)
+  time <- getCurrentTime
+  execute conn "INSERT INTO `logs`(`message`, `timestamp`) VALUES (?,?)" (msg, time)
 
 logInfo :: (MonadIOReader m r, Has Connection r) => Text -> m ()
 logInfo msg = do
@@ -42,12 +44,14 @@ logInfo msg = do
 logInfoFork :: MonadIO m => Text -> m ()
 logInfoFork msg = void $ liftIO $ do
   putStrLn (unpack msg)
-  forkIO $ withDB $ \conn -> void $ execute conn "INSERT INTO `logs`(`message`) VALUES (?)" (Only msg)
+  time <- getCurrentTime
+  forkIO $ withDB $ \conn -> void $ execute conn "INSERT INTO `logs`(`message`, `timestamp`) VALUES (?,?)" (msg, time)
 
 logError' :: MonadIO m => Connection -> Text -> m ()
 logError' conn msg = liftIO $ void $ do
   putStrLn (unpack msg)
-  execute conn "INSERT INTO `logs`(`message`,`type`) VALUES (?,'error')" (Only msg)
+  time <- getCurrentTime
+  execute conn "INSERT INTO `logs`(`message`,`timestamp`,`type`) VALUES (?,?,'error')" (msg, time)
 
 logError :: (MonadIOReader m r, Has Connection r) => Text -> m ()
 logError msg = do
@@ -57,7 +61,8 @@ logError msg = do
 logErrorFork :: MonadIO m => Text -> m ()
 logErrorFork msg = void $ liftIO $ do
   putStrLn (unpack msg)
-  forkIO $ withDB $ \conn -> void $ execute conn "INSERT INTO `logs`(`message`,`type`) VALUES (?,'error')" (Only msg)
+  time <- getCurrentTime
+  forkIO $ withDB $ \conn -> void $ execute conn "INSERT INTO `logs`(`message`,`timestamp`,`type`) VALUES (?,?,'error')" (msg, time)
 
 replaceQuery :: Text -> Text -> Query -> Query
 replaceQuery from to q = Query $ BS.toStrict $ BS.replace (T.encodeUtf8 from) (BS.fromStrict $ T.encodeUtf8 to :: BS.ByteString) (fromQuery q)
