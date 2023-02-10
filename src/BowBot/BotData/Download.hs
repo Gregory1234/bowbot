@@ -59,7 +59,6 @@ refreshBotData = do
   refreshCache @InfoField
   refreshCache @MinecraftAccount
   refreshCache @BowBotAccount
-  refreshCache @Settings
   refreshCache @HypixelBowLeaderboardEntry
   refreshCache @SavedRoles
   refreshCache @DiscordAccount

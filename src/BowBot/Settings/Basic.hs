@@ -64,25 +64,19 @@ onlyIfTer Never _ _ = Nothing
 onlyIfTer WhenSensible True a = Just a
 onlyIfTer WhenSensible False _ = Nothing
 
-instance Cached Settings where
-  type CacheIndex Settings = UserId
-  refreshCache = do
-    cache <- getCache
-    res :: [(UserId, SettingBin, SettingBin, SettingTer, SettingTer, SettingTer, SettingTer, SettingTer, SettingBin, SettingBin, SettingTer)] <-
-      queryLog "SELECT `discord`, `wins`, `losses`, `wlr`, `winsUntil`, `bestStreak`, `currentStreak`, `bestDailyStreak`, `bowHits`, `bowShots`, `accuracy` FROM `settings`" ()
-    let newValues = HM.fromList $ flip fmap res $ \(discord, sWins, sLosses, sWLR, sWinsUntil, sBestStreak, sCurrentStreak, sBestDailyStreak, sBowHits, sBowShots, sAccuracy) -> (discord, Settings {..})
-    liftIO $ atomically $ writeTVar cache newValues
+getSettingsByDiscord :: (MonadIOReader m r, Has Connection r) => UserId -> m Settings
+getSettingsByDiscord discord = do
+  res :: [(SettingBin, SettingBin, SettingTer, SettingTer, SettingTer, SettingTer, SettingTer, SettingBin, SettingBin, SettingTer)] <-
+        queryLog "SELECT `wins`, `losses`, `wlr`, `winsUntil`, `bestStreak`, `currentStreak`, `bestDailyStreak`, `bowHits`, `bowShots`, `accuracy` FROM `settings` WHERE `discord` = ?" (Only discord)
+  return $ case res of
+    [(sWins, sLosses, sWLR, sWinsUntil, sBestStreak, sCurrentStreak, sBestDailyStreak, sBowHits, sBowShots, sAccuracy)] -> Settings {..}
+    _ -> defSettings
 
-instance CachedStorable Settings where
-  storeInCacheIndexed accs = do
-    cacheMap <- getCacheMap
-    let toQueryParams (d, set@Settings {..}) = if Just set == cacheMap HM.!? d then Nothing else Just (toInteger d, sWins, sLosses, sWLR, sWinsUntil, sBestStreak, sCurrentStreak, sBestDailyStreak, sBowHits, sBowShots, sAccuracy)
-    let queryParams = mapMaybe toQueryParams accs
-    success <- liftIO $ withDB $ \conn -> (>0) <$> executeManyLog' conn "INSERT INTO `settings` (`discord`, `wins`, `losses`, `wlr`, `winsUntil`, `bestStreak`, `currentStreak`, `bestDailyStreak`, `bowHits`, `bowShots`, `accuracy`) VALUES (?,?,?,?,?,?,?,?,?,?,?) ON DUPLICATE KEY UPDATE `wins`=VALUES(`wins`), `losses`=VALUES(`losses`), `wlr`=VALUES(`wlr`), `winsUntil`=VALUES(`winsUntil`), `bestStreak`=VALUES(`bestStreak`), `currentStreak`=VALUES(`currentStreak`), `bestDailyStreak`=VALUES(`bestDailyStreak`), `bowHits`=VALUES(`bowHits`), `bowShots`=VALUES(`bowShots`), `accuracy`=VALUES(`accuracy`)"  queryParams
-    when success $ do
-      cache <- getCache
-      liftIO $ atomically $ modifyTVar cache (insertMany accs)
-    return success
+setSettingsByDiscord :: (MonadIOReader m r, Has Connection r) => UserId -> Settings -> m Bool
+setSettingsByDiscord discord Settings {..} = do
+  let queryParams = (discord, sWins, sLosses, sWLR, sWinsUntil, sBestStreak, sCurrentStreak, sBestDailyStreak, sBowHits, sBowShots, sAccuracy)
+  affected <- executeLog "INSERT INTO `settings` (`discord`, `wins`, `losses`, `wlr`, `winsUntil`, `bestStreak`, `currentStreak`, `bestDailyStreak`, `bowHits`, `bowShots`, `accuracy`) VALUES (?,?,?,?,?,?,?,?,?,?,?) ON DUPLICATE KEY UPDATE `wins`=VALUES(`wins`), `losses`=VALUES(`losses`), `wlr`=VALUES(`wlr`), `winsUntil`=VALUES(`winsUntil`), `bestStreak`=VALUES(`bestStreak`), `currentStreak`=VALUES(`currentStreak`), `bestDailyStreak`=VALUES(`bestDailyStreak`), `bowHits`=VALUES(`bowHits`), `bowShots`=VALUES(`bowShots`), `accuracy`=VALUES(`accuracy`)" queryParams
+  return $ affected == 1
 
 defSettings :: Settings
 defSettings = Settings
@@ -114,10 +108,10 @@ allSettings = Settings
 
 data SettingsSource = DefSettings | AllSettings | UserSettings
 
-getSettingsFromSource :: (MonadIOBotData m d r, HasCache Settings d) => SettingsSource -> UserId -> m Settings
+getSettingsFromSource :: (MonadIOReader m r, Has Connection r) => SettingsSource -> UserId -> m Settings
 getSettingsFromSource DefSettings _ = return defSettings
 getSettingsFromSource AllSettings _ = return allSettings
-getSettingsFromSource UserSettings user = fromMaybe defSettings <$> getFromCache user
+getSettingsFromSource UserSettings discord = getSettingsByDiscord discord
 
 data SingleSetting = SingleSettingBin (Settings -> SettingBin) (Settings -> SettingBin -> Settings) | SingleSettingTer (Settings -> SettingTer) (Settings -> SettingTer -> Settings)
 
