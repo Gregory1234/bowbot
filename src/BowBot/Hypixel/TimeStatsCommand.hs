@@ -17,7 +17,7 @@ import BowBot.BotData.Cached
 import Control.Monad.Error.Class (throwError)
 import BowBot.Counter.Basic
 import BowBot.Discord.Roles
-import BowBot.Hypixel.Leaderboard (hypixelBowStatsToLeaderboards)
+import BowBot.Hypixel.Leaderboard
 import BowBot.BotData.Info
 import BowBot.Discord.Utils
 import BowBot.Account.Basic
@@ -42,9 +42,9 @@ hypixelTimeStatsCommand src name desc = Command CommandInfo
     respond $ didYouMean <> renderedName <> ":\n" <> showMaybeHypixelBowTimeStats settings stats dailyStats <> "\n" <> showMaybeHypixelBowTimeStats settings stats weeklyStats <> "\n" <> showMaybeHypixelBowTimeStats settings stats monthlyStats
     when addAccount $ do
       a <- storeInCache [mcResponseAccount]
-      when a $ void $ storeInCacheIndexed [(mcUUID, hypixelBowStatsToLeaderboards stats)]
+      when a $ void $ setHypixelBowLeaderboardEntryByUUID mcUUID (hypixelBowStatsToLeaderboards stats)
     when (mcResponseAutocorrect /= ResponseNew) $ do
-      void $ storeInCacheIndexed [(mcUUID, hypixelBowStatsToLeaderboards stats)]
+      void $ setHypixelBowLeaderboardEntryByUUID mcUUID (hypixelBowStatsToLeaderboards stats)
       updateRolesDivisionTitleByUUID mcUUID
   where
     helper MinecraftAccount {..} = do

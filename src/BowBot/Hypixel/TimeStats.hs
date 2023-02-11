@@ -112,12 +112,12 @@ instance (Default (SStatsTimeRange t)) => CachedStorable (HypixelBowTimeStats t)
       liftIO $ atomically $ modifyTVar cache (insertMany accs)
     return success
 
-updateHypixelTimeStatsCache :: forall t m d r. (Default (SStatsTimeRange t), MonadIOBotData m d r, HasCaches [HypixelBowLeaderboardEntry,HypixelBowTimeStats t] d) => SStatsTimeRange t -> m ()
+updateHypixelTimeStatsCache :: forall t m d r. (Default (SStatsTimeRange t), MonadIOBotData m d r, HasCache (HypixelBowTimeStats t) d, Has Connection r) => SStatsTimeRange t -> m ()
 updateHypixelTimeStatsCache _ = do
-  lbCache <- HM.toList <$> getCacheMap
+  lbCache <- HM.toList <$> getHypixelBowLeaderboards
   void $ storeInCacheIndexed (map (\(u,v) -> (u, hypixelBowLeaderboardToTimeStats @t v)) lbCache)
 
-updateHypixelTimeStatsCache' :: forall m d r. (forall t. Default (SStatsTimeRange t) => HasCache (HypixelBowTimeStats t) d, MonadIOBotData m d r, HasCache HypixelBowLeaderboardEntry d) => StatsTimeRange -> m ()
+updateHypixelTimeStatsCache' :: forall m d r. (forall t. Default (SStatsTimeRange t) => HasCache (HypixelBowTimeStats t) d, MonadIOBotData m d r, Has Connection r) => StatsTimeRange -> m ()
 updateHypixelTimeStatsCache' DailyStats = updateHypixelTimeStatsCache SDailyStats
 updateHypixelTimeStatsCache' WeeklyStats = updateHypixelTimeStatsCache SWeeklyStats
 updateHypixelTimeStatsCache' MonthlyStats = updateHypixelTimeStatsCache SMonthlyStats

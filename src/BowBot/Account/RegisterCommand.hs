@@ -9,9 +9,9 @@ import BowBot.Account.Basic
 import BowBot.Minecraft.Arg
 import BowBot.Account.Arg
 import BowBot.Discord.Utils
-import BowBot.BotData.Cached (storeInCache, getFromCache, storeInCacheIndexed)
+import BowBot.BotData.Cached (storeInCache, getFromCache)
 import BowBot.Hypixel.Basic (HypixelApi(..))
-import BowBot.Hypixel.Leaderboard (hypixelBowStatsToLeaderboards)
+import BowBot.Hypixel.Leaderboard
 import BowBot.Counter.Basic (tryIncreaseCounter)
 import BowBot.Account.Register
 import BowBot.Discord.Roles (updateRoles)
@@ -41,10 +41,10 @@ registerCommandBody RegisterCommandMessages {..} name did = do
       let newacc = MinecraftAccount { mcUUID = uuid, mcNames = names, mcHypixelBow = NotBanned, mcHypixelWatchlist = False }
       a <- storeInCache [newacc]
       unless a $ throwError somethingWentWrongMessage
-      when a $ void $ storeInCacheIndexed [(uuid, hypixelBowStatsToLeaderboards stats)]
+      when a $ void $ setHypixelBowLeaderboardEntryByUUID uuid (hypixelBowStatsToLeaderboards stats)
       pure newacc
     Just acc -> do
-      when (mcHypixelBow acc == NotBanned) $ void $ storeInCacheIndexed [(uuid, hypixelBowStatsToLeaderboards stats)]
+      when (mcHypixelBow acc == NotBanned) $ void $ setHypixelBowLeaderboardEntryByUUID uuid (hypixelBowStatsToLeaderboards stats)
       pure acc
   newacc <- liftMaybe somethingWentWrongMessage =<< createNewBowBotAccount (head $ mcNames mc) did uuid
   gid <- askInfo discordGuildIdInfo
@@ -102,8 +102,8 @@ addaltCommand = Command CommandInfo
         let newacc = MinecraftAccount { mcUUID = uuid, mcNames = names, mcHypixelBow = NotBanned, mcHypixelWatchlist = False }
         a <- storeInCache [newacc]
         unless a $ throwError somethingWentWrongMessage
-        when a $ void $ storeInCacheIndexed [(uuid, hypixelBowStatsToLeaderboards stats)]
-      Just MinecraftAccount { mcHypixelBow = NotBanned } -> void $ storeInCacheIndexed [(uuid, hypixelBowStatsToLeaderboards stats)]
+        when a $ void $ setHypixelBowLeaderboardEntryByUUID uuid (hypixelBowStatsToLeaderboards stats)
+      Just MinecraftAccount { mcHypixelBow = NotBanned } -> void $ setHypixelBowLeaderboardEntryByUUID uuid (hypixelBowStatsToLeaderboards stats)
       _ -> pure ()
     newacc <- liftMaybe somethingWentWrongMessage =<< addAltToBowBotAccount (accountBotId bacc) uuid
     gid <- askInfo discordGuildIdInfo

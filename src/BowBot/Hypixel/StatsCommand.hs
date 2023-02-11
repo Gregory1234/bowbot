@@ -37,9 +37,9 @@ hypixelStatsCommand src name desc = Command CommandInfo
     respond $ didYouMean <> renderedName <> ":\n" <> showHypixelBowStats settings stats
     when addAccount $ do
       a <- storeInCache [mcResponseAccount]
-      when a $ void $ storeInCacheIndexed [(mcUUID, hypixelBowStatsToLeaderboards stats)]
+      when a $ void $ setHypixelBowLeaderboardEntryByUUID mcUUID (hypixelBowStatsToLeaderboards stats)
     when (mcResponseAutocorrect /= ResponseNew) $ do
-      void $ storeInCacheIndexed [(mcUUID, hypixelBowStatsToLeaderboards stats)]
+      void $ setHypixelBowLeaderboardEntryByUUID mcUUID (hypixelBowStatsToLeaderboards stats)
       updateRolesDivisionTitleByUUID mcUUID
   where
     helper MinecraftAccount {..} = do
@@ -47,6 +47,6 @@ hypixelStatsCommand src name desc = Command CommandInfo
       case cv of
         Nothing -> do
           stats <- liftMaybe "*The player has never joined Hypixel!*" =<< requestHypixelBowStats mcUUID
-          oldstats <- getFromCache mcUUID
+          oldstats <- getHypixelBowLeaderboardEntryByUUID mcUUID
           return (if bowWins stats + bowLosses stats /= 0 then ResponseGood else ResponseFindBetter, completeHypixelBowStats stats oldstats)
         Just sec -> throwError $ "*Too many requests! Wait another " <> showt sec <> " seconds!*"

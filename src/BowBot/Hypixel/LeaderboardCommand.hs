@@ -34,7 +34,7 @@ thePlayerIsntOnThisLeaderboardMessage = "*The player isn't on this leaderboard!*
 
 throwUnlessAccountOnLeaderboard :: (HypixelBowLeaderboardEntry -> Maybe (Integer, Text)) -> UUID -> ExceptT Text CommandHandler ()
 throwUnlessAccountOnLeaderboard leaderboardParser uuid = do
-  lb <- liftMaybe "*The player hasn't had their stats checked or isn't on this leaderboard!*" =<< getFromCache uuid
+  lb <- liftMaybe "*The player hasn't had their stats checked or isn't on this leaderboard!*" =<< getHypixelBowLeaderboardEntryByUUID uuid -- TODO: don't query the database again
   _ <- liftMaybe thePlayerIsntOnThisLeaderboardMessage (leaderboardParser lb)
   pure ()
 
@@ -69,7 +69,7 @@ leaderboardArgument leaderboardParser maybename = do
 
 generateLeaderboardLines :: LeaderboardType -> [UUID] -> CommandHandler [(UUID, Text)]
 generateLeaderboardLines LeaderboardType {..} selected = do
-  lb <- HM.toList <$> getCacheMap
+  lb <- HM.toList <$> getHypixelBowLeaderboards
   names <- getCacheMap
   return $ zipWith (\index (_, (uuid, str)) -> (uuid, pad 5 (showt index <> ".") <> str)) [1 :: Integer ..] $ sortOn fst $ mapMaybe (\(uuid, lbe) -> (\(score, str) -> let MinecraftAccount {..} = names HM.! uuid in (-score, (mcUUID, (if mcUUID `elem` selected then "*" else " ") <> pad 20 (head mcNames) <> " ( " <> str <> " " <> leaderboardStatName <> " )"))) <$> leaderboardParser lbe) lb
 
@@ -114,7 +114,7 @@ leaderboardArgumentGuild parser arg = do
 
 generateLeaderboardLinesGuild :: LeaderboardType -> [UUID] -> HypixelGuildMembers -> CommandHandler [(UUID, Text)]
 generateLeaderboardLinesGuild LeaderboardType {..} selected gmems = do
-  lb <- HM.toList . HM.filterWithKey (\k _ -> k `elem` M.keys (getHypixelGuildMemberMap gmems)) <$> getCacheMap
+  lb <- HM.toList . HM.filterWithKey (\k _ -> k `elem` M.keys (getHypixelGuildMemberMap gmems)) <$> getHypixelBowLeaderboards
   names <- getCacheMap
   return $ zipWith (\index (_, (uuid, str)) -> (uuid, pad 5 (showt index <> ".") <> str)) [1 :: Integer ..] $ sortOn fst $ mapMaybe (\(uuid, lbe) -> (\(score, str) -> let MinecraftAccount {..} = names HM.! uuid in (-score, (mcUUID, (if mcUUID `elem` selected then "*" else " ") <> pad 20 (head mcNames) <> " ( " <> str <> " " <> leaderboardStatName <> " )"))) <$> leaderboardParser lbe) lb
 

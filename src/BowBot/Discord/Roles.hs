@@ -20,7 +20,7 @@ import BowBot.Counter.Basic
 import BowBot.Account.Basic
 import qualified Data.HashMap.Strict as HM
 import qualified Discord.Requests as R
-import BowBot.DB.Basic (queryLog, withDB, executeManyLog')
+import BowBot.DB.Basic (queryLog, withDB, executeManyLog', Connection)
 import BowBot.Hypixel.Guild
 import BowBot.Network.Basic
 import qualified Data.Text as T
@@ -59,9 +59,9 @@ addRemoveDiscordRoles gid GuildMember {..} universe correct = do
   for_ toAdd $ \r -> call_ $ R.AddGuildMemberRole gid did r
   for_ toRemove $ \r -> call_ $ R.RemoveGuildMemberRole gid did r
 
-updateRolesDivisionTitle :: (MonadIOBotData m d r, Has DiscordHandle r, HasCaches [InfoField, HypixelBowLeaderboardEntry] d) => GuildMember -> Maybe BowBotAccount -> m ()
+updateRolesDivisionTitle :: (MonadIOBotData m d r, HasAll [DiscordHandle, Connection] r, HasCache InfoField d) => GuildMember -> Maybe BowBotAccount -> m ()
 updateRolesDivisionTitle gmem (Just BowBotAccount {..}) = do
-  lb <- getCacheMap
+  lb <- getHypixelBowLeaderboards
   let m = maximum . (0:) $ mapMaybe (fmap bowLbWins . (lb HM.!?)) accountMinecrafts
   divisionTitles <- askInfo divisionTitleRolesInfo
   let correctRole = fmap snd $ take 1 $ reverse $ filter (\(x,_) -> x <= m) divisionTitles
@@ -69,7 +69,7 @@ updateRolesDivisionTitle gmem (Just BowBotAccount {..}) = do
   addRemoveDiscordRoles gid gmem (map snd divisionTitles) correctRole
 updateRolesDivisionTitle _ Nothing = pure ()
 
-updateRolesDivisionTitleByUUID :: (MonadIOBotData m d r, Has DiscordHandle r, HasCaches [InfoField, HypixelBowLeaderboardEntry, BowBotAccount] d) => UUID -> m ()
+updateRolesDivisionTitleByUUID :: (MonadIOBotData m d r, HasAll [DiscordHandle, Connection] r, HasCaches [InfoField, BowBotAccount] d) => UUID -> m ()
 updateRolesDivisionTitleByUUID mcUUID = do
   gid <- askInfo discordGuildIdInfo
   gmems <- discordGuildMembers gid
@@ -176,14 +176,14 @@ updateRolesIllegal gmem Nothing = do
   gid <- askInfo discordGuildIdInfo
   addRemoveDiscordRoles gid gmem [illegalRole] [illegalRole | not (null (memberRoles gmem `intersect` allRoles))]
 
-updateRoles :: (MonadHoistIOBotData m d r, HasAll [DiscordHandle, CounterState] r, Has Manager r, HasCache InfoField d, HasCache HypixelBowLeaderboardEntry d, HasCache SavedRoles d, HasCachedData HypixelGuildMembers d) => GuildMember -> Maybe BowBotAccount -> m ()
+updateRoles :: (MonadHoistIOBotData m d r, HasAll [DiscordHandle, CounterState, Connection] r, Has Manager r, HasCache InfoField d, HasCache SavedRoles d, HasCachedData HypixelGuildMembers d) => GuildMember -> Maybe BowBotAccount -> m ()
 updateRoles gmem acc = do
   updateRolesSaved gmem acc
   updateRolesDivisionTitle gmem acc
   updateRolesMember gmem acc
   updateRolesIllegal gmem acc
 
-updateRolesAll :: (MonadHoistIOBotData m d r, HasAll [DiscordHandle, Manager, CounterState] r, HasCaches [InfoField, HypixelBowLeaderboardEntry, BowBotAccount, SavedRoles] d, HasCachedData HypixelGuildMembers d) => m ()
+updateRolesAll :: (MonadHoistIOBotData m d r, HasAll [DiscordHandle, Manager, CounterState, Connection] r, HasCaches [InfoField, BowBotAccount, SavedRoles] d, HasCachedData HypixelGuildMembers d) => m ()
 updateRolesAll = do
   gid <- askInfo discordGuildIdInfo
   mems <- discordGuildMembers gid

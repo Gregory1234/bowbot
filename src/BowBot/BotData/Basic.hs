@@ -32,7 +32,6 @@ data BotData = BotData
   { infoFieldCache :: DatabaseCache InfoField
   , minecraftAccountCache :: DatabaseCache MinecraftAccount
   , bowBotAccountCache :: DatabaseCache BowBotAccount
-  , hypixelLeaderboardCache :: DatabaseCache HypixelBowLeaderboardEntry
   , savedRolesCache :: DatabaseCache SavedRoles
   , hypixelGuildMembersCache :: CachedData HypixelGuildMembers
   , discordAccountsCache :: DatabaseCache DiscordAccount
@@ -54,10 +53,6 @@ instance Has (DatabaseCache MinecraftAccount) BotData where
 instance Has (DatabaseCache BowBotAccount) BotData where
   getter = bowBotAccountCache
   modifier f x = x { bowBotAccountCache = f $ bowBotAccountCache x }
-
-instance Has (DatabaseCache HypixelBowLeaderboardEntry) BotData where
-  getter = hypixelLeaderboardCache
-  modifier f x = x { hypixelLeaderboardCache = f $ hypixelLeaderboardCache x }
 
 instance Has (DatabaseCache SavedRoles) BotData where
   getter = savedRolesCache
