@@ -155,3 +155,7 @@ nullZeroTime x
 
 unNullZeroTime :: Maybe UTCTime -> UTCTime
 unNullZeroTime = fromMaybe zeroTimestamp
+
+only :: [a] -> Maybe a
+only [a] = Just a
+only _ = Nothing

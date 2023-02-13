@@ -10,10 +10,11 @@ module BowBot.Settings.Basic where
 import BowBot.BotData.Cached
 import Discord.Types (UserId)
 import BowBot.Discord.Orphans ()
-import qualified Data.HashMap.Strict as HM
 import BowBot.DB.Basic
 import BowBot.Utils
 import Database.MySQL.Simple (Param, Result, ToField(..), FromField(..))
+import Database.MySQL.Simple.QueryResults (QueryResults(..))
+import Database.MySQL.Simple.QueryParams (QueryParams(..))
 import qualified Database.MySQL.Base.Types as T
 
 data SettingBin = Yes | No deriving (Show, Eq, Ord, Enum)
@@ -48,12 +49,6 @@ instance FromField SettingTer where
     "sensibly" -> Right WhenSensible
     _ -> Left "Wrong permission level")
 
-data Settings = Settings
-  { sWins :: !SettingBin, sLosses :: !SettingBin, sWLR :: !SettingTer, sWinsUntil :: !SettingTer
-  , sBestStreak :: !SettingTer, sCurrentStreak :: !SettingTer, sBestDailyStreak :: !SettingTer
-  , sBowHits :: !SettingBin, sBowShots :: !SettingBin, sAccuracy :: !SettingTer
-  } deriving (Show, Eq)
-
 onlyIfBin :: SettingBin -> a -> Maybe a
 onlyIfBin Yes a = Just a
 onlyIfBin No _ = Nothing
@@ -64,19 +59,26 @@ onlyIfTer Never _ _ = Nothing
 onlyIfTer WhenSensible True a = Just a
 onlyIfTer WhenSensible False _ = Nothing
 
+data Settings = Settings
+  { sWins :: !SettingBin, sLosses :: !SettingBin, sWLR :: !SettingTer, sWinsUntil :: !SettingTer
+  , sBestStreak :: !SettingTer, sCurrentStreak :: !SettingTer, sBestDailyStreak :: !SettingTer
+  , sBowHits :: !SettingBin, sBowShots :: !SettingBin, sAccuracy :: !SettingTer
+  } deriving (Show, Eq)
+
+instance QueryParams Settings where
+  renderParams Settings {..} = renderParams (sWins, sLosses, sWLR, sWinsUntil, sBestStreak, sCurrentStreak, sBestDailyStreak, sBowHits, sBowShots, sAccuracy)
+instance QueryResults Settings where
+  convertResults fields strings = let
+    (sWins, sLosses, sWLR, sWinsUntil, sBestStreak, sCurrentStreak, sBestDailyStreak, sBowHits, sBowShots, sAccuracy) = convertResults fields strings
+      in Settings {..}
+instance QueryResultsSize Settings where
+  queryResultsSize _ = 10
+
 getSettingsByDiscord :: (MonadIOReader m r, Has Connection r) => UserId -> m Settings
-getSettingsByDiscord discord = do
-  res :: [(SettingBin, SettingBin, SettingTer, SettingTer, SettingTer, SettingTer, SettingTer, SettingBin, SettingBin, SettingTer)] <-
-        queryLog "SELECT `wins`, `losses`, `wlr`, `winsUntil`, `bestStreak`, `currentStreak`, `bestDailyStreak`, `bowHits`, `bowShots`, `accuracy` FROM `settings` WHERE `discord` = ?" (Only discord)
-  return $ case res of
-    [(sWins, sLosses, sWLR, sWinsUntil, sBestStreak, sCurrentStreak, sBestDailyStreak, sBowHits, sBowShots, sAccuracy)] -> Settings {..}
-    _ -> defSettings
+getSettingsByDiscord discord = fromMaybe defSettings . only <$> queryLog "SELECT `wins`, `losses`, `wlr`, `winsUntil`, `bestStreak`, `currentStreak`, `bestDailyStreak`, `bowHits`, `bowShots`, `accuracy` FROM `settings` WHERE `discord` = ?" (Only discord)
 
 setSettingsByDiscord :: (MonadIOReader m r, Has Connection r) => UserId -> Settings -> m Bool
-setSettingsByDiscord discord Settings {..} = do
-  let queryParams = (discord, sWins, sLosses, sWLR, sWinsUntil, sBestStreak, sCurrentStreak, sBestDailyStreak, sBowHits, sBowShots, sAccuracy)
-  affected <- executeLog "INSERT INTO `settings` (`discord`, `wins`, `losses`, `wlr`, `winsUntil`, `bestStreak`, `currentStreak`, `bestDailyStreak`, `bowHits`, `bowShots`, `accuracy`) VALUES (?,?,?,?,?,?,?,?,?,?,?) ON DUPLICATE KEY UPDATE `wins`=VALUES(`wins`), `losses`=VALUES(`losses`), `wlr`=VALUES(`wlr`), `winsUntil`=VALUES(`winsUntil`), `bestStreak`=VALUES(`bestStreak`), `currentStreak`=VALUES(`currentStreak`), `bestDailyStreak`=VALUES(`bestDailyStreak`), `bowHits`=VALUES(`bowHits`), `bowShots`=VALUES(`bowShots`), `accuracy`=VALUES(`accuracy`)" queryParams
-  return $ affected > 0
+setSettingsByDiscord discord settings = (>0) <$> executeLog "INSERT INTO `settings` (`discord`, `wins`, `losses`, `wlr`, `winsUntil`, `bestStreak`, `currentStreak`, `bestDailyStreak`, `bowHits`, `bowShots`, `accuracy`) VALUES (?,?,?,?,?,?,?,?,?,?,?) ON DUPLICATE KEY UPDATE `wins`=VALUES(`wins`), `losses`=VALUES(`losses`), `wlr`=VALUES(`wlr`), `winsUntil`=VALUES(`winsUntil`), `bestStreak`=VALUES(`bestStreak`), `currentStreak`=VALUES(`currentStreak`), `bestDailyStreak`=VALUES(`bestDailyStreak`), `bowHits`=VALUES(`bowHits`), `bowShots`=VALUES(`bowShots`), `accuracy`=VALUES(`accuracy`)" (Concat (Only discord, settings))
 
 defSettings :: Settings
 defSettings = Settings

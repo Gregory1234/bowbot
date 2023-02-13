@@ -18,6 +18,8 @@ import BowBot.Utils
 import BowBot.Settings.Basic
 import BowBot.Discord.Utils
 import qualified Data.Text as T
+import Database.MySQL.Simple.QueryParams (QueryParams(..))
+import Database.MySQL.Simple.QueryResults (QueryResults(..))
 
 data StatsTimeRange = DailyStats | WeeklyStats | MonthlyStats deriving (Show, Eq)
 
@@ -26,6 +28,15 @@ data HypixelBowTimeStats = HypixelBowTimeStats
     bowTimeLosses :: Integer,
     bowTimeTimestamp :: Maybe UTCTime
   } deriving (Show, Eq)
+
+instance QueryParams HypixelBowTimeStats where
+  renderParams HypixelBowTimeStats {..} = renderParams (bowTimeWins, bowTimeLosses, bowTimeTimestamp)
+instance QueryResults HypixelBowTimeStats where
+  convertResults fields strings = let
+    (bowTimeWins, bowTimeLosses, nullZeroTime -> bowTimeTimestamp) = convertResults fields strings
+      in HypixelBowTimeStats {..}
+instance QueryResultsSize HypixelBowTimeStats where
+  queryResultsSize _ = 3
 
 statsTimeRangeName :: StatsTimeRange -> Text
 statsTimeRangeName DailyStats = "Day"
@@ -71,8 +82,4 @@ updateHypixelBowTimeStats :: (MonadIOReader m r, Has Connection r) => StatsTimeR
 updateHypixelBowTimeStats time = void $ executeLog (replaceQuery "TIME" (statsTimeRangeName time) "UPDATE `stats` SET `lastTIMEWins`=`bowWins`, `lastTIMELosses`=`bowLosses`, `lastTIMEUpdate`=`lastUpdate`") ()
 
 getHypixelBowTimeStatsByUUID :: (MonadIOReader m r, Has Connection r) => StatsTimeRange -> UUID -> m (Maybe HypixelBowTimeStats)
-getHypixelBowTimeStatsByUUID time uuid = do
-  res :: [(Integer, Integer, UTCTime)] <- queryLog (replaceQuery "TIME" (statsTimeRangeName time) "SELECT `lastTIMEWins`, `lastTIMELosses`, `lastTIMEUpdate` FROM `stats` WHERE `minecraft` = ? AND `lastTIMEWins` >= 0 AND `lastTIMELosses` >= 0") (Only uuid)
-  return $ case res of
-    [(bowTimeWins, bowTimeLosses, nullZeroTime -> bowTimeTimestamp)] -> Just HypixelBowTimeStats {..}
-    _ -> Nothing
+getHypixelBowTimeStatsByUUID time uuid = only <$> queryLog (replaceQuery "TIME" (statsTimeRangeName time) "SELECT `lastTIMEWins`, `lastTIMELosses`, `lastTIMEUpdate` FROM `stats` WHERE `minecraft` = ? AND `lastTIMEWins` >= 0 AND `lastTIMELosses` >= 0") (Only uuid)

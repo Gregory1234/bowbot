@@ -1,6 +1,9 @@
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE FlexibleInstances #-}
 
 module BowBot.DB.Basic(
   module BowBot.DB.Basic, Connection, Only(..)
@@ -9,8 +12,8 @@ module BowBot.DB.Basic(
 import BowBot.Utils
 import Database.MySQL.Simple hiding (withTransaction, commit, rollback, insertID)
 import qualified Database.MySQL.Simple as M (withTransaction, commit, rollback, insertID)
-import Database.MySQL.Simple.QueryParams (QueryParams)
-import Database.MySQL.Simple.QueryResults (QueryResults)
+import Database.MySQL.Simple.QueryParams (QueryParams(..))
+import Database.MySQL.Simple.QueryResults (QueryResults(..))
 import Database.MySQL.Simple.Types (Query(..))
 import Data.Int (Int64)
 import qualified Data.ByteString.Lazy as BS
@@ -19,6 +22,7 @@ import qualified Data.ByteString.Search as BS
 import Control.Exception.Base (bracket)
 import Control.Concurrent (forkIO)
 import Data.Time (getCurrentTime)
+import Data.Proxy (Proxy(..))
 
 
 withDB :: MonadHoistIO m => (Connection -> m a) -> m a -- TODO: report connection errors
@@ -135,3 +139,25 @@ insertID :: (MonadIOReader m r, Has Connection r, Num a) => m a
 insertID = do
   conn <- asks getter
   insertID' conn
+
+class QueryResults a => QueryResultsSize a where
+  queryResultsSize :: Proxy a -> Int
+instance Result a => QueryResultsSize (Only a) where
+  queryResultsSize _ = 1
+instance (Result a, Result b) => QueryResultsSize (a, b) where
+  queryResultsSize _ = 2
+
+newtype Concat tuple = Concat { fromConcat :: tuple } deriving (Show, Eq)
+
+instance (QueryParams a, QueryParams b) => QueryParams (Concat (a, b)) where
+  renderParams (Concat (a, b)) = renderParams a ++ renderParams b
+instance (QueryResultsSize a, QueryResults b) => QueryResults (Concat (a, b)) where
+  convertResults fields strings = let
+    aSize = queryResultsSize (Proxy @a)
+    (aFields, bFields) = splitAt aSize fields
+    (aStrings, bStrings) = splitAt aSize strings
+    a = convertResults aFields aStrings
+    b = convertResults bFields bStrings
+      in Concat (a, b)
+instance (QueryResultsSize a, QueryResultsSize b) => QueryResultsSize (Concat (a, b)) where
+  queryResultsSize _ = queryResultsSize (Proxy @a) + queryResultsSize (Proxy @b)

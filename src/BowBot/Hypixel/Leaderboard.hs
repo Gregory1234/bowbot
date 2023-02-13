@@ -22,6 +22,8 @@ import BowBot.Counter.Basic
 import Control.Concurrent (threadDelay)
 import Control.Concurrent.Async (mapConcurrently)
 import Data.Time.Clock (UTCTime(..))
+import Database.MySQL.Simple.QueryParams (QueryParams(..))
+import Database.MySQL.Simple.QueryResults (QueryResults(..))
 
 data HypixelBowLeaderboardEntry = HypixelBowLeaderboardEntry
   { bowLbWins :: !Integer,
@@ -30,6 +32,16 @@ data HypixelBowLeaderboardEntry = HypixelBowLeaderboardEntry
     bowLbTimestamp :: !(Maybe UTCTime),
     bowLbWinstreakTimestamp :: !(Maybe UTCTime)
   } deriving (Show, Eq)
+
+instance QueryParams HypixelBowLeaderboardEntry where
+  renderParams HypixelBowLeaderboardEntry {..} = renderParams (bowLbWins, bowLbLosses, bowLbWinstreak, bowLbTimestamp, bowLbWinstreakTimestamp)
+instance QueryResults HypixelBowLeaderboardEntry where
+  convertResults fields strings = let
+    (bowLbWins, bowLbLosses, (\x -> if x == 0 then Nothing else Just x) -> bowLbWinstreak, nullZeroTime -> bowLbTimestamp, nullZeroTime -> bowLbWinstreakTimestamp) = convertResults fields strings
+      in HypixelBowLeaderboardEntry {..}
+instance QueryResultsSize HypixelBowLeaderboardEntry where
+  queryResultsSize _ = 5
+
 hypixelBowStatsToLeaderboards :: HypixelBowStats -> HypixelBowLeaderboardEntry
 hypixelBowStatsToLeaderboards HypixelBowStats {..} = HypixelBowLeaderboardEntry
   { bowLbWins = bowWins, bowLbLosses = bowLosses, bowLbWinstreak = cachedToMaybe bestWinstreak, bowLbTimestamp = bowStatsTimestamp, bowLbWinstreakTimestamp = cachedTimestamp bowStatsTimestamp bestWinstreak }
@@ -39,9 +51,7 @@ completeHypixelBowStats s Nothing = s
 completeHypixelBowStats s (Just HypixelBowLeaderboardEntry {..}) = s { bestWinstreak = completeCachedMaybe bowLbWinstreakTimestamp (bestWinstreak s) bowLbWinstreak }
 
 getHypixelBowLeaderboards :: (MonadIOReader m r, HasAll '[Connection] r) => m (HM.HashMap UUID HypixelBowLeaderboardEntry)
-getHypixelBowLeaderboards = do
-  res :: [(UUID, Integer, Integer, Integer, UTCTime, UTCTime)] <- queryLog "SELECT `minecraft`, `bowWins`, `bowLosses`, `bowWinstreak`, `lastUpdate`, `lastWinstreakUpdate` FROM `stats`" ()
-  return $ HM.fromList $ map (\(uuid, bowLbWins, bowLbLosses, (\x -> if x == 0 then Nothing else Just x) -> bowLbWinstreak, nullZeroTime -> bowLbTimestamp, nullZeroTime -> bowLbWinstreakTimestamp) -> (uuid, HypixelBowLeaderboardEntry {..})) res
+getHypixelBowLeaderboards = HM.fromList . map (\(Concat (Only a,b)) -> (a,b)) <$> queryLog "SELECT `minecraft`, `bowWins`, `bowLosses`, `bowWinstreak`, `lastUpdate`, `lastWinstreakUpdate` FROM `stats`" ()
 
 updateHypixelBowLeaderboards :: (MonadIOReader m r, HasAll '[Manager, CounterState, Connection] r) => m ()
 updateHypixelBowLeaderboards = do
@@ -64,23 +74,14 @@ updateHypixelBowLeaderboards = do
     newVals <- fmap concat $ liftIO $ for chunked $ \chunk -> mapConcurrently (fmap (`runReaderT` ctx) helper) chunk
     liftIO $ (`runReaderT` ctx) $ withTransaction $ do
       currentKeys :: [UUID] <- map fromOnly <$> queryLog "SELECT `minecraft` FROM `stats`" ()
-      let queryParams = map (\(uuid, HypixelBowLeaderboardEntry {..}) -> (uuid, bowLbWins, bowLbLosses, bowLbWinstreak, bowLbTimestamp, bowLbWinstreakTimestamp)) $ filter (\(uuid, _) -> uuid `elem` currentKeys) newVals
+      let queryParams = map (\(uuid, entry) -> Concat (Only uuid, entry)) $ filter (\(uuid, _) -> uuid `elem` currentKeys) newVals
       void $ executeManyLog "INSERT INTO `stats` (`minecraft`, `bowWins`, `bowLosses`, `bowWinstreak`, `lastUpdate`, `lastWinstreakUpdate`) VALUES (?,?,?,?,?,?) ON DUPLICATE KEY UPDATE `bowWins`=VALUES(`bowWins`), `bowLosses`=VALUES(`bowLosses`), `bowWinstreak`=VALUES(`bowWinstreak`), `lastUpdate`=VALUES(`lastUpdate`), `lastWinstreakUpdate`=VALUES(`lastWinstreakUpdate`)" queryParams
 
 getHypixelBowLeaderboardEntryByUUID :: (MonadIOReader m r, Has Connection r) => UUID -> m (Maybe HypixelBowLeaderboardEntry)
-getHypixelBowLeaderboardEntryByUUID uuid = do
-  res :: [(Integer, Integer, Integer, UTCTime, UTCTime)] <- queryLog "SELECT `bowWins`, `bowLosses`, `bowWinstreak`, `lastUpdate`, `lastWinstreakUpdate` FROM `stats` WHERE `minecraft` = ?" (Only uuid)
-  return $ case res of
-    [(bowLbWins, bowLbLosses, (\x -> if x == 0 then Nothing else Just x) -> bowLbWinstreak, nullZeroTime -> bowLbTimestamp, nullZeroTime -> bowLbWinstreakTimestamp)] -> Just HypixelBowLeaderboardEntry {..}
-    _ -> Nothing
+getHypixelBowLeaderboardEntryByUUID uuid = only <$> queryLog "SELECT `bowWins`, `bowLosses`, `bowWinstreak`, `lastUpdate`, `lastWinstreakUpdate` FROM `stats` WHERE `minecraft` = ?" (Only uuid)
 
 setHypixelBowLeaderboardEntryByUUID :: (MonadIOReader m r, Has Connection r) => UUID -> HypixelBowLeaderboardEntry -> m Bool
-setHypixelBowLeaderboardEntryByUUID uuid HypixelBowLeaderboardEntry {..} = do
-  let queryParams = (uuid, bowLbWins, bowLbLosses, bowLbWinstreak, bowLbTimestamp, bowLbWinstreakTimestamp)
-  affected <- executeLog "INSERT INTO `stats` (`minecraft`, `bowWins`, `bowLosses`, `bowWinstreak`, `lastUpdate`, `lastWinstreakUpdate`) VALUES (?,?,?,?,?,?) ON DUPLICATE KEY UPDATE `bowWins`=VALUES(`bowWins`), `bowLosses`=VALUES(`bowLosses`), `bowWinstreak`=VALUES(`bowWinstreak`), `lastUpdate`=VALUES(`lastUpdate`), `lastWinstreakUpdate`=VALUES(`lastWinstreakUpdate`)" queryParams
-  return $ affected > 0
+setHypixelBowLeaderboardEntryByUUID uuid entry = (>0) <$> executeLog "INSERT INTO `stats` (`minecraft`, `bowWins`, `bowLosses`, `bowWinstreak`, `lastUpdate`, `lastWinstreakUpdate`) VALUES (?,?,?,?,?,?) ON DUPLICATE KEY UPDATE `bowWins`=VALUES(`bowWins`), `bowLosses`=VALUES(`bowLosses`), `bowWinstreak`=VALUES(`bowWinstreak`), `lastUpdate`=VALUES(`lastUpdate`), `lastWinstreakUpdate`=VALUES(`lastWinstreakUpdate`)" (Concat (Only uuid, entry))
 
 removeHypixelBowLeaderboardEntryByUUID :: (MonadIOReader m r, Has Connection r) => UUID -> m Bool
-removeHypixelBowLeaderboardEntryByUUID uuid = do
-  affected <- executeLog "DELETE FROM `stats` WHERE `minecraft` = ?" (Only uuid)
-  return $ affected > 0
+removeHypixelBowLeaderboardEntryByUUID uuid = (>0) <$> executeLog "DELETE FROM `stats` WHERE `minecraft` = ?" (Only uuid)
