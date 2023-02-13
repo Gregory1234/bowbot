@@ -15,6 +15,7 @@ import BowBot.Counter.Basic
 import Control.Monad.Error.Class (throwError)
 import Discord.Types
 import BowBot.Hypixel.Leaderboard
+import BowBot.Hypixel.Announce
 import BowBot.BotData.Cached (storeInCacheIndexed, storeInCache, getFromCache)
 import BowBot.BotData.Info
 import BowBot.Discord.Roles
@@ -41,6 +42,7 @@ hypixelStatsCommand src name desc = Command CommandInfo
     when (mcResponseAutocorrect /= ResponseNew) $ do
       void $ setHypixelBowLeaderboardEntryByUUID mcUUID (hypixelBowStatsToLeaderboards stats)
       updateRolesDivisionTitleByUUID mcUUID
+      announceMilestones
   where
     helper MinecraftAccount {..} = do
       cv <- tryIncreaseCounter HypixelApi 1

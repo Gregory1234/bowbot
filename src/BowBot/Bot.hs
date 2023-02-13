@@ -88,9 +88,8 @@ backgroundMinutely mint = do
           (0, _, _) -> [DailyStats]
           _ -> []
     when (hour == 5) announceBirthdays
-    oldDaily <- getCacheMap
     updateBotData times
-    when (hour == 0) $ announceMilestones oldDaily
+    announceMilestones
     storeNewSavedRolesAll
     updateRolesAll
     updateMinecraftAccountCache hour

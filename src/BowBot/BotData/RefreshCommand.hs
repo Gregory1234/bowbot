@@ -36,9 +36,8 @@ quietAdminCommand timeout name desc body = Command CommandInfo
 updateDataCommand :: [StatsTimeRange] -> Text -> Command
 updateDataCommand times name = adminCommand 3600 name ("update Bow Bot data" <> if null times then "" else " as if it was the beginning of: " <> T.intercalate ", " (map (T.toLower . statsTimeRangeName) times)) $ do
   refreshBotData
-  oldDaily <- getCacheMap
   updateBotData times
-  when (DailyStats `elem` times) $ announceMilestones oldDaily
+  announceMilestones
 
 updateNamesCommand :: Command
 updateNamesCommand = Command CommandInfo
