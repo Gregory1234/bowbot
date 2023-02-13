@@ -61,9 +61,6 @@ refreshBotData = do
   refreshCache @BowBotAccount
   refreshCache @SavedRoles
   refreshCache @DiscordAccount
-  refreshCache @(HypixelBowTimeStats 'DailyStats)
-  refreshCache @(HypixelBowTimeStats 'WeeklyStats)
-  refreshCache @(HypixelBowTimeStats 'MonthlyStats)
   refreshCache @SnipeMessage -- TODO: this is meaningless...
 
 updateBotData :: (MonadIOBotData m BotData r, HasAll [Manager, DiscordHandle, CounterState, Connection] r) => [StatsTimeRange] -> m ()
@@ -72,7 +69,7 @@ updateBotData times = (ask >>=) $ \ctx -> liftIO $ foldl1 concurrently_ $
     [ updateDiscordAccountCache
     , do
       updateHypixelBowLeaderboards
-      forM_ times updateHypixelTimeStatsCache'
+      forM_ times updateHypixelBowTimeStats
     ]
 
 clearBotDataCaches :: (MonadIOBotData m BotData r, Has CounterState r) => m ()

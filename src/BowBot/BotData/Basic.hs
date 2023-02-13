@@ -35,9 +35,6 @@ data BotData = BotData
   , savedRolesCache :: DatabaseCache SavedRoles
   , hypixelGuildMembersCache :: CachedData HypixelGuildMembers
   , discordAccountsCache :: DatabaseCache DiscordAccount
-  , hypixelDailyStatsCache :: DatabaseCache (HypixelBowTimeStats 'DailyStats)
-  , hypixelWeeklyStatsCache :: DatabaseCache (HypixelBowTimeStats 'WeeklyStats)
-  , hypixelMonthlyStatsCache :: DatabaseCache (HypixelBowTimeStats 'MonthlyStats)
   , hypixelOnlinePlayersCache :: CachedData HypixelOnlinePlayers
   , snipeCache :: DatabaseCache SnipeMessage
   }
@@ -65,16 +62,6 @@ instance Has (CachedData HypixelGuildMembers) BotData where
 instance Has (DatabaseCache DiscordAccount) BotData where
   getter = discordAccountsCache
   modifier f x = x { discordAccountsCache = f $ discordAccountsCache x }
-
-instance (Default (SStatsTimeRange t)) => Has (DatabaseCache (HypixelBowTimeStats t)) BotData where
-  getter = case def :: SStatsTimeRange t of
-    SDailyStats -> hypixelDailyStatsCache
-    SWeeklyStats -> hypixelWeeklyStatsCache
-    SMonthlyStats -> hypixelMonthlyStatsCache
-  modifier f x = case def :: SStatsTimeRange t of
-    SDailyStats -> x { hypixelDailyStatsCache = f $ hypixelDailyStatsCache x }
-    SWeeklyStats -> x { hypixelWeeklyStatsCache = f $ hypixelWeeklyStatsCache x }
-    SMonthlyStats -> x { hypixelMonthlyStatsCache = f $ hypixelMonthlyStatsCache x }
 
 instance Has (CachedData HypixelOnlinePlayers) BotData where
   getter = hypixelOnlinePlayersCache

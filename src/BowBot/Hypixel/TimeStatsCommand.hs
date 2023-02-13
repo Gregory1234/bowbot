@@ -35,12 +35,12 @@ hypixelTimeStatsCommand src name desc = Command CommandInfo
     let (didYouMean, renderedName) = (if mcResponseAutocorrect == ResponseAutocorrect then "*Did you mean* " else "", showMinecraftAccountDiscord mcResponseTime mcResponseAccount)
     user <- envs envSender
     settings <- getSettingsFromSource src (userId user)
-    dailyStats <- getFromCache @(HypixelBowTimeStats 'DailyStats) mcUUID
-    weeklyStats <- getFromCache @(HypixelBowTimeStats 'WeeklyStats) mcUUID
-    monthlyStats <- getFromCache @(HypixelBowTimeStats 'MonthlyStats) mcUUID
+    dailyStats <- getHypixelBowTimeStatsByUUID DailyStats mcUUID
+    weeklyStats <- getHypixelBowTimeStatsByUUID WeeklyStats mcUUID
+    monthlyStats <- getHypixelBowTimeStatsByUUID MonthlyStats mcUUID
     let addAccount = bowWins stats >= 50 && mcResponseAutocorrect == ResponseNew
     when addAccount $ minecraftNewAccountTip mcResponseAccount
-    respond $ didYouMean <> renderedName <> ":\n" <> showMaybeHypixelBowTimeStats settings stats dailyStats <> "\n" <> showMaybeHypixelBowTimeStats settings stats weeklyStats <> "\n" <> showMaybeHypixelBowTimeStats settings stats monthlyStats
+    respond $ didYouMean <> renderedName <> ":\n" <> showMaybeHypixelBowTimeStats DailyStats settings stats dailyStats <> "\n" <> showMaybeHypixelBowTimeStats WeeklyStats settings stats weeklyStats <> "\n" <> showMaybeHypixelBowTimeStats MonthlyStats settings stats monthlyStats
     when addAccount $ do
       a <- storeInCache [mcResponseAccount]
       when a $ void $ setHypixelBowLeaderboardEntryByUUID mcUUID (hypixelBowStatsToLeaderboards stats)
