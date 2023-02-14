@@ -6,7 +6,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 
 module BowBot.Utils(
-  module BowBot.Utils, module BowBot.HoistIO, getEnv, for, for_, readMaybe, (<|>), ($>),
+  module BowBot.Utils, module BowBot.HoistIO, getEnv, for, for_, readMaybe, (<|>), ($>), foldl',
   STM, atomically, TVar, newTVar, readTVar, writeTVar, modifyTVar, pack, unpack, Has(..), Text, TextShow(..),
   module Data.Char, module Data.List, module Data.List.Split, module Data.Maybe, module Control.Monad.Reader
 ) where
@@ -18,7 +18,7 @@ import Data.Ratio ((%))
 import Data.Time.Format (formatTime, defaultTimeLocale)
 import Data.Time.Clock.POSIX (getCurrentTime, posixSecondsToUTCTime, utcTimeToPOSIXSeconds)
 import Data.Traversable (for)
-import Data.Foldable (for_)
+import Data.Foldable (for_, foldl')
 import Text.Read (readMaybe)
 import Control.Concurrent.STM (STM, atomically)
 import Control.Concurrent.STM.TVar (TVar, newTVar, readTVar, writeTVar, modifyTVar)

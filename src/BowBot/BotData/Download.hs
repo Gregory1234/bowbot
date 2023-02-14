@@ -59,7 +59,6 @@ refreshBotData = do
   refreshCache @InfoField
   refreshCache @MinecraftAccount
   refreshCache @BowBotAccount
-  refreshCache @SavedRoles
   refreshCache @DiscordAccount
   refreshCache @SnipeMessage -- TODO: this is meaningless...
 

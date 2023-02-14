@@ -1,5 +1,6 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RecordWildCards #-}
 
 module BowBot.Discord.Utils(
   module BowBot.Discord.Utils, module BowBot.Discord.Basic, module Discord, module Discord.Types, module BowBot.Utils
@@ -22,6 +23,24 @@ discordGuildMembers gid = do
       logErrorFork $ showt e
       return []
     Right m -> return (filter (maybe False (not . userIsBot) . memberUser) m)
+
+getDiscordGuildMember :: (MonadIOReader m r, Has DiscordHandle r) => GuildId -> UserId -> m (Maybe GuildMember)
+getDiscordGuildMember gid uid = do
+  member <- call $ R.GetGuildMember gid uid
+  case member of
+    Left e -> do
+      logErrorFork $ showt e
+      return Nothing
+    Right m -> return $ if maybe True userIsBot (memberUser m) then Nothing else Just m
+
+addRemoveDiscordRoles :: (MonadIOReader m r, Has DiscordHandle r) => GuildId -> GuildMember -> [RoleId] -> [RoleId] -> m ()
+addRemoveDiscordRoles gid GuildMember {..} universe correct = do
+  let current = memberRoles `intersect` universe
+  let toAdd = correct \\ current
+  let toRemove = current \\ correct
+  let did = maybe 0 userId memberUser
+  for_ toAdd $ \r -> call_ $ R.AddGuildMemberRole gid did r
+  for_ toRemove $ \r -> call_ $ R.RemoveGuildMemberRole gid did r
 
 fromPingDiscordUser :: Text -> Maybe UserId
 fromPingDiscordUser str | "<@" `T.isPrefixOf` str && ">" `T.isSuffixOf` str = readMaybe $ unpack $ T.filter isDigit str

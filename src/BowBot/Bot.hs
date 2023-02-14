@@ -27,6 +27,7 @@ import BowBot.Settings.Basic
 import BowBot.Network.Basic
 import BowBot.Network.ClearLogs
 import BowBot.Discord.Roles
+import BowBot.Discord.SavedRoles
 import BowBot.Hypixel.LeaderboardCommand
 import BowBot.Hypixel.TimeStats
 import BowBot.Hypixel.TimeStatsCommand
@@ -90,8 +91,8 @@ backgroundMinutely mint = do
     when (hour == 5) announceBirthdays
     updateBotData times
     announceMilestones
-    storeNewSavedRolesAll
-    updateRolesAll
+    updateSavedRolesAll
+    applyRolesAll
     updateMinecraftAccountCache hour
     dev <- ifDev False $ return True
     unless dev $ when (hour `mod` 8 == 0) clearLogs
@@ -147,13 +148,14 @@ eventHandler (GuildMemberAdd gid gmem) = do
   maingid <- askInfo discordGuildIdInfo
   when (gid == maingid && not (maybe True userIsBot (memberUser gmem))) $ do
     void $ storeInCache [guildMemberToDiscordAccount gmem]
-    acc <- getBowBotAccountByDiscord (maybe 0 userId (memberUser gmem))
-    updateRoles gmem acc
+    applyRoles gmem
 eventHandler (GuildMemberUpdate gid roles usr newname) = do
   maingid <- askInfo discordGuildIdInfo
   when (gid == maingid && not (userIsBot usr)) $ do
     void $ storeInCache [(userToDiscordAccount usr) { discordNickname = newname, discordIsMember = True }]
-    unless (null roles) $ storeNewRolesSaved (userId usr) roles
+    unless (null roles) $ do
+      savedRoles <- savedRolesFromIds roles
+      setSavedRolesByDiscord (userId usr) savedRoles
 eventHandler (GuildMemberRemove gid usr) = do
   maingid <- askInfo discordGuildIdInfo
   when (gid == maingid && not (userIsBot usr)) $ do
@@ -229,8 +231,8 @@ commands =
   , updateDataCommand [DailyStats, WeeklyStats, MonthlyStats] "dataupdateweekmonth"
   , updateNamesCommand
   , adminCommand 15 "clearLogs" "clear Bow Bot's logs" clearLogs
-  , adminCommand 120 "rolesupdate" "update everyone's discord roles" updateRolesAll
-  , adminCommand 120 "savedrolesstore" "store everyone's saved roles" storeNewSavedRolesAll
+  , adminCommand 120 "rolesupdate" "update everyone's discord roles" applyRolesAll
+  , adminCommand 120 "savedrolesstore" "store everyone's saved roles" updateSavedRolesAll
   , adminCommand 15 "statusupdate" "update Bow Bot's discord status" updateDiscordStatus
   , quietAdminCommand 5 "throw" "throw an error" $ respond $ showt ((1 :: Integer) `div` 0)
   , quietAdminCommand 5 "time" "display Bow Bot's time" $ respond . pack =<< liftIO (getTime "Month: %m, Day: %d, Weekday: %u, Hour: %k, Minute: %M, Second %S")

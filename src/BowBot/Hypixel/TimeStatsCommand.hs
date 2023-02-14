@@ -46,7 +46,7 @@ hypixelTimeStatsCommand src name desc = Command CommandInfo
       when a $ void $ setHypixelBowLeaderboardEntryByUUID mcUUID (hypixelBowStatsToLeaderboards stats)
     when (mcResponseAutocorrect /= ResponseNew) $ do
       void $ setHypixelBowLeaderboardEntryByUUID mcUUID (hypixelBowStatsToLeaderboards stats)
-      updateRolesDivisionTitleByUUID mcUUID
+      applyRolesDivisionTitleByUUID mcUUID
       announceMilestones
   where
     helper MinecraftAccount {..} = do

@@ -14,7 +14,7 @@ import BowBot.Hypixel.Basic (HypixelApi(..))
 import BowBot.Hypixel.Leaderboard
 import BowBot.Counter.Basic (tryIncreaseCounter)
 import BowBot.Account.Register
-import BowBot.Discord.Roles (updateRoles)
+import BowBot.Discord.Roles
 import BowBot.BotData.Info (askInfo, discordGuildIdInfo)
 import BowBot.Hypixel.Stats (requestHypixelBowStats)
 import Control.Monad.Except
@@ -47,9 +47,7 @@ registerCommandBody RegisterCommandMessages {..} name did = do
       when (mcHypixelBow acc == NotBanned) $ void $ setHypixelBowLeaderboardEntryByUUID uuid (hypixelBowStatsToLeaderboards stats)
       pure acc
   newacc <- liftMaybe somethingWentWrongMessage =<< createNewBowBotAccount (head $ mcNames mc) did uuid
-  gid <- askInfo discordGuildIdInfo
-  gmems <- discordGuildMembers gid
-  for_ gmems $ \gmem -> when (maybe 0 userId (memberUser gmem) == did) $ lift $ updateRoles gmem (Just newacc)
+  applyRolesByBowBotAccount newacc
   lift $ respond "*Registered successfully*"
 
 registerCommand :: Command
@@ -106,7 +104,5 @@ addaltCommand = Command CommandInfo
       Just MinecraftAccount { mcHypixelBow = NotBanned } -> void $ setHypixelBowLeaderboardEntryByUUID uuid (hypixelBowStatsToLeaderboards stats)
       _ -> pure ()
     newacc <- liftMaybe somethingWentWrongMessage =<< addAltToBowBotAccount (accountBotId bacc) uuid
-    gid <- askInfo discordGuildIdInfo
-    gmems <- discordGuildMembers gid
-    for_ gmems $ \gmem -> when (maybe 0 userId (memberUser gmem) `elem` accountDiscords bacc) $ lift $ updateRoles gmem (Just newacc)
+    applyRolesByBowBotAccount newacc
     lift $ respond "*Registered successfully*"

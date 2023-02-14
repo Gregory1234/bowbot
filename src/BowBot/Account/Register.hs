@@ -15,20 +15,18 @@ import BowBot.Birthday.Basic
 import Control.Monad.Except (runExceptT, throwError)
 import qualified Data.Text as T
 
-createNewBowBotAccount :: (MonadIOBotData m d r, HasCaches [BowBotAccount, SavedRoles] d, Has Connection r) => Text -> UserId -> UUID -> m (Maybe BowBotAccount)
+createNewBowBotAccount :: (MonadIOBotData m d r, HasCache BowBotAccount d, Has Connection r) => Text -> UserId -> UUID -> m (Maybe BowBotAccount)
 createNewBowBotAccount name did uuid = do
   cache <- getCache
-  savedRoles <- getFromCache did
   r <- ask
   ret <- liftIO $ flip runReaderT r $ withTransaction $ (either (const $ rollback $> Nothing) (pure . Just) =<<) $ runExceptT $ do
-    birthday <- getBirthdayByDiscord did
-    void $ executeLog "DELETE FROM `unregistered` WHERE `discord` = ?" (Only (toInteger did))
-    c1 <- executeLog "INSERT INTO `people`(`name`, `roles`, `birthday`) VALUES (?,?,?)" (name, maybe "" (T.intercalate "," . getSavedRoleNames) savedRoles, birthdayString <$> birthday)
+    c1 <- executeLog "INSERT INTO `people`(`name`, `roles`, `birthday`) SELECT ?, `roles`, `birthday` FROM `unregistered` WHERE `discord` = ?" (name, did)
     when (c1 <= 0) $ throwError ()
     bid <- insertID
-    c2 <- executeLog "INSERT INTO `peopleMinecraft`(`id`, `minecraft`,`status`, `selected`, `verified`) VALUES (?,?, 'main', 1, 0)" (bid, uuidString uuid)
+    void $ executeLog "DELETE FROM `unregistered` WHERE `discord` = ?" (Only did)
+    c2 <- executeLog "INSERT INTO `peopleMinecraft`(`id`, `minecraft`,`status`, `selected`, `verified`) VALUES (?,?, 'main', 1, 0)" (bid, uuid)
     when (c2 <= 0) $ throwError ()
-    c3 <- executeLog "INSERT INTO `peopleDiscord`(`id`, `discord`) VALUES (?,?)" (bid, toInteger did)
+    c3 <- executeLog "INSERT INTO `peopleDiscord`(`id`, `discord`) VALUES (?,?)" (bid, did)
     when (c3 <= 0) $ throwError ()
     pure $ BowBotAccount { accountBotId = bid, accountDiscords = [did], accountSelectedMinecraft = uuid, accountMinecrafts = [uuid] }
   liftIO $ atomically $ for_ ret $ \bacc -> modifyTVar cache (insertMany [(accountBotId bacc, bacc)])

@@ -8,7 +8,7 @@ import BowBot.Command
 import qualified Data.Map as M
 import qualified Discord.Requests as R
 import BowBot.BotData.Info
-import BowBot.Discord.Roles
+import BowBot.Discord.SavedRoles
 import BowBot.Discord.Utils
 import qualified Data.Text as T
 
@@ -20,9 +20,9 @@ roleCommand = Command CommandInfo
     , HelpEntry { helpUsage = "role [role name]", helpDescription = "toggle a discord role", helpGroup = "normal" } ]
   , commandPerms = DefaultLevel
   , commandTimeout = 15
-  } $ oneOptionalArgument (traverse $ \n -> fmap (,n) . liftMaybe "*Toggleable role not found!*" . (M.!? n) =<< askInfo toggleableRolesInfo) $ \case
+  } $ oneOptionalArgument (traverse $ \n -> fmap (,n) . liftMaybe "*Toggleable role not found!*" . (M.!? n) . M.mapKeys savedRoleName =<< askInfo toggleableRolesInfo) $ \case
     Nothing -> do
-      allRoles <- askInfo toggleableRolesInfo
+      allRoles <- M.mapKeys savedRoleName <$> askInfo toggleableRolesInfo
       gid <- askInfo discordGuildIdInfo
       sender <- userId <$> envs envSender
       maybeMem <- call $ R.GetGuildMember gid sender
