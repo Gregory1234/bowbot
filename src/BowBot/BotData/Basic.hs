@@ -1,6 +1,3 @@
-{-# LANGUAGE DerivingVia #-}
-{-# LANGUAGE DataKinds #-}
-
 module BowBot.BotData.Basic where
 
 import BowBot.BotData.Info

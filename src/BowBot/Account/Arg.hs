@@ -1,7 +1,3 @@
-{-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE DataKinds #-}
-{-# LANGUAGE OverloadedStrings #-}
-
 module BowBot.Account.Arg where
 
 import BowBot.Minecraft.Account

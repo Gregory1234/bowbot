@@ -1,6 +1,3 @@
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE RecordWildCards #-}
-
 module BowBot.Discord.Utils(
   module BowBot.Discord.Utils, module BowBot.Discord.Basic, module Discord, module Discord.Types, module BowBot.Utils
 ) where

@@ -1,6 +1,3 @@
-{-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE OverloadedStrings #-}
-
 module BowBot.Command.HelpCommand where
 
 import BowBot.Command

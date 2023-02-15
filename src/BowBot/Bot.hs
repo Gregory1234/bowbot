@@ -1,7 +1,3 @@
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE DerivingVia #-}
-{-# LANGUAGE RecordWildCards #-}
-
 module BowBot.Bot where
 
 import BowBot.Utils

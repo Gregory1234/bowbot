@@ -1,5 +1,3 @@
-{-# LANGUAGE OverloadedStrings #-}
-
 module BowBot.Hypixel.Division where
 
 import BowBot.Utils

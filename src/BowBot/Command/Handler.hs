@@ -1,5 +1,3 @@
-{-# LANGUAGE DataKinds #-}
-
 module BowBot.Command.Handler where
 
 import BowBot.Utils

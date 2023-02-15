@@ -1,6 +1,3 @@
-{-# LANGUAGE LambdaCase #-}
-{-# LANGUAGE OverloadedStrings #-}
-
 module BowBot.Perms.Basic where
 
 import BowBot.BotData.Cached

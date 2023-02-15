@@ -1,7 +1,3 @@
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE DataKinds #-}
-{-# LANGUAGE RecordWildCards #-}
-
 module BowBot.Discord.SavedRoles where
 
 import BowBot.Discord.Utils

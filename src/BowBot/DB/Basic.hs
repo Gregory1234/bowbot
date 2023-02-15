@@ -1,5 +1,3 @@
-{-# LANGUAGE OverloadedStrings #-}
-
 module BowBot.DB.Basic(
   module BowBot.DB.Basic, Connection, Only(..)
 ) where

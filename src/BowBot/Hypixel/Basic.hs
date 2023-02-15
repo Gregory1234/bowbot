@@ -1,5 +1,3 @@
-{-# LANGUAGE OverloadedStrings #-}
-
 module BowBot.Hypixel.Basic where
 
 import BowBot.Minecraft.Basic (UUID(..))

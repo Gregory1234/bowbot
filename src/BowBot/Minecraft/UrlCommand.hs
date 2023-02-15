@@ -1,6 +1,3 @@
-{-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE OverloadedStrings #-}
-
 module BowBot.Minecraft.UrlCommand where
 
 import BowBot.Command

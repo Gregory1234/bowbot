@@ -1,6 +1,3 @@
-{-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE OverloadedStrings #-}
-
 module BowBot.Hypixel.StatsCommand where
 
 import BowBot.Command

@@ -1,6 +1,3 @@
-{-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE OverloadedStrings #-}
-
 module BowBot.Command.Tips where
 
 import BowBot.Minecraft.Account

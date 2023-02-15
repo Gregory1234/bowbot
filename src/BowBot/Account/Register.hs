@@ -1,6 +1,3 @@
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE DataKinds #-}
-
 module BowBot.Account.Register where
 
 import BowBot.Minecraft.Basic (UUID(..))

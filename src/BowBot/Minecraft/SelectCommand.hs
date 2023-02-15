@@ -1,5 +1,3 @@
-{-# LANGUAGE OverloadedStrings #-}
-
 module BowBot.Minecraft.SelectCommand where
 
 import BowBot.Command

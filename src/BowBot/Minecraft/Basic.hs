@@ -1,6 +1,3 @@
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE DerivingStrategies #-}
-
 module BowBot.Minecraft.Basic where
 
 import BowBot.Network.Basic hiding (Result)

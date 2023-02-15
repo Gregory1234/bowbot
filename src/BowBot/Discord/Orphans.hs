@@ -1,7 +1,6 @@
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE DeriveAnyClass #-}
-{-# LANGUAGE DerivingVia #-}
 
 module BowBot.Discord.Orphans() where
 

@@ -1,6 +1,3 @@
-{-# LANGUAGE ViewPatterns #-}
-{-# LANGUAGE OverloadedStrings #-}
-
 module BowBot.Discord.Arg where
 
 import BowBot.BotData.Cached

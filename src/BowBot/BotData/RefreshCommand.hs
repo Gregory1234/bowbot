@@ -1,5 +1,3 @@
-{-# LANGUAGE OverloadedStrings #-}
-
 module BowBot.BotData.RefreshCommand where
 
 import BowBot.Command

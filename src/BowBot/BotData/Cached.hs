@@ -1,6 +1,5 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE AllowAmbiguousTypes #-}
-{-# LANGUAGE DataKinds #-}
 
 module BowBot.BotData.Cached(
   module BowBot.BotData.Cached, MonadIO(..), MonadReader(..), asks, Has(..), module BowBot.BotData.HasData

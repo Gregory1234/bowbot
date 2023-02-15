@@ -1,6 +1,3 @@
-{-# LANGUAGE DataKinds #-}
-{-# LANGUAGE OverloadedStrings #-}
-
 module BowBot.Command.Args where
 
 import BowBot.Command.Handler

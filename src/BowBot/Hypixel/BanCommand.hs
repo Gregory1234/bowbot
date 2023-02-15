@@ -1,5 +1,3 @@
-{-# LANGUAGE OverloadedStrings #-}
-
 module BowBot.Hypixel.BanCommand where
 
 import BowBot.Command

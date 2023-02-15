@@ -1,6 +1,3 @@
-{-# LANGUAGE ViewPatterns #-}
-{-# LANGUAGE OverloadedStrings #-}
-
 module BowBot.Snipe.Detect where
 
 import BowBot.Discord.Utils

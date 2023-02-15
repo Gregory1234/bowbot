@@ -1,6 +1,3 @@
-{-# LANGUAGE LambdaCase #-}
-{-# LANGUAGE OverloadedStrings #-}
-
 module BowBot.Discord.RoleCommand where
 
 import BowBot.Command

@@ -1,6 +1,4 @@
 {-# OPTIONS_GHC -fno-warn-orphans #-}
-{-# LANGUAGE LambdaCase #-}
-{-# LANGUAGE DerivingVia #-}
 
 module BowBot.Discord.Basic(
   module BowBot.Discord.Basic, module Discord.Types, DiscordHandler, MonadIO(..), MonadReader(..), asks, Has(..)

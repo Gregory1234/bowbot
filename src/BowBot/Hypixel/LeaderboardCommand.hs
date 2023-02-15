@@ -1,8 +1,3 @@
-{-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE ViewPatterns #-}
-{-# LANGUAGE LambdaCase #-}
-{-# LANGUAGE OverloadedStrings #-}
-
 module BowBot.Hypixel.LeaderboardCommand where
 
 import BowBot.Command

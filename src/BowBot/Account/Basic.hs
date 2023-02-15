@@ -1,6 +1,4 @@
 {-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE RecordWildCards #-}
 
 module BowBot.Account.Basic where
 

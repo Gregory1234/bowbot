@@ -42,6 +42,14 @@ library:
 
 language: GHC2021
 
+default-extensions:
+- LambdaCase
+- DerivingVia
+- RecordWildCards
+- OverloadedStrings
+- DataKinds
+- ViewPatterns
+
 executables:
   bowbot-exe:
     main:                Main.hs

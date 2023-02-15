@@ -1,8 +1,3 @@
-{-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE ViewPatterns #-}
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE DataKinds #-}
-
 module BowBot.Hypixel.Leaderboard where
 
 import BowBot.Hypixel.Stats

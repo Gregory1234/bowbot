@@ -1,5 +1,3 @@
-{-# LANGUAGE RecordWildCards #-}
-
 module BowBot.Counter.Basic where
 
 import BowBot.Utils

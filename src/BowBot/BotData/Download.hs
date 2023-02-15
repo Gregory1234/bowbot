@@ -1,7 +1,3 @@
-{-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE DataKinds #-}
-{-# LANGUAGE OverloadedStrings #-}
-
 module BowBot.BotData.Download where
 
 import BowBot.BotData.Basic

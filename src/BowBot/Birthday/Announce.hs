@@ -1,7 +1,3 @@
-{-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE DataKinds #-}
-{-# LANGUAGE OverloadedStrings #-}
-
 module BowBot.Birthday.Announce where
 
 import BowBot.BotData.Cached

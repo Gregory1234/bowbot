@@ -1,7 +1,4 @@
-{-# LANGUAGE ViewPatterns #-}
-{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE OverloadedStrings #-}
 
 module BowBot.Utils(
   module BowBot.Utils, module BowBot.HoistIO, getEnv, for, for_, readMaybe, (<|>), ($>), foldl',

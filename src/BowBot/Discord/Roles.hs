@@ -1,6 +1,3 @@
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE DataKinds #-}
-
 module BowBot.Discord.Roles where
 
 import qualified Data.Map as M

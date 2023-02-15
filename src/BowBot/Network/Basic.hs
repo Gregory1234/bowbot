@@ -1,6 +1,3 @@
-{-# LANGUAGE ViewPatterns #-}
-{-# LANGUAGE OverloadedStrings #-}
-
 module BowBot.Network.Basic(
   module BowBot.Network.Basic, Manager, newManager, MonadIO(..), MonadReader(..), asks, Has(..),
   module Data.Aeson.Types, module Data.Aeson

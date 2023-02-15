@@ -1,6 +1,3 @@
-{-# LANGUAGE DataKinds #-}
-{-# LANGUAGE OverloadedStrings #-}
-
 module BowBot.Hypixel.Guild where
 
 import BowBot.BotData.Info

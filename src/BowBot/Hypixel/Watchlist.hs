@@ -1,7 +1,3 @@
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE DataKinds #-}
-
 module BowBot.Hypixel.Watchlist where
 
 import BowBot.BotData.Cached

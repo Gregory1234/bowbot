@@ -1,5 +1,3 @@
-{-# LANGUAGE OverloadedStrings #-}
-
 module BowBot.Birthday.SetCommand where
 
 import BowBot.Command

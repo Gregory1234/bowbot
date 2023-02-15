@@ -1,9 +1,3 @@
-{-# LANGUAGE ViewPatterns #-}
-{-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE DataKinds #-}
-{-# LANGUAGE LambdaCase #-}
-
 module BowBot.Birthday.Basic where
 
 import BowBot.BotData.Cached

@@ -1,7 +1,3 @@
-{-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE DataKinds #-}
-{-# LANGUAGE OverloadedStrings #-}
-
 module BowBot.Hypixel.TimeStatsCommand where
 
 import BowBot.Command

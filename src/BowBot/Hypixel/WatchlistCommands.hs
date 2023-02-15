@@ -1,5 +1,3 @@
-{-# LANGUAGE OverloadedStrings #-}
-
 module BowBot.Hypixel.WatchlistCommands where
 
 import BowBot.Command
