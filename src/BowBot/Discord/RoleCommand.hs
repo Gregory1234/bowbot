@@ -1,5 +1,4 @@
 {-# LANGUAGE LambdaCase #-}
-{-# LANGUAGE TupleSections #-}
 {-# LANGUAGE OverloadedStrings #-}
 
 module BowBot.Discord.RoleCommand where

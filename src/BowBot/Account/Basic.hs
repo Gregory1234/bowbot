@@ -1,9 +1,6 @@
 {-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE TupleSections #-}
 
 module BowBot.Account.Basic where
 

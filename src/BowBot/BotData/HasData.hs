@@ -1,8 +1,4 @@
 {-# LANGUAGE FunctionalDependencies #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TypeApplications #-}
-{-# LANGUAGE ConstraintKinds #-}
-{-# LANGUAGE FlexibleInstances #-}
 
 module BowBot.BotData.HasData where
 

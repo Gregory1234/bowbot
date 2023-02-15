@@ -1,12 +1,6 @@
-{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE DerivingStrategies #-}
-{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE AllowAmbiguousTypes #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE ConstraintKinds #-}
-{-# LANGUAGE FlexibleContexts #-}
 
 module BowBot.BotData.CachedSingle(
   module BowBot.BotData.CachedSingle, MonadIO(..), MonadReader(..), asks, Has(..), module BowBot.BotData.HasData

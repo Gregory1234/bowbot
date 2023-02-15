@@ -1,7 +1,5 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE OverloadedStrings #-}
 

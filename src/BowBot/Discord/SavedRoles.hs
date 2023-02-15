@@ -1,10 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE TupleSections #-}
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE ScopedTypeVariables #-}
 
 module BowBot.Discord.SavedRoles where
 

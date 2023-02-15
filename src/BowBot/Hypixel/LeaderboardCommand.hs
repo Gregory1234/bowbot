@@ -1,7 +1,6 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE LambdaCase #-}
-{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE OverloadedStrings #-}
 
 module BowBot.Hypixel.LeaderboardCommand where

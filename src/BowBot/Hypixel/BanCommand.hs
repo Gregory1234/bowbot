@@ -1,4 +1,3 @@
-{-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE OverloadedStrings #-}
 
 module BowBot.Hypixel.BanCommand where

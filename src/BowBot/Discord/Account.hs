@@ -1,11 +1,6 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE ViewPatterns #-}
-{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE DataKinds #-}
 
 module BowBot.Discord.Account where

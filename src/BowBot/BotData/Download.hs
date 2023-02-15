@@ -1,9 +1,6 @@
 {-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE DataKinds #-}
-{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE ScopedTypeVariables #-}
 
 module BowBot.BotData.Download where
 

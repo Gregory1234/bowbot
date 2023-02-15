@@ -1,6 +1,4 @@
 {-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE TypeApplications #-}
-{-# LANGUAGE FlexibleContexts #-}
 
 module BowBot.Counter.Basic where
 

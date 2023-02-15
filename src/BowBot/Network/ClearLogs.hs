@@ -1,6 +1,3 @@
-{-# LANGUAGE TypeApplications #-}
-{-# LANGUAGE FlexibleContexts #-}
-
 module BowBot.Network.ClearLogs where
 
 import Control.Exception.Base (SomeException, try)

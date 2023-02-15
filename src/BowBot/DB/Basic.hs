@@ -1,9 +1,4 @@
-{-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE TypeApplications #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE FlexibleInstances #-}
 
 module BowBot.DB.Basic(
   module BowBot.DB.Basic, Connection, Only(..)

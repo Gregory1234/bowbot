@@ -1,5 +1,4 @@
 {-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE OverloadedStrings #-}
 
 module BowBot.Command.Tips where

@@ -1,7 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE DerivingStrategies #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE FlexibleContexts #-}
 
 module BowBot.Minecraft.Basic where
 

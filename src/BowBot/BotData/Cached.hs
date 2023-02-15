@@ -1,12 +1,6 @@
 {-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE AllowAmbiguousTypes #-}
-{-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE DataKinds #-}
-{-# LANGUAGE TypeOperators #-}
 
 module BowBot.BotData.Cached(
   module BowBot.BotData.Cached, MonadIO(..), MonadReader(..), asks, Has(..), module BowBot.BotData.HasData

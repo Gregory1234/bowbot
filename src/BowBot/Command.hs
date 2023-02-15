@@ -1,4 +1,3 @@
-{-# LANGUAGE ExistentialQuantification #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE OverloadedStrings #-}
 

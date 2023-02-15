@@ -1,5 +1,3 @@
-{-# LANGUAGE MultiParamTypeClasses #-}
-
 module BowBot.BotMonad where
 
 import Discord

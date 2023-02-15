@@ -1,5 +1,4 @@
 {-# LANGUAGE ViewPatterns #-}
-{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE OverloadedStrings #-}
 
 module BowBot.Discord.Arg where

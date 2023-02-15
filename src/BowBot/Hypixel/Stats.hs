@@ -1,6 +1,5 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE FlexibleContexts #-}
 
 module BowBot.Hypixel.Stats where
 

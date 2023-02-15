@@ -40,6 +40,8 @@ dependencies:
 library:
   source-dirs: src
 
+language: GHC2021
+
 executables:
   bowbot-exe:
     main:                Main.hs

@@ -1,9 +1,3 @@
-{-# LANGUAGE TupleSections #-}
-{-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE ViewPatterns #-}
-{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE DataKinds #-}
 

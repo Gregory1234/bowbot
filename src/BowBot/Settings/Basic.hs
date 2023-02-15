@@ -1,9 +1,6 @@
-{-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE LambdaCase #-}
-{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE FlexibleContexts #-}
 
 module BowBot.Settings.Basic where
 

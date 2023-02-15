@@ -1,8 +1,5 @@
 {-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE DataKinds #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TupleSections #-}
 {-# LANGUAGE OverloadedStrings #-}
 
 module BowBot.Account.Arg where

@@ -1,6 +1,4 @@
 {-# LANGUAGE ViewPatterns #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE OverloadedStrings #-}
 
 module BowBot.Network.Basic(

@@ -1,7 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE DerivingVia #-}
-{-# LANGUAGE TypeApplications #-}
-{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE RecordWildCards #-}
 
 module BowBot.Bot where

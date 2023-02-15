@@ -1,7 +1,5 @@
-{-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE DataKinds #-}
-{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE OverloadedStrings #-}
 
 module BowBot.Hypixel.TimeStatsCommand where

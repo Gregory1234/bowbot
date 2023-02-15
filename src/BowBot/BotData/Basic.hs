@@ -1,11 +1,5 @@
 {-# LANGUAGE DerivingVia #-}
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE DataKinds #-}
-{-# LANGUAGE GADTs #-}
-{-# LANGUAGE ScopedTypeVariables #-}
 
 module BowBot.BotData.Basic where
 

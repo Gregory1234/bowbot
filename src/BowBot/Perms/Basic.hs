@@ -1,7 +1,4 @@
-{-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE LambdaCase #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE OverloadedStrings #-}
 
 module BowBot.Perms.Basic where

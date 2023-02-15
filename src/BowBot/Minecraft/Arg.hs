@@ -1,8 +1,5 @@
-{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE DataKinds #-}
-{-# LANGUAGE TupleSections #-}
 {-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE OverloadedStrings #-}
 

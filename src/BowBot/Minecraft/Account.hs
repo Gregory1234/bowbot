@@ -1,11 +1,8 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE ViewPatterns #-}
-{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE NamedFieldPuns #-}
-{-# LANGUAGE FlexibleContexts #-}
 
 module BowBot.Minecraft.Account where
 

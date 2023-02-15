@@ -1,9 +1,6 @@
-{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE DataKinds #-}
-{-# LANGUAGE TupleSections #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE ScopedTypeVariables #-}
 
 module BowBot.Hypixel.Announce where
 

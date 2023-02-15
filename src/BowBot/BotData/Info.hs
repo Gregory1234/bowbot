@@ -1,8 +1,6 @@
-{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE FlexibleContexts #-}
 
 module BowBot.BotData.Info(
   module BowBot.BotData.Info, readEither

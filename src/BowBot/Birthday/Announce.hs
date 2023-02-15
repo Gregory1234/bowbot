@@ -1,6 +1,4 @@
 {-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE TupleSections #-}
-{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE OverloadedStrings #-}
 

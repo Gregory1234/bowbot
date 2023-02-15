@@ -1,9 +1,6 @@
 {-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE LambdaCase #-}
 

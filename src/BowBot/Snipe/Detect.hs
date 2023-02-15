@@ -1,6 +1,5 @@
 {-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE FlexibleContexts #-}
 
 module BowBot.Snipe.Detect where
 

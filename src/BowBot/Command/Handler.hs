@@ -1,6 +1,3 @@
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE ImpredicativeTypes #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE DataKinds #-}
 
 module BowBot.Command.Handler where
