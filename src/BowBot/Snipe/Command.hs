@@ -14,7 +14,7 @@ snipeCommand = Command CommandInfo
   , commandTimeout = 10
   } $ noArguments $ do
     channel <- envs envChannel
-    msg <- getFromCache channel
+    msg <- getSnipeMessageByChannel channel
     case msg of
       Nothing -> respond "*Nothing to snipe!*"
       Just SnipeMessage {..} -> do

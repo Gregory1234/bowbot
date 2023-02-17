@@ -23,7 +23,6 @@ data BotData = BotData
   , minecraftAccountCache :: DatabaseCache MinecraftAccount
   , bowBotAccountCache :: DatabaseCache BowBotAccount
   , discordAccountsCache :: DatabaseCache DiscordAccount
-  , snipeCache :: DatabaseCache SnipeMessage
   }
 
 instance Has (DatabaseCache InfoField) BotData where
@@ -41,9 +40,5 @@ instance Has (DatabaseCache BowBotAccount) BotData where
 instance Has (DatabaseCache DiscordAccount) BotData where
   getter = discordAccountsCache
   modifier f x = x { discordAccountsCache = f $ discordAccountsCache x }
-
-instance Has (DatabaseCache SnipeMessage) BotData where
-  getter = snipeCache
-  modifier f x = x { snipeCache = f $ snipeCache x }
 
 instance HasBotData BotData BotData

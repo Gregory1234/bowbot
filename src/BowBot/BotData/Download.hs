@@ -50,7 +50,6 @@ refreshBotData = do
   refreshCache @MinecraftAccount
   refreshCache @BowBotAccount
   refreshCache @DiscordAccount
-  refreshCache @SnipeMessage -- TODO: this is meaningless...
 
 updateBotData :: (MonadIOBotData m BotData r, HasAll [Manager, DiscordHandle, CounterState, Connection] r) => [StatsTimeRange] -> m ()
 updateBotData times = (ask >>=) $ \ctx -> liftIO $ foldl1 concurrently_ $
