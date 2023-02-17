@@ -1,35 +1,39 @@
 module BowBot.Hypixel.Watchlist where
 
 import BowBot.BotData.Cached
-import BowBot.Minecraft.Account
-import qualified Data.HashMap.Strict as HM
 import BowBot.Minecraft.Basic
 import BowBot.Network.Basic
-import BowBot.BotData.CachedSingle
 import BowBot.Counter.Basic
 import BowBot.Hypixel.Basic
 import Control.Concurrent.Async (mapConcurrently)
 import BowBot.Utils
+import BowBot.DB.Basic
 
 
-getWatchlist :: (MonadIOBotData m d r, HasCache MinecraftAccount d) => m [MinecraftAccount]
-getWatchlist = filter mcHypixelWatchlist . HM.elems <$> getCacheMap
+getWatchlist :: (MonadIOReader m r, Has Connection r) => m [UUID]
+getWatchlist = map fromOnly <$> queryLog "SELECT `minecraft` FROM `watchlist`" ()
 
-newtype HypixelOnlinePlayers = HypixelOnlinePlayers { getHypixelOnlinePlayersList :: [UUID] }
+clearOnlinePlayers :: (MonadIOReader m r, Has Connection r) => m ()
+clearOnlinePlayers = void $ executeLog "UPDATE `watchlist` SET `online` = NULL" ()
+
+getOnlinePlayers :: (MonadIOReader m r, HasAll [Connection, Manager, CounterState] r) => m (Maybe [UUID])
+getOnlinePlayers = do
+  unknownPlayers :: [UUID] <- map fromOnly <$> queryLog "SELECT `minecraft` FROM `watchlist` WHERE `online` IS NULL" ()
+  unless (null unknownPlayers) $ do
+    ctx <- ask
+    cv <- tryIncreaseCounter HypixelApi (fromIntegral $ length unknownPlayers)
+    res <- case cv of
+      Nothing -> fmap Just $ liftIO $ flip mapConcurrently unknownPlayers $ \uuid -> flip runReaderT ctx $ do
+        inBowDuels <- isInBowDuels uuid
+        pure (uuid, inBowDuels)
+      _ -> return Nothing
+    case res of
+      Nothing -> pure ()
+      Just res' -> void $ executeManyLog "INSERT INTO `watchlist` (`minecraft`, `online`) VALUES (?, ?) ON DUPLICATE KEY UPDATE `online`=VALUES(`online`)" res'
+  Just . map fromOnly <$> queryLog "SELECT `minecraft` FROM `watchlist` WHERE `online` = 1" ()
 
 isInBowDuels :: (MonadIOReader m r, Has Manager r) => UUID -> m (Maybe Bool)
 isInBowDuels uuid = hypixelWithPlayerStatus uuid $ \o -> do
   session <- o .: "session"
   mode :: Maybe Text <- session .:? "mode"
   return $ mode == Just "DUELS_BOW_DUEL"
-
-getHypixelOnlinePlayers :: (MonadHoistIOBotData m d r, HasAll '[Manager, CounterState] r, HasCachedData HypixelOnlinePlayers d, HasCache MinecraftAccount d) => m (CacheResponse HypixelOnlinePlayers)
-getHypixelOnlinePlayers = getOrCalculateCacheSingle $ do
-  watchlist <- getWatchlist
-  cv <- tryIncreaseCounter HypixelApi (fromIntegral $ length watchlist)
-  ctx <- ask
-  case cv of
-    Nothing -> liftIO $ fmap (Just . HypixelOnlinePlayers . map snd . filter fst) $ flip mapConcurrently watchlist $ \acc -> flip runReaderT ctx $ do
-      inBowDuels <- isInBowDuels (mcUUID acc)
-      pure (inBowDuels == Just True, mcUUID acc)
-    _ -> return Nothing

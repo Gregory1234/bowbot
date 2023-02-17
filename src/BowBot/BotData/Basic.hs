@@ -9,7 +9,6 @@ import BowBot.Hypixel.Basic
 import BowBot.Settings.Basic
 import BowBot.Hypixel.Leaderboard
 import BowBot.Discord.Roles
-import BowBot.BotData.CachedSingle
 import BowBot.Hypixel.Guild
 import BowBot.Discord.Account
 import BowBot.Hypixel.TimeStats
@@ -24,7 +23,6 @@ data BotData = BotData
   , minecraftAccountCache :: DatabaseCache MinecraftAccount
   , bowBotAccountCache :: DatabaseCache BowBotAccount
   , discordAccountsCache :: DatabaseCache DiscordAccount
-  , hypixelOnlinePlayersCache :: CachedData HypixelOnlinePlayers
   , snipeCache :: DatabaseCache SnipeMessage
   }
 
@@ -43,10 +41,6 @@ instance Has (DatabaseCache BowBotAccount) BotData where
 instance Has (DatabaseCache DiscordAccount) BotData where
   getter = discordAccountsCache
   modifier f x = x { discordAccountsCache = f $ discordAccountsCache x }
-
-instance Has (CachedData HypixelOnlinePlayers) BotData where
-  getter = hypixelOnlinePlayersCache
-  modifier f x = x { hypixelOnlinePlayersCache = f $ hypixelOnlinePlayersCache x }
 
 instance Has (DatabaseCache SnipeMessage) BotData where
   getter = snipeCache

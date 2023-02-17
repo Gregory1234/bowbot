@@ -33,7 +33,7 @@ updateHypixelRoles = do
           known <- HM.keys <$> getCacheMap @MinecraftAccount
           let unknown = map fst members \\ known
           names <- catMaybes <$> traverse (\x -> fmap (x,) <$> mojangUUIDToCurrentName x) unknown
-          b <- storeInCache [MinecraftAccount {mcUUID, mcNames = [mcName], mcHypixelBow = NotBanned, mcHypixelWatchlist = False} | (mcUUID, mcName) <- names]
+          b <- storeInCache [MinecraftAccount {mcUUID, mcNames = [mcName], mcHypixelBow = NotBanned} | (mcUUID, mcName) <- names]
           when b $ withTransaction $ void $ executeManyLog "INSERT INTO `minecraft` (`uuid`, `hypixelRole`) VALUES (?,?) ON DUPLICATE KEY UPDATE `hypixelRole`=VALUES(`hypixelRole`)" members
     _ -> return ()
 

@@ -51,7 +51,7 @@ minecraftArgFromNetwork name = orElseError ((ResponseTrue,) <$> minecraftArgFrom
     (uuidFromString -> Just uuid) -> return uuid
     _ -> liftMaybe thePlayerDoesNotExistMessage =<< mcNameToUUID name
   mcNames <- liftMaybe thePlayerDoesNotExistMessage =<< mcUUIDToNames mcUUID
-  return (ResponseNew, MinecraftAccount { mcHypixelBow = NotBanned, mcHypixelWatchlist = False, ..})
+  return (ResponseNew, MinecraftAccount { mcHypixelBow = NotBanned, ..})
 
 minecraftArgFromNetworkAutocorrect :: (MonadError Text m, MonadIOBotData m d r, HasCache MinecraftAccount d, Has Manager r) => Text -> m MinecraftResponse
 minecraftArgFromNetworkAutocorrect name = flip orElseError (minecraftArgFromCacheAutocorrect name) $ do

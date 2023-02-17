@@ -15,7 +15,6 @@ import qualified Data.HashMap.Strict as HM
 import qualified Data.Map as M
 import Data.Either (isRight)
 import BowBot.Discord.Account
-import BowBot.BotData.CachedSingle
 import BowBot.Hypixel.Guild
 import qualified Data.Text as T
 

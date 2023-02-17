@@ -35,7 +35,7 @@ registerCommandBody RegisterCommandMessages {..} name did = do
   mc <- case saved of
     Nothing -> do
       names <- liftMaybe thePlayerDoesNotExistMessage =<< mcUUIDToNames uuid
-      let newacc = MinecraftAccount { mcUUID = uuid, mcNames = names, mcHypixelBow = NotBanned, mcHypixelWatchlist = False }
+      let newacc = MinecraftAccount { mcUUID = uuid, mcNames = names, mcHypixelBow = NotBanned }
       a <- storeInCache [newacc]
       unless a $ throwError somethingWentWrongMessage
       when a $ void $ setHypixelBowLeaderboardEntryByUUID uuid (hypixelBowStatsToLeaderboards stats)
@@ -94,7 +94,7 @@ addaltCommand = Command CommandInfo
     case saved of -- TODO: remove repetition!
       Nothing -> do
         names <- liftMaybe thePlayerDoesNotExistMessage =<< mcUUIDToNames uuid
-        let newacc = MinecraftAccount { mcUUID = uuid, mcNames = names, mcHypixelBow = NotBanned, mcHypixelWatchlist = False }
+        let newacc = MinecraftAccount { mcUUID = uuid, mcNames = names, mcHypixelBow = NotBanned }
         a <- storeInCache [newacc]
         unless a $ throwError somethingWentWrongMessage
         when a $ void $ setHypixelBowLeaderboardEntryByUUID uuid (hypixelBowStatsToLeaderboards stats)

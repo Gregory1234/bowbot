@@ -6,7 +6,6 @@ import BowBot.Minecraft.Account
 import BowBot.Account.Basic
 import Database.MySQL.Simple (Connection)
 import BowBot.BotData.Cached
-import BowBot.BotData.CachedSingle
 import BowBot.DB.Basic (withDB, queryLog)
 import BowBot.Command.Basic (PermissionLevel)
 import BowBot.Counter.Basic
@@ -37,12 +36,10 @@ emptyBotData = do
   settingsCache <- newCache
   hypixelLeaderboardCache <- newCache
   savedRolesCache <- newCache
-  hypixelGuildMembersCache <- newCachedData
   discordAccountsCache <- newCache
   hypixelDailyStatsCache <- newCache
   hypixelWeeklyStatsCache <- newCache
   hypixelMonthlyStatsCache <- newCache
-  hypixelOnlinePlayersCache <- newCachedData
   birthdayCache <- newCache
   snipeCache <- newCache
   return BotData {..}
@@ -65,10 +62,10 @@ updateBotData times = (ask >>=) $ \ctx -> liftIO $ foldl1 concurrently_ $
       forM_ times updateHypixelBowTimeStats
     ]
 
-clearBotDataCaches :: (MonadIOBotData m BotData r, Has CounterState r) => m ()
+clearBotDataCaches :: (MonadIOReader m r, HasAll '[CounterState, Connection, Manager] r) => m ()
 clearBotDataCaches = do
   clearCounter HypixelApi
-  clearCacheSingle @HypixelOnlinePlayers
+  clearOnlinePlayers
 
 downloadBotData :: IO BotData
 downloadBotData = do
