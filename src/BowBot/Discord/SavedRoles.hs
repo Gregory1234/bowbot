@@ -11,6 +11,7 @@ import BowBot.DB.Basic
 import BowBot.Account.Basic
 import Database.MySQL.Simple (Param, Result, ToField(..), FromField(..))
 import qualified Database.MySQL.Base.Types as T
+import BowBot.Hypixel.Guild
 
 toggleableRolesInfo :: InfoType (M.Map SavedRole RoleId)
 toggleableRolesInfo = InfoType { infoName = "toggleable_roles", infoDefault = M.empty, infoParse = \s -> fmap M.fromList $ for (T.lines s) $ \l -> case T.splitOn "->" l of [a, b] -> (SavedRole a,) <$> fmap fromInteger ((first pack . readEither . unpack) b); _ -> Left "wrong format" }
@@ -18,8 +19,8 @@ toggleableRolesInfo = InfoType { infoName = "toggleable_roles", infoDefault = M.
 savedRolesInfo :: InfoType (M.Map SavedRole RoleId)
 savedRolesInfo = InfoType { infoName = "saved_roles", infoDefault = M.empty, infoParse = \s -> fmap M.fromList $ for (T.lines s) $ \l -> case T.splitOn "->" l of [a, b] -> (SavedRole a,) <$> fmap fromInteger ((first pack . readEither . unpack) b); _ -> Left "wrong format" }
 
-savedHypixelRolesInfo :: InfoType (M.Map SavedRole ([Text], RoleId))
-savedHypixelRolesInfo = InfoType { infoName = "hypixel_roles", infoDefault = M.empty, infoParse = \s -> fmap M.fromList $ for (T.lines s) $ \l -> case T.splitOn "->" l of [a, b, c] -> (SavedRole a,) . (T.splitOn "|" b,) <$> fmap fromInteger ((first pack . readEither . unpack) c); _ -> Left "wrong format" }
+savedHypixelRolesInfo :: InfoType (M.Map SavedRole ([HypixelRole], RoleId))
+savedHypixelRolesInfo = InfoType { infoName = "hypixel_roles", infoDefault = M.empty, infoParse = \s -> fmap M.fromList $ for (T.lines s) $ \l -> case T.splitOn "->" l of [a, b, c] -> (SavedRole a,) . (map HypixelRole $ T.splitOn "|" b,) <$> fmap fromInteger ((first pack . readEither . unpack) c); _ -> Left "wrong format" }
 
 newtype SavedRole = SavedRole { savedRoleName :: Text } deriving (Eq, Ord, Show)
 
@@ -57,7 +58,7 @@ updateSavedRolesAll = do
       roles <- savedRolesFromIds memberRoles
       when (roles /= savedRoles M.! userId) $ setSavedRolesByDiscord userId roles
 
-giveSavedRoles :: (MonadIOBotData m d r, HasCaches '[InfoField, BowBotAccount] d, HasAll '[Connection, DiscordHandle] r) => GuildMember -> [SavedRole] -> Maybe [Text] -> m ()
+giveSavedRoles :: (MonadIOBotData m d r, HasCaches '[InfoField, BowBotAccount] d, HasAll '[Connection, DiscordHandle] r) => GuildMember -> [SavedRole] -> Maybe [HypixelRole] -> m ()
 giveSavedRoles gmem roles hypixelRoles = do
   gid <- askInfo discordGuildIdInfo
   let partialSetUni roleMapFull roleMapPartial = addRemoveDiscordRoles gid gmem (map snd $ M.toList roleMapFull) (mapMaybe (roleMapPartial M.!?) roles)

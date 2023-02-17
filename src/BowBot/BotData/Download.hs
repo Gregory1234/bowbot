@@ -60,6 +60,7 @@ updateBotData times = (ask >>=) $ \ctx -> liftIO $ foldl1 concurrently_ $
   map (`runReaderT` ctx)
     [ updateDiscordAccountCache
     , do
+      updateHypixelRoles
       updateHypixelBowLeaderboards
       forM_ times updateHypixelBowTimeStats
     ]
@@ -67,7 +68,6 @@ updateBotData times = (ask >>=) $ \ctx -> liftIO $ foldl1 concurrently_ $
 clearBotDataCaches :: (MonadIOBotData m BotData r, Has CounterState r) => m ()
 clearBotDataCaches = do
   clearCounter HypixelApi
-  clearCacheSingle @HypixelGuildMembers
   clearCacheSingle @HypixelOnlinePlayers
 
 downloadBotData :: IO BotData

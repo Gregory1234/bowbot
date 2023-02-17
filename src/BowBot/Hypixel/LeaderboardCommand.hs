@@ -96,19 +96,19 @@ leaderboardCommand lbt@LeaderboardType {..} name = Command CommandInfo
 
 -- TODO: refactor all of this!!!
 
-leaderboardArgumentGuild :: (HypixelBowLeaderboardEntry -> Maybe (Integer, Text)) -> Maybe Text -> ExceptT Text CommandHandler (HypixelGuildMembers, LeaderboardResponse, [UUID])
+leaderboardArgumentGuild :: (HypixelBowLeaderboardEntry -> Maybe (Integer, Text)) -> Maybe Text -> ExceptT Text CommandHandler ([UUID], LeaderboardResponse, [UUID])
 leaderboardArgumentGuild parser arg = do
   (res, sel) <- leaderboardArgument parser arg
-  gmems <- liftMaybe somethingWentWrongMessage . cacheResponseToMaybe =<< lift getHypixelGuildMembers
+  gmems <- getHypixelGuildMembers
   case res of
-    LeaderboardFind {} | all (`notElem` M.keys (getHypixelGuildMemberMap gmems)) sel -> case arg of
+    LeaderboardFind {} | all (`notElem` gmems) sel -> case arg of
       Nothing -> return (gmems, LeaderboardPage 0, [])
       Just _ -> throwError thePlayerIsntOnThisLeaderboardMessage
-    _ -> return (gmems, res, filter (`elem` M.keys (getHypixelGuildMemberMap gmems)) sel)
+    _ -> return (gmems, res, filter (`elem` gmems) sel)
 
-generateLeaderboardLinesGuild :: LeaderboardType -> [UUID] -> HypixelGuildMembers -> CommandHandler [(UUID, Text)]
+generateLeaderboardLinesGuild :: LeaderboardType -> [UUID] -> [UUID] -> CommandHandler [(UUID, Text)]
 generateLeaderboardLinesGuild LeaderboardType {..} selected gmems = do
-  lb <- HM.toList . HM.filterWithKey (\k _ -> k `elem` M.keys (getHypixelGuildMemberMap gmems)) <$> getHypixelBowLeaderboards
+  lb <- HM.toList . HM.filterWithKey (\k _ -> k `elem` gmems) <$> getHypixelBowLeaderboards
   names <- getCacheMap
   return $ zipWith (\index (_, (uuid, str)) -> (uuid, pad 5 (showt index <> ".") <> str)) [1 :: Integer ..] $ sortOn fst $ mapMaybe (\(uuid, lbe) -> (\(score, str) -> let MinecraftAccount {..} = names HM.! uuid in (-score, (mcUUID, (if mcUUID `elem` selected then "*" else " ") <> pad 20 (head mcNames) <> " ( " <> str <> " " <> leaderboardStatName <> " )"))) <$> leaderboardParser lbe) lb
 
