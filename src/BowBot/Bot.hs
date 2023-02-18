@@ -46,6 +46,7 @@ import BowBot.Snipe.Command
 import BowBot.Hypixel.Announce
 import BowBot.BotData.Basic
 import BowBot.Counter.Basic
+import BowBot.Hypixel.Guild
 
 runBowBot :: IO ()
 runBowBot = do
@@ -225,7 +226,7 @@ commands =
   , updateDataCommand [DailyStats, WeeklyStats, MonthlyStats] "dataupdateweekmonth"
   , updateNamesCommand
   , adminCommand 15 "clearLogs" "clear Bow Bot's logs" clearLogs
-  , adminCommand 120 "rolesupdate" "update everyone's discord roles" applyRolesAll
+  , adminCommand 120 "rolesupdate" "update everyone's discord roles" $ do { updateHypixelRoles; applyRolesAll }
   , adminCommand 120 "savedrolesstore" "store everyone's saved roles" updateSavedRolesAll
   , adminCommand 15 "statusupdate" "update Bow Bot's discord status" updateDiscordStatus
   , quietAdminCommand 5 "throw" "throw an error" $ respond $ showt ((1 :: Integer) `div` 0)
