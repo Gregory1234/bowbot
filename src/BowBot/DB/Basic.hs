@@ -154,3 +154,20 @@ instance (QueryResultsSize a, QueryResults b) => QueryResults (Concat (a, b)) wh
       in Concat (a, b)
 instance (QueryResultsSize a, QueryResultsSize b) => QueryResultsSize (Concat (a, b)) where
   queryResultsSize _ = queryResultsSize (Proxy @a) + queryResultsSize (Proxy @b)
+
+instance (QueryParams a, QueryParams b, QueryParams c) => QueryParams (Concat (a, b, c)) where
+  renderParams (Concat (a, b, c)) = renderParams a ++ renderParams b ++ renderParams c
+instance (QueryResultsSize a, QueryResultsSize b, QueryResults c) => QueryResults (Concat (a, b, c)) where
+  convertResults fields strings = let
+    aSize = queryResultsSize (Proxy @a)
+    (aFields, bcFields) = splitAt aSize fields
+    (aStrings, bcStrings) = splitAt aSize strings
+    a = convertResults aFields aStrings
+    bSize = queryResultsSize (Proxy @b)
+    (bFields, cFields) = splitAt bSize bcFields
+    (bStrings, cStrings) = splitAt bSize bcStrings
+    b = convertResults bFields bStrings
+    c = convertResults cFields cStrings
+      in Concat (a, b, c)
+instance (QueryResultsSize a, QueryResultsSize b, QueryResultsSize c) => QueryResultsSize (Concat (a, b, c)) where
+  queryResultsSize _ = queryResultsSize (Proxy @a) + queryResultsSize (Proxy @b) + queryResultsSize (Proxy @c)

@@ -147,7 +147,7 @@ eventHandler (GuildMemberAdd gid gmem) = do
 eventHandler (GuildMemberUpdate gid roles usr newname) = do
   maingid <- askInfo discordGuildIdInfo
   when (gid == maingid && not (userIsBot usr)) $ do
-    void $ storeInCache [(userToDiscordAccount usr) { discordNickname = newname, discordIsMember = True }]
+    void $ storeInCache [let acc = userToDiscordAccount usr in acc { discordName = (discordName acc) { discordNickname = newname }, discordIsMember = True }]
     unless (null roles) $ do
       savedRoles <- savedRolesFromIds roles
       setSavedRolesByDiscord (userId usr) savedRoles

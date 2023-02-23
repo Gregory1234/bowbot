@@ -22,4 +22,4 @@ discordArgSelf did = liftMaybe "*The discord id doesn't exist!*" =<< getFromCach
 discordArgFromName :: (MonadIOBotData m d r, HasCache DiscordAccount d, MonadError Text m) => Text -> m DiscordAccount
 discordArgFromName name = liftMaybe "*The discord user doesn't exist!*" . find helper . HM.elems =<< getCacheMap
   where
-    helper x = T.toLower name `elem` [T.toLower y | discordIsMember x, Just y <- [Just (discordName x), discordNickname x]]
+    helper x = T.toLower name `elem` [T.toLower y | discordIsMember x, Just y <- [Just (discordUsername $ discordName x), discordNickname $ discordName x]]

@@ -43,6 +43,6 @@ announceMilestones = do
         Just BowBotAccount {..} -> do
           mcacc <- fromJust <$> getFromCache uuid
           dcaccounts <- getCacheMap
-          let p = map (\x -> x { discordNickname = Nothing}) $ filter discordIsMember $ map (dcaccounts HM.!) accountDiscords
+          let p = map (\x -> x { discordName = (discordName x) { discordNickname = Nothing } }) $ filter discordIsMember $ map (dcaccounts HM.!) accountDiscords
           unless (null p) $ do
-            call_ $ R.CreateMessage milestonesChannel $ "**Congratulations** to **" <> head (mcNames mcacc) <> "** (" <> T.intercalate ", " (map showDiscordAccountDiscord p) <> ") for reaching " <> milestone <> "!"
+            call_ $ R.CreateMessage milestonesChannel $ "**Congratulations** to **" <> head (mcNames mcacc) <> "** (" <> T.intercalate ", " (map (showDiscordNameDiscord . discordName) p) <> ") for reaching " <> milestone <> "!"

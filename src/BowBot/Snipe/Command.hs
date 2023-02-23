@@ -18,9 +18,9 @@ snipeCommand = Command CommandInfo
     case msg of
       Nothing -> respond "*Nothing to snipe!*"
       Just SnipeMessage {..} -> do
-        snipeAuthor' <- getFromCache snipeMessageAuthor
+        snipeAuthor' <- fmap discordName <$> getFromCache snipeMessageAuthor
         case snipeAuthor' of
           Nothing -> respond somethingWentWrongMessage
           Just snipeAuthor -> respond $ if snipeMessageWasEdited
-              then showDiscordAccountDiscord snipeAuthor <> " *edited " <> discordFormatTimestampFull snipeMessageTimestamp <> ":* \n" <> snipeMessageContent
-              else showDiscordAccountDiscord snipeAuthor <> " *deleted " <> discordFormatTimestampFull snipeMessageTimestamp <> ":* \n" <> snipeMessageContent
+              then showDiscordNameDiscord snipeAuthor <> " *edited " <> discordFormatTimestampFull snipeMessageTimestamp <> ":* \n" <> snipeMessageContent
+              else showDiscordNameDiscord snipeAuthor <> " *deleted " <> discordFormatTimestampFull snipeMessageTimestamp <> ":* \n" <> snipeMessageContent
