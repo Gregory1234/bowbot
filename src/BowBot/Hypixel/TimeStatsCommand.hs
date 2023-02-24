@@ -17,6 +17,7 @@ import BowBot.BotData.Info
 import BowBot.Discord.Utils
 import BowBot.Account.Basic
 import BowBot.Command.Tips
+import BowBot.Hypixel.LeaderboardStatus
 
 
 hypixelTimeStatsCommand :: SettingsSource -> Text -> Text -> Command
@@ -39,9 +40,11 @@ hypixelTimeStatsCommand src name desc = Command CommandInfo
       a <- storeInCache [mcResponseAccount]
       when a $ void $ setHypixelBowLeaderboardEntryByUUID mcUUID (hypixelBowStatsToLeaderboards stats)
     when (mcResponseAutocorrect /= ResponseNew) $ do
-      void $ setHypixelBowLeaderboardEntryByUUID mcUUID (hypixelBowStatsToLeaderboards stats)
-      applyRolesDivisionTitleByUUID mcUUID
-      announceMilestones
+      isBanned <- getHypixelIsBannedByUUID mcUUID
+      when (isBanned == NotBanned) $ do
+        void $ setHypixelBowLeaderboardEntryByUUID mcUUID (hypixelBowStatsToLeaderboards stats)
+        applyRolesDivisionTitleByUUID mcUUID
+        announceMilestones
   where
     helper MinecraftAccount {..} = do
       cv <- tryIncreaseCounter HypixelApi 1

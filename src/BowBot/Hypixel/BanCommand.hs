@@ -10,6 +10,7 @@ import qualified Data.HashMap.Strict as HM
 import BowBot.DB.Basic (withDB, executeLog')
 import BowBot.Minecraft.Basic (uuidString)
 import Database.MySQL.Simple.Types
+import BowBot.Hypixel.LeaderboardStatus
   
 hypixelBanCommand :: Command
 hypixelBanCommand = Command CommandInfo
@@ -18,9 +19,10 @@ hypixelBanCommand = Command CommandInfo
   , commandPerms = ModLevel
   , commandTimeout = 15
   } $ oneArgument (getMinecraftAccountByCurrentNameFromCache >=> liftMaybe thePlayerDoesNotExistMessage) $ \mc -> do
-    if mcHypixelBow mc == Banned
+    banned <- getHypixelIsBannedByUUID (mcUUID mc)
+    if banned == Banned
       then respond "*The player is already banned!*"
       else do
-        a <- storeInCache [ mc { mcHypixelBow = Banned} ]
+        a <- setHypixelIsBannedByUUID (mcUUID mc) Banned
         b <- removeHypixelBowLeaderboardEntryByUUID (mcUUID mc)
         respond $ if a && b then "*Success, player got banned!*" else somethingWentWrongMessage

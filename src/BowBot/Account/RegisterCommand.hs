@@ -17,6 +17,7 @@ import BowBot.Hypixel.Stats (requestHypixelBowStats)
 import Control.Monad.Except
 import BowBot.Discord.Account
 import BowBot.Discord.Arg
+import BowBot.Hypixel.LeaderboardStatus
 
 data RegisterCommandMessages = RegisterCommandMessages { registerAlreadyBelongsMessage :: Text, registerAlreadyBelongsSomeoneElseMessage :: Text, registerAlreadyRegisteredMessage :: Text }
 
@@ -31,17 +32,19 @@ registerCommandBody RegisterCommandMessages {..} name did = do
   stats <- case cv of
     Nothing -> liftMaybe "*The player has never joined Hypixel!*" =<< requestHypixelBowStats uuid
     Just sec -> throwError $ "*Too many requests! Wait another " <> showt sec <> " seconds!*"
-  saved <- getFromCache uuid
+  saved :: Maybe MinecraftAccount <- getFromCache uuid
   mc <- case saved of
     Nothing -> do
       names <- liftMaybe thePlayerDoesNotExistMessage =<< mcUUIDToNames uuid
-      let newacc = MinecraftAccount { mcUUID = uuid, mcNames = names, mcHypixelBow = NotBanned }
+      let newacc = MinecraftAccount { mcUUID = uuid, mcNames = names }
       a <- storeInCache [newacc]
       unless a $ throwError somethingWentWrongMessage
       when a $ void $ setHypixelBowLeaderboardEntryByUUID uuid (hypixelBowStatsToLeaderboards stats)
       pure newacc
     Just acc -> do
-      when (mcHypixelBow acc == NotBanned) $ void $ setHypixelBowLeaderboardEntryByUUID uuid (hypixelBowStatsToLeaderboards stats)
+      isBanned <- getHypixelIsBannedByUUID uuid
+      when (isBanned == NotBanned) $ do
+        void $ setHypixelBowLeaderboardEntryByUUID uuid (hypixelBowStatsToLeaderboards stats)
       pure acc
   newacc <- liftMaybe somethingWentWrongMessage =<< createNewBowBotAccount (head $ mcNames mc) did uuid
   applyRolesByBowBotAccount newacc
@@ -90,16 +93,18 @@ addaltCommand = Command CommandInfo
     stats <- case cv of
       Nothing -> liftMaybe "*The player has never joined Hypixel!*" =<< requestHypixelBowStats uuid
       Just sec -> throwError $ "*Too many requests! Wait another " <> showt sec <> " seconds!*"
-    saved <- getFromCache uuid
+    saved :: Maybe MinecraftAccount <- getFromCache uuid
     case saved of -- TODO: remove repetition!
       Nothing -> do
         names <- liftMaybe thePlayerDoesNotExistMessage =<< mcUUIDToNames uuid
-        let newacc = MinecraftAccount { mcUUID = uuid, mcNames = names, mcHypixelBow = NotBanned }
+        let newacc = MinecraftAccount { mcUUID = uuid, mcNames = names }
         a <- storeInCache [newacc]
         unless a $ throwError somethingWentWrongMessage
         when a $ void $ setHypixelBowLeaderboardEntryByUUID uuid (hypixelBowStatsToLeaderboards stats)
-      Just MinecraftAccount { mcHypixelBow = NotBanned } -> void $ setHypixelBowLeaderboardEntryByUUID uuid (hypixelBowStatsToLeaderboards stats)
-      _ -> pure ()
+      Just _ -> do
+        isBanned <- getHypixelIsBannedByUUID uuid
+        when (isBanned == NotBanned) $ do
+          void $ setHypixelBowLeaderboardEntryByUUID uuid (hypixelBowStatsToLeaderboards stats)
     newacc <- liftMaybe somethingWentWrongMessage =<< addAltToBowBotAccount (accountBotId bacc) uuid
     applyRolesByBowBotAccount newacc
     lift $ respond "*Registered successfully*"

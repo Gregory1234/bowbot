@@ -10,43 +10,26 @@ import BowBot.Utils
 import qualified Data.HashMap.Strict as HM
 import qualified Data.Text as T
 
-data IsBanned
-  = NotBanned
-  | Banned
-  deriving (Eq, Ord, Enum, Bounded, Show)
-
-stringToIsBanned :: Text -> Maybe IsBanned
-stringToIsBanned "normal" = Just NotBanned
-stringToIsBanned "ban" = Just Banned
-stringToIsBanned _ = Nothing
-
-isBannedToString :: IsBanned -> Text
-isBannedToString NotBanned = "normal"
-isBannedToString Banned = "ban"
-
 data MinecraftAccount = MinecraftAccount
   { mcUUID :: !UUID
   , mcNames :: ![Text]
-  , mcHypixelBow :: !IsBanned
   } deriving (Show, Eq)
 
 instance Cached MinecraftAccount where
   type CacheIndex MinecraftAccount = UUID
   refreshCache = do
     cache <- getCache
-    res :: [(UUID, Text, Text)] <- queryLog "SELECT `uuid`, `names`, `hypixel` FROM `minecraft`" ()
-    let newValues = HM.fromList $ flip fmap res $ \case
-          (mcUUID, T.splitOn "," -> mcNames, stringToIsBanned -> Just mcHypixelBow) -> (mcUUID, MinecraftAccount {..})
-          (mcUUID, T.splitOn "," -> mcNames, _) -> (mcUUID, MinecraftAccount {mcHypixelBow = NotBanned, ..})
+    res :: [(UUID, Text)] <- queryLog "SELECT `uuid`, `names` FROM `minecraft`" ()
+    let newValues = HM.fromList $ flip fmap res $ \(mcUUID, T.splitOn "," -> mcNames) -> (mcUUID, MinecraftAccount {..})
     liftIO $ atomically $ writeTVar cache newValues
 
 instance CachedIndexed MinecraftAccount where
   cacheIndex = mcUUID
   storeInCache accs = do
     cacheMap <- getCacheMap
-    let toQueryParams acc@MinecraftAccount {..} = if Just acc == cacheMap HM.!? mcUUID then Nothing else Just (uuidString mcUUID, head mcNames, T.intercalate "," mcNames, isBannedToString mcHypixelBow)
+    let toQueryParams acc@MinecraftAccount {..} = if Just acc == cacheMap HM.!? mcUUID then Nothing else Just (uuidString mcUUID, head mcNames, T.intercalate "," mcNames)
     let queryParams = mapMaybe toQueryParams accs
-    success <- liftIO $ withDB $ \conn -> (>0) <$> executeManyLog' conn "INSERT INTO `minecraft` (`uuid`, `name`, `names`, `hypixel`) VALUES (?,?,?,?) ON DUPLICATE KEY UPDATE `name`=VALUES(`name`), `names`=VALUES(`names`), `hypixel`=VALUES(`hypixel`)" queryParams
+    success <- liftIO $ withDB $ \conn -> (>0) <$> executeManyLog' conn "INSERT INTO `minecraft` (`uuid`, `name`, `names`) VALUES (?,?,?) ON DUPLICATE KEY UPDATE `name`=VALUES(`name`), `names`=VALUES(`names`), `hypixel`=VALUES(`hypixel`)" queryParams
     when success $ do
       cache <- getCache
       liftIO $ atomically $ modifyTVar cache (insertMany (map (\x -> (mcUUID x, x)) accs))

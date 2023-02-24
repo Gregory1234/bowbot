@@ -18,6 +18,7 @@ import BowBot.Discord.Roles
 import BowBot.Account.Basic
 import BowBot.Discord.Utils (discordGuildMembers)
 import BowBot.Command.Tips
+import BowBot.Hypixel.LeaderboardStatus
 
 hypixelStatsCommand :: SettingsSource -> Text -> Text -> Command
 hypixelStatsCommand src name desc = Command CommandInfo
@@ -36,9 +37,11 @@ hypixelStatsCommand src name desc = Command CommandInfo
       a <- storeInCache [mcResponseAccount]
       when a $ void $ setHypixelBowLeaderboardEntryByUUID mcUUID (hypixelBowStatsToLeaderboards stats)
     when (mcResponseAutocorrect /= ResponseNew) $ do
-      void $ setHypixelBowLeaderboardEntryByUUID mcUUID (hypixelBowStatsToLeaderboards stats)
-      applyRolesDivisionTitleByUUID mcUUID
-      announceMilestones
+      isBanned <- getHypixelIsBannedByUUID mcUUID
+      when (isBanned == NotBanned) $ do
+        void $ setHypixelBowLeaderboardEntryByUUID mcUUID (hypixelBowStatsToLeaderboards stats)
+        applyRolesDivisionTitleByUUID mcUUID
+        announceMilestones
   where
     helper MinecraftAccount {..} = do
       cv <- tryIncreaseCounter HypixelApi 1
