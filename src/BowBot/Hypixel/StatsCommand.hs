@@ -12,11 +12,8 @@ import Control.Monad.Error.Class (throwError)
 import Discord.Types
 import BowBot.Hypixel.Leaderboard
 import BowBot.Hypixel.Announce
-import BowBot.BotData.Cached (storeInCacheIndexed, storeInCache, getFromCache)
-import BowBot.BotData.Info
+import BowBot.BotData.Cached (storeInCache)
 import BowBot.Discord.Roles
-import BowBot.Account.Basic
-import BowBot.Discord.Utils (discordGuildMembers)
 import BowBot.Command.Tips
 import BowBot.Hypixel.LeaderboardStatus
 

@@ -13,9 +13,7 @@ import BowBot.Counter.Basic
 import BowBot.Discord.Roles
 import BowBot.Hypixel.Leaderboard
 import BowBot.Hypixel.Announce
-import BowBot.BotData.Info
 import BowBot.Discord.Utils
-import BowBot.Account.Basic
 import BowBot.Command.Tips
 import BowBot.Hypixel.LeaderboardStatus
 

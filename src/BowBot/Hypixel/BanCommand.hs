@@ -4,12 +4,7 @@ import BowBot.Command
 import BowBot.Minecraft.Account
 import BowBot.Discord.Utils
 import BowBot.Minecraft.Arg
-import BowBot.BotData.Cached
 import BowBot.Hypixel.Leaderboard
-import qualified Data.HashMap.Strict as HM
-import BowBot.DB.Basic (withDB, executeLog')
-import BowBot.Minecraft.Basic (uuidString)
-import Database.MySQL.Simple.Types
 import BowBot.Hypixel.LeaderboardStatus
   
 hypixelBanCommand :: Command

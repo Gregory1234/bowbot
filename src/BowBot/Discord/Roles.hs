@@ -9,8 +9,7 @@ import BowBot.BotData.Cached
 import BowBot.Counter.Basic
 import BowBot.Account.Basic
 import qualified Data.HashMap.Strict as HM
-import qualified Discord.Requests as R
-import BowBot.DB.Basic (queryLog, withDB, executeManyLog', Connection, Only(..))
+import BowBot.DB.Basic (queryLog, Connection, Only(..))
 import BowBot.Hypixel.Guild
 import BowBot.Network.Basic
 import qualified Data.Text as T

@@ -21,19 +21,13 @@ dependencies:
 - stm
 - async
 - http-client-tls
-- vector
-- transformers
 - split
 - mtl
-- base64
 - deepseq
 - mysql-simple
 - stringsearch
 - hashable
-- data-default
 - data-has
-- regex-compat
-- regex-base
 - text-show
 - mysql
 

@@ -2,7 +2,6 @@ module BowBot.Snipe.Detect where
 
 import BowBot.Discord.Utils
 import BowBot.Snipe.Basic
-import BowBot.BotData.Cached
 import BowBot.DB.Basic
 import qualified Data.Text as T
 

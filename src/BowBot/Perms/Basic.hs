@@ -4,7 +4,7 @@ import BowBot.BotData.Cached
 import Discord.Types (UserId)
 import BowBot.Discord.Orphans ()
 import BowBot.Utils
-import BowBot.DB.Basic (queryLog, withDB, executeManyLog', Connection, Only(..))
+import BowBot.DB.Basic (queryLog, Connection, Only(..))
 import Database.MySQL.Simple (Param, Result, ToField(..), FromField(..))
 import qualified Database.MySQL.Base.Types as T
 

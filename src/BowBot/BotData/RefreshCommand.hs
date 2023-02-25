@@ -5,7 +5,6 @@ import BowBot.BotData.Download
 import BowBot.Hypixel.TimeStats
 import BowBot.Hypixel.Announce
 import BowBot.Discord.Utils
-import BowBot.BotData.Cached (getCacheMap)
 import BowBot.Minecraft.Account
 import Control.Monad.Error.Class (liftEither)
 import Text.Read (readEither)

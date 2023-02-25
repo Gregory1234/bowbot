@@ -2,9 +2,7 @@ module BowBot.Hypixel.TimeStats where
 
 import BowBot.Hypixel.Stats
 import BowBot.Hypixel.Leaderboard
-import Data.Default
 import BowBot.Minecraft.Basic
-import qualified Data.HashMap.Strict as HM
 import BowBot.BotData.Cached
 import BowBot.DB.Basic
 import BowBot.Utils

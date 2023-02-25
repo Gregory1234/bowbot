@@ -6,14 +6,11 @@ import BowBot.Minecraft.Account
 import BowBot.Account.Basic
 import Database.MySQL.Simple (Connection)
 import BowBot.BotData.Cached
-import BowBot.DB.Basic (withDB, queryLog)
-import BowBot.Command.Basic (PermissionLevel)
+import BowBot.DB.Basic (withDB)
 import BowBot.Counter.Basic
 import BowBot.Hypixel.Basic
-import BowBot.Settings.Basic
 import Network.HTTP.Conduit (Manager)
 import BowBot.Hypixel.Leaderboard
-import BowBot.Discord.Roles
 import BowBot.Hypixel.Guild
 import BowBot.Discord.Account
 import Discord
@@ -21,8 +18,6 @@ import Control.Monad.Reader
 import BowBot.Hypixel.TimeStats
 import BowBot.Hypixel.Watchlist
 import Control.Concurrent.Async (concurrently_)
-import BowBot.Birthday.Basic
-import BowBot.Snipe.Basic
 import BowBot.Utils
 
 
@@ -30,18 +25,8 @@ emptyBotData :: STM BotData
 emptyBotData = do
   infoFieldCache <- newCache
   minecraftAccountCache <- newCache
-  permissionCache <- newCache
   bowBotAccountCache <- newCache
-  hypixelApiCounter <- newCounter
-  settingsCache <- newCache
-  hypixelLeaderboardCache <- newCache
-  savedRolesCache <- newCache
   discordAccountsCache <- newCache
-  hypixelDailyStatsCache <- newCache
-  hypixelWeeklyStatsCache <- newCache
-  hypixelMonthlyStatsCache <- newCache
-  birthdayCache <- newCache
-  snipeCache <- newCache
   return BotData {..}
 
 refreshBotData :: (MonadIOBotData m BotData r, Has Connection r) => m ()

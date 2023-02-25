@@ -12,7 +12,6 @@ import Discord.Types
 import BowBot.BotData.Cached
 import BowBot.Discord.Utils
 import qualified Data.HashMap.Strict as HM
-import qualified Data.Map as M
 import Data.Either (isRight)
 import BowBot.Discord.Account
 import BowBot.Hypixel.Guild
