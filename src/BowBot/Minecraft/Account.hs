@@ -4,7 +4,7 @@ module BowBot.Minecraft.Account where
 
 import BowBot.Minecraft.Basic
 import BowBot.BotData.Cached
-import BowBot.DB.Basic (queryLog, executeManyLog', withDB)
+import BowBot.DB.Basic
 import BowBot.Network.Basic
 import BowBot.Utils
 import qualified Data.HashMap.Strict as HM
@@ -64,4 +64,9 @@ mcUUIDToNames uuid = do
 
 getMinecraftAccountByCurrentNameFromCache :: (MonadIOBotData m d r, HasCache MinecraftAccount d) => Text -> m (Maybe MinecraftAccount)
 getMinecraftAccountByCurrentNameFromCache name = find ((==T.toLower name) . T.toLower . head . mcNames) . HM.elems <$> getCacheMap
-  
+
+addMinecraftName :: (MonadIOReader m r, Has Connection r) => Text -> UUID -> m Bool
+addMinecraftName name uuid = addMinecraftNames [(name, uuid)]
+
+addMinecraftNames :: (MonadIOReader m r, Has Connection r) => [(Text, UUID)] -> m Bool
+addMinecraftNames namePairs = (>0) <$> executeManyLog "INSERT INTO `minecraftName` (`name`, `uuid`) VALUES (?,?) ON DUPLICATE KEY UPDATE `name`=VALUES(`name`), `uuid`=VALUES(`uuid`)" namePairs

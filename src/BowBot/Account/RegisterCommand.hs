@@ -38,8 +38,9 @@ registerCommandBody RegisterCommandMessages {..} name did = do
       names <- liftMaybe thePlayerDoesNotExistMessage =<< mcUUIDToNames uuid
       let newacc = MinecraftAccount { mcUUID = uuid, mcNames = names }
       a <- storeInCache [newacc]
-      unless a $ throwError somethingWentWrongMessage
-      when a $ void $ setHypixelBowLeaderboardEntryByUUID uuid (hypixelBowStatsToLeaderboards stats)
+      b <- addMinecraftName (head names) uuid
+      unless (a && b) $ throwError somethingWentWrongMessage
+      when (a && b) $ void $ setHypixelBowLeaderboardEntryByUUID uuid (hypixelBowStatsToLeaderboards stats)
       pure newacc
     Just acc -> do
       isBanned <- getHypixelIsBannedByUUID uuid
@@ -99,8 +100,9 @@ addaltCommand = Command CommandInfo
         names <- liftMaybe thePlayerDoesNotExistMessage =<< mcUUIDToNames uuid
         let newacc = MinecraftAccount { mcUUID = uuid, mcNames = names }
         a <- storeInCache [newacc]
-        unless a $ throwError somethingWentWrongMessage
-        when a $ void $ setHypixelBowLeaderboardEntryByUUID uuid (hypixelBowStatsToLeaderboards stats)
+        b <- addMinecraftName (head names) uuid
+        unless (a && b) $ throwError somethingWentWrongMessage
+        when (a && b) $ void $ setHypixelBowLeaderboardEntryByUUID uuid (hypixelBowStatsToLeaderboards stats)
       Just _ -> do
         isBanned <- getHypixelIsBannedByUUID uuid
         when (isBanned == NotBanned) $ do

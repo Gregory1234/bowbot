@@ -36,7 +36,8 @@ hypixelTimeStatsCommand src name desc = Command CommandInfo
     respond $ didYouMean <> renderedName <> ":\n" <> showMaybeHypixelBowTimeStats DailyStats settings stats dailyStats <> "\n" <> showMaybeHypixelBowTimeStats WeeklyStats settings stats weeklyStats <> "\n" <> showMaybeHypixelBowTimeStats MonthlyStats settings stats monthlyStats
     when addAccount $ do
       a <- storeInCache [mcResponseAccount]
-      when a $ void $ setHypixelBowLeaderboardEntryByUUID mcUUID (hypixelBowStatsToLeaderboards stats)
+      b <- addMinecraftName (head mcNames) mcUUID
+      when (a && b) $ void $ setHypixelBowLeaderboardEntryByUUID mcUUID (hypixelBowStatsToLeaderboards stats)
     when (mcResponseAutocorrect /= ResponseNew) $ do
       isBanned <- getHypixelIsBannedByUUID mcUUID
       when (isBanned == NotBanned) $ do
