@@ -29,3 +29,6 @@ getHypixelIsBannedByUUID uuid = maybe NotBanned fromOnly . only <$> queryLog "SE
 
 setHypixelIsBannedByUUID :: (MonadIOReader m r, Has Connection r) => UUID -> IsBanned -> m Bool
 setHypixelIsBannedByUUID uuid banned = (>0) <$> executeLog "UPDATE `minecraft` SET `hypixel` = ? WHERE `uuid` = ?" (banned, uuid)
+
+getHypixelUnbanned :: (MonadIOReader m r, Has Connection r) => m [UUID]
+getHypixelUnbanned = map fromOnly <$> queryLog "SELECT `uuid` FROM `minecraft` WHERE `hypixel` = 'normal'" ()
