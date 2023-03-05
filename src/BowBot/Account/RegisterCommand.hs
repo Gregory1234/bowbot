@@ -57,7 +57,7 @@ registerCommand = Command CommandInfo
   , commandHelpEntries = [HelpEntry { helpUsage = "register [name]", helpDescription = "register your Minecraft name in Bow Bot", helpGroup = "normal" }]
   , commandPerms = DefaultLevel
   , commandTimeout = 30
-  } $ oneArgument' $ \name ->
+  } $ oneArgument $ \name ->
     lift (envs envSender) >>=
       registerCommandBody RegisterCommandMessages {
           registerAlreadyBelongsMessage = "*That account already belongs to you!*",
@@ -71,7 +71,7 @@ addCommand = Command CommandInfo
   , commandHelpEntries = [HelpEntry { helpUsage = "add [discord] [name]", helpDescription = "register someone in Bow Bot", helpGroup = "normal" }]
   , commandPerms = ModLevel
   , commandTimeout = 30
-  } $ twoArguments' $ \did name ->
+  } $ twoArguments $ \did name ->
     discordArg did >>=
       registerCommandBody RegisterCommandMessages {
           registerAlreadyBelongsMessage = "*That account already belongs to this user!*",
@@ -85,7 +85,7 @@ addaltCommand = Command CommandInfo
   , commandHelpEntries = [HelpEntry { helpUsage = "addalt [discord] [name]", helpDescription = "register someone's alt account in Bow Bot", helpGroup = "normal" }]
   , commandPerms = ModLevel
   , commandTimeout = 30
-  } $ twoArguments' $ \did name -> do
+  } $ twoArguments $ \did name -> do
     bacc <- liftMaybe thePlayerIsntRegisteredMessage =<< getBowBotAccountByDiscord . discordId =<< discordArg did
     uuid <- liftMaybe thePlayerDoesNotExistMessage =<< mcNameToUUID name
     baccother <- getBowBotAccountByMinecraft uuid

@@ -13,6 +13,7 @@ nameCommand = Command CommandInfo
   , commandHelpEntries = [HelpEntry { helpUsage = "n [name]", helpDescription = "show player's Minecraft name history", helpGroup = "normal" }]
   , commandPerms = DefaultLevel
   , commandTimeout = 15
-  } $ oneOptionalArgument (\s -> lift (envs envSender) >>= flip minecraftArgFull s . userId) $ \MinecraftResponse {mcResponseAccount = mcResponseAccount@MinecraftAccount {..}, ..} -> do
+  } $ oneOptionalArgument $ \str -> do
+    MinecraftResponse {mcResponseAccount = mcResponseAccount@MinecraftAccount {..}, ..} <- flip minecraftArgFull str . userId =<< lift (envs envSender)
     let (didYouMean, renderedName) = (if mcResponseAutocorrect == ResponseAutocorrect then "*Did you mean*" else "Name history of", showMinecraftAccountDiscord mcResponseTime mcResponseAccount)
     respond $ didYouMean <> " " <> renderedName <> ":```\n" <> T.unlines mcNames <> "```"

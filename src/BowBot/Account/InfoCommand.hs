@@ -19,7 +19,8 @@ infoCommand = Command CommandInfo
   , commandHelpEntries = [HelpEntry { helpUsage = "i [name]", helpDescription = "show info about a player", helpGroup = "normal" }]
   , commandPerms = DefaultLevel
   , commandTimeout = 15
-  } $ oneOptionalArgument (\s -> lift (envs envSender) >>= flip accountArgFull s . userId) $ \AccountResponse { accResponseAccount = BowBotAccount {..}, ..} -> do
+  } $ oneOptionalArgument $ \str -> do
+    AccountResponse { accResponseAccount = BowBotAccount {..}, ..} <- flip accountArgFull str . userId =<< lift (envs envSender)
     let (didYouMean, renderedName) = case accResponseType of
           (AccountDiscordResponse acc) -> ("", (showDiscordNameDiscord . discordName) acc)
           (AccountMinecraftResponse MinecraftResponse {..}) -> (if mcResponseAutocorrect == ResponseAutocorrect then "*Did you mean* " else "", showMinecraftAccountDiscord mcResponseTime mcResponseAccount)

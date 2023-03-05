@@ -16,7 +16,7 @@ roleCommand = Command CommandInfo
     , HelpEntry { helpUsage = "role [role name]", helpDescription = "toggle a discord role", helpGroup = "normal" } ]
   , commandPerms = DefaultLevel
   , commandTimeout = 15
-  } $ oneOptionalArgument (traverse $ \n -> fmap (,n) . liftMaybe "*Toggleable role not found!*" . (M.!? n) . M.mapKeys savedRoleName =<< askInfo toggleableRolesInfo) $ \case
+  } $ oneOptionalArgument $ traverse (\n -> fmap (,n) . liftMaybe "*Toggleable role not found!*" . (M.!? n) . M.mapKeys savedRoleName =<< askInfo toggleableRolesInfo) >=> \case
     Nothing -> do
       allRoles <- M.mapKeys savedRoleName <$> askInfo toggleableRolesInfo
       gid <- askInfo discordGuildIdInfo

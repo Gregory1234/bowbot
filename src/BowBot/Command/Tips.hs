@@ -21,7 +21,7 @@ minecraftArgFullConstraintWithSkipTip constraint s = do
       when (isJust s && (mcUUID . mcResponseAccount . fst $ ret) `elem` maybe [] accountMinecrafts acc) $ respond $ "*Tip: you can select this account (for use in Bow Bot's commands without providing a username) using `" <> prefix <> "selectmc " <> (head . mcNames . mcResponseAccount . fst $ ret) <> "`!*"
   return ret
 
-minecraftNewAccountTip :: MinecraftAccount -> CommandHandler ()
+minecraftNewAccountTip :: MinecraftAccount -> ExceptT Text CommandHandler ()
 minecraftNewAccountTip MinecraftAccount {..} = do
   acc <- getFromCache @MinecraftAccount mcUUID
   when (isNothing acc) $ respond "**A new Minecraft player discovered! 🥳**"

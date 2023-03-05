@@ -59,7 +59,7 @@ leaderboardArgument leaderboardParser maybename = do
       throwUnlessAccountOnLeaderboard leaderboardParser (mcUUID mcResponseAccount)
       return (LeaderboardFind mcResponseTime mcResponseAutocorrect (head $ mcNames mcResponseAccount), [mcUUID mcResponseAccount])
 
-generateLeaderboardLines :: LeaderboardType -> [UUID] -> CommandHandler [(UUID, Text)]
+generateLeaderboardLines :: LeaderboardType -> [UUID] -> ExceptT Text CommandHandler [(UUID, Text)]
 generateLeaderboardLines LeaderboardType {..} selected = do
   lb <- HM.toList <$> getHypixelBowLeaderboards
   names <- getCacheMap
@@ -72,7 +72,7 @@ leaderboardCommand lbt@LeaderboardType {..} name = Command CommandInfo
     [ HelpEntry { helpUsage = name <> " [name|page|\"all\"]", helpDescription = "show Bow Duels " <> leaderboardName <> " leaderboard", helpGroup = "normal" } ]
   , commandPerms = DefaultLevel
   , commandTimeout = 15
-  } $ oneOptionalArgument (leaderboardArgument leaderboardParser) $ \case
+  } $ oneOptionalArgument $ leaderboardArgument leaderboardParser >=> \case
     (LeaderboardPage pagenum, selected) -> do
       lb <- generateLeaderboardLines lbt selected
       let pages = chunksOf 20 (map snd lb)
@@ -104,7 +104,7 @@ leaderboardArgumentGuild parser arg = do
       Just _ -> throwError thePlayerIsntOnThisLeaderboardMessage
     _ -> return (gmems, res, filter (`elem` gmems) sel)
 
-generateLeaderboardLinesGuild :: LeaderboardType -> [UUID] -> [UUID] -> CommandHandler [(UUID, Text)]
+generateLeaderboardLinesGuild :: LeaderboardType -> [UUID] -> [UUID] -> ExceptT Text CommandHandler [(UUID, Text)]
 generateLeaderboardLinesGuild LeaderboardType {..} selected gmems = do
   lb <- HM.toList . HM.filterWithKey (\k _ -> k `elem` gmems) <$> getHypixelBowLeaderboards
   names <- getCacheMap
@@ -118,7 +118,7 @@ leaderboardGuildCommand lbt@LeaderboardType {..} name = Command CommandInfo
     [ HelpEntry { helpUsage = name <> " [name|page|\"all\"]", helpDescription = "show Bow Duels " <> leaderboardName <> " guild leaderboard", helpGroup = "normal" } ]
   , commandPerms = DefaultLevel
   , commandTimeout = 15
-  } $ oneOptionalArgument (leaderboardArgumentGuild leaderboardParser) $ \case
+  } $ oneOptionalArgument $ leaderboardArgumentGuild leaderboardParser >=> \case
     (gmems, LeaderboardPage pagenum, selected) -> do
       lb <- generateLeaderboardLinesGuild lbt selected gmems
       let pages = chunksOf 20 (map snd lb)

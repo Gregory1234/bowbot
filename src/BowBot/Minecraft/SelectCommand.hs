@@ -16,7 +16,8 @@ selectMinecraftCommand = Command CommandInfo
   , commandHelpEntries = [HelpEntry { helpUsage = "selectmc [name]", helpDescription = "select one of your registered minecraft accounts as a preferred one", helpGroup = "settings" }]
   , commandPerms = DefaultLevel
   , commandTimeout = 30
-  } $ oneArgument (getMinecraftAccountByCurrentNameFromCache >=> liftMaybe "*This account doesn't exist!*") $ \mc -> do
+  } $ oneArgument $ \str -> do
+    mc <- liftMaybe "*This account doesn't exist!*" =<< getMinecraftAccountByCurrentNameFromCache str
     acc' <- getBowBotAccountByDiscord . userId =<< envs envSender
     case acc' of
       Nothing -> respond youArentRegisteredMessage

@@ -12,6 +12,8 @@ setBirthdayCommand = Command CommandInfo
   , commandHelpEntries = [HelpEntry { helpUsage = "bdset [discord/discord id] [day(1-31).month(1-12)]", helpDescription = "override someone's birthday", helpGroup = "normal" }]
   , commandPerms = ModLevel
   , commandTimeout = 15
-  } $ twoArguments (\did db -> (,) <$> (discordId <$> discordArg did) <*> liftMaybe "*Invalid birthday date!*" (birthdayFromString db)) $ \(did, db) -> do
+  } $ twoArguments $ \didStr dbStr -> do
+    did <- discordId <$> discordArg didStr
+    db <- liftMaybe "*Invalid birthday date!*" $ birthdayFromString dbStr
     a <- setBirthday did db
     respond $ if a then "*Birthday set!*" else somethingWentWrongMessage
