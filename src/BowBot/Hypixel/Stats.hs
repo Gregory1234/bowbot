@@ -70,45 +70,45 @@ requestHypixelBowStats uuid = do
 showHypixelBowStats :: Settings -> HypixelBowStats -> Text
 showHypixelBowStats Settings {..} HypixelBowStats {..} = T.unlines $ catMaybes
   [ onlyIfBin sWins
-  $ " - *Bow Duels Wins:* **"
+  $ "- *Bow Duels Wins:* **"
   <> showt bowWins
   <> "**" <> maybe "" (\x -> " (**Bow " <> divisionRankName x <> "**)") (divisionRankFromWins bowWins)
   , onlyIfBin sLosses
-  $ " - *Bow Duels Losses:* **"
+  $ "- *Bow Duels Losses:* **"
   <> showt bowLosses
   <> "**"
   , onlyIfTer sWLR (bowWins + bowLosses /= 0)
-  $ " - *Bow Duels Win/Loss Ratio:* **"
+  $ "- *Bow Duels Win/Loss Ratio:* **"
   <> winLossRatio
   <> "**"
   , onlyIfTer sWinsUntil (bowLosses /= 0)
-  $ " - *Bow Duels Wins until "
+  $ "- *Bow Duels Wins until "
   <> nextWinLossRatio
   <> " WLR:* **"
   <> winsRemaining
   <> "**"
   , onlyIfTer sBestStreak (isAnyJust bestWinstreak)
-  $ " - *Best Bow Duels Winstreak:* **"
+  $ "- *Best Bow Duels Winstreak:* **"
   <> cachedMaybe "API DISABLED" showt (\t -> (<>" (CACHED" <> maybe "" ((\s -> " **" <> s <> "**") . discordFormatTimestampFull) t <> ")") . pack . show) bestWinstreak
   <> "**"
   , onlyIfTer sCurrentStreak (isJust currentWinstreak)
-  $ " - *Current Bow Duels Winstreak:* **"
+  $ "- *Current Bow Duels Winstreak:* **"
   <> maybe "API DISABLED" showt currentWinstreak
   <> "**"
   , onlyIfTer sBestDailyStreak (isJust bestDailyWinstreak)
-  $ " - *Best Daily Bow Duels Winstreak(?):* **"
+  $ "- *Best Daily Bow Duels Winstreak(?):* **"
   <> maybe "API DISABLED" showt bestDailyWinstreak
   <> "**"
   , onlyIfBin sBowHits
-  $ " - *Bow Hits in Bow Duels:* **"
+  $ "- *Bow Hits in Bow Duels:* **"
   <> showt bowHits
   <> "**"
   , onlyIfBin sBowShots
-  $ " - *Bow Shots in Bow Duels:* **"
+  $ "- *Bow Shots in Bow Duels:* **"
   <> showt bowShots
   <> "**"
   , onlyIfTer sAccuracy (bowShots /= 0)
-  $ " - *Bow Accuracy:* **"
+  $ "- *Bow Accuracy:* **"
   <> accuracy
   <> "**"
   ]

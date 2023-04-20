@@ -42,7 +42,7 @@ hypixelBowLeaderboardToTimeStats HypixelBowLeaderboardEntry {..} = HypixelBowTim
 
 showHypixelBowTimeStats :: StatsTimeRange -> Settings -> HypixelBowStats -> HypixelBowTimeStats -> Text
 showHypixelBowTimeStats timeRange Settings {..} HypixelBowStats {..} HypixelBowTimeStats {..} = T.unlines $ catMaybes
-  [ ("*Since:* " <>) . discordFormatTimestampFull <$> bowTimeTimestamp
+  [ ("- *Since:* " <>) . discordFormatTimestampFull <$> bowTimeTimestamp
   , onlyIfBin sWins
   $ " - *Bow Duels " <> time <> " Wins:* **"
   <> showt (bowWins - bowTimeWins)
@@ -64,9 +64,9 @@ showHypixelBowTimeStats timeRange Settings {..} HypixelBowStats {..} HypixelBowT
     winLossRatio = showWLR (bowWins - bowTimeWins) (bowLosses - bowTimeLosses)
 
 showMaybeHypixelBowTimeStats :: StatsTimeRange -> Settings -> HypixelBowStats -> Maybe HypixelBowTimeStats -> Text
-showMaybeHypixelBowTimeStats DailyStats _ _ Nothing = "**Daily data isn't avaliable yet for this player! Wait until tomorrow!**"
-showMaybeHypixelBowTimeStats WeeklyStats _ _ Nothing = "**Weekly data isn't avaliable yet for this player! Wait until next week!**"
-showMaybeHypixelBowTimeStats MonthlyStats _ _ Nothing = "**Monthly data isn't avaliable yet for this player! Wait until next month!**"
+showMaybeHypixelBowTimeStats DailyStats _ _ Nothing = "- **Daily data isn't avaliable yet for this player! Wait until tomorrow!**"
+showMaybeHypixelBowTimeStats WeeklyStats _ _ Nothing = "- **Weekly data isn't avaliable yet for this player! Wait until next week!**"
+showMaybeHypixelBowTimeStats MonthlyStats _ _ Nothing = "- **Monthly data isn't avaliable yet for this player! Wait until next month!**"
 showMaybeHypixelBowTimeStats tm s t (Just v) = showHypixelBowTimeStats tm s t v
 
 updateHypixelBowTimeStats :: (MonadIOReader m r, Has Connection r) => StatsTimeRange -> m ()

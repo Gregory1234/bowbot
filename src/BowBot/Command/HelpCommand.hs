@@ -20,7 +20,7 @@ helpCommand commands level footer group name = Command CommandInfo
       maybe "" (("\n"<>) . ($ prefix)) footer <>
       "\nMade by **GregC**#9698"
   where
-    helper prefix HelpEntry {..} = "  - **" <> prefix <> helpUsage <> "** - *" <> helpDescription <> "*"
+    helper prefix HelpEntry {..} = "- **" <> prefix <> helpUsage <> "** - *" <> helpDescription <> "*"
     levelname = case level of
       ModLevel -> "mod "
       AdminLevel -> "admin "
