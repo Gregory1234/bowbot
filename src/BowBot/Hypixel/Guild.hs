@@ -10,7 +10,7 @@ import BowBot.Hypixel.Basic
 import BowBot.Discord.Utils
 import BowBot.Minecraft.Account
 import BowBot.DB.Basic
-import Database.MySQL.Simple (Param, Result)
+import Database.MySQL.Simple (Param, Result, In(..))
 
 
 hypixelGuildIdInfo :: InfoType Text
@@ -35,7 +35,8 @@ updateHypixelRoles = do
           names <- catMaybes <$> traverse (\x -> fmap (x,) <$> mojangUUIDToCurrentName x) unknown
           b <- storeInCache [MinecraftAccount {mcUUID, mcNames = [mcName, mcName <> "OldNamesCurrentlyNotKnown"]} | (mcUUID, mcName) <- names]
           c <- addMinecraftNames (map (\(u,n) -> (n,u)) names)
-          when (b && c) $ withTransaction $ void $ executeManyLog "INSERT INTO `minecraft` (`uuid`, `hypixelRole`) VALUES (?,?) ON DUPLICATE KEY UPDATE `hypixelRole`=VALUES(`hypixelRole`)" members
+          when (b && c) $ void $ executeManyLog "INSERT INTO `minecraft` (`uuid`, `hypixelRole`) VALUES (?,?) ON DUPLICATE KEY UPDATE `hypixelRole`=VALUES(`hypixelRole`)" members
+          void $ executeLog "UPDATE `minecraft` SET `hypixelRole` = NULL WHERE `uuid` NOT IN ?" (Only (In (map fst members)))
     _ -> return ()
 
 getHypixelRoleByUUID :: (MonadIOReader m r, HasAll '[Manager, CounterState, Connection] r) => UUID -> m (Maybe HypixelRole)
