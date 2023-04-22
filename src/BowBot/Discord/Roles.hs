@@ -90,7 +90,7 @@ applyRolesByBowBotAccount' :: (MonadIOBotData m d r, HasCaches '[InfoField, BowB
 applyRolesByBowBotAccount' (Just bbacc) gmems = do
   wins :: [Integer] <- map fromOnly <$> queryLog "SELECT `bowWins` FROM `stats` JOIN `peopleMinecraft` ON `stats`.`minecraft` = `peopleMinecraft`.`minecraft` WHERE `id` = ?" (Only (accountBotId bbacc))
   savedRoles :: [SavedRole] <- maybe [] fromOnly . only <$> queryLog "SELECT `roles` FROM `people` WHERE `id` = ?" (Only (accountBotId bbacc))
-  hypixelRoles :: [HypixelRole] <- map fromOnly <$> queryLog "SELECT `uuid`, `hypixelRole` FROM `minecraft` WHERE `uuid` IN ? AND `hypixelRole` IS NOT NULL" (Only (In (accountMinecrafts bbacc)))
+  hypixelRoles :: [HypixelRole] <- map fromOnly <$> queryLog "SELECT `hypixelRole` FROM `minecraft` WHERE `uuid` IN ? AND `hypixelRole` IS NOT NULL" (Only (In (accountMinecrafts bbacc)))
   for_ gmems $ \gmem -> do
     giveSavedRoles gmem savedRoles (Just hypixelRoles)
     giveRolesDivisionTitle gmem (foldl' max 0 wins)
