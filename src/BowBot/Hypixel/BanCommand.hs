@@ -3,7 +3,6 @@ module BowBot.Hypixel.BanCommand where
 import BowBot.Command
 import BowBot.Minecraft.Account
 import BowBot.Discord.Utils
-import BowBot.Minecraft.Arg
 import BowBot.Hypixel.Leaderboard
 import BowBot.Hypixel.LeaderboardStatus
   
@@ -14,11 +13,4 @@ hypixelBanCommand = Command CommandInfo
   , commandPerms = ModLevel
   , commandTimeout = 15
   } $ oneArgument $ \str -> do
-    mc <- liftMaybe thePlayerDoesNotExistMessage =<< getMinecraftAccountByCurrentNameFromCache str
-    banned <- getHypixelIsBannedByUUID (mcUUID mc)
-    if banned == Banned
-      then respond "*The player is already banned!*"
-      else do
-        a <- setHypixelIsBannedByUUID (mcUUID mc) Banned
-        b <- removeHypixelBowLeaderboardEntryByUUID (mcUUID mc)
-        respond $ if a && b then "*Success, player got banned!*" else somethingWentWrongMessage
+    undefined

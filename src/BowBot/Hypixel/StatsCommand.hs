@@ -2,7 +2,6 @@ module BowBot.Hypixel.StatsCommand where
 
 import BowBot.Command
 import BowBot.Minecraft.Account
-import BowBot.Minecraft.Arg
 import BowBot.Hypixel.Stats
 import BowBot.Settings.Basic
 import BowBot.Utils
@@ -24,29 +23,4 @@ hypixelStatsCommand src name desc = Command CommandInfo
   , commandPerms = DefaultLevel
   , commandTimeout = 15
   } $ oneOptionalArgument $ \str -> do
-    (MinecraftResponse {mcResponseAccount = mcResponseAccount@MinecraftAccount {..}, ..}, stats) <- minecraftArgFullConstraintWithSkipTip helper str
-    let (didYouMean, renderedName) = (if mcResponseAutocorrect == ResponseAutocorrect then "*Did you mean* " else "", showMinecraftAccountDiscord mcResponseTime mcResponseAccount)
-    user <- envs envSender
-    settings <- getSettingsFromSource src (userId user)
-    let addAccount = bowWins stats >= 50 && mcResponseAutocorrect == ResponseNew
-    when addAccount $ minecraftNewAccountTip mcResponseAccount
-    respond $ didYouMean <> renderedName <> ":\n" <> showHypixelBowStats settings stats
-    when addAccount $ do
-      a <- storeInCache [mcResponseAccount]
-      b <- addMinecraftName (head mcNames) mcUUID
-      when (a && b) $ void $ setHypixelBowLeaderboardEntryByUUID mcUUID (hypixelBowStatsToLeaderboards stats)
-    when (mcResponseAutocorrect /= ResponseNew) $ do
-      isBanned <- getHypixelIsBannedByUUID mcUUID
-      when (isBanned == NotBanned) $ do
-        void $ setHypixelBowLeaderboardEntryByUUID mcUUID (hypixelBowStatsToLeaderboards stats)
-        applyRolesDivisionTitleByUUID mcUUID
-        announceMilestones
-  where
-    helper MinecraftAccount {..} = do
-      cv <- tryIncreaseCounter HypixelApi 1
-      case cv of
-        Nothing -> do
-          stats <- liftMaybe "*The player has never joined Hypixel!*" =<< requestHypixelBowStats mcUUID
-          oldstats <- getHypixelBowLeaderboardEntryByUUID mcUUID
-          return (if bowWins stats + bowLosses stats /= 0 then ResponseGood else ResponseFindBetter, completeHypixelBowStats stats oldstats)
-        Just sec -> throwError $ "*Too many requests! Wait another " <> showt sec <> " seconds!*"
+    undefined

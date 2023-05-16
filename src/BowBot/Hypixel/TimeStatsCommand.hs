@@ -3,7 +3,6 @@ module BowBot.Hypixel.TimeStatsCommand where
 import BowBot.Command
 import BowBot.Settings.Basic
 import BowBot.Minecraft.Account
-import BowBot.Minecraft.Arg
 import BowBot.Hypixel.Basic
 import BowBot.Hypixel.Stats
 import BowBot.Hypixel.TimeStats
@@ -25,31 +24,4 @@ hypixelTimeStatsCommand src name desc = Command CommandInfo
   , commandPerms = DefaultLevel
   , commandTimeout = 15
   } $ oneOptionalArgument $ \str -> do
-    (MinecraftResponse {mcResponseAccount = mcResponseAccount@MinecraftAccount {..}, ..}, stats) <- minecraftArgFullConstraintWithSkipTip helper str
-    let (didYouMean, renderedName) = (if mcResponseAutocorrect == ResponseAutocorrect then "*Did you mean* " else "", showMinecraftAccountDiscord mcResponseTime mcResponseAccount)
-    user <- envs envSender
-    settings <- getSettingsFromSource src (userId user)
-    dailyStats <- getHypixelBowTimeStatsByUUID DailyStats mcUUID
-    weeklyStats <- getHypixelBowTimeStatsByUUID WeeklyStats mcUUID
-    monthlyStats <- getHypixelBowTimeStatsByUUID MonthlyStats mcUUID
-    let addAccount = bowWins stats >= 50 && mcResponseAutocorrect == ResponseNew
-    when addAccount $ minecraftNewAccountTip mcResponseAccount
-    respond $ didYouMean <> renderedName <> ":\n" <> showMaybeHypixelBowTimeStats DailyStats settings stats dailyStats <> "\n" <> showMaybeHypixelBowTimeStats WeeklyStats settings stats weeklyStats <> "\n" <> showMaybeHypixelBowTimeStats MonthlyStats settings stats monthlyStats
-    when addAccount $ do
-      a <- storeInCache [mcResponseAccount]
-      b <- addMinecraftName (head mcNames) mcUUID
-      when (a && b) $ void $ setHypixelBowLeaderboardEntryByUUID mcUUID (hypixelBowStatsToLeaderboards stats)
-    when (mcResponseAutocorrect /= ResponseNew) $ do
-      isBanned <- getHypixelIsBannedByUUID mcUUID
-      when (isBanned == NotBanned) $ do
-        void $ setHypixelBowLeaderboardEntryByUUID mcUUID (hypixelBowStatsToLeaderboards stats)
-        applyRolesDivisionTitleByUUID mcUUID
-        announceMilestones
-  where
-    helper MinecraftAccount {..} = do
-      cv <- tryIncreaseCounter HypixelApi 1
-      case cv of
-        Nothing -> do
-          stats <- liftMaybe "*The player has never joined Hypixel!*" =<< requestHypixelBowStats mcUUID
-          return (if bowWins stats + bowLosses stats /= 0 then ResponseGood else ResponseFindBetter, stats)
-        Just sec -> throwError $ "*Too many requests! Wait another " <> showt sec <> " seconds!*"
+    undefined

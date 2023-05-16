@@ -1,7 +1,6 @@
 module BowBot.Birthday.SetCommand where
 
 import BowBot.Command
-import BowBot.Discord.Arg
 import BowBot.Discord.Account
 import BowBot.Discord.Utils
 import BowBot.Birthday.Basic
@@ -13,7 +12,4 @@ setBirthdayCommand = Command CommandInfo
   , commandPerms = ModLevel
   , commandTimeout = 15
   } $ twoArguments $ \didStr dbStr -> do
-    did <- discordId <$> discordArg didStr
-    db <- liftMaybe "*Invalid birthday date!*" $ birthdayFromString dbStr
-    a <- setBirthday did db
-    respond $ if a then "*Birthday set!*" else somethingWentWrongMessage
+    undefined
