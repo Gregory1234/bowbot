@@ -1,21 +1,15 @@
 module BowBot.BotData.Basic where
 
-import BowBot.BotData.Info
 import BowBot.BotData.Cached
 import BowBot.Minecraft.Account
 import BowBot.Account.Basic
 import BowBot.Discord.Account
 
 data BotData = BotData
-  { infoFieldCache :: DatabaseCache InfoField
-  , minecraftAccountCache :: DatabaseCache MinecraftAccount
+  { minecraftAccountCache :: DatabaseCache MinecraftAccount
   , bowBotAccountCache :: DatabaseCache BowBotAccount
   , discordAccountsCache :: DatabaseCache DiscordAccount
   }
-
-instance Has (DatabaseCache InfoField) BotData where
-  getter = infoFieldCache
-  modifier f x = x { infoFieldCache = f $ infoFieldCache x }
 
 instance Has (DatabaseCache MinecraftAccount) BotData where
   getter = minecraftAccountCache
