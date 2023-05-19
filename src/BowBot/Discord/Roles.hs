@@ -126,12 +126,12 @@ applyRolesAll = do
     bbacc <- getBowBotAccountByDiscord discord
     case bbacc of
       Nothing -> do
-        giveSavedRoles gmem (savedRoles M.! discord) Nothing
+        for_ (savedRoles M.!? discord) $ \r -> giveSavedRoles gmem r Nothing
         giveRolesMemberUnregistered gmem
         giveIllegalRole gmem
       Just acc -> do
         let hypixelRoles = mapMaybe (`lookup` roles) (accountMinecrafts acc)
-        giveSavedRoles gmem (savedRoles M.! discord) (Just hypixelRoles)
+        for_ (savedRoles M.!? discord) $ \r -> giveSavedRoles gmem r (Just hypixelRoles)
         giveRolesDivisionTitle gmem (foldl' max 0 (mapMaybe (fmap bowLbWins . (lb HM.!?)) (accountMinecrafts acc)))
         giveRolesMember gmem (not $ null hypixelRoles)
         removeIllegalRole gmem
