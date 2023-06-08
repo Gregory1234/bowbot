@@ -194,10 +194,10 @@ commands =
   , leaderboardCommand lossesLeaderboardType "lbl"
   , leaderboardCommand winstreakLeaderboardType "lbs"
   , leaderboardCommand wlrLeaderboardType "lbr"
-  , leaderboardGuildCommand winsLeaderboardTypeUnrestricted "lbg"
-  , leaderboardGuildCommand lossesLeaderboardTypeUnrestricted "lblg"
-  , leaderboardGuildCommand winstreakLeaderboardTypeUnrestricted "lbsg"
-  , leaderboardGuildCommand wlrLeaderboardTypeUnrestricted "lbrg"
+  , leaderboardCommand winsLeaderboardTypeGuild "lbg"
+  , leaderboardCommand lossesLeaderboardTypeGuild "lblg"
+  , leaderboardCommand winstreakLeaderboardTypeGuild "lbsg"
+  , leaderboardCommand wlrLeaderboardTypeGuild "lbrg"
   , infoCommand
   , snipeCommand
   , roleCommand
