@@ -71,3 +71,6 @@ giveSavedRoles gmem roles hypixelRoles = do
   case hypixelRoles of
     Nothing -> partialSet (M.map snd savedHypixelRoles)
     Just hypixelRoles' -> partialSetUni (M.map snd savedHypixelRoles) (M.map snd $ M.filter (not . null . intersect hypixelRoles' . fst) savedHypixelRoles)
+
+getSavedRolesByDiscord :: (MonadIOBotData m d r, HasCache BowBotAccount d, HasAll '[Connection, DiscordHandle, InfoCache] r) => UserId -> m (Maybe [SavedRole])
+getSavedRolesByDiscord did = only . map fromOnly <$> queryLog "SELECT `roles` FROM `unregistered` WHERE `discord` = ? UNION SELECT `roles` FROM `people` JOIN `peopleDiscord` ON `people`.`id` = `peopleDiscord`.`id` WHERE `peopleDiscord`.`discord` = ?" (did, did)
