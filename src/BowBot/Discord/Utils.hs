@@ -38,12 +38,15 @@ addRemoveDiscordRoles gid GuildMember {..} universe correct = do
   for_ toAdd $ \r -> call_ $ R.AddGuildMemberRole gid did r
   for_ toRemove $ \r -> call_ $ R.RemoveGuildMemberRole gid did r
 
-fromPingDiscordUser :: Text -> Maybe UserId
-fromPingDiscordUser str | "<@" `T.isPrefixOf` str && ">" `T.isSuffixOf` str = readMaybe $ unpack $ T.filter isDigit str
-fromPingDiscordUser _ = Nothing
-
 discordFormatTimestamp :: Maybe Text -> UTCTime -> Text
 discordFormatTimestamp style timestamp = "<t:" <> showt (timestampToUnixSecond timestamp) <> maybe "" (T.cons ':') style <> ">"
 
 discordFormatTimestampFull :: UTCTime -> Text
 discordFormatTimestampFull time = discordFormatTimestamp (Just "R") time <> " (" <> discordFormatTimestamp Nothing time <> ")"
+
+discordIdFromPing :: Text -> Maybe UserId
+discordIdFromPing str | "<@" `T.isPrefixOf` str && ">" `T.isSuffixOf` str = readMaybe $ unpack $ T.filter isDigit str
+discordIdFromPing _ = Nothing
+
+discordIdFromString :: Text -> Maybe UserId
+discordIdFromString t = (readMaybe @UserId $ unpack t) <|> discordIdFromPing t
