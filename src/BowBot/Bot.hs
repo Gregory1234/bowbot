@@ -24,7 +24,6 @@ import BowBot.Discord.Roles
 import BowBot.Discord.SavedRoles
 import BowBot.Hypixel.LeaderboardCommand
 import BowBot.Hypixel.TimeStats
-import BowBot.Hypixel.TimeStatsCommand
 import BowBot.Hypixel.WatchlistCommands
 import BowBot.Discord.Account
 import BowBot.Account.Basic
