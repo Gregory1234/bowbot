@@ -19,6 +19,9 @@ theUserIsntRegisteredMessage = "*The user isn't registered!*"
 thePlayerDoesNotExistMessage :: Text
 thePlayerDoesNotExistMessage = "*The player doesn't exist!*"
 
+theDiscordIdIsInvalid :: Text
+theDiscordIdIsInvalid = "*The discord id is invalid!*"
+
 showSelfSkipTip :: MinecraftAccount -> ExceptT Text CommandHandler ()
 showSelfSkipTip acc = do
   user <- envs envSender

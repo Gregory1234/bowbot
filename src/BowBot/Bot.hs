@@ -215,7 +215,6 @@ commands =
   , selectMinecraftCommand
   , helpCommand commands ModLevel Nothing "normal" "modhelp"
   , addCommand
-  , addaltCommand
   , hypixelBanCommand
   , setBirthdayCommand
   , helpCommand commands AdminLevel Nothing "normal" "adminhelp"
