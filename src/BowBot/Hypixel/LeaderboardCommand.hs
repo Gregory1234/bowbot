@@ -14,36 +14,38 @@ import BowBot.Hypixel.Guild
 import qualified Data.Text as T
 import Data.Bifunctor (second)
 import BowBot.Command.Utils
+import Data.Ord
 
-data LeaderboardType = LeaderboardType
+data LeaderboardType s a = LeaderboardType
   { leaderboardName :: !Text
   , leaderboardIsGuild :: !Bool
   , leaderboardStatName :: !Text
-  , leaderboardParser :: HypixelBowLeaderboardEntry -> Maybe (Integer, Text)
+  , leaderboardShowValue :: a -> Text
+  , leaderboardGetStats :: CommandHandler (HM.HashMap UUID s)
+  , leaderboardParser :: s -> Maybe a
   }
 
-leaderboardDescription :: LeaderboardType -> Text
+leaderboardDescription :: LeaderboardType s a -> Text
 leaderboardDescription LeaderboardType {..} = "show Bow Duels " <> leaderboardName <> (if leaderboardIsGuild then " guild" else "") <> " leaderboard"
 
 thePlayerIsntOnThisLeaderboardMessage :: Text
 thePlayerIsntOnThisLeaderboardMessage = "*The player isn't on this leaderboard!*"
 
-data LeaderboardRow = LeaderboardRow
+data LeaderboardRow a = LeaderboardRow
   { lbRowAccount :: MinecraftAccount
   , lbRowIndex :: Int
-  , lbRowValue :: Integer
-  , lbRowValueText :: Text
+  , lbRowValue :: a
   , lbRowSelected :: Bool
   }
 
-showLeaderboardRow :: Text -> LeaderboardRow -> Text
-showLeaderboardRow name LeaderboardRow {..} = 
+showLeaderboardRow :: LeaderboardType s a -> LeaderboardRow a -> Text
+showLeaderboardRow LeaderboardType {..} LeaderboardRow {..} = 
      pad 5 (showt lbRowIndex <> ".")
   <> (if lbRowSelected then "*" else " ")
   <> pad 20 (head (mcNames lbRowAccount))
-  <> " ( " <> lbRowValueText <> " " <> name <> " )"
+  <> " ( " <> leaderboardShowValue lbRowValue <> " " <> leaderboardStatName <> " )"
 
-leaderboardCommand :: LeaderboardType -> Text -> Command
+leaderboardCommand :: forall s a. Ord a => LeaderboardType s a -> Text -> Command
 leaderboardCommand lbt@LeaderboardType {..} name = Command CommandInfo
   { commandName = name
   , commandHelpEntries =
@@ -53,7 +55,7 @@ leaderboardCommand lbt@LeaderboardType {..} name = Command CommandInfo
   } $ oneOptionalArgument $ \case
     Just "all" -> do
       lb <- generateLeaderboardDiscordSelf
-      respondFile (name <> ".txt") $ T.unlines (map (showLeaderboardRow leaderboardStatName) lb)
+      respondFile (name <> ".txt") $ T.unlines (map (showLeaderboardRow lbt) lb)
     Just (readMaybe @Int . unpack -> Just page) | page < 1000 -> do
       lb <- generateLeaderboardDiscordSelf
       displayLeaderboard (Just (page - 1)) "" lb
@@ -72,28 +74,28 @@ leaderboardCommand lbt@LeaderboardType {..} name = Command CommandInfo
       showSelfSkipTip (autocorrectAccount ac)
       handlerMinecraft ac
   where
-    generateLeaderboardDiscordSelf :: ExceptT Text CommandHandler [LeaderboardRow]
+    generateLeaderboardDiscordSelf :: ExceptT Text CommandHandler [LeaderboardRow a]
     generateLeaderboardDiscordSelf = do
       did <- userId <$> envs envSender
       bbacc <- getBowBotAccountByDiscord did
       generateLeaderboard (maybe [] accountMinecrafts bbacc)
-    generateLeaderboard :: [UUID] -> ExceptT Text CommandHandler [LeaderboardRow]
+    generateLeaderboard :: [UUID] -> ExceptT Text CommandHandler [LeaderboardRow a]
     generateLeaderboard selected = do
-      lbFull <- HM.toList <$> getHypixelBowLeaderboards
+      lbFull <- HM.toList <$> lift leaderboardGetStats
       lb <- if leaderboardIsGuild then do
                 gmems <- getHypixelGuildMembers
                 return $ filter ((`elem` gmems) . fst) lbFull
               else return lbFull
       accs <- getCacheMap @MinecraftAccount
       let lbParsed = mapMaybe (sequence . second leaderboardParser) lb
-      let lbSorted = sortOn (negate . fst . snd) lbParsed
-      return $ zipWith (\lbRowIndex (uuid, (lbRowValue, lbRowValueText)) -> LeaderboardRow {lbRowAccount = accs HM.! uuid, lbRowSelected = uuid `elem` selected, ..}) [1..] lbSorted
+      let lbSorted = sortOn (Down . snd) lbParsed
+      return $ zipWith (\lbRowIndex (uuid, lbRowValue) -> LeaderboardRow {lbRowAccount = accs HM.! uuid, lbRowSelected = uuid `elem` selected, ..}) [1..] lbSorted
     handlerMinecraft :: MinecraftAutocorrect -> ExceptT Text CommandHandler ()
     handlerMinecraft ac@MinecraftAutocorrect {..} = do
       lb <- generateLeaderboard [mcUUID autocorrectAccount]
       unless (any lbRowSelected lb) $ throwError thePlayerIsntOnThisLeaderboardMessage
       displayLeaderboard Nothing (if autocorrectIsDirect then "" else minecraftAutocorrectToHeader ac) lb
-    displayLeaderboard :: Maybe Int -> Text -> [LeaderboardRow] -> ExceptT Text CommandHandler ()
+    displayLeaderboard :: Maybe Int -> Text -> [LeaderboardRow a] -> ExceptT Text CommandHandler ()
     displayLeaderboard page headerExtra lb = do
       let pages = chunksOf 20 lb
       let pagenum = fromMaybe 0 $ page <|> findIndex (any lbRowSelected) pages
@@ -101,36 +103,36 @@ leaderboardCommand lbt@LeaderboardType {..} name = Command CommandInfo
       respond $ headerExtra
              <> leaderboardName <> " Leaderboard (page **"
              <> showt (pagenum + 1) <> "/" <> pack (show (length pages))
-             <> "**):```\n" <> T.unlines (map (showLeaderboardRow leaderboardStatName) $ pages !! pagenum) <> "```"
+             <> "**):```\n" <> T.unlines (map (showLeaderboardRow lbt) $ pages !! pagenum) <> "```"
 
-winsLeaderboardType :: LeaderboardType
-winsLeaderboardType = LeaderboardType "Hypixel Bow Duels Wins" False "Wins" $ \case
-  HypixelBowLeaderboardEntry {..} | bowLbWins >= 500 -> Just (bowLbWins, showt bowLbWins)
+winsLeaderboardType :: LeaderboardType HypixelBowLeaderboardEntry Integer
+winsLeaderboardType = LeaderboardType "Hypixel Bow Duels Wins" False "Wins" showt getHypixelBowLeaderboards $ \case
+  HypixelBowLeaderboardEntry {..} | bowLbWins >= 500 -> Just bowLbWins
   _ -> Nothing
 
-lossesLeaderboardType :: LeaderboardType
-lossesLeaderboardType = LeaderboardType "Hypixel Bow Duels Losses" False "Losses" $ \case
-  HypixelBowLeaderboardEntry {..} | bowLbWins >= 500 -> Just (bowLbLosses, showt bowLbLosses)
+lossesLeaderboardType :: LeaderboardType HypixelBowLeaderboardEntry Integer
+lossesLeaderboardType = LeaderboardType "Hypixel Bow Duels Losses" False "Losses" showt getHypixelBowLeaderboards $ \case
+  HypixelBowLeaderboardEntry {..} | bowLbWins >= 500 -> Just bowLbLosses
   _ -> Nothing
 
-winstreakLeaderboardType :: LeaderboardType
-winstreakLeaderboardType = LeaderboardType "Hypixel Bow Duels Winstreak" False "Winstreak" $ \case
-  HypixelBowLeaderboardEntry { bowLbWinstreak = (Just ws) } | ws >= 50 -> Just (ws, showt ws)
+winstreakLeaderboardType :: LeaderboardType HypixelBowLeaderboardEntry Integer
+winstreakLeaderboardType = LeaderboardType "Hypixel Bow Duels Winstreak" False "Winstreak" showt getHypixelBowLeaderboards $ \case
+  HypixelBowLeaderboardEntry { bowLbWinstreak = (Just ws) } | ws >= 50 -> Just ws
   _ -> Nothing
 
-wlrLeaderboardType :: LeaderboardType
-wlrLeaderboardType = LeaderboardType "Hypixel Bow Duels WLR" False "WLR" $ \case
-  HypixelBowLeaderboardEntry {..} | bowLbWins >= bowLbLosses, bowLbWins >= 150 -> Just (if bowLbLosses == 0 then bowLbWins*100000000 else (bowLbWins*10000) `div` bowLbLosses, showWLR bowLbWins bowLbLosses)
+wlrLeaderboardType :: LeaderboardType HypixelBowLeaderboardEntry (WLR Integer)
+wlrLeaderboardType = LeaderboardType "Hypixel Bow Duels WLR" False "WLR" showWLR getHypixelBowLeaderboards $ \case
+  HypixelBowLeaderboardEntry {..} | bowLbWins >= bowLbLosses, bowLbWins >= 150 -> Just (WLR bowLbWins bowLbLosses)
   _ -> Nothing
 
-winsLeaderboardTypeGuild :: LeaderboardType
-winsLeaderboardTypeGuild = LeaderboardType "Hypixel Bow Duels Wins" True "Wins" $ \HypixelBowLeaderboardEntry {..} -> Just (bowLbWins, showt bowLbWins)
+winsLeaderboardTypeGuild :: LeaderboardType HypixelBowLeaderboardEntry Integer
+winsLeaderboardTypeGuild = LeaderboardType "Hypixel Bow Duels Wins" True "Wins" showt getHypixelBowLeaderboards $ \HypixelBowLeaderboardEntry {..} -> Just bowLbWins
 
-lossesLeaderboardTypeGuild :: LeaderboardType
-lossesLeaderboardTypeGuild = LeaderboardType "Hypixel Bow Duels Losses" True "Losses" $ \HypixelBowLeaderboardEntry {..} -> Just (bowLbLosses, showt bowLbLosses)
+lossesLeaderboardTypeGuild :: LeaderboardType HypixelBowLeaderboardEntry Integer
+lossesLeaderboardTypeGuild = LeaderboardType "Hypixel Bow Duels Losses" True "Losses" showt getHypixelBowLeaderboards $ \HypixelBowLeaderboardEntry {..} -> Just bowLbLosses
 
-winstreakLeaderboardTypeGuild :: LeaderboardType
-winstreakLeaderboardTypeGuild = LeaderboardType "Hypixel Bow Duels Winstreak" True "Winstreak" $ \HypixelBowLeaderboardEntry {..} -> fmap (\ws -> (ws, showt ws)) bowLbWinstreak
+winstreakLeaderboardTypeGuild :: LeaderboardType HypixelBowLeaderboardEntry Integer
+winstreakLeaderboardTypeGuild = LeaderboardType "Hypixel Bow Duels Winstreak" True "Winstreak" showt getHypixelBowLeaderboards $ \HypixelBowLeaderboardEntry {..} -> bowLbWinstreak
 
-wlrLeaderboardTypeGuild :: LeaderboardType
-wlrLeaderboardTypeGuild = LeaderboardType "Hypixel Bow Duels WLR" True "WLR" $ \HypixelBowLeaderboardEntry {..} -> Just (if bowLbLosses == 0 then bowLbWins*100000000 else (bowLbWins*10000) `div` bowLbLosses, showWLR bowLbWins bowLbLosses)
+wlrLeaderboardTypeGuild :: LeaderboardType HypixelBowLeaderboardEntry (WLR Integer)
+wlrLeaderboardTypeGuild = LeaderboardType "Hypixel Bow Duels WLR" True "WLR" showWLR getHypixelBowLeaderboards $ \HypixelBowLeaderboardEntry {..} -> Just (WLR bowLbWins bowLbLosses)

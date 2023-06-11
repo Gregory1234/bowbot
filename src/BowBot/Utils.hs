@@ -81,8 +81,13 @@ ifDev v action = do
   devmode <- liftIO $ fromMaybe "" <$> getEnv "IS_DEV"
   if devmode == "1" then action else return v
 
-showWLR :: Integral a => a -> a -> Text
-showWLR (fromIntegral -> bowWins) (fromIntegral -> bowLosses)
+data WLR a = WLR { wlrWins :: a, wlrLosses :: a } deriving (Show, Eq)
+
+instance (Num a, Ord a) => Ord (WLR a) where
+  (WLR w1 l1) <= (WLR w2 l2) = if w1 * l2 == w2 * l1 then w1 <= w2 else w1 * l2 <= w2 * l1
+
+showWLR :: Integral a => WLR a -> Text
+showWLR (WLR (fromIntegral -> bowWins) (fromIntegral -> bowLosses))
   | bowWins == 0, bowLosses == 0 = "NaN"
   | bowLosses == 0 = "∞"
   | otherwise = pack $ printf "%.04f" (fromRational (bowWins % bowLosses) :: Double)
@@ -154,3 +159,6 @@ unNullZeroTime = fromMaybe zeroTimestamp
 only :: [a] -> Maybe a
 only [a] = Just a
 only _ = Nothing
+
+filterMaybe :: (a -> Bool) -> a -> Maybe a
+filterMaybe f a = if f a then Just a else Nothing

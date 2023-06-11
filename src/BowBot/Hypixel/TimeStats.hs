@@ -61,7 +61,7 @@ showHypixelBowTimeStats timeRange Settings {..} HypixelBowStats {..} HypixelBowT
     timeStatsTypeShowName DailyStats = "Daily"
     timeStatsTypeShowName WeeklyStats = "Weekly"
     timeStatsTypeShowName MonthlyStats = "Monthly"
-    winLossRatio = showWLR (bowWins - bowTimeWins) (bowLosses - bowTimeLosses)
+    winLossRatio = showWLR (WLR (bowWins - bowTimeWins) (bowLosses - bowTimeLosses))
 
 showMaybeHypixelBowTimeStats :: StatsTimeRange -> Settings -> HypixelBowStats -> Maybe HypixelBowTimeStats -> Text
 showMaybeHypixelBowTimeStats DailyStats _ _ Nothing = "- **Daily data isn't avaliable yet for this player! Wait until tomorrow!**"
