@@ -5,6 +5,7 @@ import BowBot.Minecraft.Basic
 import BowBot.Minecraft.Account
 import BowBot.Command.Utils
 import BowBot.Discord.Utils
+import BowBot.Account.Utils
 
 urlCommand :: Text -> Text -> (UUID -> Text) -> Command
 urlCommand name desc url = Command CommandInfo
@@ -14,12 +15,13 @@ urlCommand name desc url = Command CommandInfo
   , commandTimeout = 15
   } $ oneOptionalArgument $ \case
     Nothing -> do
-      acc <- commandSelectedMinecraftByDiscordSelf
+      did <- userId <$> envs envSender
+      acc <- liftMaybe youArentRegisteredMessage =<< getSelectedMinecraftByDiscord did
       respond $ url $ mcUUID acc
     Just (uuidFromString -> Just uuid) -> do
       respond $ url uuid
     Just (discordIdFromString -> Just did) -> do
-      acc <- commandSelectedMinecraftByDiscord did
+      acc <- liftMaybe theUserIsntRegisteredMessage =<< getSelectedMinecraftByDiscord did
       respond $ url $ mcUUID acc
     Just n -> do
       ac <- liftMaybe thePlayerDoesNotExistMessage =<< minecraftAutocorrect n

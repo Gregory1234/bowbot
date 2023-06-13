@@ -35,6 +35,7 @@ import Data.Fixed (Fixed(..), resolution)
 import TextShow
 import Data.ByteString.Char8 (ByteString)
 import qualified Data.ByteString.Char8 as BS
+import Control.Monad.Except (ExceptT, runExceptT)
 
 dist :: Text -> Text -> Int
 dist a b =
@@ -95,6 +96,9 @@ showWLR (WLR (fromIntegral -> bowWins) (fromIntegral -> bowLosses))
 liftMaybe :: MonadError e m => e -> Maybe a -> m a
 liftMaybe _ (Just a) = return a
 liftMaybe e Nothing = throwError e
+
+runMaybeT :: Functor m => ExceptT e m a -> m (Maybe a)
+runMaybeT = fmap (either (const Nothing) Just) . runExceptT
 
 assertIO :: MonadIO m => Bool -> m ()
 assertIO x = liftIO $ do

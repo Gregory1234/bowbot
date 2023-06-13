@@ -8,6 +8,7 @@ import BowBot.Discord.Utils
 import BowBot.Minecraft.Basic
 import Control.Monad.Except
 import BowBot.BotData.Cached
+import BowBot.Account.Utils
 
 nameCommand :: Command
 nameCommand = Command CommandInfo
@@ -17,13 +18,14 @@ nameCommand = Command CommandInfo
   , commandTimeout = 15
   } $ oneOptionalArgument $ \case
     Nothing -> do
-      acc <- commandSelectedMinecraftByDiscordSelf
+      did <- userId <$> envs envSender
+      acc <- liftMaybe youArentRegisteredMessage =<< getSelectedMinecraftByDiscord did
       handler (autocorrectFromAccountDirect acc)
     Just (uuidFromString -> Just uuid) -> do
       acc <- liftMaybe thePlayerDoesNotExistMessage =<< getFromCache @MinecraftAccount uuid
       handler (autocorrectFromAccountDirect acc)
     Just (discordIdFromString -> Just did) -> do
-      acc <- commandSelectedMinecraftByDiscord did
+      acc <- liftMaybe theUserIsntRegisteredMessage =<< getSelectedMinecraftByDiscord did
       handler (autocorrectFromAccountDirect acc)
     Just n -> do
       ac <- liftMaybe thePlayerDoesNotExistMessage =<< minecraftAutocorrect n

@@ -16,6 +16,7 @@ import Control.Monad.Except
 import BowBot.Command.Utils
 import BowBot.Hypixel.CommandUtils
 import BowBot.Hypixel.TimeStats
+import BowBot.Account.Utils
 
 data StatsCommandSettings a = StatsCommandSettings
   { requestStats :: Bool -> UUID -> ExceptT Text CommandHandler a
@@ -32,14 +33,15 @@ statsCommandTemplate StatsCommandSettings {..} src name desc = Command CommandIn
   , commandTimeout = 15
   } $ oneOptionalArgument $ \case
     Nothing -> do
-      acc <- commandSelectedMinecraftByDiscordSelf
+      did <- userId <$> envs envSender
+      acc <- liftMaybe youArentRegisteredMessage =<< getSelectedMinecraftByDiscord did
       stats <- requestStats True (mcUUID acc)
       displayStats (minecraftAccountToHeader acc Nothing) stats
       updateStatsUnlessBanned (mcUUID acc) stats
     Just (uuidFromString -> Just uuid) -> do
       commandMinecraftByUUID handlerNewAccount (handlerOldAccount . autocorrectFromAccountDirect) uuid
     Just (discordIdFromString -> Just did) -> do
-      acc <- commandSelectedMinecraftByDiscord did
+      acc <- liftMaybe theUserIsntRegisteredMessage =<< getSelectedMinecraftByDiscord did
       handlerOldAccount (autocorrectFromAccountDirect acc)
     Just n -> do
       commandMinecraftByNameWithSkipTip handlerNewAccount handlerOldAccount n

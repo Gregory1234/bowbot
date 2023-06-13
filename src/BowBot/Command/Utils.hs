@@ -39,17 +39,6 @@ addMinecraftAccount acc@MinecraftAccount {..} = do
   void $ storeInCache [acc]
   void $ addMinecraftName (head mcNames) mcUUID
 
-commandSelectedMinecraftByDiscord :: UserId -> ExceptT Text CommandHandler MinecraftAccount
-commandSelectedMinecraftByDiscord did = do
-  bbacc <- liftMaybe theUserIsntRegisteredMessage =<< getBowBotAccountByDiscord did
-  liftMaybe theUserIsntRegisteredMessage =<< getFromCache @MinecraftAccount (accountSelectedMinecraft bbacc)
-
-commandSelectedMinecraftByDiscordSelf :: ExceptT Text CommandHandler MinecraftAccount
-commandSelectedMinecraftByDiscordSelf = do
-  did <- userId <$> envs envSender
-  bbacc <- liftMaybe youArentRegisteredMessage =<< getBowBotAccountByDiscord did
-  liftMaybe youArentRegisteredMessage =<< getFromCache @MinecraftAccount (accountSelectedMinecraft bbacc)
-
 commandMinecraftByNameWithSkipTip :: (MinecraftAccount -> ExceptT Text CommandHandler ()) -> (MinecraftAutocorrect -> ExceptT Text CommandHandler ()) -> Text -> ExceptT Text CommandHandler ()
 commandMinecraftByNameWithSkipTip new old n = do
   autocorrect <- minecraftAutocorrect n
