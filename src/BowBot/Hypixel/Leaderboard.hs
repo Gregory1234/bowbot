@@ -33,6 +33,9 @@ instance QueryResults HypixelBowLeaderboardEntry where
 instance QueryResultsSize HypixelBowLeaderboardEntry where
   queryResultsSize _ = 5
 
+bowLbWLR :: HypixelBowLeaderboardEntry -> WLR Integer
+bowLbWLR HypixelBowLeaderboardEntry {..} = WLR bowLbWins bowLbLosses
+
 hypixelBowStatsToLeaderboards :: HypixelBowStats -> HypixelBowLeaderboardEntry
 hypixelBowStatsToLeaderboards HypixelBowStats {..} = HypixelBowLeaderboardEntry
   { bowLbWins = bowWins, bowLbLosses = bowLosses, bowLbWinstreak = cachedToMaybe bestWinstreak, bowLbTimestamp = bowStatsTimestamp, bowLbWinstreakTimestamp = cachedTimestamp bowStatsTimestamp bestWinstreak }

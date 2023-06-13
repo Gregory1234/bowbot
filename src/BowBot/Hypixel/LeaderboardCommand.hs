@@ -39,7 +39,7 @@ data LeaderboardRow a = LeaderboardRow
   }
 
 showLeaderboardRow :: LeaderboardType s a -> LeaderboardRow a -> Text
-showLeaderboardRow LeaderboardType {..} LeaderboardRow {..} = 
+showLeaderboardRow LeaderboardType {..} LeaderboardRow {..} =
      pad 5 (showt lbRowIndex <> ".")
   <> (if lbRowSelected then "*" else " ")
   <> pad 20 (head (mcNames lbRowAccount))
@@ -106,33 +106,27 @@ leaderboardCommand lbt@LeaderboardType {..} name = Command CommandInfo
              <> "**):```\n" <> T.unlines (map (showLeaderboardRow lbt) $ pages !! pagenum) <> "```"
 
 winsLeaderboardType :: LeaderboardType HypixelBowLeaderboardEntry Integer
-winsLeaderboardType = LeaderboardType "Hypixel Bow Duels Wins" False "Wins" showt getHypixelBowLeaderboards $ \case
-  HypixelBowLeaderboardEntry {..} | bowLbWins >= 500 -> Just bowLbWins
-  _ -> Nothing
+winsLeaderboardType = LeaderboardType "Hypixel Bow Duels Wins" False "Wins" showt getHypixelBowLeaderboards (filterMaybe (>= 500) . bowLbWins)
 
 lossesLeaderboardType :: LeaderboardType HypixelBowLeaderboardEntry Integer
-lossesLeaderboardType = LeaderboardType "Hypixel Bow Duels Losses" False "Losses" showt getHypixelBowLeaderboards $ \case
-  HypixelBowLeaderboardEntry {..} | bowLbWins >= 500 -> Just bowLbLosses
-  _ -> Nothing
+lossesLeaderboardType = LeaderboardType "Hypixel Bow Duels Losses" False "Losses" showt getHypixelBowLeaderboards (fmap bowLbLosses . filterMaybe ((>= 500) . bowLbWins))
 
 winstreakLeaderboardType :: LeaderboardType HypixelBowLeaderboardEntry Integer
-winstreakLeaderboardType = LeaderboardType "Hypixel Bow Duels Winstreak" False "Winstreak" showt getHypixelBowLeaderboards $ \case
-  HypixelBowLeaderboardEntry { bowLbWinstreak = (Just ws) } | ws >= 50 -> Just ws
-  _ -> Nothing
+winstreakLeaderboardType = LeaderboardType "Hypixel Bow Duels Winstreak" False "Winstreak" showt getHypixelBowLeaderboards (filterMaybe (>= 50) <=< bowLbWinstreak)
 
 wlrLeaderboardType :: LeaderboardType HypixelBowLeaderboardEntry (WLR Integer)
-wlrLeaderboardType = LeaderboardType "Hypixel Bow Duels WLR" False "WLR" showWLR getHypixelBowLeaderboards $ \case
-  HypixelBowLeaderboardEntry {..} | bowLbWins >= bowLbLosses, bowLbWins >= 150 -> Just (WLR bowLbWins bowLbLosses)
-  _ -> Nothing
+wlrLeaderboardType = LeaderboardType "Hypixel Bow Duels WLR" False "WLR" showWLR getHypixelBowLeaderboards (fmap bowLbWLR . filterMaybe requirements)
+  where
+    requirements HypixelBowLeaderboardEntry {..} = bowLbWins >= bowLbLosses && bowLbWins >= 150
 
 winsLeaderboardTypeGuild :: LeaderboardType HypixelBowLeaderboardEntry Integer
-winsLeaderboardTypeGuild = LeaderboardType "Hypixel Bow Duels Wins" True "Wins" showt getHypixelBowLeaderboards $ \HypixelBowLeaderboardEntry {..} -> Just bowLbWins
+winsLeaderboardTypeGuild = LeaderboardType "Hypixel Bow Duels Wins" True "Wins" showt getHypixelBowLeaderboards (Just . bowLbWins)
 
 lossesLeaderboardTypeGuild :: LeaderboardType HypixelBowLeaderboardEntry Integer
-lossesLeaderboardTypeGuild = LeaderboardType "Hypixel Bow Duels Losses" True "Losses" showt getHypixelBowLeaderboards $ \HypixelBowLeaderboardEntry {..} -> Just bowLbLosses
+lossesLeaderboardTypeGuild = LeaderboardType "Hypixel Bow Duels Losses" True "Losses" showt getHypixelBowLeaderboards (Just . bowLbLosses)
 
 winstreakLeaderboardTypeGuild :: LeaderboardType HypixelBowLeaderboardEntry Integer
-winstreakLeaderboardTypeGuild = LeaderboardType "Hypixel Bow Duels Winstreak" True "Winstreak" showt getHypixelBowLeaderboards $ \HypixelBowLeaderboardEntry {..} -> bowLbWinstreak
+winstreakLeaderboardTypeGuild = LeaderboardType "Hypixel Bow Duels Winstreak" True "Winstreak" showt getHypixelBowLeaderboards bowLbWinstreak
 
 wlrLeaderboardTypeGuild :: LeaderboardType HypixelBowLeaderboardEntry (WLR Integer)
-wlrLeaderboardTypeGuild = LeaderboardType "Hypixel Bow Duels WLR" True "WLR" showWLR getHypixelBowLeaderboards $ \HypixelBowLeaderboardEntry {..} -> Just (WLR bowLbWins bowLbLosses)
+wlrLeaderboardTypeGuild = LeaderboardType "Hypixel Bow Duels WLR" True "WLR" showWLR getHypixelBowLeaderboards (Just . bowLbWLR)
