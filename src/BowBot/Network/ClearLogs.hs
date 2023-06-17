@@ -1,13 +1,27 @@
 module BowBot.Network.ClearLogs where
 
-import Control.Exception.Base (SomeException, try)
 import BowBot.Utils
-import Network.HTTP.Conduit hiding (path)
+import Network.Mail.SMTP
+import Network.Mail.Mime hiding (simpleMail)
+import BowBot.DB.Basic
+import Data.Time
+import qualified Data.Text as T
+import Codec.Compression.GZip
+import qualified Data.Text.Encoding as T
+import qualified Data.ByteString as BS
 
-clearLogs :: (MonadIOReader m r, Has Manager r) => m ()
-clearLogs = asks getter >>= \man -> liftIO $ do
-  website <- getEnvOrThrow "DB_SITE"
-  apiKey <- getEnvOrThrow "DB_KEY"
-  let url = "http://" ++ website ++ "/api/log/clear.php?key=" ++ apiKey
-  request <- parseRequest url
-  void $ try @SomeException $ httpLbs request man
+clearLogs :: (MonadIOReader m r, Has Connection r) => m ()
+clearLogs = do -- TODO: timezones?
+  logs :: [(UTCTime, Text, Text)] <- queryLog "SELECT `timestamp`,`message`,`type` FROM `logs`" ()
+  let showLogLine (time, msg, typ) = "[" <> typ <> ", " <> pack (formatTime defaultTimeLocale "%d %b %Y %H:%M:%S" time) <> "]: " <> msg
+  let logsFile = T.unlines $ map showLogLine logs
+  let zippedLogsFile = compress $ BS.fromStrict $ T.encodeUtf8 logsFile
+  liftIO $ do
+    mailFrom <- getEnvOrThrow "MAIL_FROM"
+    mailTo <- getEnvOrThrow "MAIL_TO"
+    let from = Address (Just "BowBot") (pack mailFrom)
+    let to = Address Nothing (pack mailTo)
+    date <- getTime "%d %b %Y %H:%M"
+    let subject = "Bowbot logs " <> pack date
+    renderSendMailCustom "/usr/sbin/sendmail" ["-t", "-i"] $ simpleMail from [to] [] [] subject [plainPart "...", filePartBS "application/octet-stream" "logs.gz" zippedLogsFile]
+  void $ executeLog "DELETE FROM `logs`" ()

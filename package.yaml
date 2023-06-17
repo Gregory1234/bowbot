@@ -30,6 +30,9 @@ dependencies:
 - data-has
 - text-show
 - mysql
+- smtp-mail
+- mime-mail
+- zlib
 
 library:
   source-dirs: src
