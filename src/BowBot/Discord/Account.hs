@@ -51,7 +51,7 @@ userToDiscordAccount user@User {..} = DiscordAccount
   , discordIsMember = False
   }
 
-updateDiscordAccountCache :: (MonadIOBotData m d r, Has DiscordHandle r, HasCaches [InfoField, DiscordAccount] d) => m ()
+updateDiscordAccountCache :: (MonadIOBotData m d r, HasAll '[InfoCache, DiscordHandle] r, HasCache DiscordAccount d) => m ()
 updateDiscordAccountCache = do
   gid <- askInfo discordGuildIdInfo
   members <- map guildMemberToDiscordAccount . filter (\GuildMember {..} -> fmap userIsBot memberUser == Just False) <$> discordGuildMembers gid

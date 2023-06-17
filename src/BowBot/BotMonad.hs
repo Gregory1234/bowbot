@@ -8,12 +8,14 @@ import Data.Has
 import BowBot.BotData.HasData
 import BowBot.Counter.Basic
 import BowBot.DB.Basic (Connection)
+import BowBot.BotData.Info
 
 data BotContext = BotContext
   { bctxManager :: !Manager
   , bctxConnection :: !Connection
   , bctxDiscord :: !DiscordHandle
   , bctxCounter :: !CounterState
+  , bctxInfo :: !InfoCache
   , bctxData :: !BotData
   }
 
@@ -29,6 +31,9 @@ instance Has DiscordHandle BotContext where
 instance Has CounterState BotContext where
   getter = bctxCounter
   modifier f x = x { bctxCounter = f $ bctxCounter x }
+instance Has InfoCache BotContext where
+  getter = bctxInfo
+  modifier f x = x { bctxInfo = f $ bctxInfo x }
 instance Has BotData BotContext where
   getter = bctxData
   modifier f x = x { bctxData = f $ bctxData x }

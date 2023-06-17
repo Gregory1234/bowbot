@@ -17,6 +17,22 @@ import Discord (RestCallErrorCode(..))
 
 deriving stock instance Generic Snowflake
 deriving anyclass instance NFData Snowflake
+deriving stock instance Generic (DiscordId a)
+deriving anyclass instance NFData (DiscordId a)
+deriving stock instance Generic Button
+deriving anyclass instance NFData Button
+deriving stock instance Generic ChannelTypeOption
+deriving anyclass instance NFData ChannelTypeOption
+deriving stock instance Generic SelectMenuData
+deriving anyclass instance NFData SelectMenuData
+deriving stock instance Generic SelectMenu
+deriving anyclass instance NFData SelectMenu
+deriving stock instance Generic ActionRow
+deriving anyclass instance NFData ActionRow
+deriving stock instance Generic RolePermissions
+deriving anyclass instance NFData RolePermissions
+deriving stock instance Generic (R.Base64Image a)
+deriving anyclass instance NFData (R.Base64Image a)
 deriving stock instance Generic R.Overwrite
 deriving anyclass instance NFData R.Overwrite
 deriving stock instance Generic R.ModifyChannelOpts
@@ -37,8 +53,6 @@ deriving stock instance Generic R.MessageDetailedOpts
 deriving anyclass instance NFData R.MessageDetailedOpts
 deriving stock instance Generic R.ReactionTiming
 deriving anyclass instance NFData R.ReactionTiming
-deriving stock instance Generic R.ChannelPermissionsOptsType
-deriving anyclass instance NFData R.ChannelPermissionsOptsType
 deriving stock instance Generic R.ChannelPermissionsOpts
 deriving anyclass instance NFData R.ChannelPermissionsOpts
 deriving stock instance Generic R.ChannelInviteOpts
@@ -79,16 +93,10 @@ deriving stock instance Generic R.ThreadMember
 deriving anyclass instance NFData R.ThreadMember
 deriving stock instance Generic R.GuildMember
 deriving anyclass instance NFData R.GuildMember
-deriving stock instance Generic R.ComponentActionRow
-deriving anyclass instance NFData R.ComponentActionRow
-deriving stock instance Generic R.ComponentButton
-deriving anyclass instance NFData R.ComponentButton
 deriving stock instance Generic R.ButtonStyle
 deriving anyclass instance NFData R.ButtonStyle
 deriving stock instance Generic R.Emoji
 deriving anyclass instance NFData R.Emoji
-deriving stock instance Generic R.ComponentSelectMenu
-deriving anyclass instance NFData R.ComponentSelectMenu
 deriving stock instance Generic R.SelectOption
 deriving anyclass instance NFData R.SelectOption
 deriving stock instance Generic R.GuildWidget
@@ -136,7 +144,7 @@ instance NFData (R.ChannelRequest a) where
 instance NFData (R.UserRequest a) where
   rnf R.GetCurrentUser = ()
   rnf (R.GetUser a) = a `deepseq` ()
-  rnf (R.ModifyCurrentUser a b) = a `deepseq` b `seq` () -- TODO: deepseq impossible
+  rnf (R.ModifyCurrentUser a b) = a `deepseq` b `deepseq` ()
   rnf R.GetCurrentUserGuilds = ()
   rnf (R.LeaveGuild a) = a `deepseq` ()
   rnf R.GetUserDMs = ()
@@ -184,6 +192,10 @@ deriving newtype instance Hashable Snowflake
 deriving newtype instance TextShow Snowflake
 deriving newtype instance Param Snowflake
 deriving newtype instance Result Snowflake
+deriving newtype instance Hashable (DiscordId a)
+deriving newtype instance TextShow (DiscordId a)
+deriving newtype instance Param (DiscordId a)
+deriving newtype instance Result (DiscordId a)
 
 deriving stock instance Generic RestCallErrorCode
 deriving via (FromGeneric RestCallErrorCode) instance TextShow RestCallErrorCode

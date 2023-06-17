@@ -2,51 +2,95 @@ module BowBot.Hypixel.StatsCommand where
 
 import BowBot.Command
 import BowBot.Minecraft.Account
-import BowBot.Minecraft.Arg
 import BowBot.Hypixel.Stats
 import BowBot.Settings.Basic
 import BowBot.Utils
-import BowBot.Hypixel.Basic (HypixelApi(..))
-import BowBot.Counter.Basic
-import Control.Monad.Error.Class (throwError)
 import Discord.Types
 import BowBot.Hypixel.Leaderboard
 import BowBot.Hypixel.Announce
-import BowBot.BotData.Cached (storeInCache)
 import BowBot.Discord.Roles
-import BowBot.Command.Tips
 import BowBot.Hypixel.LeaderboardStatus
+import BowBot.Minecraft.Basic
+import BowBot.Discord.Utils
+import Control.Monad.Except
+import BowBot.Command.Utils
+import BowBot.Hypixel.CommandUtils
+import BowBot.Hypixel.TimeStats
+import BowBot.Account.Utils
 
-hypixelStatsCommand :: SettingsSource -> Text -> Text -> Command
-hypixelStatsCommand src name desc = Command CommandInfo
+data StatsCommandSettings a = StatsCommandSettings
+  { requestStats :: Bool -> UUID -> ExceptT Text CommandHandler a
+  , shouldAddAccount :: a -> Bool
+  , updateStats :: UUID -> a -> ExceptT Text CommandHandler ()
+  , showStats :: Settings -> a -> Text
+  }
+
+statsCommandTemplate :: forall a. StatsCommandSettings a -> SettingsSource -> Text -> Text -> Command
+statsCommandTemplate StatsCommandSettings {..} src name desc = Command CommandInfo
   { commandName = name
   , commandHelpEntries = [HelpEntry { helpUsage = name <> " [name]", helpDescription = desc, helpGroup = "normal" }]
   , commandPerms = DefaultLevel
   , commandTimeout = 15
-  } $ oneOptionalArgument $ \str -> do
-    (MinecraftResponse {mcResponseAccount = mcResponseAccount@MinecraftAccount {..}, ..}, stats) <- minecraftArgFullConstraintWithSkipTip helper str
-    let (didYouMean, renderedName) = (if mcResponseAutocorrect == ResponseAutocorrect then "*Did you mean* " else "", showMinecraftAccountDiscord mcResponseTime mcResponseAccount)
-    user <- envs envSender
-    settings <- getSettingsFromSource src (userId user)
-    let addAccount = bowWins stats >= 50 && mcResponseAutocorrect == ResponseNew
-    when addAccount $ minecraftNewAccountTip mcResponseAccount
-    respond $ didYouMean <> renderedName <> ":\n" <> showHypixelBowStats settings stats
-    when addAccount $ do
-      a <- storeInCache [mcResponseAccount]
-      b <- addMinecraftName (head mcNames) mcUUID
-      when (a && b) $ void $ setHypixelBowLeaderboardEntryByUUID mcUUID (hypixelBowStatsToLeaderboards stats)
-    when (mcResponseAutocorrect /= ResponseNew) $ do
-      isBanned <- getHypixelIsBannedByUUID mcUUID
-      when (isBanned == NotBanned) $ do
-        void $ setHypixelBowLeaderboardEntryByUUID mcUUID (hypixelBowStatsToLeaderboards stats)
-        applyRolesDivisionTitleByUUID mcUUID
-        announceMilestones
+  } $ oneOptionalArgument $ \case
+    Nothing -> do
+      did <- userId <$> envs envSender
+      acc <- liftMaybe youArentRegisteredMessage =<< getSelectedMinecraftByDiscord did
+      stats <- requestStats True (mcUUID acc)
+      displayStats (minecraftAccountToHeader acc Nothing) stats
+      updateStatsUnlessBanned (mcUUID acc) stats
+    Just (uuidFromString -> Just uuid) -> do
+      commandMinecraftByUUID handlerNewAccount (handlerOldAccount . autocorrectFromAccountDirect) uuid
+    Just (discordIdFromString -> Just did) -> do
+      acc <- liftMaybe theUserIsntRegisteredMessage =<< getSelectedMinecraftByDiscord did
+      handlerOldAccount (autocorrectFromAccountDirect acc)
+    Just n -> do
+      commandMinecraftByNameWithSkipTip handlerNewAccount handlerOldAccount n
   where
-    helper MinecraftAccount {..} = do
-      cv <- tryIncreaseCounter HypixelApi 1
-      case cv of
-        Nothing -> do
-          stats <- liftMaybe "*The player has never joined Hypixel!*" =<< requestHypixelBowStats mcUUID
-          oldstats <- getHypixelBowLeaderboardEntryByUUID mcUUID
-          return (if bowWins stats + bowLosses stats /= 0 then ResponseGood else ResponseFindBetter, completeHypixelBowStats stats oldstats)
-        Just sec -> throwError $ "*Too many requests! Wait another " <> showt sec <> " seconds!*"
+    handlerOldAccount :: MinecraftAutocorrect -> ExceptT Text CommandHandler ()
+    handlerOldAccount ac@MinecraftAutocorrect {autocorrectAccount = acc} = do
+      stats <- requestStats False (mcUUID acc)
+      displayStats (minecraftAutocorrectToHeader ac) stats
+      updateStatsUnlessBanned (mcUUID acc) stats
+    handlerNewAccount :: MinecraftAccount -> ExceptT Text CommandHandler ()
+    handlerNewAccount acc = do
+      stats <- requestStats False (mcUUID acc)
+      let toAdd = shouldAddAccount stats
+      when toAdd $ addMinecraftAccount acc
+      displayStats (minecraftAccountToHeader acc Nothing) stats
+      when toAdd $ updateStats (mcUUID acc) stats
+    displayStats :: Text -> a -> ExceptT Text CommandHandler ()
+    displayStats header stats = do
+      user <- envs envSender
+      settings <- getSettingsFromSource src (userId user)
+      respond $ header <> showStats settings stats
+    updateStatsUnlessBanned :: UUID -> a -> ExceptT Text CommandHandler ()
+    updateStatsUnlessBanned uuid stats = do
+      isBanned <- getHypixelIsBannedByUUID uuid
+      when (isBanned == NotBanned) $ updateStats uuid stats
+
+hypixelStatsCommand :: SettingsSource -> Text -> Text -> Command
+hypixelStatsCommand = statsCommandTemplate StatsCommandSettings
+  { requestStats = \b -> liftMaybe (if b then youNeverJoinedHypixelMessage else thePlayerNeverJoinedHypixelMessage) <=< hypixelSafeRequestStats
+  , shouldAddAccount = (>= 50) . bowWins
+  , updateStats = \uuid stats -> do
+      void $ setHypixelBowLeaderboardEntryByUUID uuid (hypixelBowStatsToLeaderboards stats)
+      applyRolesDivisionTitleByUUID uuid
+      announceMilestones
+  , showStats = showHypixelBowStats
+  }
+
+hypixelTimeStatsCommand :: SettingsSource -> Text -> Text -> Command
+hypixelTimeStatsCommand = statsCommandTemplate StatsCommandSettings
+  { requestStats = \b uuid -> do
+    currentHypixelBowStats <- liftMaybe (if b then youNeverJoinedHypixelMessage else thePlayerNeverJoinedHypixelMessage) =<< hypixelSafeRequestStats uuid
+    dailyHypixelBowStats <- getHypixelBowTimeStatsByUUID DailyStats uuid
+    weeklyHypixelBowStats <- getHypixelBowTimeStatsByUUID WeeklyStats uuid
+    monthlyHypixelBowStats <- getHypixelBowTimeStatsByUUID MonthlyStats uuid
+    return FullHypixelBowTimeStats {..}
+  , shouldAddAccount = (>= 50) . bowWins . currentHypixelBowStats
+  , updateStats = \uuid stats -> do
+      void $ setHypixelBowLeaderboardEntryByUUID uuid (hypixelBowStatsToLeaderboards (currentHypixelBowStats stats))
+      applyRolesDivisionTitleByUUID uuid
+      announceMilestones
+  , showStats = showFullHypixelBowTimeStats
+  }

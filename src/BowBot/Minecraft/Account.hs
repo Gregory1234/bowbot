@@ -53,14 +53,18 @@ mcNameToUUID name = do
     Just MinecraftAccount {mcUUID} -> return (Just mcUUID)
     _ -> mojangNameToUUID name
 
-mcUUIDToNames :: (MonadIOBotData m d r, Has Manager r, HasCache MinecraftAccount d) => UUID -> m (Maybe [Text])
-mcUUIDToNames uuid = do
-  goodAcc <- getFromCache uuid
-  case goodAcc of
-    Just MinecraftAccount {mcNames} -> return (Just mcNames)
-    _ -> do
-      current <- mojangUUIDToCurrentName uuid
-      return $ fmap (\x -> [x, x <> "OldNamesCurrentlyNotKnown"]) current
+freshMinecraftAccount :: UUID -> Text -> MinecraftAccount
+freshMinecraftAccount mcUUID name = MinecraftAccount { mcUUID, mcNames = [name, name <> "OldNamesCurrentlyNotKnown"] }
+
+freshMinecraftAccountByUUID :: (MonadIOReader m r, Has Manager r) => UUID -> m (Maybe MinecraftAccount)
+freshMinecraftAccountByUUID uuid = do
+  name <- mojangUUIDToCurrentName uuid
+  return $ freshMinecraftAccount uuid <$> name
+
+freshMinecraftAccountByName :: (MonadIOReader m r, Has Manager r) => Text -> m (Maybe MinecraftAccount)
+freshMinecraftAccountByName name = do
+  uuid <- mojangNameToUUID name
+  join <$> for uuid freshMinecraftAccountByUUID
 
 getMinecraftAccountByCurrentNameFromCache :: (MonadIOBotData m d r, HasCache MinecraftAccount d) => Text -> m (Maybe MinecraftAccount)
 getMinecraftAccountByCurrentNameFromCache name = find ((==T.toLower name) . T.toLower . head . mcNames) . HM.elems <$> getCacheMap
@@ -70,3 +74,31 @@ addMinecraftName name uuid = addMinecraftNames [(name, uuid)]
 
 addMinecraftNames :: (MonadIOReader m r, Has Connection r) => [(Text, UUID)] -> m Bool
 addMinecraftNames namePairs = (>0) <$> executeManyLog "INSERT INTO `minecraftName` (`name`, `uuid`) VALUES (?,?) ON DUPLICATE KEY UPDATE `name`=VALUES(`name`), `uuid`=VALUES(`uuid`)" namePairs
+
+data MinecraftAutocorrect = MinecraftAutocorrect 
+  { autocorrectAccount :: MinecraftAccount
+  , autocorrectIsDirect :: Bool
+  , autocorrectPastName :: Maybe Text
+  }
+
+autocorrectFromAccountDirect :: MinecraftAccount -> MinecraftAutocorrect
+autocorrectFromAccountDirect acc = MinecraftAutocorrect { autocorrectAccount = acc, autocorrectIsDirect = True, autocorrectPastName = Nothing }
+
+minecraftAutocorrect :: (MonadIOBotData m d r, HasCache MinecraftAccount d) => Text -> m (Maybe MinecraftAutocorrect)
+minecraftAutocorrect name = do
+  people <- HM.elems <$> getCacheMap
+  let process isPast = map snd . sortOn fst $ do
+        acc@MinecraftAccount {..} <- people
+        n <- (if isPast then drop 1 else take 1) mcNames
+        let d = dist (T.toLower n) (T.toLower name)
+        guard (d <= 2)
+        return (d, MinecraftAutocorrect { autocorrectAccount = acc, autocorrectIsDirect = d == 0, autocorrectPastName = if isPast then Just n else Nothing })
+  return $ listToMaybe $ process False ++ process True
+
+minecraftAccountToHeader :: MinecraftAccount -> Maybe Text -> Text
+minecraftAccountToHeader MinecraftAccount {..} Nothing = "**" <> discordEscape (head mcNames) <> "**:\n"
+minecraftAccountToHeader MinecraftAccount {..} (Just name) = "**" <> discordEscape name <> "** (" <> discordEscape (head mcNames) <> "):\n"
+
+minecraftAutocorrectToHeader :: MinecraftAutocorrect -> Text
+minecraftAutocorrectToHeader MinecraftAutocorrect {..} =
+  (if autocorrectIsDirect then "" else "*Did you mean* ") <> minecraftAccountToHeader autocorrectAccount autocorrectPastName

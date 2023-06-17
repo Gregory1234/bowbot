@@ -31,12 +31,11 @@ emptyBotData = do
 
 refreshBotData :: (MonadIOBotData m BotData r, Has Connection r) => m ()
 refreshBotData = do
-  refreshCache @InfoField
   refreshCache @MinecraftAccount
   refreshCache @BowBotAccount
   refreshCache @DiscordAccount
 
-updateBotData :: (MonadIOBotData m BotData r, HasAll [Manager, DiscordHandle, CounterState, Connection] r) => [StatsTimeRange] -> m ()
+updateBotData :: (MonadIOBotData m BotData r, HasAll [Manager, DiscordHandle, CounterState, Connection, InfoCache] r) => [StatsTimeRange] -> m ()
 updateBotData times = (ask >>=) $ \ctx -> liftIO $ foldl1 concurrently_ $
   map (`runReaderT` ctx)
     [ updateDiscordAccountCache

@@ -16,7 +16,7 @@ data Command = Command { commandInfo :: !CommandInfo, commandHandler :: CommandH
 runCommand :: Command -> Message -> Bot ()
 runCommand Command {..} m = do
   BotContext {..} <- ask
-  liftIO $ runReaderT commandHandler CommandHandlerContext { cctxEnv = commandEnvFromMessage m, cctxManager = bctxManager, cctxConnection = bctxConnection, cctxDiscord = bctxDiscord, cctxCounter = bctxCounter, cctxData = bctxData}
+  liftIO $ runReaderT commandHandler CommandHandlerContext { cctxEnv = commandEnvFromMessage m, cctxManager = bctxManager, cctxConnection = bctxConnection, cctxDiscord = bctxDiscord, cctxCounter = bctxCounter, cctxInfo = bctxInfo, cctxData = bctxData}
 
 somethingWentWrongMessage :: Text
 somethingWentWrongMessage = "**Something went wrong!**"

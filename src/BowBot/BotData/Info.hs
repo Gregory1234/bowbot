@@ -7,38 +7,32 @@ module BowBot.BotData.Info(
 import BowBot.DB.Basic
 import Discord.Internal.Rest (GuildId)
 import BowBot.Utils
-import qualified Data.HashMap.Strict as HM
-import BowBot.BotData.Cached
 import Text.Read (readEither)
 import Data.Bifunctor (first)
+import qualified Data.Map.Strict as M
 
-data InfoField = InfoField { infoFieldName :: !Text, infoFieldValue :: !Text } deriving (Show, Eq)
+data InfoType a = InfoType { infoName :: !Text, infoDefault :: !a, infoParse :: Text -> Either Text a }
 
-instance Cached InfoField where
-  type CacheIndex InfoField = Text
-  refreshCache = do
-    cache <- getCache
-    res :: [(Text, Text)] <- queryLog "SELECT `name`, `value` FROM `botInfo`" ()
-    let newValues = HM.fromList $ flip fmap res $ \(infoFieldName, infoFieldValue) -> (infoFieldName, InfoField {..})
-    liftIO $ atomically $ writeTVar cache newValues
+newtype InfoCache = InfoCache (TVar (M.Map Text Text))
 
-instance CachedIndexed InfoField where
-  cacheIndex = infoFieldName
-  storeInCache accs = do
-    cacheMap <- getCacheMap
-    let toQueryParams f@InfoField {..} = if Just f == cacheMap HM.!? infoFieldName then Nothing else Just (infoFieldName, infoFieldValue)
-    let queryParams = mapMaybe toQueryParams accs
-    success <- liftIO $ withDB $ \conn -> (>0) <$> executeManyLog' conn "INSERT INTO `botInfo` (`name`, `value`) VALUES (?,?) ON DUPLICATE KEY UPDATE `value`=VALUES(`value`)" queryParams
-    when success $ do
-      cache <- getCache
-      liftIO $ atomically $ modifyTVar cache (insertMany $ map (\x -> (infoFieldValue x, x)) accs)
-    return success
+refreshInfoCache :: (MonadIOReader m r, HasAll '[InfoCache, Connection] r) => m ()
+refreshInfoCache = do
+  InfoCache cache <- asks getter
+  res :: [(Text, Text)] <- queryLog "SELECT `name`, `value` FROM `botInfo`" ()
+  liftIO $ atomically $ writeTVar cache (M.fromList res)
 
-askInfo :: (MonadIOBotData m d r, HasCache InfoField d) => InfoType a -> m a
+downloadInfoCache :: IO InfoCache
+downloadInfoCache = do
+  cache <- atomically $ newTVar M.empty
+  withDB $ \conn -> runReaderT refreshInfoCache (conn, InfoCache cache)
+  return (InfoCache cache)
+
+askInfo :: (MonadIOReader m r, Has InfoCache r) => InfoType a -> m a
 askInfo InfoType {..} = do
-  xs <- getFromCache infoName
-  case xs of
-    Just InfoField { infoFieldValue = r } -> case infoParse r of
+  InfoCache cache <- asks getter
+  xs <- liftIO $ atomically $ readTVar cache
+  case xs M.!? infoName of
+    Just r -> case infoParse r of
       Right v -> return v
       Left e -> do
         logErrorFork $ "Info perser error in " <> infoName <> ": " <> e
@@ -46,8 +40,6 @@ askInfo InfoType {..} = do
     _ -> do
       logErrorFork $ "Info not found: " <> infoName
       return infoDefault
-
-data InfoType a = InfoType { infoName :: !Text, infoDefault :: !a, infoParse :: Text -> Either Text a }
 
 discordCommandPrefixInfo :: InfoType Text
 discordCommandPrefixInfo = InfoType { infoName = "command_prefix", infoDefault = "???", infoParse = Right }

@@ -113,7 +113,7 @@ showHypixelBowStats Settings {..} HypixelBowStats {..} = T.unlines $ catMaybes
   <> "**"
   ]
   where
-    winLossRatio = showWLR bowWins bowLosses
+    winLossRatio = showWLR (WLR bowWins bowLosses)
     nextWinLossRatio
       | bowLosses == 0 = "∞"
       | otherwise = showt $ (bowWins `div` bowLosses) + 1

@@ -33,7 +33,7 @@ instance ToField [SavedRole] where
 instance FromField [SavedRole] where
   fromField = ([T.String, T.Blob], Right . map SavedRole . filter (not . T.null) . T.splitOn "," . T.decodeUtf8)
 
-savedRolesFromIds :: (MonadIOBotData m d r, HasCache InfoField d) => [RoleId] -> m [SavedRole]
+savedRolesFromIds :: (MonadIOReader m r, Has InfoCache r) => [RoleId] -> m [SavedRole]
 savedRolesFromIds roleids = do
   toggleableRoles <- askInfo toggleableRolesInfo
   savedRoles <- askInfo savedRolesInfo
@@ -47,7 +47,7 @@ setSavedRolesByDiscord discord roles = do
     Nothing -> executeManyLog "INSERT INTO `unregistered` (`discord`, `roles`) VALUES (?,?) ON DUPLICATE KEY UPDATE `roles`=VALUES(`roles`)" [(discord, roles)]
     Just a -> executeManyLog "INSERT INTO `people` (`id`, `roles`) VALUES (?,?) ON DUPLICATE KEY UPDATE `roles`=VALUES(`roles`)" [(accountBotId a, roles)]
 
-updateSavedRolesAll :: (MonadIOBotData m d r, HasCaches '[InfoField, BowBotAccount] d, HasAll '[Connection, DiscordHandle] r) => m ()
+updateSavedRolesAll :: (MonadIOBotData m d r, HasCache BowBotAccount d, HasAll '[Connection, DiscordHandle, InfoCache] r) => m ()
 updateSavedRolesAll = do
   savedRoles :: M.Map UserId [SavedRole] <- M.fromList <$> queryLog "SELECT `discord`, `roles` FROM `unregistered` UNION SELECT `discord`, `roles` FROM `people` JOIN `peopleDiscord` ON `people`.`id` = `peopleDiscord`.`id`" ()
   gid <- askInfo discordGuildIdInfo
@@ -58,7 +58,7 @@ updateSavedRolesAll = do
       roles <- savedRolesFromIds memberRoles
       when (roles /= savedRoles M.! userId) $ setSavedRolesByDiscord userId roles
 
-giveSavedRoles :: (MonadIOBotData m d r, HasCaches '[InfoField, BowBotAccount] d, HasAll '[Connection, DiscordHandle] r) => GuildMember -> [SavedRole] -> Maybe [HypixelRole] -> m ()
+giveSavedRoles :: (MonadIOBotData m d r, HasCache BowBotAccount d, HasAll '[Connection, DiscordHandle, InfoCache] r) => GuildMember -> [SavedRole] -> Maybe [HypixelRole] -> m ()
 giveSavedRoles gmem roles hypixelRoles = do
   gid <- askInfo discordGuildIdInfo
   let partialSetUni roleMapFull roleMapPartial = addRemoveDiscordRoles gid gmem (map snd $ M.toList roleMapFull) (mapMaybe (roleMapPartial M.!?) roles)
@@ -71,3 +71,6 @@ giveSavedRoles gmem roles hypixelRoles = do
   case hypixelRoles of
     Nothing -> partialSet (M.map snd savedHypixelRoles)
     Just hypixelRoles' -> partialSetUni (M.map snd savedHypixelRoles) (M.map snd $ M.filter (not . null . intersect hypixelRoles' . fst) savedHypixelRoles)
+
+getSavedRolesByDiscord :: (MonadIOBotData m d r, HasCache BowBotAccount d, HasAll '[Connection, DiscordHandle, InfoCache] r) => UserId -> m (Maybe [SavedRole])
+getSavedRolesByDiscord did = only . map fromOnly <$> queryLog "SELECT `roles` FROM `unregistered` WHERE `discord` = ? UNION SELECT `roles` FROM `people` JOIN `peopleDiscord` ON `people`.`id` = `peopleDiscord`.`id` WHERE `peopleDiscord`.`discord` = ?" (did, did)

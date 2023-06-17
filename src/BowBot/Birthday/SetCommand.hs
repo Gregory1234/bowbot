@@ -1,10 +1,9 @@
 module BowBot.Birthday.SetCommand where
 
 import BowBot.Command
-import BowBot.Discord.Arg
-import BowBot.Discord.Account
 import BowBot.Discord.Utils
 import BowBot.Birthday.Basic
+import BowBot.Command.Utils
   
 setBirthdayCommand :: Command
 setBirthdayCommand = Command CommandInfo
@@ -12,8 +11,8 @@ setBirthdayCommand = Command CommandInfo
   , commandHelpEntries = [HelpEntry { helpUsage = "bdset [discord/discord id] [day(1-31).month(1-12)]", helpDescription = "override someone's birthday", helpGroup = "normal" }]
   , commandPerms = ModLevel
   , commandTimeout = 15
-  } $ twoArguments $ \didStr dbStr -> do
-    did <- discordId <$> discordArg didStr
-    db <- liftMaybe "*Invalid birthday date!*" $ birthdayFromString dbStr
-    a <- setBirthday did db
+  } $ twoArguments $ \didStr bdStr -> do
+    did <- liftMaybe theDiscordIdIsInvalid $ discordIdFromString didStr
+    bd <- liftMaybe "*Invalid birthday date!*" $ birthdayFromString bdStr
+    a <- setBirthday did bd
     respond $ if a then "*Birthday set!*" else somethingWentWrongMessage

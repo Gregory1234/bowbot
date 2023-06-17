@@ -6,10 +6,7 @@ import BowBot.BotData.Cached
 import BowBot.DB.Basic
 import BowBot.Utils
 import BowBot.Account.Basic
-import BowBot.Discord.Roles
-import BowBot.Birthday.Basic
 import Control.Monad.Except (runExceptT, throwError)
-import qualified Data.Text as T
 
 createNewBowBotAccount :: (MonadIOBotData m d r, HasCache BowBotAccount d, Has Connection r) => Text -> UserId -> UUID -> m (Maybe BowBotAccount)
 createNewBowBotAccount name did uuid = do

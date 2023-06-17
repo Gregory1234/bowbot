@@ -20,7 +20,7 @@ newtype HypixelRole = HypixelRole { fromHypixelRole :: Text }
   deriving (Eq, Ord, Show)
   deriving newtype (Param, Result)
 
-updateHypixelRoles :: (MonadHoistIOBotData m d r, HasAll '[Manager, CounterState, Connection] r, HasCaches '[InfoField, MinecraftAccount] d) => m ()
+updateHypixelRoles :: (MonadHoistIOBotData m d r, HasAll '[InfoCache, Manager, CounterState, Connection] r, HasCache MinecraftAccount d) => m ()
 updateHypixelRoles = do
   cv <- tryIncreaseCounter HypixelApi 1
   case cv of

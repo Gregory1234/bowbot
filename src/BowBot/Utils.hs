@@ -35,6 +35,7 @@ import Data.Fixed (Fixed(..), resolution)
 import TextShow
 import Data.ByteString.Char8 (ByteString)
 import qualified Data.ByteString.Char8 as BS
+import Control.Monad.Except (ExceptT, runExceptT)
 
 dist :: Text -> Text -> Int
 dist a b =
@@ -81,8 +82,13 @@ ifDev v action = do
   devmode <- liftIO $ fromMaybe "" <$> getEnv "IS_DEV"
   if devmode == "1" then action else return v
 
-showWLR :: Integral a => a -> a -> Text
-showWLR (fromIntegral -> bowWins) (fromIntegral -> bowLosses)
+data WLR a = WLR { wlrWins :: a, wlrLosses :: a } deriving (Show, Eq)
+
+instance (Num a, Ord a) => Ord (WLR a) where
+  (WLR w1 l1) <= (WLR w2 l2) = if w1 * l2 == w2 * l1 then w1 <= w2 else w1 * l2 <= w2 * l1
+
+showWLR :: Integral a => WLR a -> Text
+showWLR (WLR (fromIntegral -> bowWins) (fromIntegral -> bowLosses))
   | bowWins == 0, bowLosses == 0 = "NaN"
   | bowLosses == 0 = "∞"
   | otherwise = pack $ printf "%.04f" (fromRational (bowWins % bowLosses) :: Double)
@@ -90,6 +96,9 @@ showWLR (fromIntegral -> bowWins) (fromIntegral -> bowLosses)
 liftMaybe :: MonadError e m => e -> Maybe a -> m a
 liftMaybe _ (Just a) = return a
 liftMaybe e Nothing = throwError e
+
+runMaybeT :: Functor m => ExceptT e m a -> m (Maybe a)
+runMaybeT = fmap (either (const Nothing) Just) . runExceptT
 
 assertIO :: MonadIO m => Bool -> m ()
 assertIO x = liftIO $ do
@@ -154,3 +163,6 @@ unNullZeroTime = fromMaybe zeroTimestamp
 only :: [a] -> Maybe a
 only [a] = Just a
 only _ = Nothing
+
+filterMaybe :: (a -> Bool) -> a -> Maybe a
+filterMaybe f a = if f a then Just a else Nothing

@@ -2,10 +2,13 @@ module BowBot.Minecraft.NameCommand where
 
 import BowBot.Command
 import BowBot.Minecraft.Account
-import BowBot.Minecraft.Arg
-import Discord.Types
-import Control.Monad.Trans (lift)
 import qualified Data.Text as T
+import BowBot.Command.Utils
+import BowBot.Discord.Utils
+import BowBot.Minecraft.Basic
+import Control.Monad.Except
+import BowBot.BotData.Cached
+import BowBot.Account.Utils
 
 nameCommand :: Command
 nameCommand = Command CommandInfo
@@ -13,7 +16,22 @@ nameCommand = Command CommandInfo
   , commandHelpEntries = [HelpEntry { helpUsage = "n [name]", helpDescription = "show player's Minecraft name history", helpGroup = "normal" }]
   , commandPerms = DefaultLevel
   , commandTimeout = 15
-  } $ oneOptionalArgument $ \str -> do
-    MinecraftResponse {mcResponseAccount = mcResponseAccount@MinecraftAccount {..}, ..} <- flip minecraftArgFull str . userId =<< lift (envs envSender)
-    let (didYouMean, renderedName) = (if mcResponseAutocorrect == ResponseAutocorrect then "*Did you mean*" else "Name history of", showMinecraftAccountDiscord mcResponseTime mcResponseAccount)
-    respond $ didYouMean <> " " <> renderedName <> ":```\n" <> T.unlines mcNames <> "```"
+  } $ oneOptionalArgument $ \case
+    Nothing -> do
+      did <- userId <$> envs envSender
+      acc <- liftMaybe youArentRegisteredMessage =<< getSelectedMinecraftByDiscord did
+      handler (autocorrectFromAccountDirect acc)
+    Just (uuidFromString -> Just uuid) -> do
+      acc <- liftMaybe thePlayerDoesNotExistMessage =<< getFromCache @MinecraftAccount uuid
+      handler (autocorrectFromAccountDirect acc)
+    Just (discordIdFromString -> Just did) -> do
+      acc <- liftMaybe theUserIsntRegisteredMessage =<< getSelectedMinecraftByDiscord did
+      handler (autocorrectFromAccountDirect acc)
+    Just n -> do
+      ac <- liftMaybe thePlayerDoesNotExistMessage =<< minecraftAutocorrect n
+      handler ac
+  where
+    handler :: MinecraftAutocorrect -> ExceptT Text CommandHandler ()
+    handler ac@MinecraftAutocorrect {..} = do
+      let header = (if autocorrectIsDirect then "Name history of " else "") <> minecraftAutocorrectToHeader ac
+      respond $ header <> "```\n" <> T.unlines (mcNames autocorrectAccount) <> "```"

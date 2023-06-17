@@ -3,10 +3,9 @@ module BowBot.Minecraft.UrlCommand where
 import BowBot.Command
 import BowBot.Minecraft.Basic
 import BowBot.Minecraft.Account
-import BowBot.Minecraft.Arg
-import Discord.Types
-import Control.Monad.Trans (lift)
-import BowBot.Discord.Utils (Text)
+import BowBot.Command.Utils
+import BowBot.Discord.Utils
+import BowBot.Account.Utils
 
 urlCommand :: Text -> Text -> (UUID -> Text) -> Command
 urlCommand name desc url = Command CommandInfo
@@ -14,6 +13,16 @@ urlCommand name desc url = Command CommandInfo
   , commandHelpEntries = [HelpEntry { helpUsage = name <> " [name]", helpDescription = desc, helpGroup = "normal" }]
   , commandPerms = DefaultLevel
   , commandTimeout = 15
-  } $ oneOptionalArgument $ \str -> do
-    MinecraftResponse {mcResponseAccount = MinecraftAccount {..}} <- flip minecraftArgFull str . userId =<< lift (envs envSender)
-    respond $ url mcUUID
+  } $ oneOptionalArgument $ \case
+    Nothing -> do
+      did <- userId <$> envs envSender
+      acc <- liftMaybe youArentRegisteredMessage =<< getSelectedMinecraftByDiscord did
+      respond $ url $ mcUUID acc
+    Just (uuidFromString -> Just uuid) -> do
+      respond $ url uuid
+    Just (discordIdFromString -> Just did) -> do
+      acc <- liftMaybe theUserIsntRegisteredMessage =<< getSelectedMinecraftByDiscord did
+      respond $ url $ mcUUID acc
+    Just n -> do
+      ac <- liftMaybe thePlayerDoesNotExistMessage =<< minecraftAutocorrect n
+      respond $ url $ mcUUID $ autocorrectAccount ac
