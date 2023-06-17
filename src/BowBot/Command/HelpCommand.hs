@@ -18,7 +18,7 @@ helpCommand commands level footer group name = Command CommandInfo
     respond $ "**Bow Bot " <> (if group == "normal" then "" else group <> " ") <> "help:**\n\n**" <> levelnameupper <> "Commands:**\n" <>
       T.unlines ((map (helper prefix) . filter ((==group) . helpGroup) . commandHelpEntries) =<< filter (\c -> level == commandPerms c) (map commandInfo commands)) <>
       maybe "" (("\n"<>) . ($ prefix)) footer <>
-      "\nMade by **GregC**#9698"
+      "\nMade by **GregC** (gregc_)"
   where
     helper prefix HelpEntry {..} = "- **" <> prefix <> helpUsage <> "** - *" <> helpDescription <> "*"
     levelname = case level of

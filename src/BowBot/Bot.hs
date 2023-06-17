@@ -220,6 +220,7 @@ commands =
   , helpCommand commands AdminLevel Nothing "normal" "adminhelp"
   , adminCommand 30 "datarefresh" "sync Bow Bot's data from the database" refreshBotData
   , adminCommand 30 "inforefresh" "sync Bow Bot's info cache from the database" refreshInfoCache
+  , adminCommand 3600 "discordupdate" "update discord data" updateDiscordAccountCache
   , updateDataCommand [] "dataupdate"
   , updateDataCommand [DailyStats] "dataupdateday"
   , updateDataCommand [DailyStats, WeeklyStats] "dataupdateweek"

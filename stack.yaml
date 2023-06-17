@@ -44,7 +44,8 @@ packages:
 
 extra-deps:
 - emoji-0.1.0.2
-- discord-haskell-1.15.4
+- github: discord-haskell/discord-haskell
+  commit: 6d3627ca520b3fb81877a475a359f9d6cb6a8d68
 
 # Override default flag values for local packages and extra-deps
 # flags: {}
