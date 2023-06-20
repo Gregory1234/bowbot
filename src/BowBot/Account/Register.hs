@@ -15,7 +15,7 @@ createNewBowBotAccount name did uuid = do
   ret <- liftIO $ flip runReaderT r $ withTransaction $ (either (const $ rollback $> Nothing) (pure . Just) =<<) $ runExceptT $ do
     c1 <- executeLog "INSERT INTO `people`(`name`, `roles`, `birthday`) SELECT ?, `roles`, `birthday` FROM `unregistered` WHERE `discord` = ?" (name, did)
     when (c1 <= 0) $ throwError ()
-    bid <- insertID
+    bid <- BowBotId <$> insertID
     void $ executeLog "DELETE FROM `unregistered` WHERE `discord` = ?" (Only did)
     c2 <- executeLog "INSERT INTO `peopleMinecraft`(`id`, `minecraft`,`status`, `selected`, `verified`) VALUES (?,?, 'main', 1, 0)" (bid, uuid)
     when (c2 <= 0) $ throwError ()
@@ -25,7 +25,7 @@ createNewBowBotAccount name did uuid = do
   liftIO $ atomically $ for_ ret $ \bacc -> modifyTVar cache (insertMany [(accountBotId bacc, bacc)])
   return ret
 
-addAltToBowBotAccount :: (MonadIOBotData m d r, HasCache BowBotAccount d) => Integer -> UUID -> m (Maybe BowBotAccount)
+addAltToBowBotAccount :: (MonadIOBotData m d r, HasCache BowBotAccount d) => BowBotId -> UUID -> m (Maybe BowBotAccount)
 addAltToBowBotAccount bid uuid = do
   acc <- fromJust <$> getFromCache bid
   success <- liftIO $ withDB $ \conn -> (>0) <$> executeLog' conn "INSERT INTO `peopleMinecraft`(`id`, `minecraft`,`status`, `selected`, `verified`) VALUES (?,?, 'alt', 0, 0)" (bid, uuidString uuid)
