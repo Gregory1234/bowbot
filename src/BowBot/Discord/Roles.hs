@@ -39,22 +39,23 @@ giveRolesDivisionTitle gmem maxWins = do
   let selectedRole = map snd $ take 1 $ reverse $ takeWhile ((<= maxWins) . fst) allRoles
   addRemoveDiscordRoles gid gmem (map snd allRoles) selectedRole
 
-applyRolesDivisionTitleByBowBotAccount' :: (MonadIOReader m r, HasAll '[Connection, DiscordHandle, InfoCache] r) => BowBotAccount -> [GuildMember] -> m ()
-applyRolesDivisionTitleByBowBotAccount' bbacc gmems = do
-  wins :: [Integer] <- map fromOnly <$> queryLog "SELECT `bowWins` FROM `stats` JOIN `peopleMinecraft` ON `stats`.`minecraft` = `peopleMinecraft`.`minecraft` WHERE `id` = ?" (Only (accountBotId bbacc))
+applyRolesDivisionTitleByBowBotId' :: (MonadIOReader m r, HasAll '[Connection, DiscordHandle, InfoCache] r) => BowBotId -> [GuildMember] -> m ()
+applyRolesDivisionTitleByBowBotId' bid gmems = do
+  wins :: [Integer] <- map fromOnly <$> queryLog "SELECT `bowWins` FROM `stats` JOIN `peopleMinecraft` ON `stats`.`minecraft` = `peopleMinecraft`.`minecraft` WHERE `id` = ?" (Only bid)
   for_ gmems $ \gmem -> do
     giveRolesDivisionTitle gmem (foldl' max 0 wins)
 
-applyRolesDivisionTitleByBowBotAccount :: (MonadIOReader m r, HasAll '[Connection, DiscordHandle, InfoCache] r) => BowBotAccount -> m ()
-applyRolesDivisionTitleByBowBotAccount bbacc = do
+applyRolesDivisionTitleByBowBotId :: (MonadIOReader m r, HasAll '[Connection, DiscordHandle, InfoCache] r) => BowBotId -> m ()
+applyRolesDivisionTitleByBowBotId bid = do
   gid <- askInfo discordGuildIdInfo
   gmems <- discordGuildMembers gid
-  applyRolesDivisionTitleByBowBotAccount' bbacc $ filter (\gmem -> maybe 0 userId (memberUser gmem) `elem` accountDiscords bbacc) gmems
+  accountDiscords <- getDiscordIdsByBowBotId bid
+  applyRolesDivisionTitleByBowBotId' bid $ filter (\gmem -> maybe 0 userId (memberUser gmem) `elem` accountDiscords) gmems
 
-applyRolesDivisionTitleByUUID :: (MonadIOBotData m d r, HasCache BowBotAccount d, HasAll '[Connection, DiscordHandle, InfoCache] r) => UUID -> m ()
+applyRolesDivisionTitleByUUID :: (MonadIOReader m r, HasAll '[Connection, DiscordHandle, InfoCache] r) => UUID -> m ()
 applyRolesDivisionTitleByUUID uuid = do
-  bbacc <- getBowBotAccountByMinecraft uuid
-  for_ bbacc applyRolesDivisionTitleByBowBotAccount
+  bbacc <- getBowBotIdByMinecraft uuid
+  for_ bbacc applyRolesDivisionTitleByBowBotId
 
 giveRolesMember :: (MonadIOReader m r, HasAll '[DiscordHandle, InfoCache] r) => GuildMember -> Bool -> m ()
 giveRolesMember gmem isMember = do
@@ -86,52 +87,53 @@ giveIllegalRole gmem = do
   gid <- askInfo discordGuildIdInfo
   addRemoveDiscordRoles gid gmem [illegalRole] $ [illegalRole | not . null $ intersect (memberRoles gmem) (memberRole:savedHypixelRoles ++ divisionTitleRoles)]
 
-applyRolesByBowBotAccount' :: (MonadIOBotData m d r, HasCache BowBotAccount d, HasAll '[Connection, DiscordHandle, Manager, CounterState, InfoCache] r) => Maybe BowBotAccount -> [GuildMember] -> m ()
-applyRolesByBowBotAccount' (Just bbacc) gmems = do
-  wins :: [Integer] <- map fromOnly <$> queryLog "SELECT `bowWins` FROM `stats` JOIN `peopleMinecraft` ON `stats`.`minecraft` = `peopleMinecraft`.`minecraft` WHERE `id` = ?" (Only (accountBotId bbacc))
-  savedRoles :: [SavedRole] <- maybe [] fromOnly . only <$> queryLog "SELECT `roles` FROM `people` WHERE `id` = ?" (Only (accountBotId bbacc))
-  hypixelRoles :: [HypixelRole] <- map fromOnly <$> queryLog "SELECT `hypixelRole` FROM `minecraft` WHERE `uuid` IN ? AND `hypixelRole` IS NOT NULL" (Only (In (accountMinecrafts bbacc)))
+applyRolesByBowBotId' :: (MonadIOReader m r, HasAll '[Connection, DiscordHandle, Manager, CounterState, InfoCache] r) => Maybe BowBotId -> [GuildMember] -> m ()
+applyRolesByBowBotId' (Just bid) gmems = do
+  wins :: [Integer] <- map fromOnly <$> queryLog "SELECT `bowWins` FROM `stats` JOIN `peopleMinecraft` ON `stats`.`minecraft` = `peopleMinecraft`.`minecraft` WHERE `id` = ?" (Only bid)
+  savedRoles :: [SavedRole] <- maybe [] fromOnly . only <$> queryLog "SELECT `roles` FROM `people` WHERE `id` = ?" (Only bid)
+  hypixelRoles :: [HypixelRole] <- map fromOnly <$> queryLog "SELECT `hypixelRole` FROM `minecraft` JOIN `peopleMinecraft` ON `peopleMinecraft`.`minecraft` = `minecraft`.`uuid` WHERE `peopleMinecraft`.`id` = ? AND `hypixelRole` IS NOT NULL" (Only bid)
   for_ gmems $ \gmem -> do
     giveSavedRoles gmem savedRoles (Just hypixelRoles)
     giveRolesDivisionTitle gmem (foldl' max 0 wins)
     giveRolesMember gmem (not $ null hypixelRoles)
     removeIllegalRole gmem
-applyRolesByBowBotAccount' Nothing gmems = for_ gmems $ \gmem -> do
+applyRolesByBowBotId' Nothing gmems = for_ gmems $ \gmem -> do
   savedRoles :: [SavedRole] <- maybe [] fromOnly . only <$> queryLog "SELECT `roles` FROM `unregistered` WHERE `discord` = ?" (Only (maybe 0 userId (memberUser gmem)))
   giveSavedRoles gmem savedRoles Nothing
   giveRolesMemberUnregistered gmem
   giveIllegalRole gmem
 
 
-applyRolesByBowBotAccount :: (MonadIOBotData m d r, HasCache BowBotAccount d, HasAll '[Connection, DiscordHandle, Manager, CounterState, InfoCache] r) => BowBotAccount -> m ()
-applyRolesByBowBotAccount bbacc = do
+applyRolesByBowBotId :: (MonadIOReader m r, HasAll '[Connection, DiscordHandle, Manager, CounterState, InfoCache] r) => BowBotId -> m ()
+applyRolesByBowBotId bid = do
   gid <- askInfo discordGuildIdInfo
   gmems <- discordGuildMembers gid
-  applyRolesByBowBotAccount' (Just bbacc) $ filter (\gmem -> maybe 0 userId (memberUser gmem) `elem` accountDiscords bbacc) gmems
+  accountDiscords <- getDiscordIdsByBowBotId bid
+  applyRolesByBowBotId' (Just bid) $ filter (\gmem -> maybe 0 userId (memberUser gmem) `elem` accountDiscords) gmems
 
-applyRoles :: (MonadIOBotData m d r, HasCache BowBotAccount d, HasAll '[Connection, DiscordHandle, Manager, CounterState, InfoCache] r) => GuildMember -> m ()
+applyRoles :: (MonadIOReader m r, HasAll '[Connection, DiscordHandle, Manager, CounterState, InfoCache] r) => GuildMember -> m ()
 applyRoles gmem = do
-  bbacc <- getBowBotAccountByDiscord (maybe 0 userId (memberUser gmem))
-  applyRolesByBowBotAccount' bbacc [gmem]
+  bid <- getBowBotIdByDiscord (maybe 0 userId (memberUser gmem))
+  applyRolesByBowBotId' bid [gmem]
 
-applyRolesAll :: (MonadIOBotData m d r, HasCache BowBotAccount d, HasAll '[Connection, DiscordHandle, Manager, CounterState, InfoCache] r) => m ()
+applyRolesAll :: (MonadIOReader m r, HasAll '[Connection, DiscordHandle, Manager, CounterState, InfoCache] r) => m ()
 applyRolesAll = do
   lb <- getHypixelBowLeaderboards
   savedRoles :: M.Map UserId [SavedRole] <- M.fromList <$> queryLog "SELECT `discord`, `roles` FROM `unregistered` UNION SELECT `discord`, `roles` FROM `people` JOIN `peopleDiscord` ON `people`.`id` = `peopleDiscord`.`id`" ()
   gid <- askInfo discordGuildIdInfo
   gmems <- discordGuildMembers gid
   roles :: [(UUID, HypixelRole)] <- queryLog "SELECT `uuid`, `hypixelRole` FROM `minecraft` WHERE `hypixelRole` IS NOT NULL" ()
+  accountMinecrafts :: M.Map UserId [UUID] <- M.map (map snd) . groupByToMap fst <$> queryLog "SELECT `peopleDiscord`.`discord`, `peopleMinecraft`.`minecraft` FROM `peopleMinecraft` JOIN `peopleDiscord` ON `peopleDiscord`.`id` = `peopleMinecraft`.`id`" ()
   for_ gmems $ \gmem -> do
     let discord = maybe 0 userId (memberUser gmem)
-    bbacc <- getBowBotAccountByDiscord discord
-    case bbacc of
+    case accountMinecrafts M.!? discord of
       Nothing -> do
         for_ (savedRoles M.!? discord) $ \r -> giveSavedRoles gmem r Nothing
         giveRolesMemberUnregistered gmem
         giveIllegalRole gmem
-      Just acc -> do
-        let hypixelRoles = mapMaybe (`lookup` roles) (accountMinecrafts acc)
+      Just mcs -> do
+        let hypixelRoles = mapMaybe (`lookup` roles) mcs
         for_ (savedRoles M.!? discord) $ \r -> giveSavedRoles gmem r (Just hypixelRoles)
-        giveRolesDivisionTitle gmem (foldl' max 0 (mapMaybe (fmap bowLbWins . (lb HM.!?)) (accountMinecrafts acc)))
+        giveRolesDivisionTitle gmem (foldl' max 0 (mapMaybe (fmap bowLbWins . (lb HM.!?)) mcs))
         giveRolesMember gmem (not $ null hypixelRoles)
         removeIllegalRole gmem

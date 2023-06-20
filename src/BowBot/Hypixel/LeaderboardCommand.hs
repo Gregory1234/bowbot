@@ -66,8 +66,8 @@ leaderboardCommand lbt@LeaderboardType {..} name = Command CommandInfo
       acc <- liftMaybe thePlayerDoesNotExistMessage =<< getFromCache @MinecraftAccount uuid
       handlerMinecraft (autocorrectFromAccountDirect acc)
     Just (discordIdFromString -> Just did) -> do
-      bbacc <- liftMaybe theUserIsntRegisteredMessage =<< getBowBotAccountByDiscord did
-      lb <- generateLeaderboard (accountMinecrafts bbacc)
+      mcs <- getMinecraftUUIDsByDiscord did
+      lb <- generateLeaderboard mcs
       displayLeaderboard Nothing "" lb
     Just n -> do
       ac <- liftMaybe thePlayerIsntOnThisLeaderboardMessage =<< minecraftAutocorrect n
@@ -77,8 +77,8 @@ leaderboardCommand lbt@LeaderboardType {..} name = Command CommandInfo
     generateLeaderboardDiscordSelf :: ExceptT Text CommandHandler [LeaderboardRow a]
     generateLeaderboardDiscordSelf = do
       did <- userId <$> envs envSender
-      bbacc <- getBowBotAccountByDiscord did
-      generateLeaderboard (maybe [] accountMinecrafts bbacc)
+      mcs <- getMinecraftUUIDsByDiscord did
+      generateLeaderboard mcs
     generateLeaderboard :: [UUID] -> ExceptT Text CommandHandler [LeaderboardRow a]
     generateLeaderboard selected = do
       lbFull <- HM.toList <$> lift leaderboardGetStats

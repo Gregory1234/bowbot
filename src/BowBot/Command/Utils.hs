@@ -25,11 +25,11 @@ theDiscordIdIsInvalid = "*The discord id is invalid!*"
 showSelfSkipTip :: MinecraftAccount -> ExceptT Text CommandHandler ()
 showSelfSkipTip acc = do
   user <- envs envSender
-  bbaccMaybe <- getBowBotAccountByDiscord (userId user)
-  for_ bbaccMaybe $ \BowBotAccount {..} -> do
-    when (mcUUID acc `elem` accountMinecrafts) $ do
+  mcs' <- getMinecraftListByDiscord (userId user)
+  for_ mcs' $ \mcs -> 
+    when (mcUUID acc `elem` allMinecrafts mcs) $ do
       prefix <- askInfo discordCommandPrefixInfo
-      if mcUUID acc == accountSelectedMinecraft
+      if mcUUID acc == selectedMinecraft mcs
         then respond "*Tip: you can use most Bow Bot's commands on yourself by not providing your username!*"
         else respond $ "*Tip: you can select this account (for use in Bow Bot's commands without providing a username) using `" <> prefix <> "selectmc " <> (head . mcNames $ acc) <> "`!*"
 

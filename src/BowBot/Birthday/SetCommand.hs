@@ -14,5 +14,5 @@ setBirthdayCommand = Command CommandInfo
   } $ twoArguments $ \didStr bdStr -> do
     did <- liftMaybe theDiscordIdIsInvalid $ discordIdFromString didStr
     bd <- liftMaybe "*Invalid birthday date!*" $ birthdayFromString bdStr
-    a <- setBirthday did bd
-    respond $ if a then "*Birthday set!*" else somethingWentWrongMessage
+    setBirthday did bd
+    respond "*Birthday set!*"

@@ -32,17 +32,14 @@ getHypixelBowMilestones = do
     return res
   return [(uuid, milestone) | (uuid, low, high) <- milestonePairs, milestone <- milestoneNamesFromWins milestoneNames low high]
 
-announceMilestones :: (MonadIOBotData m d r, HasAll [DiscordHandle, Connection, InfoCache] r, HasCaches [BowBotAccount, DiscordAccount, MinecraftAccount] d) => m ()
+announceMilestones :: (MonadIOBotData m d r, HasAll [DiscordHandle, Connection, InfoCache] r, HasCaches [DiscordAccount, MinecraftAccount] d) => m ()
 announceMilestones = do
   milestonesChannel <- askInfo milestonesChannelInfo
   toAnnounce <- getHypixelBowMilestones
   for_ toAnnounce $ \(uuid, milestone) -> do
-      bbacc' <- getBowBotAccountByMinecraft uuid
-      case bbacc' of
-        Nothing -> pure ()
-        Just BowBotAccount {..} -> do
-          mcacc <- fromJust <$> getFromCache uuid
-          dcaccounts <- getCacheMap
-          let p = map (\x -> x { discordName = (discordName x) { discordNickname = Nothing } }) $ filter discordIsMember $ map (dcaccounts HM.!) accountDiscords
-          unless (null p) $ do
-            call_ $ R.CreateMessage milestonesChannel $ "**Congratulations** to **" <> head (mcNames mcacc) <> "** (" <> T.intercalate ", " (map (showDiscordNameDiscord . discordName) p) <> ") for reaching " <> milestone <> "!"
+    accountDiscords <- getDiscordIdsByMinecraft uuid
+    mcacc <- fromJust <$> getFromCache uuid
+    dcaccounts <- getCacheMap
+    let p = map (\x -> x { discordName = (discordName x) { discordNickname = Nothing } }) $ filter discordIsMember $ map (dcaccounts HM.!) accountDiscords
+    unless (null p) $ do
+      call_ $ R.CreateMessage milestonesChannel $ "**Congratulations** to **" <> head (mcNames mcacc) <> "** (" <> T.intercalate ", " (map (showDiscordNameDiscord . discordName) p) <> ") for reaching " <> milestone <> "!"

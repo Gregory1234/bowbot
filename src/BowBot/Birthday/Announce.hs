@@ -17,14 +17,14 @@ import qualified Data.Text as T
 birthdayChannelInfo :: InfoType ChannelId
 birthdayChannelInfo = InfoType { infoName = "birthday_channel", infoDefault = 0, infoParse = first pack . readEither . unpack }
 
-announceBirthdays :: (MonadIOBotData m d r, HasAll [DiscordHandle, Connection, InfoCache] r, HasCaches [BowBotAccount, DiscordAccount] d) => m ()
+announceBirthdays :: (MonadIOBotData m d r, HasAll [DiscordHandle, Connection, InfoCache] r, HasCache DiscordAccount d) => m ()
 announceBirthdays = do
   currentDay <- liftIO currentBirthdayDate
   birthdays <- getBirthdaysByDate currentDay
   birthdayChannel <- askInfo birthdayChannelInfo
   dcaccounts <- getCacheMap
   logInfoFork $ "Announcing birthdays: " <> T.intercalate ", " (map (showDiscordName . discordName) . filter discordIsMember . map (dcaccounts HM.!) $ birthdays)
-  pns <- HM.fromList . ((\BowBotAccount {..} -> (,accountBotId) <$> accountDiscords) <=< HM.elems) <$> getCacheMap
+  pns :: HM.HashMap UserId BowBotId <- HM.fromList <$> queryLog "SELECT `discord`, `id` FROM `peopleDiscord`" ()
   let (registered, unregistered) = partition (isJust . (pns HM.!?)) birthdays
   let peopleMap = M.toList $ M.filter (not . null) $ M.map (filter discordIsMember . map (dcaccounts HM.!)) $ groupByToMap (pns HM.!) registered
   for_ peopleMap $ \(_, p) -> call $ R.CreateMessage birthdayChannel $ "**Happy birthday** to " <> T.intercalate ", " (map (showDiscordNameDiscord . discordName) p) <> "!"

@@ -2,7 +2,7 @@ module BowBot.Birthday.Basic where
 
 import BowBot.BotData.Cached
 import BowBot.Discord.Utils
-import BowBot.DB.Basic (queryLog, executeManyLog', withDB, Connection, Only(..))
+import BowBot.DB.Basic
 import BowBot.Account.Basic
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
@@ -35,12 +35,12 @@ birthdayFromString str = case T.splitOn "." str of
 currentBirthdayDate :: IO BirthdayDate
 currentBirthdayDate = fromJust . birthdayFromString . pack <$> getTime "%d.%m"
 
-setBirthday :: (MonadIOBotData m d r, HasCache BowBotAccount d) => UserId -> BirthdayDate -> m Bool
+setBirthday :: (MonadIOReader m r, Has Connection r) => UserId -> BirthdayDate -> m ()
 setBirthday did bd = do
-  acc <- getBowBotAccountByDiscord did
-  liftIO $ withDB $ \conn -> (>0) <$> case acc of
-    Nothing -> executeManyLog' conn "INSERT INTO `unregistered` (`discord`, `birthday`) VALUES (?,?) ON DUPLICATE KEY UPDATE `birthday`=VALUES(`birthday`)" [(did, bd)]
-    Just a -> executeManyLog' conn "INSERT INTO `people` (`id`, `birthday`) VALUES (?,?) ON DUPLICATE KEY UPDATE `birthday`=VALUES(`birthday`)" [(accountBotId a, bd)]
+  acc <- getBowBotIdByDiscord did
+  void $ case acc of
+    Nothing -> executeLog "INSERT INTO `unregistered` (`discord`, `birthday`) VALUES (?,?) ON DUPLICATE KEY UPDATE `birthday`=VALUES(`birthday`)" (did, bd)
+    Just a -> executeLog "INSERT INTO `people` (`id`, `birthday`) VALUES (?,?) ON DUPLICATE KEY UPDATE `birthday`=VALUES(`birthday`)" (a, bd)
 
 getBirthdaysByDate :: (MonadIOReader m r, Has Connection r) => BirthdayDate -> m [UserId]
 getBirthdaysByDate date = do

@@ -32,7 +32,6 @@ emptyBotData = do
 refreshBotData :: (MonadIOBotData m BotData r, Has Connection r) => m ()
 refreshBotData = do
   refreshCache @MinecraftAccount
-  refreshCache @BowBotAccount
   refreshCache @DiscordAccount
 
 updateBotData :: (MonadIOBotData m BotData r, HasAll [Manager, DiscordHandle, CounterState, Connection, InfoCache] r) => [StatsTimeRange] -> m ()

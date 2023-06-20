@@ -5,9 +5,7 @@ module BowBot.Account.Basic where
 import BowBot.Minecraft.Basic (UUID(..))
 import Discord.Internal.Rest (UserId)
 import BowBot.BotData.Cached
-import qualified Data.HashMap.Strict as HM
-import qualified Data.Map as M
-import BowBot.DB.Basic (queryLog, Only(..))
+import BowBot.DB.Basic (queryLog, Only(..), Connection)
 import BowBot.Utils
 import BowBot.Discord.Orphans ()
 import Data.Hashable (Hashable)
@@ -17,30 +15,37 @@ newtype BowBotId = BowBotId { unBowBotId :: Integer }
   deriving stock (Show, Eq, Ord)
   deriving newtype (Hashable, Param, Result)
 
-data BowBotAccount = BowBotAccount
-  { accountBotId :: !BowBotId
-  , accountDiscords :: [UserId]
-  , accountSelectedMinecraft :: !UUID
-  , accountMinecrafts :: [UUID]
-  } deriving (Show, Eq)
+data MinecraftList = MinecraftList { selectedMinecraft :: UUID, allMinecrafts :: [UUID] }
 
-instance Cached BowBotAccount where
-  type CacheIndex BowBotAccount = BowBotId
-  refreshCache = do
-    cache <- getCache
-    ids :: [Only BowBotId] <- queryLog "SELECT `id` FROM `people`" ()
-    minecrafts :: [(BowBotId, UUID, Bool)] <- queryLog "SELECT `id`, `minecraft`, `selected` FROM `peopleMinecraft`" ()
-    discords :: [(BowBotId, UserId)] <- queryLog "SELECT `id`, `discord` FROM `peopleDiscord`" ()
-    let minecraftsMap = M.map (\l -> let u = map (\(_,b,c) -> (b,c)) l in (fst $ head $ filter snd u, map fst u)) $ groupByToMap (\(a,_,_) -> a) minecrafts
-    let discordsMap = M.map (map snd) $ groupByToMap fst discords
-    let newValues = HM.fromList $ flip mapMaybe ids $ \(Only i) -> (i,) <$> do
-          (accountSelectedMinecraft, accountMinecrafts) <- minecraftsMap M.!? i
-          accountDiscords <- discordsMap M.!? i
-          return BowBotAccount { accountBotId = i, ..}
-    liftIO $ atomically $ writeTVar cache newValues
+minecraftListFromList :: [(UUID, Bool)] -> Maybe MinecraftList
+minecraftListFromList mcs = fmap (\selectedMinecraft -> MinecraftList {..}) selectedMinecraft'
+  where
+    selectedMinecraft' = fmap fst $ only $ filter snd mcs
+    allMinecrafts = map fst mcs
 
-getBowBotAccountByDiscord :: (MonadIOBotData m d r, HasCache BowBotAccount d) => UserId -> m (Maybe BowBotAccount)
-getBowBotAccountByDiscord did = find ((did `elem`) . accountDiscords) . HM.elems <$> getCacheMap
+getSelectedMinecraftUUIDByDiscord :: (MonadIOReader m r, Has Connection r) => UserId -> m (Maybe UUID)
+getSelectedMinecraftUUIDByDiscord did = only . map fromOnly <$> queryLog "SELECT `minecraft` FROM `peopleMinecraft` JOIN `peopleDiscord` ON `peopleMinecraft`.`id`=`peopleDiscord`.`id` WHERE `peopleDiscord`.`discord` = ? AND `peopleMinecraft`.`selected` = 1" (Only did)
 
-getBowBotAccountByMinecraft :: (MonadIOBotData m d r, HasCache BowBotAccount d) => UUID -> m (Maybe BowBotAccount)
-getBowBotAccountByMinecraft uuid = find ((uuid `elem`) . accountMinecrafts) . HM.elems <$> getCacheMap
+getMinecraftUUIDsByDiscord :: (MonadIOReader m r, Has Connection r) => UserId -> m [UUID]
+getMinecraftUUIDsByDiscord did = map fromOnly <$> queryLog "SELECT `minecraft` FROM `peopleMinecraft` JOIN `peopleDiscord` ON `peopleMinecraft`.`id`=`peopleDiscord`.`id` WHERE `peopleDiscord`.`discord` = ?" (Only did)
+
+getMinecraftListByDiscord :: (MonadIOReader m r, Has Connection r) => UserId -> m (Maybe MinecraftList)
+getMinecraftListByDiscord did = minecraftListFromList <$> queryLog "SELECT `minecraft`,`selected` FROM `peopleMinecraft` JOIN `peopleDiscord` ON `peopleMinecraft`.`id`=`peopleDiscord`.`id` WHERE `peopleDiscord`.`discord` = ?" (Only did)
+
+getMinecraftListByBowBotId :: (MonadIOReader m r, Has Connection r) => BowBotId -> m (Maybe MinecraftList)
+getMinecraftListByBowBotId bid = minecraftListFromList <$> queryLog "SELECT `minecraft`,`selected` FROM `peopleMinecraft` WHERE `id` = ?" (Only bid)
+
+getDiscordIdsByMinecraft :: (MonadIOReader m r, Has Connection r) => UUID -> m [UserId]
+getDiscordIdsByMinecraft uuid = map fromOnly <$> queryLog "SELECT `discord` FROM `peopleDiscord` JOIN `peopleMinecraft` ON `peopleMinecraft`.`id`=`peopleDiscord`.`id` WHERE `peopleMinecraft`.`minecraft` = ?" (Only uuid)
+
+getDiscordIdsByBowBotId :: (MonadIOReader m r, Has Connection r) => BowBotId -> m [UserId]
+getDiscordIdsByBowBotId bid = map fromOnly <$> queryLog "SELECT `discord` FROM `peopleDiscord` WHERE `id` = ?" (Only bid)
+
+getDiscordIdsByDiscord :: (MonadIOReader m r, Has Connection r) => UserId -> m [UserId]
+getDiscordIdsByDiscord uuid = map fromOnly <$> queryLog "SELECT `peopleDiscord2`.`discord` FROM `peopleDiscord` JOIN `peopleDiscord` AS `peopleDiscord2` ON `peopleDiscord`.`id` = `peopleDiscord2`.`id` WHERE `peopleDiscord`.`discord` = ?" (Only uuid)
+
+getBowBotIdByDiscord :: (MonadIOReader m r, Has Connection r) => UserId -> m (Maybe BowBotId)
+getBowBotIdByDiscord did = only . map fromOnly <$> queryLog "SELECT `id` FROM `peopleDiscord` WHERE `discord` = ?" (Only did)
+
+getBowBotIdByMinecraft :: (MonadIOReader m r, Has Connection r) => UUID -> m (Maybe BowBotId)
+getBowBotIdByMinecraft uuid = only . map fromOnly <$> queryLog "SELECT `id` FROM `peopleMinecraft` WHERE `minecraft` = ?" (Only uuid)
