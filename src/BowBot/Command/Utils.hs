@@ -8,7 +8,7 @@ import BowBot.BotData.Cached
 import Control.Monad.Except
 import BowBot.Account.Basic
 import BowBot.BotData.Info
-import BowBot.Minecraft.Basic (UUID)
+import BowBot.Minecraft.Basic
 
 youArentRegisteredMessage :: Text
 youArentRegisteredMessage = "*You aren't registered! To register, type `?register yourign`.*"
@@ -35,6 +35,8 @@ showSelfSkipTip acc = do
 
 addMinecraftAccount :: MinecraftAccount -> ExceptT Text CommandHandler ()
 addMinecraftAccount acc@MinecraftAccount {..} = do
+  acc' <- getFromCache @MinecraftAccount mcUUID
+  assertIO (isNothing acc')
   respond "**A new Minecraft player discovered! 🥳**"
   void $ storeInCache [acc]
   void $ addMinecraftName (head mcNames) mcUUID
@@ -44,8 +46,19 @@ commandMinecraftByNameWithSkipTip new old n = do
   autocorrect <- minecraftAutocorrect n
   case autocorrect of
     Nothing -> do
-      acc <- liftMaybe thePlayerDoesNotExistMessage =<< freshMinecraftAccountByName n
-      new acc
+      uuid <- liftMaybe thePlayerDoesNotExistMessage =<< mojangNameToUUID n
+      acc' <- getFromCache @MinecraftAccount uuid
+      case acc' of
+        Nothing -> do
+          acc <- liftMaybe thePlayerDoesNotExistMessage =<< freshMinecraftAccountByUUID uuid
+          new acc
+        Just acc -> do
+          newName <- liftMaybe thePlayerDoesNotExistMessage =<< mojangUUIDToCurrentName uuid
+          let newAcc = acc { mcNames = newName : mcNames acc }
+          void $ storeInCache [newAcc]
+          void $ addMinecraftName newName uuid
+          showSelfSkipTip newAcc
+          old (autocorrectFromAccountDirect newAcc)
     Just ac@MinecraftAutocorrect {..} -> do
       showSelfSkipTip autocorrectAccount
       old ac
