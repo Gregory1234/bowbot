@@ -143,19 +143,19 @@ eventHandler (MessageCreate m) = do
 eventHandler (GuildMemberAdd gid gmem) = do
   maingid <- askInfo discordGuildIdInfo
   when (gid == maingid && not (maybe True userIsBot (memberUser gmem))) $ do
-    void $ storeInCache [guildMemberToDiscordAccount gmem]
+    storeDiscordAccount $ guildMemberToDiscordAccount gmem
     applyRoles gmem
 eventHandler (GuildMemberUpdate gid roles usr newname) = do
   maingid <- askInfo discordGuildIdInfo
   when (gid == maingid && not (userIsBot usr)) $ do
-    void $ storeInCache [let acc = userToDiscordAccount usr in acc { discordName = (discordName acc) { discordNickname = newname }, discordIsMember = True }]
+    storeDiscordAccount $ let acc = userToDiscordAccount usr in acc { discordName = (discordName acc) { discordNickname = newname <|> discordNickname (discordName acc) }, discordIsMember = True }
     unless (null roles) $ do
       savedRoles <- savedRolesFromIds roles
       setSavedRolesByDiscord (userId usr) savedRoles
 eventHandler (GuildMemberRemove gid usr) = do
   maingid <- askInfo discordGuildIdInfo
   when (gid == maingid && not (userIsBot usr)) $ do
-    void $ storeInCache [userToDiscordAccount usr]
+    storeDiscordAccount $ userToDiscordAccount usr
 eventHandler _ = pure ()
 
 commandTimeoutRun :: (MonadHoistIO m, MonadReader r m, Has DiscordHandle r) => Int -> Message -> m () -> m ()

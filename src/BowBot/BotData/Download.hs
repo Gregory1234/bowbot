@@ -23,16 +23,12 @@ import BowBot.Utils
 
 emptyBotData :: STM BotData
 emptyBotData = do
-  infoFieldCache <- newCache
   minecraftAccountCache <- newCache
-  bowBotAccountCache <- newCache
-  discordAccountsCache <- newCache
   return BotData {..}
 
 refreshBotData :: (MonadIOBotData m BotData r, Has Connection r) => m ()
 refreshBotData = do
   refreshCache @MinecraftAccount
-  refreshCache @DiscordAccount
 
 updateBotData :: (MonadIOBotData m BotData r, HasAll [Manager, DiscordHandle, CounterState, Connection, InfoCache] r) => [StatsTimeRange] -> m ()
 updateBotData times = (ask >>=) $ \ctx -> liftIO $ foldl1 concurrently_ $

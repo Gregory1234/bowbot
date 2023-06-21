@@ -5,37 +5,32 @@ module BowBot.Discord.Account (
   module BowBot.Discord.Name
 ) where
 
-import BowBot.BotData.Cached
 import BowBot.Discord.Utils
-import qualified Data.HashMap.Strict as HM
 import BowBot.DB.Basic
 import BowBot.BotData.Info
 import qualified Discord.Requests as R
 import Data.List (deleteFirstsBy)
 import BowBot.Discord.Name
-import Data.Coerce
+import Database.MySQL.Simple.QueryParams (QueryParams(..))
+import Database.MySQL.Simple.QueryResults (QueryResults(..))
+import Data.Proxy
 
 data DiscordAccount = DiscordAccount { discordId :: !UserId, discordName :: !DiscordName, discordIsMember :: !Bool } deriving (Show, Eq)
 
-instance Cached DiscordAccount where
-  type CacheIndex DiscordAccount = UserId
-  refreshCache = do
-    cache <- getCache
-    res :: [Concat (Only UserId, DiscordName, Only Bool)] <- queryLog "SELECT `id`, `name`, `discriminator`, `nickname`, `member` FROM `discord`" ()
-    let newValues = HM.fromList $ flip fmap res $ (. coerce)$ \(discordId, discordName, discordIsMember) -> (discordId, DiscordAccount {..})
-    liftIO $ atomically $ writeTVar cache newValues
+instance QueryParams DiscordAccount where
+  renderParams DiscordAccount {..} = renderParams $ Concat (Only discordId, discordName, Only discordIsMember)
+instance QueryResults DiscordAccount where
+  convertResults fields strings = let
+    Concat (Only discordId, discordName, Only discordIsMember) = convertResults fields strings
+      in DiscordAccount {..}
+instance QueryResultsSize DiscordAccount where
+  queryResultsSize _ = 2 + queryResultsSize (Proxy @DiscordName)
 
-instance CachedIndexed DiscordAccount where
-  cacheIndex = discordId
-  storeInCache accs = do
-    cacheMap <- getCacheMap
-    let toQueryParams acc@DiscordAccount {..} = if Just acc == cacheMap HM.!? discordId then Nothing else Just $ Concat (Only discordId, discordName, Only discordIsMember)
-    let queryParams = mapMaybe toQueryParams accs
-    success <- liftIO $ withDB $ \conn -> (>0) <$> executeManyLog' conn "INSERT INTO `discord` (`id`, `name`, `discriminator`, `nickname`, `member`) VALUES (?,?,?,?,?) ON DUPLICATE KEY UPDATE `name`=VALUES(`name`), `discriminator`=VALUES(`discriminator`), `nickname`=VALUES(`nickname`), `member`=VALUES(`member`)" queryParams
-    when success $ do
-      cache <- getCache
-      liftIO $ atomically $ modifyTVar cache (insertMany (map (\x -> (discordId x, x)) accs))
-    return success
+getDiscordAccountById :: (MonadIOReader m r, Has Connection r) => UserId -> m (Maybe DiscordAccount)
+getDiscordAccountById did = only <$> queryLog "SELECT `id`, `name`, `discriminator`, `nickname`, `member` FROM `discord` WHERE `id` = ?" (Only did)
+
+getDiscordGuildMemberAccounts :: (MonadIOReader m r, Has Connection r) => m [DiscordAccount]
+getDiscordGuildMemberAccounts = queryLog "SELECT `id`, `name`, `discriminator`, `nickname`, `member` FROM `discord` WHERE `member` = 1" ()
 
 guildMemberToDiscordAccount :: GuildMember -> DiscordAccount
 guildMemberToDiscordAccount gmem = DiscordAccount
@@ -51,11 +46,14 @@ userToDiscordAccount user@User {..} = DiscordAccount
   , discordIsMember = False
   }
 
-updateDiscordAccountCache :: (MonadIOBotData m d r, HasAll '[InfoCache, DiscordHandle] r, HasCache DiscordAccount d) => m ()
+storeDiscordAccount :: (MonadIOReader m r, Has Connection r) => DiscordAccount -> m ()
+storeDiscordAccount acc = void $ executeLog "INSERT INTO `discord` (`id`, `name`, `discriminator`, `nickname`, `member`) VALUES (?,?,?,?,?) ON DUPLICATE KEY UPDATE `name`=VALUES(`name`), `discriminator`=VALUES(`discriminator`), `nickname`=VALUES(`nickname`), `member`=VALUES(`member`)" acc
+
+updateDiscordAccountCache :: (MonadIOReader m r, HasAll '[InfoCache, DiscordHandle, Connection] r) => m ()
 updateDiscordAccountCache = do
   gid <- askInfo discordGuildIdInfo
   members <- map guildMemberToDiscordAccount . filter (\GuildMember {..} -> fmap userIsBot memberUser == Just False) <$> discordGuildMembers gid
-  current <- HM.elems <$> getCacheMap
+  current :: [DiscordAccount] <- queryLog "SELECT `id`, `name`, `discriminator`, `nickname`, `member` FROM `discord`" ()
   updatedNonMembers <- for (deleteFirstsBy (\a b -> discordId a == discordId b) current members) $ \du -> do
     u' <- call $ R.GetUser (discordId du)
     case u' of
@@ -63,4 +61,4 @@ updateDiscordAccountCache = do
         logErrorFork $ showt e
         return du
       Right u -> return $ userToDiscordAccount u
-  void $ storeInCache $ members ++ updatedNonMembers
+  void $ executeManyLog "INSERT INTO `discord` (`id`, `name`, `discriminator`, `nickname`, `member`) VALUES (?,?,?,?,?) ON DUPLICATE KEY UPDATE `name`=VALUES(`name`), `discriminator`=VALUES(`discriminator`), `nickname`=VALUES(`nickname`), `member`=VALUES(`member`)" $ filter (`notElem` current) $ members ++ updatedNonMembers

@@ -3,7 +3,6 @@ module BowBot.Snipe.Command where
 import BowBot.Command
 import BowBot.Snipe.Basic
 import BowBot.Discord.Account
-import BowBot.BotData.Cached
 import BowBot.Discord.Utils
 
 snipeCommand :: Command
@@ -18,7 +17,7 @@ snipeCommand = Command CommandInfo
     case msg of
       Nothing -> respond "*Nothing to snipe!*"
       Just SnipeMessage {..} -> do
-        snipeAuthor' <- fmap discordName <$> getFromCache snipeMessageAuthor
+        snipeAuthor' <- fmap discordName <$> getDiscordAccountById snipeMessageAuthor
         case snipeAuthor' of
           Nothing -> respond somethingWentWrongMessage
           Just snipeAuthor -> respond $ if snipeMessageWasEdited
