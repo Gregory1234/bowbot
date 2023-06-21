@@ -35,7 +35,7 @@ updateHypixelRoles = do
           names <- catMaybes <$> traverse (\x -> fmap (x,) <$> mojangUUIDToCurrentName x) unknown
           b <- storeInCache [MinecraftAccount {mcUUID, mcNames = [mcName, mcName <> "OldNamesCurrentlyNotKnown"]} | (mcUUID, mcName) <- names]
           c <- addMinecraftNames (map (\(u,n) -> (n,u)) names)
-          when (b && c) $ void $ executeManyLog "INSERT INTO `minecraft` (`uuid`, `hypixelRole`) VALUES (?,?) ON DUPLICATE KEY UPDATE `hypixelRole`=VALUES(`hypixelRole`)" members
+          when ((b && c) || null unknown) $ void $ executeManyLog "INSERT INTO `minecraft` (`uuid`, `hypixelRole`) VALUES (?,?) ON DUPLICATE KEY UPDATE `hypixelRole`=VALUES(`hypixelRole`)" members
           void $ executeLog "UPDATE `minecraft` SET `hypixelRole` = NULL WHERE `uuid` NOT IN ?" (Only (In (map fst members)))
     _ -> return ()
 
