@@ -2,8 +2,6 @@ module BowBot.Hypixel.Guild where
 
 import BowBot.BotData.Info
 import BowBot.Minecraft.Basic
-import qualified Data.HashMap.Strict as HM
-import BowBot.BotData.Cached
 import BowBot.Counter.Basic
 import BowBot.Network.Basic hiding (Result)
 import BowBot.Hypixel.Basic

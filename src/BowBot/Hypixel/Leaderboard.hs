@@ -1,7 +1,6 @@
 module BowBot.Hypixel.Leaderboard where
 
 import BowBot.Hypixel.Stats
-import BowBot.BotData.Cached
 import qualified Data.HashMap.Strict as HM
 import BowBot.Minecraft.Basic (UUID(..))
 import BowBot.DB.Basic

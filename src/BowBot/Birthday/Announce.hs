@@ -1,6 +1,5 @@
 module BowBot.Birthday.Announce where
 
-import BowBot.BotData.Cached
 import BowBot.Birthday.Basic
 import qualified Discord.Requests as R
 import BowBot.Account.Basic

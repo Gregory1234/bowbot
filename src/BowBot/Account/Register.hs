@@ -2,7 +2,6 @@ module BowBot.Account.Register where
 
 import BowBot.Minecraft.Basic (UUID(..))
 import Discord.Internal.Rest (UserId)
-import BowBot.BotData.Cached
 import BowBot.DB.Basic
 import BowBot.Utils
 import BowBot.Account.Basic

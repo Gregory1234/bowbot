@@ -4,7 +4,6 @@ import BowBot.Command
 import BowBot.Minecraft.Account
 import BowBot.Utils
 import Discord.Types
-import BowBot.BotData.Cached
 import Control.Monad.Except
 import BowBot.Account.Basic
 import BowBot.BotData.Info

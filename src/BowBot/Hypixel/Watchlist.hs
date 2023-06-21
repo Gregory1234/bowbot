@@ -1,6 +1,5 @@
 module BowBot.Hypixel.Watchlist where
 
-import BowBot.BotData.Cached
 import BowBot.Minecraft.Basic
 import BowBot.Network.Basic
 import BowBot.Counter.Basic

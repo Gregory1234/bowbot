@@ -1,6 +1,5 @@
 module BowBot.Settings.Basic where
 
-import BowBot.BotData.Cached
 import Discord.Types (UserId)
 import BowBot.Discord.Orphans ()
 import BowBot.DB.Basic

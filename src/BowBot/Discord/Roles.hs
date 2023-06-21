@@ -5,7 +5,6 @@ import BowBot.Hypixel.Leaderboard
 import Discord.Types
 import BowBot.BotData.Info
 import BowBot.Discord.Utils
-import BowBot.BotData.Cached
 import BowBot.Counter.Basic
 import BowBot.Account.Basic
 import qualified Data.HashMap.Strict as HM
@@ -16,7 +15,6 @@ import qualified Data.Text as T
 import Data.Bifunctor (first)
 import BowBot.Minecraft.Basic (UUID)
 import BowBot.Discord.SavedRoles
-import Database.MySQL.Simple (In(..))
 
 
 

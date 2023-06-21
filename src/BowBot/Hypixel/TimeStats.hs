@@ -3,7 +3,6 @@ module BowBot.Hypixel.TimeStats where
 import BowBot.Hypixel.Stats
 import BowBot.Hypixel.Leaderboard
 import BowBot.Minecraft.Basic
-import BowBot.BotData.Cached
 import BowBot.DB.Basic
 import BowBot.Utils
 import BowBot.Settings.Basic

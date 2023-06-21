@@ -3,9 +3,7 @@ module BowBot.BotMonad where
 import Discord
 import Network.HTTP.Conduit (Manager)
 import Control.Monad.Reader (ReaderT(..))
-import BowBot.BotData.Basic
 import Data.Has
-import BowBot.BotData.HasData
 import BowBot.Counter.Basic
 import BowBot.DB.Basic (Connection)
 import BowBot.BotData.Info
@@ -16,7 +14,6 @@ data BotContext = BotContext
   , bctxDiscord :: !DiscordHandle
   , bctxCounter :: !CounterState
   , bctxInfo :: !InfoCache
-  , bctxData :: !BotData
   }
 
 instance Has Manager BotContext where
@@ -34,10 +31,6 @@ instance Has CounterState BotContext where
 instance Has InfoCache BotContext where
   getter = bctxInfo
   modifier f x = x { bctxInfo = f $ bctxInfo x }
-instance Has BotData BotContext where
-  getter = bctxData
-  modifier f x = x { bctxData = f $ bctxData x }
-instance HasBotData BotData BotContext
 
 type BotT = ReaderT BotContext
 

@@ -4,7 +4,6 @@ module BowBot.Account.Basic where
 
 import BowBot.Minecraft.Basic (UUID(..))
 import Discord.Internal.Rest (UserId)
-import BowBot.BotData.Cached
 import BowBot.DB.Basic (queryLog, Only(..), Connection)
 import BowBot.Utils
 import BowBot.Discord.Orphans ()

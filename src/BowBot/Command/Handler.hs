@@ -7,8 +7,6 @@ import BowBot.Network.Basic
 import BowBot.Discord.Basic
 import Data.Text.Encoding (encodeUtf8)
 import BowBot.Discord.Orphans ()
-import BowBot.BotData.Basic
-import BowBot.BotData.HasData
 import BowBot.Counter.Basic
 import BowBot.DB.Basic (Connection)
 import qualified Data.Text as T
@@ -44,7 +42,6 @@ data CommandHandlerContext = CommandHandlerContext
   , cctxDiscord :: !DiscordHandle
   , cctxCounter :: !CounterState
   , cctxInfo :: !InfoCache
-  , cctxData :: !BotData
   }
 
 instance Has CommandEnvironment CommandHandlerContext where
@@ -65,10 +62,6 @@ instance Has CounterState CommandHandlerContext where
 instance Has InfoCache CommandHandlerContext where
   getter = cctxInfo
   modifier f x = x { cctxInfo = f $ cctxInfo x }
-instance Has BotData CommandHandlerContext where
-  getter = cctxData
-  modifier f x = x { cctxData = f $ cctxData x }
-instance HasBotData BotData CommandHandlerContext
 
 type CommandHandler = ReaderT CommandHandlerContext IO
 

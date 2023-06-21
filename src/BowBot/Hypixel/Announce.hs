@@ -1,6 +1,5 @@
 module BowBot.Hypixel.Announce where
 
-import BowBot.BotData.Cached
 import qualified Discord.Requests as R
 import BowBot.Account.Basic
 import qualified Data.HashMap.Strict as HM

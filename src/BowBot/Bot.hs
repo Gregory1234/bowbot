@@ -15,7 +15,6 @@ import Control.Exception.Base (SomeException, try, throw)
 import System.Timeout (timeout)
 import BowBot.BotData.Download
 import BowBot.BotData.RefreshCommand
-import BowBot.BotData.Cached
 import Control.Concurrent (threadDelay, forkIO)
 import BowBot.Settings.Basic
 import BowBot.Network.Basic
@@ -26,7 +25,6 @@ import BowBot.Hypixel.LeaderboardCommand
 import BowBot.Hypixel.TimeStats
 import BowBot.Hypixel.WatchlistCommands
 import BowBot.Discord.Account
-import BowBot.Account.Basic
 import BowBot.Command.HelpCommand
 import BowBot.Minecraft.Basic
 import BowBot.Minecraft.Account
@@ -43,7 +41,6 @@ import BowBot.Birthday.SetCommand
 import BowBot.Snipe.Detect
 import BowBot.Snipe.Command
 import BowBot.Hypixel.Announce
-import BowBot.BotData.Basic
 import BowBot.Counter.Basic
 import BowBot.Hypixel.Guild
 
@@ -53,14 +50,13 @@ runBowBot = do
   ifDev () $ putStrLn "this is dev version of the bot"
   bctxManager <- newManager managerSettings
   bctxCounter <- atomically newCounterState
-  bctxData <- downloadBotData
   bctxInfo <- downloadInfoCache
   logInfoFork "bot started"
   userFacingError <-
     runDiscord $
       def
         { discordToken = pack discordKey,
-          discordOnStart = ReaderT $ onStartup bctxManager bctxCounter bctxData bctxInfo,
+          discordOnStart = ReaderT $ onStartup bctxManager bctxCounter bctxInfo,
           discordOnEvent = \e -> ReaderT $ \bctxDiscord -> withDB $ \bctxConnection -> runReaderT (eventHandler e) BotContext {..},
           discordOnLog = putStrLn . unpack,
           discordGatewayIntent = def { gatewayIntentMembers = True }
@@ -69,12 +65,11 @@ runBowBot = do
 
 backgroundMinutely :: Int -> Bot ()
 backgroundMinutely mint = do
-  clearBotDataCaches
+  clearBotCaches
   when (mint == 0) $ do
     logInfo "started update"
     updateDiscordStatus
     refreshInfoCache
-    refreshBotData
     hour <- liftIO $ read @Int <$> getTime "%k"
     weekday <- liftIO $ read @Int <$> getTime "%u"
     monthday <- liftIO $ read @Int <$> getTime "%d"
@@ -94,8 +89,8 @@ backgroundMinutely mint = do
     unless dev $ when (hour `mod` 8 == 0) clearLogs
     logInfo "finished update"
 
-onStartup :: Manager -> CounterState -> BotData -> InfoCache -> DiscordHandle -> IO ()
-onStartup bctxManager bctxCounter bctxData bctxInfo bctxDiscord = void $ forkIO $ do
+onStartup :: Manager -> CounterState -> InfoCache -> DiscordHandle -> IO ()
+onStartup bctxManager bctxCounter bctxInfo bctxDiscord = void $ forkIO $ do
   withDB $ \bctxConnection -> runReaderT updateDiscordStatus BotContext {..}
   sec <- read @Int <$> getTime "%S"
   liftIO $ threadDelay ((65 - sec `mod` 60) * 1000000)
@@ -218,7 +213,6 @@ commands =
   , hypixelBanCommand
   , setBirthdayCommand
   , helpCommand commands AdminLevel Nothing "normal" "adminhelp"
-  , adminCommand 30 "datarefresh" "sync Bow Bot's data from the database" refreshBotData
   , adminCommand 30 "inforefresh" "sync Bow Bot's info cache from the database" refreshInfoCache
   , adminCommand 3600 "discordupdate" "update discord data" updateDiscordAccountCache
   , updateDataCommand [] "dataupdate"

@@ -1,6 +1,5 @@
 module BowBot.Birthday.Basic where
 
-import BowBot.BotData.Cached
 import BowBot.Discord.Utils
 import BowBot.DB.Basic
 import BowBot.Account.Basic

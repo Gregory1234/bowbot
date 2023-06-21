@@ -1,6 +1,5 @@
 module BowBot.Perms.Basic where
 
-import BowBot.BotData.Cached
 import Discord.Types (UserId)
 import BowBot.Discord.Orphans ()
 import BowBot.Utils

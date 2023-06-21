@@ -3,7 +3,6 @@
 module BowBot.Minecraft.Account where
 
 import BowBot.Minecraft.Basic
-import BowBot.BotData.Cached
 import BowBot.DB.Basic
 import BowBot.Network.Basic
 import BowBot.Utils
