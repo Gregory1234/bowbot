@@ -2,10 +2,11 @@ module BowBot.Hypixel.WatchlistCommands where
 
 import BowBot.Command
 import BowBot.Minecraft.Account
-import qualified Data.HashMap.Strict as HM
-import BowBot.BotData.Cached
 import BowBot.Hypixel.Watchlist
 import qualified Data.Text as T
+import BowBot.DB.Basic
+import Database.MySQL.Simple.Types (In(..))
+import BowBot.Discord.Utils
 
 listCommand :: Command
 listCommand = Command CommandInfo
@@ -14,9 +15,8 @@ listCommand = Command CommandInfo
   , commandPerms = DefaultLevel
   , commandTimeout = 2
   } $ noArguments $ do
-    watchlist <- getWatchlist
-    cache <- getCacheMap
-    respond $ "**Players in watchList:**\n```\n" <> T.unwords (map (head . mcNames . (cache HM.!)) watchlist) <> "```"
+    watchlist <- getWatchlistAccounts
+    respond $ "**Players in watchList:**\n```\n" <> T.unwords (map (head . mcNames) watchlist) <> "```"
 
 onlineCommand :: Command
 onlineCommand = Command CommandInfo
@@ -25,11 +25,9 @@ onlineCommand = Command CommandInfo
   , commandPerms = DefaultLevel
   , commandTimeout = 30
   } $ noArguments $ do
-    res <- getOnlinePlayers
-    cache <- getCacheMap
-    let showOnline online = case T.unwords (map (head . mcNames . (cache HM.!)) online) of
+    online <- liftMaybe "**Processing list of online players. Please send command again later.**" =<< getOnlinePlayers
+    mcs <- queryLog "SELECT `uuid`, `names` FROM `minecraft` WHERE `uuid` IN ?" (Only (In online))
+    let onlineStr = case T.unwords (map (head . mcNames) mcs) of
           "" -> "None of the watchListed players are currently in bow duels."
           str -> str
-    case res of
-      Just online -> respond $ "**Players in watchList:**\n```\n" <> showOnline online <> "```"
-      Nothing -> respond "**Processing list of online players. Please send command again later.**"
+    respond $ "**Players in watchList:**\n```\n" <> onlineStr <> "```"

@@ -7,7 +7,6 @@ import BowBot.Account.Basic
 import Control.Monad.Except
 import BowBot.Minecraft.Basic
 import Discord.Types
-import BowBot.BotData.Cached
 import BowBot.Discord.Utils
 import qualified Data.HashMap.Strict as HM
 import BowBot.Hypixel.Guild
@@ -15,6 +14,7 @@ import qualified Data.Text as T
 import Data.Bifunctor (second)
 import BowBot.Command.Utils
 import Data.Ord
+import BowBot.DB.Basic (queryLog)
 
 data LeaderboardType s a = LeaderboardType
   { leaderboardName :: !Text
@@ -63,7 +63,7 @@ leaderboardCommand lbt@LeaderboardType {..} name = Command CommandInfo
       lb <- generateLeaderboardDiscordSelf
       displayLeaderboard Nothing "" lb
     Just (uuidFromString -> Just uuid) -> do
-      acc <- liftMaybe thePlayerDoesNotExistMessage =<< getFromCache @MinecraftAccount uuid
+      acc <- liftMaybe thePlayerDoesNotExistMessage =<< getMinecraftAccountByUUID uuid
       handlerMinecraft (autocorrectFromAccountDirect acc)
     Just (discordIdFromString -> Just did) -> do
       mcs <- getMinecraftUUIDsByDiscord did
@@ -86,7 +86,7 @@ leaderboardCommand lbt@LeaderboardType {..} name = Command CommandInfo
                 gmems <- getHypixelGuildMembers
                 return $ filter ((`elem` gmems) . fst) lbFull
               else return lbFull
-      accs <- getCacheMap @MinecraftAccount
+      accs <- HM.fromList . map (\x -> (mcUUID x, x)) <$> queryLog "SELECT `uuid`, `names` FROM `minecraft`" ()
       let lbParsed = mapMaybe (sequence . second leaderboardParser) lb
       let lbSorted = sortOn (Down . snd) lbParsed
       return $ zipWith (\lbRowIndex (uuid, lbRowValue) -> LeaderboardRow {lbRowAccount = accs HM.! uuid, lbRowSelected = uuid `elem` selected, ..}) [1..] lbSorted

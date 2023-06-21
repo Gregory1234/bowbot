@@ -14,7 +14,7 @@ hypixelBanCommand = Command CommandInfo
   , commandPerms = ModLevel
   , commandTimeout = 15
   } $ oneArgument $ \name -> do
-    mc <- liftMaybe thePlayerDoesNotExistMessage =<< getMinecraftAccountByCurrentNameFromCache name
+    mc <- liftMaybe thePlayerDoesNotExistMessage =<< getMinecraftAccountByCurrentName name
     banned <- getHypixelIsBannedByUUID (mcUUID mc)
     if banned == Banned
       then respond "*The player is already banned!*"

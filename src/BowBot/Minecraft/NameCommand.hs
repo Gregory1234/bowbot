@@ -7,7 +7,6 @@ import BowBot.Command.Utils
 import BowBot.Discord.Utils
 import BowBot.Minecraft.Basic
 import Control.Monad.Except
-import BowBot.BotData.Cached
 import BowBot.Account.Utils
 
 nameCommand :: Command
@@ -22,7 +21,7 @@ nameCommand = Command CommandInfo
       acc <- liftMaybe youArentRegisteredMessage =<< getSelectedMinecraftByDiscord did
       handler (autocorrectFromAccountDirect acc)
     Just (uuidFromString -> Just uuid) -> do
-      acc <- liftMaybe thePlayerDoesNotExistMessage =<< getFromCache @MinecraftAccount uuid
+      acc <- liftMaybe thePlayerDoesNotExistMessage =<< getMinecraftAccountByUUID uuid
       handler (autocorrectFromAccountDirect acc)
     Just (discordIdFromString -> Just did) -> do
       acc <- liftMaybe theUserIsntRegisteredMessage =<< getSelectedMinecraftByDiscord did

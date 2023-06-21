@@ -7,48 +7,44 @@ import BowBot.BotData.Cached
 import BowBot.DB.Basic
 import BowBot.Network.Basic
 import BowBot.Utils
-import qualified Data.HashMap.Strict as HM
 import qualified Data.Text as T
+import Database.MySQL.Simple.QueryParams (QueryParams(..))
+import Database.MySQL.Simple.QueryResults (QueryResults(..))
 
 data MinecraftAccount = MinecraftAccount
   { mcUUID :: !UUID
   , mcNames :: ![Text]
   } deriving (Show, Eq)
 
-instance Cached MinecraftAccount where
-  type CacheIndex MinecraftAccount = UUID
-  refreshCache = do
-    cache <- getCache
-    res :: [(UUID, Text)] <- queryLog "SELECT `uuid`, `names` FROM `minecraft`" ()
-    let newValues = HM.fromList $ flip fmap res $ \(mcUUID, T.splitOn "," -> mcNames) -> (mcUUID, MinecraftAccount {..})
-    liftIO $ atomically $ writeTVar cache newValues
+instance QueryParams MinecraftAccount where
+  renderParams MinecraftAccount {..} = renderParams (mcUUID, head mcNames, T.intercalate "," mcNames) -- TODO: this is not good
+instance QueryResults MinecraftAccount where
+  convertResults fields strings = let
+    (mcUUID, T.splitOn "," -> mcNames) = convertResults fields strings
+      in MinecraftAccount {..}
+instance QueryResultsSize MinecraftAccount where
+  queryResultsSize _ = 2
 
-instance CachedIndexed MinecraftAccount where
-  cacheIndex = mcUUID
-  storeInCache accs = do
-    cacheMap <- getCacheMap
-    let toQueryParams acc@MinecraftAccount {..} = if Just acc == cacheMap HM.!? mcUUID then Nothing else Just (uuidString mcUUID, head mcNames, T.intercalate "," mcNames)
-    let queryParams = mapMaybe toQueryParams accs
-    success <- liftIO $ withDB $ \conn -> (>0) <$> executeManyLog' conn "INSERT INTO `minecraft` (`uuid`, `name`, `names`) VALUES (?,?,?) ON DUPLICATE KEY UPDATE `name`=VALUES(`name`), `names`=VALUES(`names`), `hypixel`=VALUES(`hypixel`)" queryParams
-    when success $ do
-      cache <- getCache
-      liftIO $ atomically $ modifyTVar cache (insertMany (map (\x -> (mcUUID x, x)) accs))
-    return success
+getMinecraftAccountByUUID :: (MonadIOReader m r, Has Connection r) => UUID -> m (Maybe MinecraftAccount)
+getMinecraftAccountByUUID uuid = only <$> queryLog "SELECT `uuid`, `names` FROM `minecraft` WHERE `uuid` = ?" (Only uuid)
 
-updateMinecraftAccountCache :: (MonadIOBotData m d r, Has Manager r, HasCache MinecraftAccount d) => Int -> m ()
+storeMinecraftAccount :: (MonadIOReader m r, Has Connection r) => MinecraftAccount -> m ()
+storeMinecraftAccount acc = void $ executeLog "INSERT INTO `minecraft` (`uuid`, `name`, `names`) VALUES (?,?,?) ON DUPLICATE KEY UPDATE `name`=VALUES(`name`), `names`=VALUES(`names`)" acc
+
+updateMinecraftAccountCache :: (MonadIOReader m r, HasAll '[Manager, Connection] r) => Int -> m ()
 updateMinecraftAccountCache index = do
   let helper MinecraftAccount {..} = do
         newName <- mojangUUIDToCurrentName mcUUID
         return MinecraftAccount {mcNames = if newName == listToMaybe mcNames then mcNames else maybeToList newName ++ mcNames , ..}
-  cache <- HM.elems <$> getCacheMap
+  cache <- queryLog "SELECT `uuid`, `names` FROM `minecraft`" ()
   let bigchunked = chunksOf 150 $ sortOn (uuidString . mcUUID) cache
   let chunk = if index >= length bigchunked then [] else bigchunked !! index
   updatedAccounts <- for chunk helper
-  void $ storeInCache updatedAccounts
+  void $ executeManyLog "INSERT INTO `minecraft` (`uuid`, `name`, `names`) VALUES (?,?,?) ON DUPLICATE KEY UPDATE `name`=VALUES(`name`), `names`=VALUES(`names`)" $ filter (`notElem` cache) updatedAccounts
 
-mcNameToUUID :: (MonadIOBotData m d r, Has Manager r, HasCache MinecraftAccount d) => Text -> m (Maybe UUID)
+mcNameToUUID :: (MonadIOReader m r, HasAll '[Manager, Connection] r) => Text -> m (Maybe UUID)
 mcNameToUUID name = do
-  goodAcc <- getMinecraftAccountByCurrentNameFromCache name
+  goodAcc <- getMinecraftAccountByCurrentName name
   case goodAcc of
     Just MinecraftAccount {mcUUID} -> return (Just mcUUID)
     _ -> mojangNameToUUID name
@@ -66,8 +62,8 @@ freshMinecraftAccountByName name = do
   uuid <- mojangNameToUUID name
   join <$> for uuid freshMinecraftAccountByUUID
 
-getMinecraftAccountByCurrentNameFromCache :: (MonadIOBotData m d r, HasCache MinecraftAccount d) => Text -> m (Maybe MinecraftAccount)
-getMinecraftAccountByCurrentNameFromCache name = find ((==T.toLower name) . T.toLower . head . mcNames) . HM.elems <$> getCacheMap
+getMinecraftAccountByCurrentName :: (MonadIOReader m r, Has Connection r) => Text -> m (Maybe MinecraftAccount)
+getMinecraftAccountByCurrentName name = only <$> queryLog "SELECT `uuid`, `names` FROM `minecraft` WHERE LOWER(`name`) = ?" (Only name)
 
 addMinecraftName :: (MonadIOReader m r, Has Connection r) => Text -> UUID -> m Bool
 addMinecraftName name uuid = addMinecraftNames [(name, uuid)]
@@ -84,9 +80,9 @@ data MinecraftAutocorrect = MinecraftAutocorrect
 autocorrectFromAccountDirect :: MinecraftAccount -> MinecraftAutocorrect
 autocorrectFromAccountDirect acc = MinecraftAutocorrect { autocorrectAccount = acc, autocorrectIsDirect = True, autocorrectPastName = Nothing }
 
-minecraftAutocorrect :: (MonadIOBotData m d r, HasCache MinecraftAccount d) => Text -> m (Maybe MinecraftAutocorrect)
+minecraftAutocorrect :: (MonadIOReader m r, Has Connection r) => Text -> m (Maybe MinecraftAutocorrect)
 minecraftAutocorrect name = do
-  people <- HM.elems <$> getCacheMap
+  people <- queryLog "SELECT `uuid`, `names` FROM `minecraft`" () -- TODO: start using minecraftName table
   let process isPast = map snd . sortOn fst $ do
         acc@MinecraftAccount {..} <- people
         n <- (if isPast then drop 1 else take 1) mcNames

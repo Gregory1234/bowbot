@@ -4,7 +4,6 @@ import BowBot.Command
 import BowBot.Minecraft.Account
 import BowBot.Account.Basic
 import BowBot.Discord.Utils
-import BowBot.BotData.Cached
 import BowBot.Hypixel.Leaderboard
 import BowBot.Account.Register
 import BowBot.Discord.Roles
@@ -38,7 +37,7 @@ registerCommandHandler RegisterCommandSettings {..} name did = do
   respond "*Registered successfully*"
     where
       fullAddMinecraft uuid = do
-        acc' <- getFromCache @MinecraftAccount uuid
+        acc' <- getMinecraftAccountByUUID uuid
         case acc' of
           Nothing -> do
             acc <- liftMaybe thePlayerDoesNotExistMessage =<< freshMinecraftAccountByUUID uuid

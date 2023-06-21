@@ -20,7 +20,7 @@ newtype HypixelRole = HypixelRole { fromHypixelRole :: Text }
   deriving (Eq, Ord, Show)
   deriving newtype (Param, Result)
 
-updateHypixelRoles :: (MonadHoistIOBotData m d r, HasAll '[InfoCache, Manager, CounterState, Connection] r, HasCache MinecraftAccount d) => m ()
+updateHypixelRoles :: (MonadHoistIOReader m r, HasAll '[InfoCache, Manager, CounterState, Connection] r) => m ()
 updateHypixelRoles = do
   cv <- tryIncreaseCounter HypixelApi 1
   case cv of
@@ -30,10 +30,10 @@ updateHypixelRoles = do
       case members' of
         Nothing -> return ()
         Just members -> do
-          known <- HM.keys <$> getCacheMap @MinecraftAccount
+          known <- map fromOnly <$> queryLog "SELECT `uuid` FROM `minecraft`" ()
           let unknown = map fst members \\ known
           names <- catMaybes <$> traverse (\x -> fmap (x,) <$> mojangUUIDToCurrentName x) unknown
-          b <- storeInCache [MinecraftAccount {mcUUID, mcNames = [mcName, mcName <> "OldNamesCurrentlyNotKnown"]} | (mcUUID, mcName) <- names]
+          b <- (>0) <$> executeManyLog "INSERT INTO `minecraft` (`uuid`, `name`, `names`) VALUES (?,?,?) ON DUPLICATE KEY UPDATE `name`=VALUES(`name`), `names`=VALUES(`names`)" [MinecraftAccount {mcUUID, mcNames = [mcName, mcName <> "OldNamesCurrentlyNotKnown"]} | (mcUUID, mcName) <- names]
           c <- addMinecraftNames (map (\(u,n) -> (n,u)) names)
           when ((b && c) || null unknown) $ void $ executeManyLog "INSERT INTO `minecraft` (`uuid`, `hypixelRole`) VALUES (?,?) ON DUPLICATE KEY UPDATE `hypixelRole`=VALUES(`hypixelRole`)" members
           void $ executeLog "UPDATE `minecraft` SET `hypixelRole` = NULL WHERE `uuid` NOT IN ?" (Only (In (map fst members)))

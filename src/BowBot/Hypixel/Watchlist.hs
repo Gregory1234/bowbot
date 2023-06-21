@@ -8,10 +8,14 @@ import BowBot.Hypixel.Basic
 import Control.Concurrent.Async (mapConcurrently)
 import BowBot.Utils
 import BowBot.DB.Basic
+import BowBot.Minecraft.Account
 
 
 getWatchlist :: (MonadIOReader m r, Has Connection r) => m [UUID]
 getWatchlist = map fromOnly <$> queryLog "SELECT `minecraft` FROM `watchlist`" ()
+
+getWatchlistAccounts :: (MonadIOReader m r, Has Connection r) => m [MinecraftAccount]
+getWatchlistAccounts = queryLog "SELECT `minecraft`.`uuid`, `minecraft`.`names` FROM `minecraft` JOIN `watchlist` ON `watchlist`.`minecraft`=`minecraft`.`uuid`" ()
 
 clearOnlinePlayers :: (MonadIOReader m r, Has Connection r) => m ()
 clearOnlinePlayers = void $ executeLog "UPDATE `watchlist` SET `online` = NULL" ()

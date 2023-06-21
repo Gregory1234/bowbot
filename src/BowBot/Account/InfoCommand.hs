@@ -10,8 +10,6 @@ import Control.Monad.Except
 import BowBot.Account.Basic
 import BowBot.Discord.Account
 import qualified Data.Text as T
-import qualified Data.HashMap.Strict as HM
-import BowBot.BotData.Cached
 import BowBot.Command.Utils
 import BowBot.Account.Utils
 
@@ -26,7 +24,7 @@ infoCommand = Command CommandInfo
       did <- userId <$> envs envSender
       handleDiscord True did
     Just (uuidFromString -> Just uuid) -> do
-      acc <- liftMaybe theUserIsntRegisteredMessage =<< getFromCache @MinecraftAccount uuid
+      acc <- liftMaybe theUserIsntRegisteredMessage =<< getMinecraftAccountByUUID uuid
       handleMinecraft $ autocorrectFromAccountDirect acc
     Just (discordIdFromString -> Just did) -> handleDiscord False did
     Just n -> do
@@ -47,9 +45,8 @@ infoCommand = Command CommandInfo
       displayInfo (minecraftAutocorrectToHeader ac) bid
     displayInfo :: Text -> BowBotId -> ExceptT Text CommandHandler ()
     displayInfo header bid = do
-      mcs <- liftMaybe somethingWentWrongMessage =<< getMinecraftListByBowBotId bid
-      mc <- getCacheMap
-      let mcAccs = T.unlines $ map (\uuid -> let MinecraftAccount {..} = mc HM.! uuid in (if mcUUID == selectedMinecraft mcs  then "*" else " ") <> head mcNames <> " (" <> uuidString mcUUID <> ")") (allMinecrafts mcs)
+      let showMcAcc (MinecraftAccount {..}, sel) = (if sel then "*" else " ") <> head mcNames <> " (" <> uuidString mcUUID <> ")"
+      mcAccs <- T.unlines . map showMcAcc <$> getMinecraftAccountsByBowBotId bid
       
       let showDcAcc DiscordAccount {..} = (if discordIsMember then "*" else " ") <> showDiscordName discordName <> ", id " <> showt discordId
       dcAccs <- T.unlines . map showDcAcc <$> getDiscordAccountsByBowBotId bid

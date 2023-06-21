@@ -35,10 +35,10 @@ showSelfSkipTip acc = do
 
 addMinecraftAccount :: MinecraftAccount -> ExceptT Text CommandHandler ()
 addMinecraftAccount acc@MinecraftAccount {..} = do
-  acc' <- getFromCache @MinecraftAccount mcUUID
+  acc' <- getMinecraftAccountByUUID mcUUID
   assertIO (isNothing acc')
   respond "**A new Minecraft player discovered! 🥳**"
-  void $ storeInCache [acc]
+  storeMinecraftAccount acc
   void $ addMinecraftName (head mcNames) mcUUID
 
 commandMinecraftByNameWithSkipTip :: (MinecraftAccount -> ExceptT Text CommandHandler ()) -> (MinecraftAutocorrect -> ExceptT Text CommandHandler ()) -> Text -> ExceptT Text CommandHandler ()
@@ -47,7 +47,7 @@ commandMinecraftByNameWithSkipTip new old n = do
   case autocorrect of
     Nothing -> do
       uuid <- liftMaybe thePlayerDoesNotExistMessage =<< mojangNameToUUID n
-      acc' <- getFromCache @MinecraftAccount uuid
+      acc' <- getMinecraftAccountByUUID uuid
       case acc' of
         Nothing -> do
           acc <- liftMaybe thePlayerDoesNotExistMessage =<< freshMinecraftAccountByUUID uuid
@@ -55,7 +55,7 @@ commandMinecraftByNameWithSkipTip new old n = do
         Just acc -> do
           newName <- liftMaybe thePlayerDoesNotExistMessage =<< mojangUUIDToCurrentName uuid
           let newAcc = acc { mcNames = newName : mcNames acc }
-          void $ storeInCache [newAcc]
+          storeMinecraftAccount newAcc
           void $ addMinecraftName newName uuid
           showSelfSkipTip newAcc
           old (autocorrectFromAccountDirect newAcc)
@@ -65,7 +65,7 @@ commandMinecraftByNameWithSkipTip new old n = do
 
 commandMinecraftByUUID :: (MinecraftAccount -> ExceptT Text CommandHandler ()) -> (MinecraftAccount -> ExceptT Text CommandHandler ()) -> UUID -> ExceptT Text CommandHandler ()
 commandMinecraftByUUID new old uuid = do
-  acc' <- getFromCache @MinecraftAccount uuid
+  acc' <- getMinecraftAccountByUUID uuid
   case acc' of
     Nothing -> do
       acc <- liftMaybe thePlayerDoesNotExistMessage =<< freshMinecraftAccountByUUID uuid
