@@ -22,7 +22,7 @@ instance QueryResultsSize SnipeMessage where
   queryResultsSize _ = 4
 
 getSnipeMessageByChannel :: (MonadIOReader m r, Has Connection r) => ChannelId -> m (Maybe SnipeMessage)
-getSnipeMessageByChannel channel = only <$> queryLog "SELECT `author`, `content`, `edited`, `time` FROM `snipe` WHERE `channel` = ?" (Only channel)
+getSnipeMessageByChannel channel = queryOnlyLog "SELECT `author`, `content`, `edited`, `time` FROM `snipe` WHERE `channel` = ?" (Only channel)
 
 setSnipeMessageByChannel :: (MonadIOReader m r, Has Connection r) => ChannelId -> SnipeMessage -> m Bool
 setSnipeMessageByChannel channel message = (>0) <$> executeLog "INSERT INTO `snipe` (`channel`, `author`, `content`, `edited`, `time`) VALUES (?,?,?,?,?) ON DUPLICATE KEY UPDATE `author`=VALUES(`author`), `content`=VALUES(`content`), `edited`=VALUES(`edited`), `time`=VALUES(`time`)" (Concat (Only channel, message))

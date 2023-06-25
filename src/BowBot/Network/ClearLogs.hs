@@ -12,7 +12,7 @@ import qualified Data.ByteString as BS
 
 clearLogs :: (MonadIOReader m r, Has Connection r) => m ()
 clearLogs = do -- TODO: timezones?
-  logs :: [(UTCTime, Text, Text)] <- queryLog "SELECT `timestamp`,`message`,`type` FROM `logs`" ()
+  logs :: [(UTCTime, Text, Text)] <- queryLog_ "SELECT `timestamp`,`message`,`type` FROM `logs`"
   let showLogLine (time, msg, typ) = "[" <> typ <> ", " <> pack (formatTime defaultTimeLocale "%d %b %Y %H:%M:%S" time) <> "]: " <> msg
   let logsFile = T.unlines $ map showLogLine logs
   let zippedLogsFile = compress $ BS.fromStrict $ T.encodeUtf8 logsFile

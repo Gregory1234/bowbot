@@ -24,10 +24,10 @@ instance FromField IsBanned where
     _ -> Left "Wrong ban status")
 
 getHypixelIsBannedByUUID :: (MonadIOReader m r, Has Connection r) => UUID -> m IsBanned
-getHypixelIsBannedByUUID uuid = maybe NotBanned fromOnly . only <$> queryLog "SELECT `hypixel` FROM `minecraft` WHERE `uuid` = ?" (Only uuid)
+getHypixelIsBannedByUUID uuid = maybe NotBanned fromOnly <$> queryOnlyLog "SELECT `hypixel` FROM `minecraft` WHERE `uuid` = ?" (Only uuid)
 
 setHypixelIsBannedByUUID :: (MonadIOReader m r, Has Connection r) => UUID -> IsBanned -> m Bool
 setHypixelIsBannedByUUID uuid banned = (>0) <$> executeLog "UPDATE `minecraft` SET `hypixel` = ? WHERE `uuid` = ?" (banned, uuid)
 
 getHypixelUnbanned :: (MonadIOReader m r, Has Connection r) => m [UUID]
-getHypixelUnbanned = map fromOnly <$> queryLog "SELECT `uuid` FROM `minecraft` WHERE `hypixel` = 'normal'" ()
+getHypixelUnbanned = map fromOnly <$> queryLog_ "SELECT `uuid` FROM `minecraft` WHERE `hypixel` = 'normal'"

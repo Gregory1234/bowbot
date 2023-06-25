@@ -70,7 +70,7 @@ updateHypixelBowTimeStats :: (MonadIOReader m r, Has Connection r) => StatsTimeR
 updateHypixelBowTimeStats time = void $ executeLog (replaceQuery "TIME" (statsTimeRangeName time) "UPDATE `stats` SET `lastTIMEWins`=`bowWins`, `lastTIMELosses`=`bowLosses`, `lastTIMEUpdate`=`lastUpdate`") ()
 
 getHypixelBowTimeStatsByUUID :: (MonadIOReader m r, Has Connection r) => StatsTimeRange -> UUID -> m (Maybe HypixelBowTimeStats)
-getHypixelBowTimeStatsByUUID time uuid = only <$> queryLog (replaceQuery "TIME" (statsTimeRangeName time) "SELECT `lastTIMEWins`, `lastTIMELosses`, `lastTIMEUpdate` FROM `stats` WHERE `minecraft` = ? AND `lastTIMEWins` >= 0 AND `lastTIMELosses` >= 0") (Only uuid)
+getHypixelBowTimeStatsByUUID time uuid = queryOnlyLog (replaceQuery "TIME" (statsTimeRangeName time) "SELECT `lastTIMEWins`, `lastTIMELosses`, `lastTIMEUpdate` FROM `stats` WHERE `minecraft` = ? AND `lastTIMEWins` >= 0 AND `lastTIMELosses` >= 0") (Only uuid)
 
 data FullHypixelBowTimeStats = FullHypixelBowTimeStats
   { currentHypixelBowStats :: HypixelBowStats

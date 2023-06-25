@@ -47,7 +47,7 @@ setSavedRolesByDiscord discord roles = do
 
 updateSavedRolesAll :: (MonadIOReader m r, HasAll '[Connection, DiscordHandle, InfoCache] r) => m ()
 updateSavedRolesAll = do
-  savedRoles :: M.Map UserId [SavedRole] <- M.fromList <$> queryLog "SELECT `discord`, `roles` FROM `unregistered` UNION SELECT `discord`, `roles` FROM `people` JOIN `peopleDiscord` ON `people`.`id` = `peopleDiscord`.`id`" ()
+  savedRoles :: M.Map UserId [SavedRole] <- M.fromList <$> queryLog_ "SELECT `discord`, `roles` FROM `unregistered` UNION SELECT `discord`, `roles` FROM `people` JOIN `peopleDiscord` ON `people`.`id` = `peopleDiscord`.`id`"
   gid <- askInfo discordGuildIdInfo
   members <- discordGuildMembers gid
   for_ members $ \GuildMember {..} -> case memberUser of
@@ -71,4 +71,4 @@ giveSavedRoles gmem roles hypixelRoles = do
     Just hypixelRoles' -> partialSetUni (M.map snd savedHypixelRoles) (M.map snd $ M.filter (not . null . intersect hypixelRoles' . fst) savedHypixelRoles)
 
 getSavedRolesByDiscord :: (MonadIOReader m r, HasAll '[Connection, DiscordHandle, InfoCache] r) => UserId -> m (Maybe [SavedRole])
-getSavedRolesByDiscord did = only . map fromOnly <$> queryLog "SELECT `roles` FROM `unregistered` WHERE `discord` = ? UNION SELECT `roles` FROM `people` JOIN `peopleDiscord` ON `people`.`id` = `peopleDiscord`.`id` WHERE `peopleDiscord`.`discord` = ?" (did, did)
+getSavedRolesByDiscord did = fmap fromOnly <$> queryOnlyLog "SELECT `roles` FROM `unregistered` WHERE `discord` = ? UNION SELECT `roles` FROM `people` JOIN `peopleDiscord` ON `people`.`id` = `peopleDiscord`.`id` WHERE `peopleDiscord`.`discord` = ?" (did, did)

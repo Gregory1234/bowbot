@@ -25,10 +25,10 @@ instance QueryResultsSize DiscordAccount where
   queryResultsSize _ = 2 + queryResultsSize (Proxy @DiscordName)
 
 getDiscordAccountById :: (MonadIOReader m r, Has Connection r) => UserId -> m (Maybe DiscordAccount)
-getDiscordAccountById did = only <$> queryLog "SELECT `id`, `name`, `discriminator`, `nickname`, `member` FROM `discord` WHERE `id` = ?" (Only did)
+getDiscordAccountById did = queryOnlyLog "SELECT `id`, `name`, `discriminator`, `nickname`, `member` FROM `discord` WHERE `id` = ?" (Only did)
 
 getDiscordGuildMemberAccounts :: (MonadIOReader m r, Has Connection r) => m [DiscordAccount]
-getDiscordGuildMemberAccounts = queryLog "SELECT `id`, `name`, `discriminator`, `nickname`, `member` FROM `discord` WHERE `member` = 1" ()
+getDiscordGuildMemberAccounts = queryLog_ "SELECT `id`, `name`, `discriminator`, `nickname`, `member` FROM `discord` WHERE `member` = 1"
 
 guildMemberToDiscordAccount :: GuildMember -> DiscordAccount
 guildMemberToDiscordAccount gmem = DiscordAccount
@@ -51,7 +51,7 @@ updateDiscordAccountCache :: (MonadIOReader m r, HasAll '[InfoCache, DiscordHand
 updateDiscordAccountCache = do
   gid <- askInfo discordGuildIdInfo
   members <- map guildMemberToDiscordAccount . filter (\GuildMember {..} -> fmap userIsBot memberUser == Just False) <$> discordGuildMembers gid
-  current :: [DiscordAccount] <- queryLog "SELECT `id`, `name`, `discriminator`, `nickname`, `member` FROM `discord`" ()
+  current :: [DiscordAccount] <- queryLog_ "SELECT `id`, `name`, `discriminator`, `nickname`, `member` FROM `discord`"
   updatedNonMembers <- for (deleteFirstsBy (\a b -> discordId a == discordId b) current members) $ \du -> do
     u' <- call $ R.GetUser (discordId du)
     case u' of

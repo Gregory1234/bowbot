@@ -42,7 +42,7 @@ completeHypixelBowStats s Nothing = s
 completeHypixelBowStats s (Just HypixelBowLeaderboardEntry {..}) = s { bestWinstreak = completeCachedMaybe bowLbWinstreakTimestamp (bestWinstreak s) bowLbWinstreak }
 
 getHypixelBowLeaderboards :: (MonadIOReader m r, HasAll '[Connection] r) => m (HM.HashMap UUID HypixelBowLeaderboardEntry)
-getHypixelBowLeaderboards = HM.fromList . map (\(Concat (Only a,b)) -> (a,b)) <$> queryLog "SELECT `minecraft`, `bowWins`, `bowLosses`, `bowWinstreak`, `lastUpdate`, `lastWinstreakUpdate` FROM `stats`" ()
+getHypixelBowLeaderboards = HM.fromList . map (\(Concat (Only a,b)) -> (a,b)) <$> queryLog_ "SELECT `minecraft`, `bowWins`, `bowLosses`, `bowWinstreak`, `lastUpdate`, `lastWinstreakUpdate` FROM `stats`"
 
 updateHypixelBowLeaderboards :: (MonadIOReader m r, HasAll '[Manager, CounterState, Connection] r) => m ()
 updateHypixelBowLeaderboards = do
@@ -66,7 +66,7 @@ updateHypixelBowLeaderboards = do
       void $ executeManyLog "INSERT INTO `stats` (`minecraft`, `bowWins`, `bowLosses`, `bowWinstreak`, `lastUpdate`, `lastWinstreakUpdate`) VALUES (?,?,?,?,?,?) ON DUPLICATE KEY UPDATE `bowWins`=VALUES(`bowWins`), `bowLosses`=VALUES(`bowLosses`), `bowWinstreak`=IFNULL(VALUES(`bowWinstreak`),`bowWinstreak`), `lastUpdate`=IFNULL(VALUES(`lastUpdate`),`lastUpdate`), `lastWinstreakUpdate`=IFNULL(VALUES(`lastWinstreakUpdate`),`lastWinstreakUpdate`)" queryParams
 
 getHypixelBowLeaderboardEntryByUUID :: (MonadIOReader m r, Has Connection r) => UUID -> m (Maybe HypixelBowLeaderboardEntry)
-getHypixelBowLeaderboardEntryByUUID uuid = only <$> queryLog "SELECT `bowWins`, `bowLosses`, `bowWinstreak`, `lastUpdate`, `lastWinstreakUpdate` FROM `stats` WHERE `minecraft` = ?" (Only uuid)
+getHypixelBowLeaderboardEntryByUUID uuid = queryOnlyLog "SELECT `bowWins`, `bowLosses`, `bowWinstreak`, `lastUpdate`, `lastWinstreakUpdate` FROM `stats` WHERE `minecraft` = ?" (Only uuid)
 
 setHypixelBowLeaderboardEntryByUUID :: (MonadIOReader m r, Has Connection r) => UUID -> HypixelBowLeaderboardEntry -> m Bool
 setHypixelBowLeaderboardEntryByUUID uuid entry = (>0) <$> executeLog "INSERT INTO `stats` (`minecraft`, `bowWins`, `bowLosses`, `bowWinstreak`, `lastUpdate`, `lastWinstreakUpdate`) VALUES (?,?,?,?,?,?) ON DUPLICATE KEY UPDATE `bowWins`=VALUES(`bowWins`), `bowLosses`=VALUES(`bowLosses`), `bowWinstreak`=IFNULL(VALUES(`bowWinstreak`),`bowWinstreak`), `lastUpdate`=IFNULL(VALUES(`lastUpdate`),`lastUpdate`), `lastWinstreakUpdate`=IFNULL(VALUES(`lastWinstreakUpdate`),`lastWinstreakUpdate`)" (Concat (Only uuid, entry))

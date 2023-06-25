@@ -8,7 +8,7 @@ import BowBot.Discord.Utils
 import BowBot.Counter.Basic
 import BowBot.Account.Basic
 import qualified Data.HashMap.Strict as HM
-import BowBot.DB.Basic (queryLog, Connection, Only(..))
+import BowBot.DB.Basic
 import BowBot.Hypixel.Guild
 import BowBot.Network.Basic
 import qualified Data.Text as T
@@ -88,7 +88,7 @@ giveIllegalRole gmem = do
 applyRolesByBowBotId' :: (MonadIOReader m r, HasAll '[Connection, DiscordHandle, Manager, CounterState, InfoCache] r) => Maybe BowBotId -> [GuildMember] -> m ()
 applyRolesByBowBotId' (Just bid) gmems = do
   wins :: [Integer] <- map fromOnly <$> queryLog "SELECT `bowWins` FROM `stats` JOIN `peopleMinecraft` ON `stats`.`minecraft` = `peopleMinecraft`.`minecraft` WHERE `id` = ?" (Only bid)
-  savedRoles :: [SavedRole] <- maybe [] fromOnly . only <$> queryLog "SELECT `roles` FROM `people` WHERE `id` = ?" (Only bid)
+  savedRoles :: [SavedRole] <- maybe [] fromOnly <$> queryOnlyLog "SELECT `roles` FROM `people` WHERE `id` = ?" (Only bid)
   hypixelRoles :: [HypixelRole] <- map fromOnly <$> queryLog "SELECT `hypixelRole` FROM `minecraft` JOIN `peopleMinecraft` ON `peopleMinecraft`.`minecraft` = `minecraft`.`uuid` WHERE `peopleMinecraft`.`id` = ? AND `hypixelRole` IS NOT NULL" (Only bid)
   for_ gmems $ \gmem -> do
     giveSavedRoles gmem savedRoles (Just hypixelRoles)
@@ -96,7 +96,7 @@ applyRolesByBowBotId' (Just bid) gmems = do
     giveRolesMember gmem (not $ null hypixelRoles)
     removeIllegalRole gmem
 applyRolesByBowBotId' Nothing gmems = for_ gmems $ \gmem -> do
-  savedRoles :: [SavedRole] <- maybe [] fromOnly . only <$> queryLog "SELECT `roles` FROM `unregistered` WHERE `discord` = ?" (Only (maybe 0 userId (memberUser gmem)))
+  savedRoles :: [SavedRole] <- maybe [] fromOnly <$> queryOnlyLog "SELECT `roles` FROM `unregistered` WHERE `discord` = ?" (Only (maybe 0 userId (memberUser gmem)))
   giveSavedRoles gmem savedRoles Nothing
   giveRolesMemberUnregistered gmem
   giveIllegalRole gmem
@@ -117,11 +117,11 @@ applyRoles gmem = do
 applyRolesAll :: (MonadIOReader m r, HasAll '[Connection, DiscordHandle, Manager, CounterState, InfoCache] r) => m ()
 applyRolesAll = do
   lb <- getHypixelBowLeaderboards
-  savedRoles :: M.Map UserId [SavedRole] <- M.fromList <$> queryLog "SELECT `discord`, `roles` FROM `unregistered` UNION SELECT `discord`, `roles` FROM `people` JOIN `peopleDiscord` ON `people`.`id` = `peopleDiscord`.`id`" ()
+  savedRoles :: M.Map UserId [SavedRole] <- M.fromList <$> queryLog_ "SELECT `discord`, `roles` FROM `unregistered` UNION SELECT `discord`, `roles` FROM `people` JOIN `peopleDiscord` ON `people`.`id` = `peopleDiscord`.`id`"
   gid <- askInfo discordGuildIdInfo
   gmems <- discordGuildMembers gid
-  roles :: [(UUID, HypixelRole)] <- queryLog "SELECT `uuid`, `hypixelRole` FROM `minecraft` WHERE `hypixelRole` IS NOT NULL" ()
-  accountMinecrafts :: M.Map UserId [UUID] <- M.map (map snd) . groupByToMap fst <$> queryLog "SELECT `peopleDiscord`.`discord`, `peopleMinecraft`.`minecraft` FROM `peopleMinecraft` JOIN `peopleDiscord` ON `peopleDiscord`.`id` = `peopleMinecraft`.`id`" ()
+  roles :: [(UUID, HypixelRole)] <- queryLog_ "SELECT `uuid`, `hypixelRole` FROM `minecraft` WHERE `hypixelRole` IS NOT NULL"
+  accountMinecrafts :: M.Map UserId [UUID] <- M.map (map snd) . groupByToMap fst <$> queryLog_ "SELECT `peopleDiscord`.`discord`, `peopleMinecraft`.`minecraft` FROM `peopleMinecraft` JOIN `peopleDiscord` ON `peopleDiscord`.`id` = `peopleMinecraft`.`id`"
   for_ gmems $ \gmem -> do
     let discord = maybe 0 userId (memberUser gmem)
     case accountMinecrafts M.!? discord of

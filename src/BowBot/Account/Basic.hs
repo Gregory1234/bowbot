@@ -4,11 +4,10 @@ module BowBot.Account.Basic where
 
 import BowBot.Minecraft.Basic (UUID(..))
 import Discord.Internal.Rest (UserId)
-import BowBot.DB.Basic (queryLog, Only(..), Connection)
+import BowBot.DB.Basic
 import BowBot.Utils
 import BowBot.Discord.Orphans ()
 import Data.Hashable (Hashable)
-import Database.MySQL.Simple (Param, Result)
 
 newtype BowBotId = BowBotId { unBowBotId :: Integer }
   deriving stock (Show, Eq, Ord)
@@ -23,7 +22,7 @@ minecraftListFromList mcs = fmap (\selectedMinecraft -> MinecraftList {..}) sele
     allMinecrafts = map fst mcs
 
 getSelectedMinecraftUUIDByDiscord :: (MonadIOReader m r, Has Connection r) => UserId -> m (Maybe UUID)
-getSelectedMinecraftUUIDByDiscord did = only . map fromOnly <$> queryLog "SELECT `minecraft` FROM `peopleMinecraft` JOIN `peopleDiscord` ON `peopleMinecraft`.`id`=`peopleDiscord`.`id` WHERE `peopleDiscord`.`discord` = ? AND `peopleMinecraft`.`selected` = 1" (Only did)
+getSelectedMinecraftUUIDByDiscord did = fmap fromOnly <$> queryOnlyLog "SELECT `minecraft` FROM `peopleMinecraft` JOIN `peopleDiscord` ON `peopleMinecraft`.`id`=`peopleDiscord`.`id` WHERE `peopleDiscord`.`discord` = ? AND `peopleMinecraft`.`selected` = 1" (Only did)
 
 getMinecraftUUIDsByDiscord :: (MonadIOReader m r, Has Connection r) => UserId -> m [UUID]
 getMinecraftUUIDsByDiscord did = map fromOnly <$> queryLog "SELECT `minecraft` FROM `peopleMinecraft` JOIN `peopleDiscord` ON `peopleMinecraft`.`id`=`peopleDiscord`.`id` WHERE `peopleDiscord`.`discord` = ?" (Only did)
@@ -44,7 +43,7 @@ getDiscordIdsByDiscord :: (MonadIOReader m r, Has Connection r) => UserId -> m [
 getDiscordIdsByDiscord uuid = map fromOnly <$> queryLog "SELECT `peopleDiscord2`.`discord` FROM `peopleDiscord` JOIN `peopleDiscord` AS `peopleDiscord2` ON `peopleDiscord`.`id` = `peopleDiscord2`.`id` WHERE `peopleDiscord`.`discord` = ?" (Only uuid)
 
 getBowBotIdByDiscord :: (MonadIOReader m r, Has Connection r) => UserId -> m (Maybe BowBotId)
-getBowBotIdByDiscord did = only . map fromOnly <$> queryLog "SELECT `id` FROM `peopleDiscord` WHERE `discord` = ?" (Only did)
+getBowBotIdByDiscord did = fmap fromOnly <$> queryOnlyLog "SELECT `id` FROM `peopleDiscord` WHERE `discord` = ?" (Only did)
 
 getBowBotIdByMinecraft :: (MonadIOReader m r, Has Connection r) => UUID -> m (Maybe BowBotId)
-getBowBotIdByMinecraft uuid = only . map fromOnly <$> queryLog "SELECT `id` FROM `peopleMinecraft` WHERE `minecraft` = ?" (Only uuid)
+getBowBotIdByMinecraft uuid = fmap fromOnly <$> queryOnlyLog "SELECT `id` FROM `peopleMinecraft` WHERE `minecraft` = ?" (Only uuid)

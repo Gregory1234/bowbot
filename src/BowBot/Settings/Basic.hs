@@ -64,7 +64,7 @@ instance QueryResultsSize Settings where
   queryResultsSize _ = 10
 
 getSettingsByDiscord :: (MonadIOReader m r, Has Connection r) => UserId -> m Settings
-getSettingsByDiscord discord = fromMaybe defSettings . only <$> queryLog "SELECT `wins`, `losses`, `wlr`, `winsUntil`, `bestStreak`, `currentStreak`, `bestDailyStreak`, `bowHits`, `bowShots`, `accuracy` FROM `settings` WHERE `discord` = ?" (Only discord)
+getSettingsByDiscord discord = fromMaybe defSettings <$> queryOnlyLog "SELECT `wins`, `losses`, `wlr`, `winsUntil`, `bestStreak`, `currentStreak`, `bestDailyStreak`, `bowHits`, `bowShots`, `accuracy` FROM `settings` WHERE `discord` = ?" (Only discord)
 
 setSettingsByDiscord :: (MonadIOReader m r, Has Connection r) => UserId -> Settings -> m Bool
 setSettingsByDiscord discord settings = (>0) <$> executeLog "INSERT INTO `settings` (`discord`, `wins`, `losses`, `wlr`, `winsUntil`, `bestStreak`, `currentStreak`, `bestDailyStreak`, `bowHits`, `bowShots`, `accuracy`) VALUES (?,?,?,?,?,?,?,?,?,?,?) ON DUPLICATE KEY UPDATE `wins`=VALUES(`wins`), `losses`=VALUES(`losses`), `wlr`=VALUES(`wlr`), `winsUntil`=VALUES(`winsUntil`), `bestStreak`=VALUES(`bestStreak`), `currentStreak`=VALUES(`currentStreak`), `bestDailyStreak`=VALUES(`bestDailyStreak`), `bowHits`=VALUES(`bowHits`), `bowShots`=VALUES(`bowShots`), `accuracy`=VALUES(`accuracy`)" (Concat (Only discord, settings))

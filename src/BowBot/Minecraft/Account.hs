@@ -23,7 +23,7 @@ instance QueryResultsSize MinecraftAccount where
   queryResultsSize _ = 2
 
 getMinecraftAccountByUUID :: (MonadIOReader m r, Has Connection r) => UUID -> m (Maybe MinecraftAccount)
-getMinecraftAccountByUUID uuid = only <$> queryLog "SELECT `uuid`, `names` FROM `minecraft` WHERE `uuid` = ?" (Only uuid)
+getMinecraftAccountByUUID uuid = queryOnlyLog "SELECT `uuid`, `names` FROM `minecraft` WHERE `uuid` = ?" (Only uuid)
 
 storeMinecraftAccount :: (MonadIOReader m r, Has Connection r) => MinecraftAccount -> m ()
 storeMinecraftAccount acc = void $ executeLog "INSERT INTO `minecraft` (`uuid`, `name`, `names`) VALUES (?,?,?) ON DUPLICATE KEY UPDATE `name`=VALUES(`name`), `names`=VALUES(`names`)" acc
@@ -33,7 +33,7 @@ updateMinecraftAccountCache index = do
   let helper MinecraftAccount {..} = do
         newName <- mojangUUIDToCurrentName mcUUID
         return MinecraftAccount {mcNames = if newName == listToMaybe mcNames then mcNames else maybeToList newName ++ mcNames , ..}
-  cache <- queryLog "SELECT `uuid`, `names` FROM `minecraft`" ()
+  cache <- queryLog_ "SELECT `uuid`, `names` FROM `minecraft`"
   let bigchunked = chunksOf 150 $ sortOn (uuidString . mcUUID) cache
   let chunk = if index >= length bigchunked then [] else bigchunked !! index
   updatedAccounts <- for chunk helper
@@ -60,7 +60,7 @@ freshMinecraftAccountByName name = do
   join <$> for uuid freshMinecraftAccountByUUID
 
 getMinecraftAccountByCurrentName :: (MonadIOReader m r, Has Connection r) => Text -> m (Maybe MinecraftAccount)
-getMinecraftAccountByCurrentName name = only <$> queryLog "SELECT `uuid`, `names` FROM `minecraft` WHERE LOWER(`name`) = ?" (Only name)
+getMinecraftAccountByCurrentName name = queryOnlyLog "SELECT `uuid`, `names` FROM `minecraft` WHERE LOWER(`name`) = ?" (Only name)
 
 addMinecraftName :: (MonadIOReader m r, Has Connection r) => Text -> UUID -> m Bool
 addMinecraftName name uuid = addMinecraftNames [(name, uuid)]
@@ -79,7 +79,7 @@ autocorrectFromAccountDirect acc = MinecraftAutocorrect { autocorrectAccount = a
 
 minecraftAutocorrect :: (MonadIOReader m r, Has Connection r) => Text -> m (Maybe MinecraftAutocorrect)
 minecraftAutocorrect name = do
-  people <- queryLog "SELECT `uuid`, `names` FROM `minecraft`" () -- TODO: start using minecraftName table
+  people <- queryLog_ "SELECT `uuid`, `names` FROM `minecraft`" -- TODO: start using minecraftName table
   let process isPast = map snd . sortOn fst $ do
         acc@MinecraftAccount {..} <- people
         n <- (if isPast then drop 1 else take 1) mcNames

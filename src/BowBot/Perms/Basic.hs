@@ -31,4 +31,4 @@ instance FromField PermissionLevel where
     _ -> Left "Wrong permission level")
 
 getPermissionLevelByDiscord :: (MonadIOReader m r, Has Connection r) => UserId -> m PermissionLevel
-getPermissionLevelByDiscord discord = maybe DefaultLevel fromOnly . only <$> queryLog "SELECT `level` FROM `permissions` WHERE `id` = ?" (Only discord)
+getPermissionLevelByDiscord discord = maybe DefaultLevel fromOnly <$> queryOnlyLog "SELECT `level` FROM `permissions` WHERE `id` = ?" (Only discord)

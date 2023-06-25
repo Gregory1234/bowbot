@@ -41,13 +41,7 @@ setBirthday did bd = do
     Just a -> executeLog "INSERT INTO `people` (`id`, `birthday`) VALUES (?,?) ON DUPLICATE KEY UPDATE `birthday`=VALUES(`birthday`)" (a, bd)
 
 getBirthdaysByDate :: (MonadIOReader m r, Has Connection r) => BirthdayDate -> m [UserId]
-getBirthdaysByDate date = do
-  res :: [Only UserId] <- queryLog "SELECT `discord` FROM `unregistered` WHERE `birthday` = ? UNION SELECT `peopleDiscord`.`discord` FROM `peopleDiscord` JOIN `people` ON `people`.`id`=`peopleDiscord`.`id` WHERE `birthday` = ?" (date, date)
-  return $ map fromOnly res
+getBirthdaysByDate date = map fromOnly <$> queryLog "SELECT `discord` FROM `unregistered` WHERE `birthday` = ? UNION SELECT `peopleDiscord`.`discord` FROM `peopleDiscord` JOIN `people` ON `people`.`id`=`peopleDiscord`.`id` WHERE `birthday` = ?" (date, date)
 
 getBirthdayByDiscord :: (MonadIOReader m r, Has Connection r) => UserId -> m (Maybe BirthdayDate)
-getBirthdayByDiscord discord = do
-  res :: [Only (Maybe BirthdayDate)] <- queryLog "SELECT `birthday` FROM `unregistered` WHERE `discord` = ? UNION SELECT `birthday` FROM `peopleDiscord` JOIN `people` ON `people`.`id`=`peopleDiscord`.`id` WHERE `peopleDiscord`.`discord` = ?" (discord, discord)
-  return $ case res of
-    [Only (Just date)] -> Just date
-    _ -> Nothing
+getBirthdayByDiscord discord = (fromOnly =<<) <$> queryOnlyLog "SELECT `birthday` FROM `unregistered` WHERE `discord` = ? UNION SELECT `birthday` FROM `peopleDiscord` JOIN `people` ON `people`.`id`=`peopleDiscord`.`id` WHERE `peopleDiscord`.`discord` = ?" (discord, discord)

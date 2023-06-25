@@ -64,41 +64,47 @@ logErrorFork msg = void $ liftIO $ do
 replaceQuery :: Text -> Text -> Query -> Query
 replaceQuery from to q = Query $ BS.toStrict $ BS.replace (T.encodeUtf8 from) (BS.fromStrict $ T.encodeUtf8 to :: BS.ByteString) (fromQuery q)
 
-queryLog' :: (QueryParams q, QueryResults r, MonadIO m) => Connection -> Query -> q -> m [r]
-queryLog' conn q d = do
+queryLog :: (QueryParams q, QueryResults r, MonadIOReader m rd, Has Connection rd) => Query -> q -> m [r]
+queryLog q d = do
+  conn <- asks getter
   trueQuery <- liftIO $ formatQuery conn q d
   logInfo' conn $ "Executing query: " <> showt trueQuery
   liftIO $ query conn q d
 
-executeLog' :: (QueryParams q, MonadIO m) => Connection -> Query -> q -> m Int64
-executeLog' conn q d = do
-  trueQuery <- liftIO $ formatQuery conn q d
-  logInfo' conn $ "Executing query: " <> showt trueQuery
-  liftIO $ execute conn q d
-
-executeManyLog' :: (QueryParams q, MonadIO m) => Connection -> Query -> [q] -> m Int64
-executeManyLog' conn q [] = do
-  logInfo' conn $ "Tried executing query with no data: " <> showt (fromQuery q)
-  return 0
-executeManyLog' conn q d = do
-  trueQuery <- liftIO $ formatMany conn q d
-  logInfo' conn $ "Executing query: " <> showt trueQuery
-  liftIO $ executeMany conn q d
-
-queryLog :: (QueryParams q, QueryResults r, MonadIOReader m rd, Has Connection rd) => Query -> q -> m [r]
-queryLog q d = do
+queryLog_ :: (QueryResults r, MonadIOReader m rd, Has Connection rd) => Query -> m [r]
+queryLog_ q = do
   conn <- asks getter
-  queryLog' conn q d
+  logInfo' conn $ "Executing query: " <> showt (fromQuery q)
+  liftIO $ query_ conn q
+
+queryOnlyLog :: (QueryParams q, QueryResults r, MonadIOReader m rd, Has Connection rd) => Query -> q -> m (Maybe r)
+queryOnlyLog q d = do
+  res <- queryLog q d
+  when (length res > 1) $ logError "More query results than expected!"
+  return $ only res
 
 executeLog :: (QueryParams q, MonadIOReader m r, Has Connection r) => Query -> q -> m Int64
 executeLog q d = do
   conn <- asks getter
-  executeLog' conn q d
+  trueQuery <- liftIO $ formatQuery conn q d
+  logInfo' conn $ "Executing query: " <> showt trueQuery
+  liftIO $ execute conn q d
+
+executeLog_ :: (MonadIOReader m r, Has Connection r) => Query -> m Int64
+executeLog_ q = do
+  conn <- asks getter
+  logInfo' conn $ "Executing query: " <> showt (fromQuery q)
+  liftIO $ execute_ conn q
 
 executeManyLog :: (QueryParams q, MonadIOReader m r, Has Connection r) => Query -> [q] -> m Int64
+executeManyLog q [] = do
+  logInfo $ "Tried executing query with no data: " <> showt (fromQuery q)
+  return 0
 executeManyLog q d = do
   conn <- asks getter
-  executeManyLog' conn q d
+  trueQuery <- liftIO $ formatMany conn q d
+  logInfo' conn $ "Executing query: " <> showt trueQuery
+  liftIO $ executeMany conn q d
 
 withTransaction' :: (MonadHoistIO m) => Connection -> m a -> m a
 withTransaction' conn a = do
