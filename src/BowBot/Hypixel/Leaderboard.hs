@@ -1,9 +1,11 @@
+{-# LANGUAGE TypeFamilies #-}
+
 module BowBot.Hypixel.Leaderboard where
 
 import BowBot.Hypixel.Stats
 import qualified Data.HashMap.Strict as HM
 import BowBot.Minecraft.Basic (UUID(..))
-import BowBot.DB.Basic
+import BowBot.DB.Typed
 import BowBot.Utils
 import BowBot.Hypixel.Basic (HypixelApi(..))
 import BowBot.Network.Basic
@@ -29,6 +31,11 @@ instance QueryResults HypixelBowLeaderboardEntry where
       in HypixelBowLeaderboardEntry {..}
 instance QueryResultsSize HypixelBowLeaderboardEntry where
   queryResultsSize _ = 5
+instance DatabaseTable HypixelBowLeaderboardEntry where
+  type PrimaryKey HypixelBowLeaderboardEntry = UUID
+  databaseTableName _ = "stats"
+  databaseColumnNames _ = ["bowWins", "bowLosses", "bowWinstreak", "lastUpdate", "lastWinstreakUpdate"]
+  databasePrimaryKey _ = "minecraft"
 
 bowLbWLR :: HypixelBowLeaderboardEntry -> WLR Integer
 bowLbWLR HypixelBowLeaderboardEntry {..} = WLR bowLbWins bowLbLosses
@@ -42,7 +49,7 @@ completeHypixelBowStats s Nothing = s
 completeHypixelBowStats s (Just HypixelBowLeaderboardEntry {..}) = s { bestWinstreak = completeCachedMaybe bowLbWinstreakTimestamp (bestWinstreak s) bowLbWinstreak }
 
 getHypixelBowLeaderboards :: (MonadIOReader m r, HasAll '[Connection] r) => m (HM.HashMap UUID HypixelBowLeaderboardEntry)
-getHypixelBowLeaderboards = HM.fromList . map (\(Concat (Only a,b)) -> (a,b)) <$> queryLog_ "SELECT `minecraft`, `bowWins`, `bowLosses`, `bowWinstreak`, `lastUpdate`, `lastWinstreakUpdate` FROM `stats`"
+getHypixelBowLeaderboards = HM.fromList . map (\(KeyedRow a b) -> (a,b)) <$> queryLogT_ selectAllQueryKeyed
 
 updateHypixelBowLeaderboards :: (MonadIOReader m r, HasAll '[Manager, CounterState, Connection] r) => m ()
 updateHypixelBowLeaderboards = do
@@ -62,14 +69,14 @@ updateHypixelBowLeaderboards = do
     wait
     newVals <- fmap (catMaybes . concat) $ liftIO $ for chunked $ \chunk -> mapConcurrently (fmap (`runReaderT` ctx) helper) chunk
     liftIO $ (`runReaderT` ctx) $ withTransaction $ do
-      let queryParams = map (\(uuid, entry) -> Concat (Only uuid, entry)) newVals
-      void $ executeManyLog "INSERT INTO `stats` (`minecraft`, `bowWins`, `bowLosses`, `bowWinstreak`, `lastUpdate`, `lastWinstreakUpdate`) VALUES (?,?,?,?,?,?) ON DUPLICATE KEY UPDATE `bowWins`=VALUES(`bowWins`), `bowLosses`=VALUES(`bowLosses`), `bowWinstreak`=IFNULL(VALUES(`bowWinstreak`),`bowWinstreak`), `lastUpdate`=IFNULL(VALUES(`lastUpdate`),`lastUpdate`), `lastWinstreakUpdate`=IFNULL(VALUES(`lastWinstreakUpdate`),`lastWinstreakUpdate`)" queryParams
+      let queryParams = map (uncurry KeyedRow) newVals
+      void $ executeManyLogT insertQueryKeyed queryParams
 
 getHypixelBowLeaderboardEntryByUUID :: (MonadIOReader m r, Has Connection r) => UUID -> m (Maybe HypixelBowLeaderboardEntry)
-getHypixelBowLeaderboardEntryByUUID uuid = queryOnlyLog "SELECT `bowWins`, `bowLosses`, `bowWinstreak`, `lastUpdate`, `lastWinstreakUpdate` FROM `stats` WHERE `minecraft` = ?" (Only uuid)
+getHypixelBowLeaderboardEntryByUUID uuid = queryOnlyLogT selectByPrimaryQuery (Only uuid)
 
 setHypixelBowLeaderboardEntryByUUID :: (MonadIOReader m r, Has Connection r) => UUID -> HypixelBowLeaderboardEntry -> m Bool
-setHypixelBowLeaderboardEntryByUUID uuid entry = (>0) <$> executeLog "INSERT INTO `stats` (`minecraft`, `bowWins`, `bowLosses`, `bowWinstreak`, `lastUpdate`, `lastWinstreakUpdate`) VALUES (?,?,?,?,?,?) ON DUPLICATE KEY UPDATE `bowWins`=VALUES(`bowWins`), `bowLosses`=VALUES(`bowLosses`), `bowWinstreak`=IFNULL(VALUES(`bowWinstreak`),`bowWinstreak`), `lastUpdate`=IFNULL(VALUES(`lastUpdate`),`lastUpdate`), `lastWinstreakUpdate`=IFNULL(VALUES(`lastWinstreakUpdate`),`lastWinstreakUpdate`)" (Concat (Only uuid, entry))
+setHypixelBowLeaderboardEntryByUUID uuid entry = (>0) <$> executeLogT insertQueryKeyed (KeyedRow uuid entry)
 
 removeHypixelBowLeaderboardEntryByUUID :: (MonadIOReader m r, Has Connection r) => UUID -> m Bool
 removeHypixelBowLeaderboardEntryByUUID uuid = (>0) <$> executeLog "DELETE FROM `stats` WHERE `minecraft` = ?" (Only uuid)

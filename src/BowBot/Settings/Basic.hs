@@ -1,8 +1,10 @@
+{-# LANGUAGE TypeFamilies #-}
+
 module BowBot.Settings.Basic where
 
 import Discord.Types (UserId)
 import BowBot.Discord.Orphans ()
-import BowBot.DB.Basic
+import BowBot.DB.Typed
 import BowBot.Utils
 import qualified Database.MySQL.Base.Types as T
 
@@ -62,12 +64,17 @@ instance QueryResults Settings where
       in Settings {..}
 instance QueryResultsSize Settings where
   queryResultsSize _ = 10
+instance DatabaseTable Settings where
+  type PrimaryKey Settings = UserId
+  databaseTableName _ = "settings"
+  databaseColumnNames _ = ["wins", "losses", "wlr", "winsUntil", "bestStreak", "currentStreak", "bestDailyStreak", "bowHits", "bowShots", "accuracy"]
+  databasePrimaryKey _ = "discord"
 
 getSettingsByDiscord :: (MonadIOReader m r, Has Connection r) => UserId -> m Settings
-getSettingsByDiscord discord = fromMaybe defSettings <$> queryOnlyLog "SELECT `wins`, `losses`, `wlr`, `winsUntil`, `bestStreak`, `currentStreak`, `bestDailyStreak`, `bowHits`, `bowShots`, `accuracy` FROM `settings` WHERE `discord` = ?" (Only discord)
+getSettingsByDiscord discord = fromMaybe defSettings <$> queryOnlyLogT selectByPrimaryQuery (Only discord)
 
 setSettingsByDiscord :: (MonadIOReader m r, Has Connection r) => UserId -> Settings -> m Bool
-setSettingsByDiscord discord settings = (>0) <$> executeLog "INSERT INTO `settings` (`discord`, `wins`, `losses`, `wlr`, `winsUntil`, `bestStreak`, `currentStreak`, `bestDailyStreak`, `bowHits`, `bowShots`, `accuracy`) VALUES (?,?,?,?,?,?,?,?,?,?,?) ON DUPLICATE KEY UPDATE `wins`=VALUES(`wins`), `losses`=VALUES(`losses`), `wlr`=VALUES(`wlr`), `winsUntil`=VALUES(`winsUntil`), `bestStreak`=VALUES(`bestStreak`), `currentStreak`=VALUES(`currentStreak`), `bestDailyStreak`=VALUES(`bestDailyStreak`), `bowHits`=VALUES(`bowHits`), `bowShots`=VALUES(`bowShots`), `accuracy`=VALUES(`accuracy`)" (Concat (Only discord, settings))
+setSettingsByDiscord discord settings = (>0) <$> executeLogT insertQueryKeyed (KeyedRow discord settings)
 
 defSettings :: Settings
 defSettings = Settings

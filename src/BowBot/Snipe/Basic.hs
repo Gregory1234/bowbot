@@ -3,7 +3,7 @@
 module BowBot.Snipe.Basic where
 
 import BowBot.Discord.Utils
-import BowBot.DB.Basic
+import BowBot.DB.Typed
 
 data SnipeMessage = SnipeMessage
   { snipeMessageAuthor :: !UserId
@@ -20,9 +20,14 @@ instance QueryResults SnipeMessage where
       in SnipeMessage {..}
 instance QueryResultsSize SnipeMessage where
   queryResultsSize _ = 4
+instance DatabaseTable SnipeMessage where
+  type PrimaryKey SnipeMessage = ChannelId
+  databaseTableName _ = "snipe"
+  databaseColumnNames _ = ["author", "content", "edited", "time"]
+  databasePrimaryKey _ = "channel"
 
 getSnipeMessageByChannel :: (MonadIOReader m r, Has Connection r) => ChannelId -> m (Maybe SnipeMessage)
-getSnipeMessageByChannel channel = queryOnlyLog "SELECT `author`, `content`, `edited`, `time` FROM `snipe` WHERE `channel` = ?" (Only channel)
+getSnipeMessageByChannel channel = queryOnlyLogT selectByPrimaryQuery (Only channel)
 
 setSnipeMessageByChannel :: (MonadIOReader m r, Has Connection r) => ChannelId -> SnipeMessage -> m Bool
-setSnipeMessageByChannel channel message = (>0) <$> executeLog "INSERT INTO `snipe` (`channel`, `author`, `content`, `edited`, `time`) VALUES (?,?,?,?,?) ON DUPLICATE KEY UPDATE `author`=VALUES(`author`), `content`=VALUES(`content`), `edited`=VALUES(`edited`), `time`=VALUES(`time`)" (Concat (Only channel, message))
+setSnipeMessageByChannel channel message = (>0) <$> executeLogT insertQueryKeyed (KeyedRow channel message)
