@@ -8,8 +8,6 @@ import BowBot.Utils
 import BowBot.Settings.Basic
 import BowBot.Discord.Utils
 import qualified Data.Text as T
-import Database.MySQL.Simple.QueryParams (QueryParams(..))
-import Database.MySQL.Simple.QueryResults (QueryResults(..))
 
 data StatsTimeRange = DailyStats | WeeklyStats | MonthlyStats deriving (Show, Eq)
 

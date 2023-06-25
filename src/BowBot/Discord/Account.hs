@@ -11,8 +11,6 @@ import BowBot.BotData.Info
 import qualified Discord.Requests as R
 import Data.List (deleteFirstsBy)
 import BowBot.Discord.Name
-import Database.MySQL.Simple.QueryParams (QueryParams(..))
-import Database.MySQL.Simple.QueryResults (QueryResults(..))
 import Data.Proxy
 
 data DiscordAccount = DiscordAccount { discordId :: !UserId, discordName :: !DiscordName, discordIsMember :: !Bool } deriving (Show, Eq)

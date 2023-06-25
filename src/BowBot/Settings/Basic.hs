@@ -4,9 +4,6 @@ import Discord.Types (UserId)
 import BowBot.Discord.Orphans ()
 import BowBot.DB.Basic
 import BowBot.Utils
-import Database.MySQL.Simple (Param, Result, ToField(..), FromField(..))
-import Database.MySQL.Simple.QueryResults (QueryResults(..))
-import Database.MySQL.Simple.QueryParams (QueryParams(..))
 import qualified Database.MySQL.Base.Types as T
 
 data SettingBin = Yes | No deriving (Show, Eq, Ord, Enum)

@@ -6,7 +6,6 @@ import BowBot.Account.Basic
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
 import qualified Data.ByteString.Char8 as BS
-import Database.MySQL.Simple (Param, Result, ToField(..), FromField(..))
 import qualified Database.MySQL.Base.Types as T
 
 

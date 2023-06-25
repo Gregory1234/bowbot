@@ -11,8 +11,6 @@ import BowBot.Counter.Basic
 import Control.Concurrent (threadDelay)
 import Control.Concurrent.Async (mapConcurrently)
 import Data.Time.Clock (UTCTime(..))
-import Database.MySQL.Simple.QueryParams (QueryParams(..))
-import Database.MySQL.Simple.QueryResults (QueryResults(..))
 import BowBot.Hypixel.LeaderboardStatus
 
 data HypixelBowLeaderboardEntry = HypixelBowLeaderboardEntry

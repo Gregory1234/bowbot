@@ -2,8 +2,6 @@ module BowBot.Discord.Name where
 
 import BowBot.Discord.Utils
 import BowBot.DB.Basic
-import Database.MySQL.Simple.QueryResults (QueryResults(..))
-import Database.MySQL.Simple.QueryParams (QueryParams(..))
 import qualified Data.Text as T
 
 data DiscordName = DiscordName

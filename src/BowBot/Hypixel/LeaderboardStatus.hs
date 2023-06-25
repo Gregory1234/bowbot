@@ -2,7 +2,6 @@ module BowBot.Hypixel.LeaderboardStatus where
 
 import BowBot.Utils
 import BowBot.DB.Basic
-import Database.MySQL.Simple (Param, Result, ToField(..), FromField(..))
 import qualified Database.MySQL.Base.Types as T
 import BowBot.Minecraft.Basic
 

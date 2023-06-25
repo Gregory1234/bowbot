@@ -4,8 +4,6 @@ module BowBot.Snipe.Basic where
 
 import BowBot.Discord.Utils
 import BowBot.DB.Basic
-import Database.MySQL.Simple.QueryResults (QueryResults(..))
-import Database.MySQL.Simple.QueryParams (QueryParams(..))
 
 data SnipeMessage = SnipeMessage
   { snipeMessageAuthor :: !UserId

@@ -8,7 +8,6 @@ import qualified Data.Text.Encoding as T
 import Data.Bifunctor (first)
 import BowBot.DB.Basic
 import BowBot.Account.Basic
-import Database.MySQL.Simple (Param, Result, ToField(..), FromField(..))
 import qualified Database.MySQL.Base.Types as T
 import BowBot.Hypixel.Guild
 

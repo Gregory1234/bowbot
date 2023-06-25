@@ -7,8 +7,6 @@ import BowBot.DB.Basic
 import BowBot.Network.Basic
 import BowBot.Utils
 import qualified Data.Text as T
-import Database.MySQL.Simple.QueryParams (QueryParams(..))
-import Database.MySQL.Simple.QueryResults (QueryResults(..))
 
 data MinecraftAccount = MinecraftAccount
   { mcUUID :: !UUID
