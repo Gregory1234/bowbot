@@ -1,5 +1,5 @@
 module BowBot.DB.Basic(
-  module BowBot.DB.Basic, Connection, Only(..), QueryParams(..), QueryResults(..), Param, Result, ToField(..), FromField(..)
+  module BowBot.DB.Basic, Connection, Only(..), QueryParams(..), QueryResults(..), Param, Result, ToField(..), FromField(..), In(..)
 ) where
 
 import BowBot.Utils

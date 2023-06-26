@@ -7,8 +7,7 @@ import BowBot.Network.Basic hiding (Result)
 import BowBot.Hypixel.Basic
 import BowBot.Discord.Utils
 import BowBot.Minecraft.Account
-import BowBot.DB.Basic
-import Database.MySQL.Simple (Param, Result, In(..))
+import BowBot.DB.Typed
 
 
 hypixelGuildIdInfo :: InfoType Text
@@ -31,7 +30,7 @@ updateHypixelRoles = do
           known <- map fromOnly <$> queryLog_ "SELECT `uuid` FROM `minecraft`"
           let unknown = map fst members \\ known
           names <- catMaybes <$> traverse (\x -> fmap (x,) <$> mojangUUIDToCurrentName x) unknown
-          b <- (>0) <$> executeManyLog "INSERT INTO `minecraft` (`uuid`, `name`, `names`) VALUES (?,?,?) ON DUPLICATE KEY UPDATE `name`=VALUES(`name`), `names`=VALUES(`names`)" [MinecraftAccount {mcUUID, mcNames = [mcName, mcName <> "OldNamesCurrentlyNotKnown"]} | (mcUUID, mcName) <- names]
+          b <- (>0) <$> executeManyLogT insertQuery [MinecraftAccount {mcUUID, mcNames = [mcName, mcName <> "OldNamesCurrentlyNotKnown"]} | (mcUUID, mcName) <- names]
           c <- addMinecraftNames (map (\(u,n) -> (n,u)) names)
           when ((b && c) || null unknown) $ void $ executeManyLog "INSERT INTO `minecraft` (`uuid`, `hypixelRole`) VALUES (?,?) ON DUPLICATE KEY UPDATE `hypixelRole`=VALUES(`hypixelRole`)" members
           void $ executeLog "UPDATE `minecraft` SET `hypixelRole` = NULL WHERE `uuid` NOT IN ?" (Only (In (map fst members)))
