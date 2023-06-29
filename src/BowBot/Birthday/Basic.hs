@@ -2,7 +2,7 @@ module BowBot.Birthday.Basic where
 
 import BowBot.Discord.Utils
 import BowBot.DB.Basic
-import BowBot.Account.Basic
+import BowBot.Account.Register
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
 import qualified Data.ByteString.Char8 as BS
@@ -35,13 +35,11 @@ currentBirthdayDate = fromJust . birthdayFromString . pack <$> getTime "%d.%m"
 
 setBirthday :: (MonadIOReader m r, Has Connection r) => UserId -> BirthdayDate -> m ()
 setBirthday did bd = do
-  acc <- getBowBotIdByDiscord did
-  void $ case acc of
-    Nothing -> executeLog "INSERT INTO `unregistered` (`discord`, `birthday`) VALUES (?,?) ON DUPLICATE KEY UPDATE `birthday`=VALUES(`birthday`)" (did, bd)
-    Just a -> executeLog "INSERT INTO `people` (`id`, `birthday`) VALUES (?,?) ON DUPLICATE KEY UPDATE `birthday`=VALUES(`birthday`)" (a, bd)
+  bid' <- getOrCreateDummyBowBotAccount did
+  for_ bid' $ \bid -> executeLog "INSERT INTO `people` (`id`, `birthday`) VALUES (?,?) ON DUPLICATE KEY UPDATE `birthday`=VALUES(`birthday`)" (bid, bd)
 
 getBirthdaysByDate :: (MonadIOReader m r, Has Connection r) => BirthdayDate -> m [UserId]
-getBirthdaysByDate date = map fromOnly <$> queryLog "SELECT `discord` FROM `unregistered` WHERE `birthday` = ? UNION SELECT `peopleDiscord`.`discord` FROM `peopleDiscord` JOIN `people` ON `people`.`id`=`peopleDiscord`.`id` WHERE `birthday` = ?" (date, date)
+getBirthdaysByDate date = map fromOnly <$> queryLog "SELECT `peopleDiscord`.`discord` FROM `peopleDiscord` JOIN `people` ON `people`.`id`=`peopleDiscord`.`id` WHERE `birthday` = ?" (date, date)
 
 getBirthdayByDiscord :: (MonadIOReader m r, Has Connection r) => UserId -> m (Maybe BirthdayDate)
-getBirthdayByDiscord discord = (fromOnly =<<) <$> queryOnlyLog "SELECT `birthday` FROM `unregistered` WHERE `discord` = ? UNION SELECT `birthday` FROM `peopleDiscord` JOIN `people` ON `people`.`id`=`peopleDiscord`.`id` WHERE `peopleDiscord`.`discord` = ?" (discord, discord)
+getBirthdayByDiscord discord = (fromOnly =<<) <$> queryOnlyLog "SELECT `birthday` FROM `peopleDiscord` JOIN `people` ON `people`.`id`=`peopleDiscord`.`id` WHERE `peopleDiscord`.`discord` = ?" (discord, discord)

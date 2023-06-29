@@ -8,6 +8,7 @@ import qualified Data.Text.Encoding as T
 import Data.Bifunctor (first)
 import BowBot.DB.Basic
 import BowBot.Account.Basic
+import BowBot.Account.Register
 import qualified Database.MySQL.Base.Types as T
 import BowBot.Hypixel.Guild
 
@@ -38,23 +39,22 @@ savedRolesFromIds roleids = do
   savedHypixelRoles <- askInfo savedHypixelRolesInfo
   return $ map fst $ filter ((`elem` roleids) . snd) $ M.toList toggleableRoles ++ M.toList savedRoles ++ map (\(a,(_,c)) -> (a,c)) (M.toList savedHypixelRoles)
 
+-- TODO: switch the api to be BowBotId based, to not keep asking for user's BowBotId
 setSavedRolesByDiscord :: (MonadIOReader m r, Has Connection r) => UserId -> [SavedRole] -> m ()
 setSavedRolesByDiscord discord roles = do
-  acc <- getBowBotIdByDiscord discord
-  void $ case acc of
-    Nothing -> executeLog "INSERT INTO `unregistered` (`discord`, `roles`) VALUES (?,?) ON DUPLICATE KEY UPDATE `roles`=VALUES(`roles`)" (discord, roles)
-    Just a -> executeLog "INSERT INTO `people` (`id`, `roles`) VALUES (?,?) ON DUPLICATE KEY UPDATE `roles`=VALUES(`roles`)" (a, roles)
+  bid' <- if null roles then getBowBotIdByDiscord discord else getOrCreateDummyBowBotAccount discord -- NOTE: do not create an account if roles is empty
+  for_ bid' $ \bid -> executeLog "INSERT INTO `people` (`id`, `roles`) VALUES (?,?) ON DUPLICATE KEY UPDATE `roles`=VALUES(`roles`)" (bid, roles)
 
 updateSavedRolesAll :: (MonadIOReader m r, HasAll '[Connection, DiscordHandle, InfoCache] r) => m ()
 updateSavedRolesAll = do
-  savedRoles :: M.Map UserId [SavedRole] <- M.fromList <$> queryLog_ "SELECT `discord`, `roles` FROM `unregistered` UNION SELECT `discord`, `roles` FROM `people` JOIN `peopleDiscord` ON `people`.`id` = `peopleDiscord`.`id`"
+  savedRoles :: M.Map UserId [SavedRole] <- M.fromList <$> queryLog_ "SELECT `discord`, `roles` FROM `people` JOIN `peopleDiscord` ON `people`.`id` = `peopleDiscord`.`id`"
   gid <- askInfo discordGuildIdInfo
   members <- discordGuildMembers gid
   for_ members $ \GuildMember {..} -> case memberUser of
     Nothing -> return ()
     Just User {..} -> do
       roles <- savedRolesFromIds memberRoles
-      when (roles /= savedRoles M.! userId) $ setSavedRolesByDiscord userId roles
+      when (roles /= fromMaybe [] (savedRoles M.!? userId)) $ setSavedRolesByDiscord userId roles
 
 giveSavedRoles :: (MonadIOReader m r, HasAll '[Connection, DiscordHandle, InfoCache] r) => GuildMember -> [SavedRole] -> Maybe [HypixelRole] -> m ()
 giveSavedRoles gmem roles hypixelRoles = do
@@ -69,6 +69,3 @@ giveSavedRoles gmem roles hypixelRoles = do
   case hypixelRoles of
     Nothing -> partialSet (M.map snd savedHypixelRoles)
     Just hypixelRoles' -> partialSetUni (M.map snd savedHypixelRoles) (M.map snd $ M.filter (not . null . intersect hypixelRoles' . fst) savedHypixelRoles)
-
-getSavedRolesByDiscord :: (MonadIOReader m r, HasAll '[Connection, DiscordHandle, InfoCache] r) => UserId -> m (Maybe [SavedRole])
-getSavedRolesByDiscord did = fmap fromOnly <$> queryOnlyLog "SELECT `roles` FROM `unregistered` WHERE `discord` = ? UNION SELECT `roles` FROM `people` JOIN `peopleDiscord` ON `people`.`id` = `peopleDiscord`.`id` WHERE `peopleDiscord`.`discord` = ?" (did, did)

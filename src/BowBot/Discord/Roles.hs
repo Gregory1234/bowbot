@@ -85,6 +85,8 @@ giveIllegalRole gmem = do
   gid <- askInfo discordGuildIdInfo
   addRemoveDiscordRoles gid gmem [illegalRole] $ [illegalRole | not . null $ intersect (memberRoles gmem) (memberRole:savedHypixelRoles ++ divisionTitleRoles)]
 
+-- TODO: clean this up
+
 applyRolesByBowBotId' :: (MonadIOReader m r, HasAll '[Connection, DiscordHandle, Manager, CounterState, InfoCache] r) => Maybe BowBotId -> [GuildMember] -> m ()
 applyRolesByBowBotId' (Just bid) gmems = do
   wins :: [Integer] <- map fromOnly <$> queryLog "SELECT `bowWins` FROM `stats` JOIN `peopleMinecraft` ON `stats`.`minecraft` = `peopleMinecraft`.`minecraft` WHERE `id` = ?" (Only bid)
@@ -96,8 +98,6 @@ applyRolesByBowBotId' (Just bid) gmems = do
     giveRolesMember gmem (not $ null hypixelRoles)
     removeIllegalRole gmem
 applyRolesByBowBotId' Nothing gmems = for_ gmems $ \gmem -> do
-  savedRoles :: [SavedRole] <- maybe [] fromOnly <$> queryOnlyLog "SELECT `roles` FROM `unregistered` WHERE `discord` = ?" (Only (maybe 0 userId (memberUser gmem)))
-  giveSavedRoles gmem savedRoles Nothing
   giveRolesMemberUnregistered gmem
   giveIllegalRole gmem
 
@@ -117,7 +117,7 @@ applyRoles gmem = do
 applyRolesAll :: (MonadIOReader m r, HasAll '[Connection, DiscordHandle, Manager, CounterState, InfoCache] r) => m ()
 applyRolesAll = do
   lb <- getHypixelBowLeaderboards
-  savedRoles :: M.Map UserId [SavedRole] <- M.fromList <$> queryLog_ "SELECT `discord`, `roles` FROM `unregistered` UNION SELECT `discord`, `roles` FROM `people` JOIN `peopleDiscord` ON `people`.`id` = `peopleDiscord`.`id`"
+  savedRoles :: M.Map UserId [SavedRole] <- M.fromList <$> queryLog_ "SELECT `discord`, `roles` FROM `people` JOIN `peopleDiscord` ON `people`.`id` = `peopleDiscord`.`id`"
   gid <- askInfo discordGuildIdInfo
   gmems <- discordGuildMembers gid
   roles :: [(UUID, HypixelRole)] <- queryLog_ "SELECT `uuid`, `hypixelRole` FROM `minecraft` WHERE `hypixelRole` IS NOT NULL"
@@ -127,7 +127,7 @@ applyRolesAll = do
     case accountMinecrafts M.!? discord of
       Nothing -> do
         for_ (savedRoles M.!? discord) $ \r -> giveSavedRoles gmem r Nothing
-        giveRolesMemberUnregistered gmem
+        giveRolesMemberUnregistered gmem -- TODO: they might not be unregistered, this is a bad name
         giveIllegalRole gmem
       Just mcs -> do
         let hypixelRoles = mapMaybe (`lookup` roles) mcs

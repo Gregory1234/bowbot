@@ -22,18 +22,18 @@ registerCommandHandler RegisterCommandSettings {..} name did = do
   uuid <- liftMaybe thePlayerDoesNotExistMessage =<< mcNameToUUID name
   dcsOfUUID <- getDiscordIdsByMinecraft uuid
   unless (null dcsOfUUID) $ throwError $ if did `elem` dcsOfUUID then alreadyRegisteredByYouMsg else alreadyRegisteredBySomeoneElseMsg
-  bbacc' <- getBowBotIdByDiscord did
-  newid <- case (bbacc', alreadyRegisteredMsg) of
+  bid <- liftMaybe somethingWentWrongMessage =<< getOrCreateDummyBowBotAccount did
+  mcs <- getMinecraftListByBowBotId bid
+  a <- case (mcs, alreadyRegisteredMsg) of
     (Just _, Just msg) -> throwError msg
-    (Just bid, Nothing) -> do
+    (Just _, Nothing) -> do
       void $ fullAddMinecraft uuid
-      a <- addAltToBowBotAccount bid uuid
-      unless a $ throwError somethingWentWrongMessage
-      return bid
+      addAltToBowBotAccount bid uuid
     (Nothing, _) -> do
       mc <- fullAddMinecraft uuid
-      liftMaybe somethingWentWrongMessage =<< createNewBowBotAccount (head $ mcNames mc) did uuid
-  applyRolesByBowBotId newid
+      addFirstMinecraftAccount bid (head $ mcNames mc) uuid
+  unless a $ throwError somethingWentWrongMessage
+  applyRolesByBowBotId bid
   respond "*Registered successfully*"
     where
       fullAddMinecraft uuid = do
