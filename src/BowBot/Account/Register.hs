@@ -18,17 +18,17 @@ createDummyBowBotAccount :: (MonadIOReader m r, Has Connection r) => UserId -> m
 createDummyBowBotAccount did = do
   r <- ask
   liftIO $ flip runReaderT r $ withTransaction $ (either (const $ rollback $> Nothing) (pure . Just) =<<) $ runExceptT $ do
-    c1 <- executeLog_ "INSERT INTO `people`(`name`) VALUES (\"Dummy Account\")"
+    c1 <- executeLog_ "INSERT INTO `account`(`name`) VALUES (\"Dummy Account\")"
     when (c1 <= 0) $ throwError ()
     bid <- BowBotId <$> insertID
-    c3 <- executeLog "INSERT INTO `peopleDiscord`(`id`, `discord`) VALUES (?,?)" (bid, did)
+    c3 <- executeLog "INSERT INTO `account_discord`(`account_id`,`discord_id`) VALUES (?,?)" (bid, did)
     when (c3 <= 0) $ throwError ()
     pure bid
 
 addFirstMinecraftAccount :: (MonadIOReader m r, Has Connection r) => BowBotId -> Text -> UUID -> m Bool
 addFirstMinecraftAccount bid name uuid = do
-  _ <- executeLog "UPDATE `people` SET `name` = ? WHERE `id` = ?" (name, bid)
-  (>0) <$> executeLog "INSERT INTO `peopleMinecraft`(`id`, `minecraft`,`status`, `selected`, `verified`) VALUES (?,?, 'main', 1, 0)" (bid, uuid)
+  _ <- executeLog "UPDATE `account` SET `name` = ? WHERE `id` = ?" (name, bid)
+  (>0) <$> executeLog "INSERT INTO `account_minecraft`(`account_id`,`minecraft_uuid`,`type`,`selected`,`verified`) VALUES (?,?, 'main', 1, 0)" (bid, uuid)
 
 addAltToBowBotAccount :: (MonadIOReader m r, Has Connection r) => BowBotId -> UUID -> m Bool
-addAltToBowBotAccount bid uuid = (>0) <$> executeLog "INSERT INTO `peopleMinecraft`(`id`, `minecraft`,`status`, `selected`, `verified`) VALUES (?,?, 'alt', 0, 0)" (bid, uuidString uuid)
+addAltToBowBotAccount bid uuid = (>0) <$> executeLog "INSERT INTO `account_minecraft`(`account_id`,`minecraft_uuid`,`type`,`selected`,`verified`) VALUES (?,?, 'alt', 0, 0)" (bid, uuidString uuid)

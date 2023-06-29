@@ -39,7 +39,7 @@ giveRolesDivisionTitle gmem maxWins = do
 
 applyRolesDivisionTitleByBowBotId' :: (MonadIOReader m r, HasAll '[Connection, DiscordHandle, InfoCache] r) => BowBotId -> [GuildMember] -> m ()
 applyRolesDivisionTitleByBowBotId' bid gmems = do
-  wins :: [Integer] <- map fromOnly <$> queryLog "SELECT `bowWins` FROM `stats` JOIN `peopleMinecraft` ON `stats`.`minecraft` = `peopleMinecraft`.`minecraft` WHERE `id` = ?" (Only bid)
+  wins :: [Integer] <- map fromOnly <$> queryLog "SELECT `wins` FROM `hypixel_bow_stats` JOIN `account_minecraft` ON `hypixel_bow_stats`.`minecraft_uuid` = `account_minecraft`.`minecraft_uuid` WHERE `account_id` = ?" (Only bid)
   for_ gmems $ \gmem -> do
     giveRolesDivisionTitle gmem (foldl' max 0 wins)
 
@@ -89,9 +89,9 @@ giveIllegalRole gmem = do
 
 applyRolesByBowBotId' :: (MonadIOReader m r, HasAll '[Connection, DiscordHandle, Manager, CounterState, InfoCache] r) => Maybe BowBotId -> [GuildMember] -> m ()
 applyRolesByBowBotId' (Just bid) gmems = do
-  wins :: [Integer] <- map fromOnly <$> queryLog "SELECT `bowWins` FROM `stats` JOIN `peopleMinecraft` ON `stats`.`minecraft` = `peopleMinecraft`.`minecraft` WHERE `id` = ?" (Only bid)
-  savedRoles :: [SavedRole] <- maybe [] fromOnly <$> queryOnlyLog "SELECT `roles` FROM `people` WHERE `id` = ?" (Only bid)
-  hypixelRoles :: [HypixelRole] <- map fromOnly <$> queryLog "SELECT `hypixelRole` FROM `minecraft` JOIN `peopleMinecraft` ON `peopleMinecraft`.`minecraft` = `minecraft`.`uuid` WHERE `peopleMinecraft`.`id` = ? AND `hypixelRole` IS NOT NULL" (Only bid)
+  wins :: [Integer] <- map fromOnly <$> queryLog "SELECT `wins` FROM `hypixel_bow_stats` JOIN `account_minecraft` ON `hypixel_bow_stats`.`minecraft_uuid` = `account_minecraft`.`minecraft_uuid` WHERE `account_id` = ?" (Only bid)
+  savedRoles :: [SavedRole] <- maybe [] fromOnly <$> queryOnlyLog "SELECT `roles` FROM `account` WHERE `id` = ?" (Only bid)
+  hypixelRoles :: [HypixelRole] <- map fromOnly <$> queryLog "SELECT `hypixel_role` FROM `minecraft` JOIN `account_minecraft` ON `account_minecraft`.`minecraft_uuid` = `minecraft`.`uuid` WHERE `account_minecraft`.`account_id` = ? AND `hypixel_role` IS NOT NULL" (Only bid)
   for_ gmems $ \gmem -> do
     giveSavedRoles gmem savedRoles (Just hypixelRoles)
     giveRolesDivisionTitle gmem (foldl' max 0 wins)
@@ -117,11 +117,11 @@ applyRoles gmem = do
 applyRolesAll :: (MonadIOReader m r, HasAll '[Connection, DiscordHandle, Manager, CounterState, InfoCache] r) => m ()
 applyRolesAll = do
   lb <- getHypixelBowLeaderboards
-  savedRoles :: M.Map UserId [SavedRole] <- M.fromList <$> queryLog_ "SELECT `discord`, `roles` FROM `people` JOIN `peopleDiscord` ON `people`.`id` = `peopleDiscord`.`id`"
+  savedRoles :: M.Map UserId [SavedRole] <- M.fromList <$> queryLog_ "SELECT `discord_id`, `roles` FROM `account` JOIN `account_discord` ON `account`.`id` = `account_discord`.`account_id`"
   gid <- askInfo discordGuildIdInfo
   gmems <- discordGuildMembers gid
-  roles :: [(UUID, HypixelRole)] <- queryLog_ "SELECT `uuid`, `hypixelRole` FROM `minecraft` WHERE `hypixelRole` IS NOT NULL"
-  accountMinecrafts :: M.Map UserId [UUID] <- M.map (map snd) . groupByToMap fst <$> queryLog_ "SELECT `peopleDiscord`.`discord`, `peopleMinecraft`.`minecraft` FROM `peopleMinecraft` JOIN `peopleDiscord` ON `peopleDiscord`.`id` = `peopleMinecraft`.`id`"
+  roles :: [(UUID, HypixelRole)] <- queryLog_ "SELECT `uuid`, `hypixel_role` FROM `minecraft` WHERE `hypixel_role` IS NOT NULL"
+  accountMinecrafts :: M.Map UserId [UUID] <- M.map (map snd) . groupByToMap fst <$> queryLog_ "SELECT `account_discord`.`discord_id`, `account_minecraft`.`minecraft_uuid` FROM `account_minecraft` JOIN `account_discord` ON `account_discord`.`account_id` = `account_minecraft`.`account_id`"
   for_ gmems $ \gmem -> do
     let discord = maybe 0 userId (memberUser gmem)
     case accountMinecrafts M.!? discord of

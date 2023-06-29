@@ -36,7 +36,7 @@ instance DatabaseTable (Only PermissionLevel) where
   type PrimaryKey (Only PermissionLevel) = UserId
   databaseTableName _ = "permissions"
   databaseColumnNames _ = ["level"]
-  databasePrimaryKey _ = "id"
+  databasePrimaryKey _ = "discord_id"
 
 getPermissionLevelByDiscord :: (MonadIOReader m r, Has Connection r) => UserId -> m PermissionLevel
 getPermissionLevelByDiscord discord = maybe DefaultLevel fromOnly <$> queryOnlyLogT selectByPrimaryQuery (Only discord)

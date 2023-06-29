@@ -26,8 +26,8 @@ getHypixelBowMilestones = do
   ctx <- ask
   milestoneNames <- askInfo milestoneNamesInfo
   milestonePairs <- liftIO $ (`runReaderT` ctx) $ withTransaction $ do
-    res :: [(UUID, Integer, Integer)] <- queryLog_ "SELECT `minecraft`, `announcementWins`, `bowWins` FROM `stats` WHERE `bowWins` > `announcementWins` AND `announcementWins` != -1"
-    void $ executeLog_ "UPDATE `stats` SET `announcementWins`=`bowWins`"
+    res :: [(UUID, Integer, Integer)] <- queryLog_ "SELECT `minecraft_uuid`, `announcement_wins`, `wins` FROM `hypixel_bow_stats` WHERE `announcement_wins` IS NOT NULL AND `wins` > `announcement_wins`"
+    void $ executeLog_ "UPDATE `hypixel_bow_stats` SET `announcement_wins`=`wins`"
     return res
   return [(uuid, milestone) | (uuid, low, high) <- milestonePairs, milestone <- milestoneNamesFromWins milestoneNames low high]
 

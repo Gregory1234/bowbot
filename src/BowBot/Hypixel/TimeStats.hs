@@ -8,8 +8,24 @@ import BowBot.Utils
 import BowBot.Settings.Basic
 import BowBot.Discord.Utils
 import qualified Data.Text as T
+import qualified Database.MySQL.Base.Types as T
 
 data StatsTimeRange = DailyStats | WeeklyStats | MonthlyStats deriving (Show, Eq)
+
+instance Param StatsTimeRange
+instance Result StatsTimeRange
+
+instance ToField StatsTimeRange where
+  toField DailyStats = "daily"
+  toField WeeklyStats = "weekly"
+  toField MonthlyStats = "monthly"
+
+instance FromField StatsTimeRange where
+  fromField = ([T.Enum, T.String], \case
+    "ban" -> Right DailyStats
+    "default" -> Right WeeklyStats
+    "mod" -> Right MonthlyStats
+    _ -> Left "Wrong stats time range")
 
 data HypixelBowTimeStats = HypixelBowTimeStats
   { bowTimeWins :: Integer,
@@ -67,10 +83,10 @@ showMaybeHypixelBowTimeStats MonthlyStats _ _ Nothing = "- **Monthly data isn't 
 showMaybeHypixelBowTimeStats tm s t (Just v) = showHypixelBowTimeStats tm s t v
 
 updateHypixelBowTimeStats :: (MonadIOReader m r, Has Connection r) => StatsTimeRange -> m ()
-updateHypixelBowTimeStats time = void $ executeLog (replaceQuery "TIME" (statsTimeRangeName time) "UPDATE `stats` SET `lastTIMEWins`=`bowWins`, `lastTIMELosses`=`bowLosses`, `lastTIMEUpdate`=`lastUpdate`") ()
+updateHypixelBowTimeStats time = void $ executeLog "INSERT INTO `hypixel_bow_timed_stats`(`minecraft_uuid`,`wins`,`losses`,`last_update`,`time`) SELECT `minecraft_uuid`,`wins`,`losses`,`last_update`,? FROM `hypixel_bow_stats`" (Only time)
 
 getHypixelBowTimeStatsByUUID :: (MonadIOReader m r, Has Connection r) => StatsTimeRange -> UUID -> m (Maybe HypixelBowTimeStats)
-getHypixelBowTimeStatsByUUID time uuid = queryOnlyLog (replaceQuery "TIME" (statsTimeRangeName time) "SELECT `lastTIMEWins`, `lastTIMELosses`, `lastTIMEUpdate` FROM `stats` WHERE `minecraft` = ? AND `lastTIMEWins` >= 0 AND `lastTIMELosses` >= 0") (Only uuid)
+getHypixelBowTimeStatsByUUID time uuid = queryOnlyLog "SELECT `wins`, `losses`, `last_update` FROM `hypixel_bow_timed_stats` WHERE `minecraft_uuid` = ? AND `time` = ?" (uuid, time)
 
 data FullHypixelBowTimeStats = FullHypixelBowTimeStats
   { currentHypixelBowStats :: HypixelBowStats

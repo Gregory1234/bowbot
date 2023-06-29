@@ -67,8 +67,8 @@ instance QueryResultsSize Settings where
 instance DatabaseTable Settings where
   type PrimaryKey Settings = UserId
   databaseTableName _ = "settings"
-  databaseColumnNames _ = ["wins", "losses", "wlr", "winsUntil", "bestStreak", "currentStreak", "bestDailyStreak", "bowHits", "bowShots", "accuracy"]
-  databasePrimaryKey _ = "discord"
+  databaseColumnNames _ = ["wins", "losses", "wlr", "wins_until", "best_streak", "current_streak", "best_daily_streak", "bow_hits", "bow_shots", "accuracy"]
+  databasePrimaryKey _ = "discord_id"
 
 getSettingsByDiscord :: (MonadIOReader m r, Has Connection r) => UserId -> m Settings
 getSettingsByDiscord discord = fromMaybe defSettings <$> queryOnlyLogT selectByPrimaryQuery (Only discord)

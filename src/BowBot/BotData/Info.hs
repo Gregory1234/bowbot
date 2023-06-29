@@ -18,7 +18,7 @@ newtype InfoCache = InfoCache (TVar (M.Map Text Text))
 refreshInfoCache :: (MonadIOReader m r, HasAll '[InfoCache, Connection] r) => m ()
 refreshInfoCache = do
   InfoCache cache <- asks getter
-  res :: [(Text, Text)] <- queryLog_ "SELECT `name`, `value` FROM `botInfo`"
+  res :: [(Text, Text)] <- queryLog_ "SELECT `name`, `value` FROM `bot_info`"
   liftIO $ atomically $ writeTVar cache (M.fromList res)
 
 downloadInfoCache :: IO InfoCache

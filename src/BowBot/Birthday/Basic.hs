@@ -36,10 +36,10 @@ currentBirthdayDate = fromJust . birthdayFromString . pack <$> getTime "%d.%m"
 setBirthday :: (MonadIOReader m r, Has Connection r) => UserId -> BirthdayDate -> m ()
 setBirthday did bd = do
   bid' <- getOrCreateDummyBowBotAccount did
-  for_ bid' $ \bid -> executeLog "INSERT INTO `people` (`id`, `birthday`) VALUES (?,?) ON DUPLICATE KEY UPDATE `birthday`=VALUES(`birthday`)" (bid, bd)
+  for_ bid' $ \bid -> executeLog "INSERT INTO `account` (`id`, `birthday`) VALUES (?,?) ON DUPLICATE KEY UPDATE `birthday`=VALUES(`birthday`)" (bid, bd)
 
 getBirthdaysByDate :: (MonadIOReader m r, Has Connection r) => BirthdayDate -> m [UserId]
-getBirthdaysByDate date = map fromOnly <$> queryLog "SELECT `peopleDiscord`.`discord` FROM `peopleDiscord` JOIN `people` ON `people`.`id`=`peopleDiscord`.`id` WHERE `birthday` = ?" (date, date)
+getBirthdaysByDate date = map fromOnly <$> queryLog "SELECT `account_discord`.`discord_id` FROM `account_discord` JOIN `account` ON `account`.`id`=`account_discord`.`account_id` WHERE `birthday` = ?" (Only date)
 
 getBirthdayByDiscord :: (MonadIOReader m r, Has Connection r) => UserId -> m (Maybe BirthdayDate)
-getBirthdayByDiscord discord = (fromOnly =<<) <$> queryOnlyLog "SELECT `birthday` FROM `peopleDiscord` JOIN `people` ON `people`.`id`=`peopleDiscord`.`id` WHERE `peopleDiscord`.`discord` = ?" (discord, discord)
+getBirthdayByDiscord discord = (fromOnly =<<) <$> queryOnlyLog "SELECT `birthday` FROM `account_discord` JOIN `account` ON `account`.`id`=`account_discord`.`account_id` WHERE `account_discord`.`discord_id` = ?" (Only discord)

@@ -23,7 +23,7 @@ announceBirthdays = do
   birthdayChannel <- askInfo birthdayChannelInfo
   dcMembers <- HM.fromList . map (\x -> (discordId x, x)) <$> getDiscordGuildMemberAccounts
   logInfoFork $ "Announcing birthdays: " <> T.intercalate ", " (map (showDiscordName . discordName) . filter discordIsMember . mapMaybe (dcMembers HM.!?) $ birthdays)
-  pns :: HM.HashMap UserId BowBotId <- HM.fromList <$> queryLog_ "SELECT `discord`, `id` FROM `peopleDiscord`"
+  pns :: HM.HashMap UserId BowBotId <- HM.fromList <$> queryLog_ "SELECT `discord_id`, `account_id` FROM `account_discord`"
   let (registered, unregistered) = partition (isJust . (pns HM.!?)) birthdays
   let peopleMap = M.toList $ M.filter (not . null) $ M.map (filter discordIsMember . mapMaybe (dcMembers HM.!?)) $ groupByToMap (pns HM.!) registered
   for_ peopleMap $ \(_, p) -> call $ R.CreateMessage birthdayChannel $ "**Happy birthday** to " <> T.intercalate ", " (map (showDiscordNameDiscord . discordName) p) <> "!"

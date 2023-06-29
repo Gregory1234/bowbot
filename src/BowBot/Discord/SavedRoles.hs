@@ -43,11 +43,11 @@ savedRolesFromIds roleids = do
 setSavedRolesByDiscord :: (MonadIOReader m r, Has Connection r) => UserId -> [SavedRole] -> m ()
 setSavedRolesByDiscord discord roles = do
   bid' <- if null roles then getBowBotIdByDiscord discord else getOrCreateDummyBowBotAccount discord -- NOTE: do not create an account if roles is empty
-  for_ bid' $ \bid -> executeLog "INSERT INTO `people` (`id`, `roles`) VALUES (?,?) ON DUPLICATE KEY UPDATE `roles`=VALUES(`roles`)" (bid, roles)
+  for_ bid' $ \bid -> executeLog "INSERT INTO `account` (`id`, `roles`) VALUES (?,?) ON DUPLICATE KEY UPDATE `roles`=VALUES(`roles`)" (bid, roles)
 
 updateSavedRolesAll :: (MonadIOReader m r, HasAll '[Connection, DiscordHandle, InfoCache] r) => m ()
 updateSavedRolesAll = do
-  savedRoles :: M.Map UserId [SavedRole] <- M.fromList <$> queryLog_ "SELECT `discord`, `roles` FROM `people` JOIN `peopleDiscord` ON `people`.`id` = `peopleDiscord`.`id`"
+  savedRoles :: M.Map UserId [SavedRole] <- M.fromList <$> queryLog_ "SELECT `discord_id`, `roles` FROM `account` JOIN `account` ON `account`.`id` = `account_discord`.`account_id`"
   gid <- askInfo discordGuildIdInfo
   members <- discordGuildMembers gid
   for_ members $ \GuildMember {..} -> case memberUser of
