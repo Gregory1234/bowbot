@@ -101,3 +101,17 @@ insertQueryKeyed = TypedQuery $ Query
   <> " (" <> columnListFromNames (databasePrimaryKey (Proxy @a) ++ databaseColumnNames (Proxy @a)) <> ")"
   <> " VALUES (?," <> BS.intercalate "," (map (const "?") (databaseColumnNames (Proxy @a))) <> ")"
   <> " ON DUPLICATE KEY UPDATE " <> columnUpdateListFromNames (databaseColumnNames (Proxy @a))
+
+insertSelectQuery :: forall a b. DatabaseTable a => TypedQuery b a -> TypedQuery' b
+insertSelectQuery (TypedQuery (Query q)) = TypedQuery $ Query 
+   $ "INSERT INTO " <> queryNameBrackets (databaseTableName (Proxy @a))
+  <> " (" <> columnListFromNames (databaseColumnNames (Proxy @a)) <> ")"
+  <> " " <> q
+  <> " ON DUPLICATE KEY UPDATE " <> columnUpdateListFromNames (filter (`notElem` databasePrimaryKey (Proxy @a)) $ databaseColumnNames (Proxy @a))
+
+insertSelectQueryKeyed :: forall a b. DatabaseTable a => TypedQuery b (KeyedRow a) -> TypedQuery' b
+insertSelectQueryKeyed (TypedQuery (Query q)) = TypedQuery $ Query 
+   $ "INSERT INTO " <> queryNameBrackets (databaseTableName (Proxy @a))
+  <> " (" <> columnListFromNames (databasePrimaryKey (Proxy @a) ++ databaseColumnNames (Proxy @a)) <> ")"
+  <> " " <> q
+  <> " ON DUPLICATE KEY UPDATE " <> columnUpdateListFromNames (databaseColumnNames (Proxy @a))

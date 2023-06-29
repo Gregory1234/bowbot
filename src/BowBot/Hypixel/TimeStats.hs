@@ -1,9 +1,11 @@
+{-# LANGUAGE TypeFamilies #-}
+
 module BowBot.Hypixel.TimeStats where
 
 import BowBot.Hypixel.Stats
 import BowBot.Hypixel.Leaderboard
 import BowBot.Minecraft.Basic
-import BowBot.DB.Basic
+import BowBot.DB.Typed
 import BowBot.Utils
 import BowBot.Settings.Basic
 import BowBot.Discord.Utils
@@ -41,6 +43,11 @@ instance QueryResults HypixelBowTimeStats where
       in HypixelBowTimeStats {..}
 instance QueryResultsSize HypixelBowTimeStats where
   queryResultsSize _ = 3
+instance DatabaseTable HypixelBowTimeStats where
+  type PrimaryKey HypixelBowTimeStats = (UUID, StatsTimeRange)
+  databaseTableName _ = "hypixel_bow_timed_stats"
+  databaseColumnNames _ = ["wins", "losses", "last_update"]
+  databasePrimaryKey _ = ["minecraft_uuid", "time"]
 
 statsTimeRangeName :: StatsTimeRange -> Text
 statsTimeRangeName DailyStats = "Day"
@@ -83,10 +90,10 @@ showMaybeHypixelBowTimeStats MonthlyStats _ _ Nothing = "- **Monthly data isn't 
 showMaybeHypixelBowTimeStats tm s t (Just v) = showHypixelBowTimeStats tm s t v
 
 updateHypixelBowTimeStats :: (MonadIOReader m r, Has Connection r) => StatsTimeRange -> m ()
-updateHypixelBowTimeStats time = void $ executeLog "INSERT INTO `hypixel_bow_timed_stats`(`minecraft_uuid`,`wins`,`losses`,`last_update`,`time`) SELECT `minecraft_uuid`,`wins`,`losses`,`last_update`,? FROM `hypixel_bow_stats`" (Only time)
+updateHypixelBowTimeStats time = void $ executeLogT (insertSelectQueryKeyed @HypixelBowTimeStats (TypedQuery "SELECT `minecraft_uuid`,?,`wins`,`losses`,`last_update` FROM `hypixel_bow_stats`")) (Only time)
 
 getHypixelBowTimeStatsByUUID :: (MonadIOReader m r, Has Connection r) => StatsTimeRange -> UUID -> m (Maybe HypixelBowTimeStats)
-getHypixelBowTimeStatsByUUID time uuid = queryOnlyLog "SELECT `wins`, `losses`, `last_update` FROM `hypixel_bow_timed_stats` WHERE `minecraft_uuid` = ? AND `time` = ?" (uuid, time)
+getHypixelBowTimeStatsByUUID time uuid = queryOnlyLogT selectByPrimaryQuery (uuid, time)
 
 data FullHypixelBowTimeStats = FullHypixelBowTimeStats
   { currentHypixelBowStats :: HypixelBowStats
