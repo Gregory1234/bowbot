@@ -22,10 +22,10 @@ instance QueryResults MinecraftAccount where
 instance QueryResultsSize MinecraftAccount where
   queryResultsSize _ = 2
 instance DatabaseTable MinecraftAccount where
-  type PrimaryKey MinecraftAccount = UUID
+  type PrimaryKey MinecraftAccount = Only UUID
   databaseTableName _ = "minecraft"
   databaseColumnNames _ = ["uuid", "names"]
-  databasePrimaryKey _ = "uuid"
+  databasePrimaryKey _ = ["uuid"]
 
 getMinecraftAccountByUUID :: (MonadIOReader m r, Has Connection r) => UUID -> m (Maybe MinecraftAccount)
 getMinecraftAccountByUUID uuid = queryOnlyLogT selectByPrimaryQuery (Only uuid)

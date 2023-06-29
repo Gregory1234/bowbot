@@ -24,10 +24,10 @@ instance QueryResults DiscordAccount where
 instance QueryResultsSize DiscordAccount where
   queryResultsSize _ = 2 + queryResultsSize (Proxy @DiscordName)
 instance DatabaseTable DiscordAccount where
-  type PrimaryKey DiscordAccount = UserId
+  type PrimaryKey DiscordAccount = Only UserId
   databaseTableName _ = "discord"
   databaseColumnNames _ = ["id", "name", "discriminator", "nickname", "member"]
-  databasePrimaryKey _ = "id"
+  databasePrimaryKey _ = ["id"]
 
 getDiscordAccountById :: (MonadIOReader m r, Has Connection r) => UserId -> m (Maybe DiscordAccount)
 getDiscordAccountById did = queryOnlyLogT selectByPrimaryQuery (Only did)

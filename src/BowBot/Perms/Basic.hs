@@ -33,10 +33,10 @@ instance FromField PermissionLevel where
     _ -> Left "Wrong permission level")
 
 instance DatabaseTable (Only PermissionLevel) where
-  type PrimaryKey (Only PermissionLevel) = UserId
+  type PrimaryKey (Only PermissionLevel) = Only UserId
   databaseTableName _ = "permissions"
   databaseColumnNames _ = ["level"]
-  databasePrimaryKey _ = "discord_id"
+  databasePrimaryKey _ = ["discord_id"]
 
 getPermissionLevelByDiscord :: (MonadIOReader m r, Has Connection r) => UserId -> m PermissionLevel
 getPermissionLevelByDiscord discord = maybe DefaultLevel fromOnly <$> queryOnlyLogT selectByPrimaryQuery (Only discord)

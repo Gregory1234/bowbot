@@ -41,18 +41,18 @@ class DatabaseTable a where
   type PrimaryKey a
   databaseTableName :: Proxy a -> ByteString
   databaseColumnNames :: Proxy a -> [ByteString]
-  databasePrimaryKey :: Proxy a -> ByteString
+  databasePrimaryKey :: Proxy a -> [ByteString]
 
 data KeyedRow a = KeyedRow { keyedRowKey :: PrimaryKey a, keyedRowValue :: a }
 
-instance (Param (PrimaryKey a), QueryParams a) => QueryParams (KeyedRow a) where
-  renderParams KeyedRow {..} = renderParams (Concat (Only keyedRowKey, keyedRowValue))
-instance (Result (PrimaryKey a), QueryResults a) => QueryResults (KeyedRow a) where
+instance (QueryParams (PrimaryKey a), QueryParams a) => QueryParams (KeyedRow a) where
+  renderParams KeyedRow {..} = renderParams (Concat (keyedRowKey, keyedRowValue))
+instance (QueryResultsSize (PrimaryKey a), QueryResults a) => QueryResults (KeyedRow a) where
   convertResults fields strings = let
-    Concat (Only keyedRowKey, keyedRowValue) = convertResults fields strings
+    Concat (keyedRowKey, keyedRowValue) = convertResults fields strings
       in KeyedRow {..}
-instance (Result (PrimaryKey a), QueryResultsSize a) => QueryResultsSize (KeyedRow a) where
-  queryResultsSize _ = 1 + queryResultsSize (Proxy @a)
+instance (QueryResultsSize (PrimaryKey a), QueryResultsSize a) => QueryResultsSize (KeyedRow a) where
+  queryResultsSize _ = queryResultsSize (Proxy @(PrimaryKey a)) + queryResultsSize (Proxy @a)
 
 queryNameBrackets :: ByteString -> ByteString
 queryNameBrackets x = "`" <> x <> "`"
@@ -70,7 +70,7 @@ selectQueryWithSuffix suf = TypedQuery $ Query
 
 selectQueryKeyedWithSuffix :: forall b a. DatabaseTable a => ByteString -> TypedQuery b (KeyedRow a)
 selectQueryKeyedWithSuffix suf = TypedQuery $ Query 
-   $ "SELECT " <> columnListFromNames (databasePrimaryKey (Proxy @a):databaseColumnNames (Proxy @a))
+   $ "SELECT " <> columnListFromNames (databasePrimaryKey (Proxy @a) ++ databaseColumnNames (Proxy @a))
   <> " FROM " <> queryNameBrackets (databaseTableName (Proxy @a)) <> suf
 
 selectAllQuery :: DatabaseTable a => TypedQuery () a
@@ -85,19 +85,19 @@ selectByQuery col = selectQueryWithSuffix $ " WHERE " <> queryNameBrackets col <
 selectByQueryKeyed :: DatabaseTable a => ByteString -> TypedQuery (Only b) (KeyedRow a)
 selectByQueryKeyed col = selectQueryKeyedWithSuffix $ " WHERE " <> queryNameBrackets col <> " = ?"
 
-selectByPrimaryQuery :: forall a. DatabaseTable a => TypedQuery (Only (PrimaryKey a)) a
-selectByPrimaryQuery = selectByQuery $ databasePrimaryKey (Proxy @a)
+selectByPrimaryQuery :: forall a. DatabaseTable a => TypedQuery (PrimaryKey a) a
+selectByPrimaryQuery = selectQueryWithSuffix $ " WHERE " <> BS.intercalate "AND " (map (<> " = ?") (databasePrimaryKey (Proxy @a)))
 
 insertQuery :: forall a. DatabaseTable a => TypedQuery' a
 insertQuery = TypedQuery $ Query 
    $ "INSERT INTO " <> queryNameBrackets (databaseTableName (Proxy @a))
   <> " (" <> columnListFromNames (databaseColumnNames (Proxy @a)) <> ")"
   <> " VALUES (" <> BS.intercalate "," (map (const "?") (databaseColumnNames (Proxy @a))) <> ")"
-  <> " ON DUPLICATE KEY UPDATE " <> columnUpdateListFromNames (filter (/= databasePrimaryKey (Proxy @a)) $ databaseColumnNames (Proxy @a))
+  <> " ON DUPLICATE KEY UPDATE " <> columnUpdateListFromNames (filter (`notElem` databasePrimaryKey (Proxy @a)) $ databaseColumnNames (Proxy @a))
 
 insertQueryKeyed :: forall a. DatabaseTable a => TypedQuery' (KeyedRow a)
 insertQueryKeyed = TypedQuery $ Query 
    $ "INSERT INTO " <> queryNameBrackets (databaseTableName (Proxy @a))
-  <> " (" <> columnListFromNames (databasePrimaryKey (Proxy @a):databaseColumnNames (Proxy @a)) <> ")"
+  <> " (" <> columnListFromNames (databasePrimaryKey (Proxy @a) ++ databaseColumnNames (Proxy @a)) <> ")"
   <> " VALUES (?," <> BS.intercalate "," (map (const "?") (databaseColumnNames (Proxy @a))) <> ")"
   <> " ON DUPLICATE KEY UPDATE " <> columnUpdateListFromNames (databaseColumnNames (Proxy @a))

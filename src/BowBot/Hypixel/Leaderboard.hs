@@ -32,10 +32,10 @@ instance QueryResults HypixelBowLeaderboardEntry where
 instance QueryResultsSize HypixelBowLeaderboardEntry where
   queryResultsSize _ = 5
 instance DatabaseTable HypixelBowLeaderboardEntry where
-  type PrimaryKey HypixelBowLeaderboardEntry = UUID
+  type PrimaryKey HypixelBowLeaderboardEntry = Only UUID
   databaseTableName _ = "hypixel_bow_stats"
   databaseColumnNames _ = ["wins", "losses", "winstreak", "last_update", "last_winstreak_update"]
-  databasePrimaryKey _ = "minecraft_uuid"
+  databasePrimaryKey _ = ["minecraft_uuid"]
 
 bowLbWLR :: HypixelBowLeaderboardEntry -> WLR Integer
 bowLbWLR HypixelBowLeaderboardEntry {..} = WLR bowLbWins bowLbLosses
@@ -49,7 +49,7 @@ completeHypixelBowStats s Nothing = s
 completeHypixelBowStats s (Just HypixelBowLeaderboardEntry {..}) = s { bestWinstreak = completeCachedMaybe bowLbWinstreakTimestamp (bestWinstreak s) bowLbWinstreak }
 
 getHypixelBowLeaderboards :: (MonadIOReader m r, HasAll '[Connection] r) => m (HM.HashMap UUID HypixelBowLeaderboardEntry)
-getHypixelBowLeaderboards = HM.fromList . map (\(KeyedRow a b) -> (a,b)) <$> queryLogT_ selectAllQueryKeyed
+getHypixelBowLeaderboards = HM.fromList . map (\(KeyedRow (Only a) b) -> (a,b)) <$> queryLogT_ selectAllQueryKeyed
 
 updateHypixelBowLeaderboards :: (MonadIOReader m r, HasAll '[Manager, CounterState, Connection] r) => m ()
 updateHypixelBowLeaderboards = do
@@ -69,14 +69,14 @@ updateHypixelBowLeaderboards = do
     wait
     newVals <- fmap (catMaybes . concat) $ liftIO $ for chunked $ \chunk -> mapConcurrently (fmap (`runReaderT` ctx) helper) chunk
     liftIO $ (`runReaderT` ctx) $ withTransaction $ do
-      let queryParams = map (uncurry KeyedRow) newVals
+      let queryParams = map (\(x, y) -> KeyedRow (Only x) y) newVals
       void $ executeManyLogT insertQueryKeyed queryParams
 
 getHypixelBowLeaderboardEntryByUUID :: (MonadIOReader m r, Has Connection r) => UUID -> m (Maybe HypixelBowLeaderboardEntry)
 getHypixelBowLeaderboardEntryByUUID uuid = queryOnlyLogT selectByPrimaryQuery (Only uuid)
 
 setHypixelBowLeaderboardEntryByUUID :: (MonadIOReader m r, Has Connection r) => UUID -> HypixelBowLeaderboardEntry -> m Bool
-setHypixelBowLeaderboardEntryByUUID uuid entry = (>0) <$> executeLogT insertQueryKeyed (KeyedRow uuid entry)
+setHypixelBowLeaderboardEntryByUUID uuid entry = (>0) <$> executeLogT insertQueryKeyed (KeyedRow (Only uuid) entry)
 
 removeHypixelBowLeaderboardEntryByUUID :: (MonadIOReader m r, Has Connection r) => UUID -> m Bool
 removeHypixelBowLeaderboardEntryByUUID uuid = (>0) <$> executeLog "DELETE FROM `hypixel_bow_stats` WHERE `minecraft` = ?" (Only uuid)
