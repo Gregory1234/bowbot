@@ -43,6 +43,7 @@ import BowBot.Snipe.Command
 import BowBot.Hypixel.Announce
 import BowBot.Counter.Basic
 import BowBot.Hypixel.Guild
+import BowBot.Command.HashCommand
 
 runBowBot :: IO ()
 runBowBot = do
@@ -208,6 +209,7 @@ commands =
   , constSettingCommand Yes Always "show" "makes the stat visible"
   , constSettingCommand No Never "hide" "makes the stat hidden"
   , selectMinecraftCommand
+  , hashCommand
   , helpCommand commands ModLevel Nothing "normal" "modhelp"
   , addCommand
   , hypixelBanCommand
