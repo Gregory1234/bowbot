@@ -11,13 +11,9 @@ data DiscordName = DiscordName
   } deriving (Show, Eq)
 
 instance QueryParams DiscordName where
-  renderParams DiscordName {..} = renderParams (discordUsername, fromMaybe "0" discordDiscrim, discordNickname)
+  renderParams DiscordName {..} = [render discordUsername, render (fromMaybe "0" discordDiscrim), render discordNickname]
 instance QueryResults DiscordName where
-  convertResults fields strings = let
-    (discordUsername, filterMaybe (/="0") -> discordDiscrim, discordNickname) = convertResults fields strings
-      in DiscordName {..}
-instance QueryResultsSize DiscordName where
-  queryResultsSize _ = 3
+  convertResults = DiscordName <$> convert <*> fmap (filterMaybe (/="0")) convert <*> convert
 
 guildMemberToDiscordName :: GuildMember -> DiscordName
 guildMemberToDiscordName GuildMember { memberUser = Just user, .. } = let u = userToDiscordName user in u { discordNickname = memberNick <|> discordNickname u }

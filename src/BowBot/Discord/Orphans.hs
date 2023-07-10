@@ -14,6 +14,7 @@ import Database.MySQL.Simple (Param, Result)
 import TextShow (TextShow(..))
 import TextShow.Generic (FromGeneric(..))
 import Discord (RestCallErrorCode(..))
+import BowBot.DB.ParamResult
 
 deriving stock instance Generic Snowflake
 deriving anyclass instance NFData Snowflake
@@ -192,10 +193,14 @@ deriving newtype instance Hashable Snowflake
 deriving newtype instance TextShow Snowflake
 deriving newtype instance Param Snowflake
 deriving newtype instance Result Snowflake
+deriving newtype instance QueryParams Snowflake
+deriving newtype instance QueryResults Snowflake
 deriving newtype instance Hashable (DiscordId a)
 deriving newtype instance TextShow (DiscordId a)
 deriving newtype instance Param (DiscordId a)
 deriving newtype instance Result (DiscordId a)
+deriving newtype instance QueryParams (DiscordId a)
+deriving newtype instance QueryResults (DiscordId a)
 
 deriving stock instance Generic RestCallErrorCode
 deriving via (FromGeneric RestCallErrorCode) instance TextShow RestCallErrorCode

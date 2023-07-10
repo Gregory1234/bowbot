@@ -13,7 +13,7 @@ getSelectedMinecraftByDiscord did = runMaybeT $ do
   liftMaybe () =<< getMinecraftAccountByUUID selectedMinecraft -- TODO: do it directly?
 
 getDiscordAccountsByBowBotId :: (MonadIOReader m r, Has Connection r) => BowBotId -> m [DiscordAccount]
-getDiscordAccountsByBowBotId bid = queryLog "SELECT `discord`.`id`, `discord`.`name`, `discord`.`discriminator`, `discord`.`nickname`, `discord`.`member` FROM `discord` JOIN `account_discord` ON `account_discord`.`discord_id` = `discord`.`id` WHERE `account_discord`.`account_id` = ?" (Only bid)
+getDiscordAccountsByBowBotId = queryLog "SELECT `discord`.`id`, `discord`.`name`, `discord`.`discriminator`, `discord`.`nickname`, `discord`.`member` FROM `discord` JOIN `account_discord` ON `account_discord`.`discord_id` = `discord`.`id` WHERE `account_discord`.`account_id` = ?"
 
 getMinecraftAccountsByBowBotId :: (MonadIOReader m r, Has Connection r) => BowBotId -> m [(MinecraftAccount, Bool)]
-getMinecraftAccountsByBowBotId bid = map (second fromOnly . fromConcat) <$> queryLog "SELECT `minecraft`.`uuid`, `minecraft`.`names`, `account_minecraft`.`selected` FROM `minecraft` JOIN `account_minecraft` ON `account_minecraft`.`minecraft_uuid` = `minecraft`.`uuid` WHERE `account_minecraft`.`account_id` = ?" (Only bid)
+getMinecraftAccountsByBowBotId = queryLog "SELECT `minecraft`.`uuid`, `minecraft`.`names`, `account_minecraft`.`selected` FROM `minecraft` JOIN `account_minecraft` ON `account_minecraft`.`minecraft_uuid` = `minecraft`.`uuid` WHERE `account_minecraft`.`account_id` = ?"

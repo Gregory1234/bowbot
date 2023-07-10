@@ -8,7 +8,9 @@ import BowBot.DB.Typed
 import BowBot.Utils
 import qualified Database.MySQL.Base.Types as T
 
-data SettingBin = Yes | No deriving (Show, Eq, Ord, Enum)
+data SettingBin = Yes | No
+  deriving (Show, Eq, Ord, Enum)
+  deriving (QueryParams, QueryResults) via (SimpleValue SettingBin)
 
 instance Param SettingBin
 instance Result SettingBin
@@ -23,7 +25,9 @@ instance FromField SettingBin where
     "no" -> Right No
     _ -> Left "Wrong permission level")
 
-data SettingTer = Never | WhenSensible | Always deriving (Show, Eq, Ord, Enum)
+data SettingTer = Never | WhenSensible | Always
+  deriving (Show, Eq, Ord, Enum)
+  deriving (QueryParams, QueryResults) via (SimpleValue SettingTer)
 
 instance Param SettingTer
 instance Result SettingTer
@@ -57,24 +61,24 @@ data Settings = Settings
   } deriving (Show, Eq)
 
 instance QueryParams Settings where
-  renderParams Settings {..} = renderParams (sWins, sLosses, sWLR, sWinsUntil, sBestStreak, sCurrentStreak, sBestDailyStreak, sBowHits, sBowShots, sAccuracy)
+  renderParams Settings {..} = [render sWins, render sLosses, render sWLR, render sWinsUntil
+    , render sBestStreak, render sCurrentStreak, render sBestDailyStreak
+    , render sBowHits, render sBowShots, render sAccuracy]
 instance QueryResults Settings where
-  convertResults fields strings = let
-    (sWins, sLosses, sWLR, sWinsUntil, sBestStreak, sCurrentStreak, sBestDailyStreak, sBowHits, sBowShots, sAccuracy) = convertResults fields strings
-      in Settings {..}
-instance QueryResultsSize Settings where
-  queryResultsSize _ = 10
+  convertResults = Settings <$> convert <*> convert <*> convert <*> convert
+    <*> convert <*> convert <*> convert <*> convert <*> convert <*> convert
+
 instance DatabaseTable Settings where
-  type PrimaryKey Settings = Only UserId
+  type PrimaryKey Settings = UserId
   databaseTableName _ = "settings"
   databaseColumnNames _ = ["wins", "losses", "wlr", "wins_until", "best_streak", "current_streak", "best_daily_streak", "bow_hits", "bow_shots", "accuracy"]
   databasePrimaryKey _ = ["discord_id"]
 
 getSettingsByDiscord :: (MonadIOReader m r, Has Connection r) => UserId -> m Settings
-getSettingsByDiscord discord = fromMaybe defSettings <$> queryOnlyLogT selectByPrimaryQuery (Only discord)
+getSettingsByDiscord discord = fromMaybe defSettings <$> queryOnlyLogT selectByPrimaryQuery discord
 
 setSettingsByDiscord :: (MonadIOReader m r, Has Connection r) => UserId -> Settings -> m Bool
-setSettingsByDiscord discord settings = (>0) <$> executeLogT insertQueryKeyed (KeyedRow (Only discord) settings)
+setSettingsByDiscord discord settings = (>0) <$> executeLogT insertQueryKeyed (KeyedRow discord settings)
 
 defSettings :: Settings
 defSettings = Settings

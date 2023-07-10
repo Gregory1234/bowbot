@@ -25,7 +25,7 @@ onlineCommand = Command CommandInfo
   , commandTimeout = 30
   } $ noArguments $ do
     online <- liftMaybe "**Processing list of online players. Please send command again later.**" =<< getOnlinePlayers
-    mcs <- queryLogT (selectQueryWithSuffix " WHERE `uuid` IN ?") (Only (In online))
+    mcs <- queryLogT (selectQueryWithSuffix " WHERE `uuid` IN ?") (In online)
     let onlineStr = case T.unwords (map (head . mcNames) mcs) of
           "" -> "None of the watchListed players are currently in bow duels."
           str -> str

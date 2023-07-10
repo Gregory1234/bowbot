@@ -1,12 +1,11 @@
 module BowBot.DB.Basic(
-  module BowBot.DB.Basic, Connection, Only(..), QueryParams(..), QueryResults(..), Param, Result, ToField(..), FromField(..), In(..)
+  module BowBot.DB.Basic, Connection, module BowBot.DB.ParamResult, ToField(..), FromField(..), In(..)
 ) where
 
 import BowBot.Utils
 import Database.MySQL.Simple hiding (withTransaction, commit, rollback, insertID)
 import qualified Database.MySQL.Simple as M (withTransaction, commit, rollback, insertID)
-import Database.MySQL.Simple.QueryParams (QueryParams(..))
-import Database.MySQL.Simple.QueryResults (QueryResults(..))
+import BowBot.DB.ParamResult
 import Database.MySQL.Simple.Types (Query(..))
 import Data.Int (Int64)
 import qualified Data.ByteString.Lazy as BS
@@ -16,6 +15,7 @@ import Control.Exception.Base (bracket)
 import Control.Concurrent (forkIO)
 import Data.Time (getCurrentTime)
 import Data.Proxy (Proxy(..))
+import Data.Coerce
 
 
 withDB :: MonadHoistIO m => (Connection -> m a) -> m a -- TODO: report connection errors
@@ -64,18 +64,18 @@ logErrorFork msg = void $ liftIO $ do
 replaceQuery :: Text -> Text -> Query -> Query
 replaceQuery from to q = Query $ BS.toStrict $ BS.replace (T.encodeUtf8 from) (BS.fromStrict $ T.encodeUtf8 to :: BS.ByteString) (fromQuery q)
 
-queryLog :: (QueryParams q, QueryResults r, MonadIOReader m rd, Has Connection rd) => Query -> q -> m [r]
-queryLog q d = do
+queryLog :: forall q r m rd. (QueryParams q, QueryResults r, MonadIOReader m rd, Has Connection rd) => Query -> q -> m [r]
+queryLog q (Flattened -> d) = do
   conn <- asks getter
   trueQuery <- liftIO $ formatQuery conn q d
   logInfo' conn $ "Executing query: " <> showt trueQuery
-  liftIO $ query conn q d
+  liftIO $ coerce @[Flattened r] @[r] <$> query conn q d
 
-queryLog_ :: (QueryResults r, MonadIOReader m rd, Has Connection rd) => Query -> m [r]
+queryLog_ :: forall r m rd. (QueryResults r, MonadIOReader m rd, Has Connection rd) => Query -> m [r]
 queryLog_ q = do
   conn <- asks getter
   logInfo' conn $ "Executing query: " <> showt (fromQuery q)
-  liftIO $ query_ conn q
+  liftIO $ coerce @[Flattened r] @[r] <$> query_ conn q
 
 queryOnlyLog :: (QueryParams q, QueryResults r, MonadIOReader m rd, Has Connection rd) => Query -> q -> m (Maybe r)
 queryOnlyLog q d = do
@@ -84,7 +84,7 @@ queryOnlyLog q d = do
   return $ only res
 
 executeLog :: (QueryParams q, MonadIOReader m r, Has Connection r) => Query -> q -> m Int64
-executeLog q d = do
+executeLog q (Flattened -> d) = do
   conn <- asks getter
   trueQuery <- liftIO $ formatQuery conn q d
   logInfo' conn $ "Executing query: " <> showt trueQuery
@@ -96,11 +96,11 @@ executeLog_ q = do
   logInfo' conn $ "Executing query: " <> showt (fromQuery q)
   liftIO $ execute_ conn q
 
-executeManyLog :: (QueryParams q, MonadIOReader m r, Has Connection r) => Query -> [q] -> m Int64
+executeManyLog :: forall q m r. (QueryParams q, MonadIOReader m r, Has Connection r) => Query -> [q] -> m Int64
 executeManyLog q [] = do
   logInfo $ "Tried executing query with no data: " <> showt (fromQuery q)
   return 0
-executeManyLog q d = do
+executeManyLog q (coerce -> d :: [Flattened q]) = do
   conn <- asks getter
   trueQuery <- liftIO $ formatMany conn q d
   logInfo' conn $ "Executing query: " <> showt trueQuery
@@ -138,42 +138,3 @@ insertID :: (MonadIOReader m r, Has Connection r, Num a) => m a
 insertID = do
   conn <- asks getter
   insertID' conn
-
-class QueryResults a => QueryResultsSize a where
-  queryResultsSize :: Proxy a -> Int
-instance Result a => QueryResultsSize (Only a) where
-  queryResultsSize _ = 1
-instance (Result a, Result b) => QueryResultsSize (a, b) where
-  queryResultsSize _ = 2
-
-newtype Concat tuple = Concat { fromConcat :: tuple } deriving (Show, Eq)
-
-instance (QueryParams a, QueryParams b) => QueryParams (Concat (a, b)) where
-  renderParams (Concat (a, b)) = renderParams a ++ renderParams b
-instance (QueryResultsSize a, QueryResults b) => QueryResults (Concat (a, b)) where
-  convertResults fields strings = let
-    aSize = queryResultsSize (Proxy @a)
-    (aFields, bFields) = splitAt aSize fields
-    (aStrings, bStrings) = splitAt aSize strings
-    a = convertResults aFields aStrings
-    b = convertResults bFields bStrings
-      in Concat (a, b)
-instance (QueryResultsSize a, QueryResultsSize b) => QueryResultsSize (Concat (a, b)) where
-  queryResultsSize _ = queryResultsSize (Proxy @a) + queryResultsSize (Proxy @b)
-
-instance (QueryParams a, QueryParams b, QueryParams c) => QueryParams (Concat (a, b, c)) where
-  renderParams (Concat (a, b, c)) = renderParams a ++ renderParams b ++ renderParams c
-instance (QueryResultsSize a, QueryResultsSize b, QueryResults c) => QueryResults (Concat (a, b, c)) where
-  convertResults fields strings = let
-    aSize = queryResultsSize (Proxy @a)
-    (aFields, bcFields) = splitAt aSize fields
-    (aStrings, bcStrings) = splitAt aSize strings
-    a = convertResults aFields aStrings
-    bSize = queryResultsSize (Proxy @b)
-    (bFields, cFields) = splitAt bSize bcFields
-    (bStrings, cStrings) = splitAt bSize bcStrings
-    b = convertResults bFields bStrings
-    c = convertResults cFields cStrings
-      in Concat (a, b, c)
-instance (QueryResultsSize a, QueryResultsSize b, QueryResultsSize c) => QueryResultsSize (Concat (a, b, c)) where
-  queryResultsSize _ = queryResultsSize (Proxy @a) + queryResultsSize (Proxy @b) + queryResultsSize (Proxy @c)

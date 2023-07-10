@@ -14,21 +14,17 @@ data MinecraftAccount = MinecraftAccount
   } deriving (Show, Eq)
 
 instance QueryParams MinecraftAccount where
-  renderParams MinecraftAccount {..} = renderParams (mcUUID, T.intercalate "," mcNames) -- TODO: this is not good
+  renderParams MinecraftAccount {..} = [render mcUUID, render (T.intercalate "," mcNames)]
 instance QueryResults MinecraftAccount where
-  convertResults fields strings = let
-    (mcUUID, T.splitOn "," -> mcNames) = convertResults fields strings
-      in MinecraftAccount {..}
-instance QueryResultsSize MinecraftAccount where
-  queryResultsSize _ = 2
+  convertResults = MinecraftAccount <$> convert <*> fmap (T.splitOn ",") convert
 instance DatabaseTable MinecraftAccount where
-  type PrimaryKey MinecraftAccount = Only UUID
+  type PrimaryKey MinecraftAccount = UUID
   databaseTableName _ = "minecraft"
   databaseColumnNames _ = ["uuid", "names"]
   databasePrimaryKey _ = ["uuid"]
 
 getMinecraftAccountByUUID :: (MonadIOReader m r, Has Connection r) => UUID -> m (Maybe MinecraftAccount)
-getMinecraftAccountByUUID uuid = queryOnlyLogT selectByPrimaryQuery (Only uuid)
+getMinecraftAccountByUUID = queryOnlyLogT selectByPrimaryQuery
 
 storeMinecraftAccount :: (MonadIOReader m r, Has Connection r) => MinecraftAccount -> m ()
 storeMinecraftAccount acc = void $ executeLogT insertQuery acc
@@ -65,7 +61,7 @@ freshMinecraftAccountByName name = do
   join <$> for uuid freshMinecraftAccountByUUID
 
 getMinecraftAccountByCurrentName :: (MonadIOReader m r, Has Connection r) => Text -> m (Maybe MinecraftAccount)
-getMinecraftAccountByCurrentName name = queryOnlyLogT (selectQueryWithSuffix " WHERE substring_index(`names`,',',1) = ?") (Only name)
+getMinecraftAccountByCurrentName = queryOnlyLogT (selectQueryWithSuffix " WHERE substring_index(`names`,',',1) = ?")
 
 addMinecraftName :: (MonadIOReader m r, Has Connection r) => Text -> UUID -> m Bool
 addMinecraftName name uuid = addMinecraftNames [(name, uuid)]

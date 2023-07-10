@@ -14,6 +14,7 @@ data PermissionLevel
   | ModLevel
   | AdminLevel
   deriving (Eq, Ord, Enum, Bounded, Show)
+  deriving (QueryParams, QueryResults) via (SimpleValue PermissionLevel)
 
 instance Param PermissionLevel
 instance Result PermissionLevel
@@ -32,11 +33,11 @@ instance FromField PermissionLevel where
     "admin" -> Right AdminLevel
     _ -> Left "Wrong permission level")
 
-instance DatabaseTable (Only PermissionLevel) where
-  type PrimaryKey (Only PermissionLevel) = Only UserId
+instance DatabaseTable PermissionLevel where
+  type PrimaryKey PermissionLevel = UserId
   databaseTableName _ = "permissions"
   databaseColumnNames _ = ["level"]
   databasePrimaryKey _ = ["discord_id"]
 
 getPermissionLevelByDiscord :: (MonadIOReader m r, Has Connection r) => UserId -> m PermissionLevel
-getPermissionLevelByDiscord discord = maybe DefaultLevel fromOnly <$> queryOnlyLogT selectByPrimaryQuery (Only discord)
+getPermissionLevelByDiscord discord = fromMaybe DefaultLevel <$> queryOnlyLogT selectByPrimaryQuery discord

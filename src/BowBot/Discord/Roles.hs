@@ -39,7 +39,7 @@ giveRolesDivisionTitle gmem maxWins = do
 
 applyRolesDivisionTitleByBowBotId' :: (MonadIOReader m r, HasAll '[Connection, DiscordHandle, InfoCache] r) => BowBotId -> [GuildMember] -> m ()
 applyRolesDivisionTitleByBowBotId' bid gmems = do
-  wins :: [Integer] <- map fromOnly <$> queryLog "SELECT `wins` FROM `hypixel_bow_stats` JOIN `account_minecraft` ON `hypixel_bow_stats`.`minecraft_uuid` = `account_minecraft`.`minecraft_uuid` WHERE `account_id` = ?" (Only bid)
+  wins :: [Integer] <- queryLog "SELECT `wins` FROM `hypixel_bow_stats` JOIN `account_minecraft` ON `hypixel_bow_stats`.`minecraft_uuid` = `account_minecraft`.`minecraft_uuid` WHERE `account_id` = ?" bid
   for_ gmems $ \gmem -> do
     giveRolesDivisionTitle gmem (foldl' max 0 wins)
 
@@ -89,9 +89,9 @@ giveIllegalRole gmem = do
 
 applyRolesByBowBotId' :: (MonadIOReader m r, HasAll '[Connection, DiscordHandle, Manager, CounterState, InfoCache] r) => Maybe BowBotId -> [GuildMember] -> m ()
 applyRolesByBowBotId' (Just bid) gmems = do
-  wins :: [Integer] <- map fromOnly <$> queryLog "SELECT `wins` FROM `hypixel_bow_stats` JOIN `account_minecraft` ON `hypixel_bow_stats`.`minecraft_uuid` = `account_minecraft`.`minecraft_uuid` WHERE `account_id` = ?" (Only bid)
-  savedRoles :: [SavedRole] <- maybe [] fromOnly <$> queryOnlyLog "SELECT `roles` FROM `account` WHERE `id` = ?" (Only bid)
-  hypixelRoles :: [HypixelRole] <- map fromOnly <$> queryLog "SELECT `hypixel_role` FROM `minecraft` JOIN `account_minecraft` ON `account_minecraft`.`minecraft_uuid` = `minecraft`.`uuid` WHERE `account_minecraft`.`account_id` = ? AND `hypixel_role` IS NOT NULL" (Only bid)
+  wins :: [Integer] <- queryLog "SELECT `wins` FROM `hypixel_bow_stats` JOIN `account_minecraft` ON `hypixel_bow_stats`.`minecraft_uuid` = `account_minecraft`.`minecraft_uuid` WHERE `account_id` = ?" bid
+  savedRoles :: [SavedRole] <- fromMaybe [] <$> queryOnlyLog "SELECT `roles` FROM `account` WHERE `id` = ?" bid
+  hypixelRoles :: [HypixelRole] <- queryLog "SELECT `hypixel_role` FROM `minecraft` JOIN `account_minecraft` ON `account_minecraft`.`minecraft_uuid` = `minecraft`.`uuid` WHERE `account_minecraft`.`account_id` = ? AND `hypixel_role` IS NOT NULL" bid
   for_ gmems $ \gmem -> do
     giveSavedRoles gmem savedRoles (Just hypixelRoles)
     giveRolesDivisionTitle gmem (foldl' max 0 wins)

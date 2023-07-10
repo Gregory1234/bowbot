@@ -4,11 +4,11 @@ import BowBot.Network.Basic hiding (Result)
 import Data.Hashable (Hashable)
 import BowBot.Utils
 import qualified Data.Text as T
-import Database.MySQL.Simple (Param, Result)
+import BowBot.DB.Basic
 
 newtype UUID = UUID { uuidString :: Text }
   deriving (Show, Eq, Ord)
-  deriving newtype (Hashable, Param, Result)
+  deriving newtype (Hashable, Param, Result, QueryParams, QueryResults)
 
 uuidFromString :: Text -> Maybe UUID
 uuidFromString str

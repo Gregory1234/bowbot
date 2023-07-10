@@ -13,21 +13,17 @@ data SnipeMessage = SnipeMessage
   } deriving Show
 
 instance QueryParams SnipeMessage where
-  renderParams SnipeMessage {..} = renderParams (snipeMessageAuthor, snipeMessageContent, snipeMessageWasEdited, snipeMessageTimestamp)
+  renderParams SnipeMessage {..} = renderParams snipeMessageAuthor ++ renderParams snipeMessageContent ++ renderParams snipeMessageWasEdited ++ renderParams snipeMessageTimestamp
 instance QueryResults SnipeMessage where
-  convertResults fields strings = let
-    (snipeMessageAuthor, snipeMessageContent, snipeMessageWasEdited, snipeMessageTimestamp) = convertResults fields strings
-      in SnipeMessage {..}
-instance QueryResultsSize SnipeMessage where
-  queryResultsSize _ = 4
+  convertResults = SnipeMessage <$> convert <*> convert <*> convert <*> convert
 instance DatabaseTable SnipeMessage where
-  type PrimaryKey SnipeMessage = Only ChannelId
+  type PrimaryKey SnipeMessage = ChannelId
   databaseTableName _ = "snipe"
   databaseColumnNames _ = ["author", "content", "edited", "time"]
   databasePrimaryKey _ = ["channel"]
 
 getSnipeMessageByChannel :: (MonadIOReader m r, Has Connection r) => ChannelId -> m (Maybe SnipeMessage)
-getSnipeMessageByChannel channel = queryOnlyLogT selectByPrimaryQuery (Only channel)
+getSnipeMessageByChannel = queryOnlyLogT selectByPrimaryQuery
 
 setSnipeMessageByChannel :: (MonadIOReader m r, Has Connection r) => ChannelId -> SnipeMessage -> m Bool
-setSnipeMessageByChannel channel message = (>0) <$> executeLogT insertQueryKeyed (KeyedRow (Only channel) message)
+setSnipeMessageByChannel channel message = (>0) <$> executeLogT insertQueryKeyed (KeyedRow channel message)

@@ -21,10 +21,14 @@ savedRolesInfo = InfoType { infoName = "saved_roles", infoDefault = M.empty, inf
 savedHypixelRolesInfo :: InfoType (M.Map SavedRole ([HypixelRole], RoleId))
 savedHypixelRolesInfo = InfoType { infoName = "hypixel_roles", infoDefault = M.empty, infoParse = \s -> fmap M.fromList $ for (T.lines s) $ \l -> case T.splitOn "->" l of [a, b, c] -> (SavedRole a,) . (map HypixelRole $ T.splitOn "|" b,) <$> fmap fromInteger ((first pack . readEither . unpack) c); _ -> Left "wrong format" }
 
-newtype SavedRole = SavedRole { savedRoleName :: Text } deriving (Eq, Ord, Show)
+newtype SavedRole = SavedRole { savedRoleName :: Text }
+  deriving (Eq, Ord, Show)
 
 instance Param [SavedRole]
 instance Result [SavedRole]
+
+deriving via SimpleValue [SavedRole] instance QueryParams [SavedRole]
+deriving via SimpleValue [SavedRole] instance QueryResults [SavedRole]
 
 instance ToField [SavedRole] where
   toField = T.encodeUtf8 . T.intercalate "," . map savedRoleName
