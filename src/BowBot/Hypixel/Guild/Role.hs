@@ -1,4 +1,4 @@
-module BowBot.Hypixel.HypixelRole where
+module BowBot.Hypixel.Guild.Role where
 
 import BowBot.DB.Typed
 import Data.Text (Text)

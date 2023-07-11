@@ -3,40 +3,15 @@ module BowBot.Hypixel.Stats where
 import BowBot.Settings.Basic
 import BowBot.Network.Basic
 import BowBot.Minecraft.Basic (UUID)
-import BowBot.Hypixel.Basic
+import BowBot.Hypixel.Api
 import BowBot.Utils
-import BowBot.Hypixel.Division
+import BowBot.Hypixel.Stats.Division
 import Data.Ratio ((%))
 import Data.Time.Clock.POSIX (getCurrentTime)
 import Data.Time.Clock (UTCTime)
 import BowBot.Discord.Utils (discordFormatTimestampFull)
 import qualified Data.Text as T
-
-data CachedMaybe a = NewJust a | CachedJust (Maybe UTCTime) a | CachedNothing deriving (Show, Eq)
-
-isCachedNothing :: CachedMaybe a -> Bool
-isCachedNothing CachedNothing = True
-isCachedNothing _ = False
-
-isAnyJust :: CachedMaybe a -> Bool
-isAnyJust = not . isCachedNothing
-
-cachedMaybe :: a -> (b -> a) -> (Maybe UTCTime -> b -> a) -> CachedMaybe b -> a
-cachedMaybe n _ _ CachedNothing = n
-cachedMaybe _ f _ (NewJust a) = f a
-cachedMaybe _ _ f (CachedJust t a) = f t a
-
-completeCachedMaybe :: Maybe UTCTime -> CachedMaybe a -> Maybe a -> CachedMaybe a
-completeCachedMaybe time CachedNothing (Just a) = CachedJust time a
-completeCachedMaybe _ c _ = c
-
-cachedTimestamp :: Maybe UTCTime -> CachedMaybe a -> Maybe UTCTime
-cachedTimestamp time (NewJust _) = time
-cachedTimestamp _ (CachedJust time _) = time
-cachedTimestamp _ CachedNothing = Nothing
-
-cachedToMaybe :: CachedMaybe a -> Maybe a
-cachedToMaybe = cachedMaybe Nothing Just (const Just)
+import BowBot.Stats.CachedMaybe
 
 data HypixelBowStats = HypixelBowStats
   { bowWins :: !Integer,

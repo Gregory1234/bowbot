@@ -1,28 +1,22 @@
-module BowBot.Hypixel.StatsCommand where
+module BowBot.Stats.Command where
 
-import BowBot.Command
-import BowBot.Minecraft.Account
-import BowBot.Hypixel.Stats
-import BowBot.Settings.Basic
-import BowBot.Utils
-import Discord.Types
-import BowBot.Hypixel.Leaderboard
-import BowBot.Hypixel.Announce
-import BowBot.Discord.Roles
-import BowBot.Hypixel.LeaderboardStatus
 import BowBot.Minecraft.Basic
-import BowBot.Discord.Utils
+import BowBot.Command
 import Control.Monad.Except
+import BowBot.Settings.Basic
+import BowBot.Minecraft.Account
 import BowBot.Command.Utils
-import BowBot.Hypixel.CommandUtils
-import BowBot.Hypixel.TimeStats
+import BowBot.Discord.Utils
 import BowBot.Account.Utils
+import BowBot.Minecraft.IsBanned
+
 
 data StatsCommandSettings a = StatsCommandSettings
   { requestStats :: Bool -> UUID -> ExceptT Text CommandHandler a
   , shouldAddAccount :: a -> Bool
   , updateStats :: UUID -> a -> ExceptT Text CommandHandler ()
   , showStats :: Settings -> a -> Text
+  , getIsBanned :: UUID -> ExceptT Text CommandHandler IsBanned
   }
 
 statsCommandTemplate :: forall a. StatsCommandSettings a -> SettingsSource -> Text -> Text -> Command
@@ -65,32 +59,5 @@ statsCommandTemplate StatsCommandSettings {..} src name desc = Command CommandIn
       respond $ header <> showStats settings stats
     updateStatsUnlessBanned :: UUID -> a -> ExceptT Text CommandHandler ()
     updateStatsUnlessBanned uuid stats = do
-      isBanned <- getHypixelIsBannedByUUID uuid
+      isBanned <- getIsBanned uuid
       when (isBanned == NotBanned) $ updateStats uuid stats
-
-hypixelStatsCommand :: SettingsSource -> Text -> Text -> Command
-hypixelStatsCommand = statsCommandTemplate StatsCommandSettings
-  { requestStats = \b -> liftMaybe (if b then youNeverJoinedHypixelMessage else thePlayerNeverJoinedHypixelMessage) <=< hypixelSafeRequestStats
-  , shouldAddAccount = (>= 50) . bowWins
-  , updateStats = \uuid stats -> do
-      void $ setHypixelBowLeaderboardEntryByUUID uuid (hypixelBowStatsToLeaderboards stats)
-      applyRolesDivisionTitleByUUID uuid
-      announceMilestones
-  , showStats = showHypixelBowStats
-  }
-
-hypixelTimeStatsCommand :: SettingsSource -> Text -> Text -> Command
-hypixelTimeStatsCommand = statsCommandTemplate StatsCommandSettings
-  { requestStats = \b uuid -> do
-    currentHypixelBowStats <- liftMaybe (if b then youNeverJoinedHypixelMessage else thePlayerNeverJoinedHypixelMessage) =<< hypixelSafeRequestStats uuid
-    dailyHypixelBowStats <- getHypixelBowTimeStatsByUUID DailyStats uuid
-    weeklyHypixelBowStats <- getHypixelBowTimeStatsByUUID WeeklyStats uuid
-    monthlyHypixelBowStats <- getHypixelBowTimeStatsByUUID MonthlyStats uuid
-    return FullHypixelBowTimeStats {..}
-  , shouldAddAccount = (>= 50) . bowWins . currentHypixelBowStats
-  , updateStats = \uuid stats -> do
-      void $ setHypixelBowLeaderboardEntryByUUID uuid (hypixelBowStatsToLeaderboards (currentHypixelBowStats stats))
-      applyRolesDivisionTitleByUUID uuid
-      announceMilestones
-  , showStats = showFullHypixelBowTimeStats
-  }

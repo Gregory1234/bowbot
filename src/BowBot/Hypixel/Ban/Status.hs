@@ -1,5 +1,5 @@
-module BowBot.Hypixel.LeaderboardStatus(
-  module BowBot.Hypixel.LeaderboardStatus, module BowBot.Minecraft.IsBanned
+module BowBot.Hypixel.Ban.Status(
+  module BowBot.Hypixel.Ban.Status, module BowBot.Minecraft.IsBanned
 ) where
 
 import BowBot.Utils

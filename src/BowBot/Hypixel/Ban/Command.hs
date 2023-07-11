@@ -1,10 +1,10 @@
-module BowBot.Hypixel.BanCommand where
+module BowBot.Hypixel.Ban.Command where
 
 import BowBot.Command
 import BowBot.Minecraft.Account
 import BowBot.Discord.Utils
 import BowBot.Hypixel.Leaderboard
-import BowBot.Hypixel.LeaderboardStatus
+import BowBot.Hypixel.Ban.Status
 import BowBot.Command.Utils
   
 hypixelBanCommand :: Command

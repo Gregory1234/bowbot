@@ -6,7 +6,7 @@ import BowBot.Utils
 import BowBot.DB.Typed
 import BowBot.Minecraft.Basic
 import BowBot.Minecraft.IsBanned
-import BowBot.Hypixel.HypixelRole
+import BowBot.Hypixel.Guild.Role
 
 data MinecraftTable a where
   MinecraftTUUID :: MinecraftTable UUID

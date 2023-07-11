@@ -3,7 +3,7 @@ module BowBot.Hypixel.CommandUtils where
 import BowBot.Command
 import BowBot.Hypixel.Stats
 import BowBot.Utils
-import BowBot.Hypixel.Basic (HypixelApi(..))
+import BowBot.Hypixel.Api (HypixelApi(..))
 import BowBot.Counter.Basic
 import BowBot.Hypixel.Leaderboard
 import BowBot.Minecraft.Basic

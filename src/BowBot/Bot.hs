@@ -9,7 +9,7 @@ import BowBot.BotData.Info
 import BowBot.BotMonad
 import qualified Data.Text as T
 import BowBot.Command
-import BowBot.Hypixel.StatsCommand
+import BowBot.Hypixel.Stats.Command
 import BowBot.Discord.Basic
 import Control.Exception.Base (SomeException, try, throw)
 import System.Timeout (timeout)
@@ -21,9 +21,9 @@ import BowBot.Network.Basic
 import BowBot.Network.ClearLogs
 import BowBot.Discord.Roles
 import BowBot.Discord.SavedRoles
-import BowBot.Hypixel.LeaderboardCommand
+import BowBot.Hypixel.Leaderboard.Command
 import BowBot.Hypixel.TimeStats
-import BowBot.Hypixel.WatchlistCommands
+import BowBot.Hypixel.Watchlist.Commands
 import BowBot.Discord.Account
 import BowBot.Command.HelpCommand
 import BowBot.Minecraft.Basic
@@ -33,7 +33,7 @@ import BowBot.Minecraft.NameCommand
 import BowBot.Account.InfoCommand
 import BowBot.Account.RegisterCommand
 import BowBot.Discord.RoleCommand
-import BowBot.Hypixel.BanCommand
+import BowBot.Hypixel.Ban.Command
 import BowBot.Settings.Commands
 import BowBot.Minecraft.SelectCommand
 import BowBot.Birthday.Announce

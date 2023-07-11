@@ -1,16 +1,16 @@
 module BowBot.Hypixel.Guild(
-  module BowBot.Hypixel.Guild, module BowBot.Hypixel.HypixelRole
+  module BowBot.Hypixel.Guild, module BowBot.Hypixel.Guild.Role
 ) where
 
 import BowBot.BotData.Info
 import BowBot.Minecraft.Basic
 import BowBot.Counter.Basic
 import BowBot.Network.Basic hiding (Result)
-import BowBot.Hypixel.Basic
+import BowBot.Hypixel.Api
 import BowBot.Discord.Utils
 import BowBot.Minecraft.Account
 import BowBot.DB.Typed
-import BowBot.Hypixel.HypixelRole
+import BowBot.Hypixel.Guild.Role
 
 
 hypixelGuildIdInfo :: InfoType Text

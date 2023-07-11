@@ -1,7 +1,6 @@
-module BowBot.Hypixel.LeaderboardCommand where
+module BowBot.Leaderboard.Command where
 
 import BowBot.Command
-import BowBot.Hypixel.Leaderboard
 import BowBot.Minecraft.Account
 import BowBot.Account.Basic
 import Control.Monad.Except
@@ -9,7 +8,6 @@ import BowBot.Minecraft.Basic
 import Discord.Types
 import BowBot.Discord.Utils
 import qualified Data.HashMap.Strict as HM
-import BowBot.Hypixel.Guild
 import qualified Data.Text as T
 import Data.Bifunctor (second)
 import BowBot.Command.Utils
@@ -18,7 +16,7 @@ import BowBot.DB.Typed
 
 data LeaderboardType s a = LeaderboardType
   { leaderboardName :: !Text
-  , leaderboardIsGuild :: !Bool
+  , leaderboardFilter :: CommandHandler (UUID -> Bool)
   , leaderboardStatName :: !Text
   , leaderboardShowValue :: a -> Text
   , leaderboardGetStats :: CommandHandler (HM.HashMap UUID s)
@@ -26,7 +24,7 @@ data LeaderboardType s a = LeaderboardType
   }
 
 leaderboardDescription :: LeaderboardType s a -> Text
-leaderboardDescription LeaderboardType {..} = "show Bow Duels " <> leaderboardName <> (if leaderboardIsGuild then " guild" else "") <> " leaderboard"
+leaderboardDescription LeaderboardType {..} = "show Bow Duels " <> leaderboardName <> " leaderboard"
 
 thePlayerIsntOnThisLeaderboardMessage :: Text
 thePlayerIsntOnThisLeaderboardMessage = "*The player isn't on this leaderboard!*"
@@ -82,10 +80,8 @@ leaderboardCommand lbt@LeaderboardType {..} name = Command CommandInfo
     generateLeaderboard :: [UUID] -> ExceptT Text CommandHandler [LeaderboardRow a]
     generateLeaderboard selected = do
       lbFull <- HM.toList <$> lift leaderboardGetStats
-      lb <- if leaderboardIsGuild then do
-                gmems <- getHypixelGuildMembers
-                return $ filter ((`elem` gmems) . fst) lbFull
-              else return lbFull
+      lbFilter <- lift leaderboardFilter
+      let lb = filter (lbFilter . fst) lbFull
       accs <- HM.fromList . map (\x -> (mcUUID x, x)) <$> queryLogT_ selectAllQuery'
       let lbParsed = mapMaybe (sequence . second leaderboardParser) lb
       let lbSorted = sortOn (Down . snd) lbParsed
@@ -104,29 +100,3 @@ leaderboardCommand lbt@LeaderboardType {..} name = Command CommandInfo
              <> leaderboardName <> " Leaderboard (page **"
              <> showt (pagenum + 1) <> "/" <> pack (show (length pages))
              <> "**):```\n" <> T.unlines (map (showLeaderboardRow lbt) $ pages !! pagenum) <> "```"
-
-winsLeaderboardType :: LeaderboardType HypixelBowLeaderboardEntry Integer
-winsLeaderboardType = LeaderboardType "Hypixel Bow Duels Wins" False "Wins" showt getHypixelBowLeaderboards (filterMaybe (>= 500) . bowLbWins)
-
-lossesLeaderboardType :: LeaderboardType HypixelBowLeaderboardEntry Integer
-lossesLeaderboardType = LeaderboardType "Hypixel Bow Duels Losses" False "Losses" showt getHypixelBowLeaderboards (fmap bowLbLosses . filterMaybe ((>= 500) . bowLbWins))
-
-winstreakLeaderboardType :: LeaderboardType HypixelBowLeaderboardEntry Integer
-winstreakLeaderboardType = LeaderboardType "Hypixel Bow Duels Winstreak" False "Winstreak" showt getHypixelBowLeaderboards (filterMaybe (>= 50) <=< bowLbWinstreak)
-
-wlrLeaderboardType :: LeaderboardType HypixelBowLeaderboardEntry (WLR Integer)
-wlrLeaderboardType = LeaderboardType "Hypixel Bow Duels WLR" False "WLR" showWLR getHypixelBowLeaderboards (fmap bowLbWLR . filterMaybe requirements)
-  where
-    requirements HypixelBowLeaderboardEntry {..} = bowLbWins >= bowLbLosses && bowLbWins >= 150
-
-winsLeaderboardTypeGuild :: LeaderboardType HypixelBowLeaderboardEntry Integer
-winsLeaderboardTypeGuild = LeaderboardType "Hypixel Bow Duels Wins" True "Wins" showt getHypixelBowLeaderboards (Just . bowLbWins)
-
-lossesLeaderboardTypeGuild :: LeaderboardType HypixelBowLeaderboardEntry Integer
-lossesLeaderboardTypeGuild = LeaderboardType "Hypixel Bow Duels Losses" True "Losses" showt getHypixelBowLeaderboards (Just . bowLbLosses)
-
-winstreakLeaderboardTypeGuild :: LeaderboardType HypixelBowLeaderboardEntry Integer
-winstreakLeaderboardTypeGuild = LeaderboardType "Hypixel Bow Duels Winstreak" True "Winstreak" showt getHypixelBowLeaderboards bowLbWinstreak
-
-wlrLeaderboardTypeGuild :: LeaderboardType HypixelBowLeaderboardEntry (WLR Integer)
-wlrLeaderboardTypeGuild = LeaderboardType "Hypixel Bow Duels WLR" True "WLR" showWLR getHypixelBowLeaderboards (Just . bowLbWLR)

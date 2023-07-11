@@ -3,7 +3,7 @@ module BowBot.BotData.Download where
 import BowBot.BotData.Info
 import Database.MySQL.Simple (Connection)
 import BowBot.Counter.Basic
-import BowBot.Hypixel.Basic
+import BowBot.Hypixel.Api
 import Network.HTTP.Conduit (Manager)
 import BowBot.Hypixel.Leaderboard
 import BowBot.Hypixel.Guild
@@ -15,7 +15,7 @@ import BowBot.Hypixel.Watchlist
 import Control.Concurrent.Async (concurrently_)
 import BowBot.Utils
 
-updateBotData :: (MonadIOReader m r, HasAll [Manager, DiscordHandle, CounterState, Connection, InfoCache] r) => [StatsTimeRange] -> m ()
+updateBotData :: (MonadIOReader m r, HasAll [Manager, DiscordHandle, CounterState, Connection, InfoCache] r) => [TimeRange] -> m ()
 updateBotData times = (ask >>=) $ \ctx -> liftIO $ foldl1 concurrently_ $
   map (`runReaderT` ctx)
     [ updateDiscordAccountCache

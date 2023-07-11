@@ -7,15 +7,16 @@ import qualified Data.HashMap.Strict as HM
 import BowBot.Minecraft.Basic (UUID(..))
 import BowBot.DB.Typed
 import BowBot.Utils
-import BowBot.Hypixel.Basic (HypixelApi(..))
+import BowBot.Hypixel.Api (HypixelApi(..))
 import BowBot.Network.Basic
 import BowBot.Counter.Basic
 import Control.Concurrent (threadDelay)
 import Control.Concurrent.Async (mapConcurrently)
 import Data.Time.Clock (UTCTime(..))
-import BowBot.Hypixel.LeaderboardStatus
-import BowBot.Hypixel.Table
+import BowBot.Hypixel.Ban.Status
+import BowBot.Hypixel.Stats.Table
 import Data.Coerce
+import BowBot.Stats.CachedMaybe
 
 data HypixelBowLeaderboardEntry = HypixelBowLeaderboardEntry
   { bowLbWins :: !Integer,

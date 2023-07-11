@@ -1,4 +1,4 @@
-module BowBot.Hypixel.Division where
+module BowBot.Hypixel.Stats.Division where
 
 import BowBot.Utils
 

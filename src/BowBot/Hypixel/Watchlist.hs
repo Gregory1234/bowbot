@@ -3,7 +3,7 @@ module BowBot.Hypixel.Watchlist where
 import BowBot.Minecraft.Basic
 import BowBot.Network.Basic
 import BowBot.Counter.Basic
-import BowBot.Hypixel.Basic
+import BowBot.Hypixel.Api
 import Control.Concurrent.Async (mapConcurrently)
 import BowBot.Utils
 import BowBot.DB.Basic

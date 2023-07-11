@@ -1,4 +1,4 @@
-module BowBot.Hypixel.WatchlistCommands where
+module BowBot.Hypixel.Watchlist.Commands where
 
 import BowBot.Command
 import BowBot.Minecraft.Account

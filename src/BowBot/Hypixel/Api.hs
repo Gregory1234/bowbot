@@ -1,4 +1,4 @@
-module BowBot.Hypixel.Basic where
+module BowBot.Hypixel.Api where
 
 import BowBot.Minecraft.Basic (UUID(..))
 import BowBot.Network.Basic

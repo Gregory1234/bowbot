@@ -30,8 +30,8 @@ quietAdminCommand timeout name desc body = Command CommandInfo
   , commandTimeout = timeout
   } $ noArguments $ lift body
 
-updateDataCommand :: [StatsTimeRange] -> Text -> Command
-updateDataCommand times name = adminCommand 3600 name ("update Bow Bot data" <> if null times then "" else " as if it was the beginning of: " <> T.intercalate ", " (map (T.toLower . statsTimeRangeName) times)) $ do
+updateDataCommand :: [TimeRange] -> Text -> Command
+updateDataCommand times name = adminCommand 3600 name ("update Bow Bot data" <> if null times then "" else " as if it was the beginning of: " <> T.intercalate ", " (map (T.toLower . timeRangeName) times)) $ do
   updateBotData times
   announceMilestones
 
