@@ -1,28 +1,11 @@
-module BowBot.Hypixel.LeaderboardStatus where
+module BowBot.Hypixel.LeaderboardStatus(
+  module BowBot.Hypixel.LeaderboardStatus, module BowBot.Minecraft.IsBanned
+) where
 
 import BowBot.Utils
 import BowBot.DB.Basic
-import qualified Database.MySQL.Base.Types as T
 import BowBot.Minecraft.Basic
-
-data IsBanned
-  = NotBanned
-  | Banned
-  deriving (Eq, Ord, Enum, Bounded, Show)
-  deriving (QueryParams, QueryResults) via (SimpleValue IsBanned)
-
-instance Param IsBanned
-instance Result IsBanned
-
-instance ToField IsBanned where
-  toField NotBanned = "normal"
-  toField Banned = "ban"
-
-instance FromField IsBanned where
-  fromField = ([T.Enum, T.String], \case
-    "normal" -> Right NotBanned
-    "ban" -> Right Banned
-    _ -> Left "Wrong ban status")
+import BowBot.Minecraft.IsBanned
 
 getHypixelIsBannedByUUID :: (MonadIOReader m r, Has Connection r) => UUID -> m IsBanned
 getHypixelIsBannedByUUID uuid = fromMaybe NotBanned <$> queryOnlyLog "SELECT `hypixel` FROM `minecraft` WHERE `uuid` = ?" uuid

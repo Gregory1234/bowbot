@@ -7,6 +7,7 @@ import BowBot.DB.Typed
 import BowBot.Network.Basic
 import BowBot.Utils
 import qualified Data.Text as T
+import BowBot.Minecraft.Table
 
 data MinecraftAccount = MinecraftAccount
   { mcUUID :: !UUID
@@ -17,28 +18,27 @@ instance QueryParams MinecraftAccount where
   renderParams MinecraftAccount {..} = [render mcUUID, render (T.intercalate "," mcNames)]
 instance QueryResults MinecraftAccount where
   convertResults = MinecraftAccount <$> convert <*> fmap (T.splitOn ",") convert
-instance DatabaseTable MinecraftAccount where
-  type PrimaryKey MinecraftAccount = UUID
-  databaseTableName _ = "minecraft"
-  databaseColumnNames _ = ["uuid", "names"]
-  databasePrimaryKey _ = ["uuid"]
+instance InTable MinecraftTable MinecraftAccount where
+  columnRep = ColRep [SomeCol MinecraftTUUID, SomeCol MinecraftTNames]
+
+type instance MainTable MinecraftAccount = MinecraftTable
 
 getMinecraftAccountByUUID :: (MonadIOReader m r, Has Connection r) => UUID -> m (Maybe MinecraftAccount)
-getMinecraftAccountByUUID = queryOnlyLogT selectByPrimaryQuery
+getMinecraftAccountByUUID uuid = queryOnlyLogT selectByPrimaryQuery (MinecraftTPrimary uuid)
 
 storeMinecraftAccount :: (MonadIOReader m r, Has Connection r) => MinecraftAccount -> m ()
-storeMinecraftAccount acc = void $ executeLogT insertQuery acc
+storeMinecraftAccount acc = void $ executeLogT insertQuery' acc
 
 updateMinecraftAccountCache :: (MonadIOReader m r, HasAll '[Manager, Connection] r) => Int -> m ()
 updateMinecraftAccountCache index = do
   let helper MinecraftAccount {..} = do
         newName <- mojangUUIDToCurrentName mcUUID
         return MinecraftAccount {mcNames = if newName == listToMaybe mcNames then mcNames else maybeToList newName ++ mcNames , ..}
-  cache <- queryLogT_ selectAllQuery
+  cache <- queryLogT_ selectAllQuery'
   let bigchunked = chunksOf 150 $ sortOn (uuidString . mcUUID) cache
   let chunk = if index >= length bigchunked then [] else bigchunked !! index
   updatedAccounts <- for chunk helper
-  void $ executeManyLogT insertQuery $ filter (`notElem` cache) updatedAccounts
+  void $ executeManyLogT insertQuery' $ filter (`notElem` cache) updatedAccounts
 
 mcNameToUUID :: (MonadIOReader m r, HasAll '[Manager, Connection] r) => Text -> m (Maybe UUID)
 mcNameToUUID name = do
@@ -60,8 +60,11 @@ freshMinecraftAccountByName name = do
   uuid <- mojangNameToUUID name
   join <$> for uuid freshMinecraftAccountByUUID
 
+sqlStringListFirstElem :: SqlFunction Text () Text
+sqlStringListFirstElem = SqlFunction $ \c -> "substring_index(" <> c <> ",',',1)"
+
 getMinecraftAccountByCurrentName :: (MonadIOReader m r, Has Connection r) => Text -> m (Maybe MinecraftAccount)
-getMinecraftAccountByCurrentName = queryOnlyLogT (selectQueryWithSuffix " WHERE substring_index(`names`,',',1) = ?")
+getMinecraftAccountByCurrentName = queryOnlyLogT (selectConditionQuery (FunCondition MinecraftTNames sqlStringListFirstElem))
 
 addMinecraftName :: (MonadIOReader m r, Has Connection r) => Text -> UUID -> m Bool
 addMinecraftName name uuid = addMinecraftNames [(name, uuid)]
@@ -80,7 +83,7 @@ autocorrectFromAccountDirect acc = MinecraftAutocorrect { autocorrectAccount = a
 
 minecraftAutocorrect :: (MonadIOReader m r, Has Connection r) => Text -> m (Maybe MinecraftAutocorrect)
 minecraftAutocorrect name = do
-  people <- queryLogT_ selectAllQuery -- TODO: start using minecraftName table
+  people <- queryLogT_ selectAllQuery' -- TODO: start using minecraftName table
   let process isPast = map snd . sortOn fst $ do
         acc@MinecraftAccount {..} <- people
         n <- (if isPast then drop 1 else take 1) mcNames

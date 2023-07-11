@@ -1,5 +1,3 @@
-{-# LANGUAGE TypeFamilies #-}
-
 module BowBot.DB.ParamResult(
   module BowBot.DB.ParamResult, Q.Param(render), Q.Result
 ) where
@@ -134,8 +132,3 @@ instance (QueryResults a, QueryResults b, QueryResults c) => QueryResults (a,b,c
   convertResults = (,,) <$> convertResults <*> convertResults <*> convertResults
 instance (QueryResults a, QueryResults b, QueryResults c, QueryResults d) => QueryResults (a,b,c,d) where
   convertResults = (,,,) <$> convertResults <*> convertResults <*> convertResults <*> convertResults
-
-type family SimpTup2 a b where
-  SimpTup2 () b = b
-  SimpTup2 a () = a
-  SimpTup2 a b = (a,b)

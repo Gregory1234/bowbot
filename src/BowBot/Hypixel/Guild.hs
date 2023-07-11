@@ -1,4 +1,6 @@
-module BowBot.Hypixel.Guild where
+module BowBot.Hypixel.Guild(
+  module BowBot.Hypixel.Guild, module BowBot.Hypixel.HypixelRole
+) where
 
 import BowBot.BotData.Info
 import BowBot.Minecraft.Basic
@@ -8,14 +10,11 @@ import BowBot.Hypixel.Basic
 import BowBot.Discord.Utils
 import BowBot.Minecraft.Account
 import BowBot.DB.Typed
+import BowBot.Hypixel.HypixelRole
 
 
 hypixelGuildIdInfo :: InfoType Text
 hypixelGuildIdInfo = InfoType { infoName = "hypixel_guild_id", infoDefault = "", infoParse = Right }
-
-newtype HypixelRole = HypixelRole { fromHypixelRole :: Text }
-  deriving (Eq, Ord, Show)
-  deriving newtype (Param, Result, QueryParams, QueryResults)
 
 updateHypixelRoles :: (MonadHoistIOReader m r, HasAll '[InfoCache, Manager, CounterState, Connection] r) => m ()
 updateHypixelRoles = do
@@ -30,7 +29,7 @@ updateHypixelRoles = do
           known <- queryLog_ "SELECT `uuid` FROM `minecraft`"
           let unknown = map fst members \\ known
           names <- catMaybes <$> traverse (\x -> fmap (x,) <$> mojangUUIDToCurrentName x) unknown
-          b <- (>0) <$> executeManyLogT insertQuery [MinecraftAccount {mcUUID, mcNames = [mcName, mcName <> "OldNamesCurrentlyNotKnown"]} | (mcUUID, mcName) <- names]
+          b <- (>0) <$> executeManyLogT insertQuery' [MinecraftAccount {mcUUID, mcNames = [mcName, mcName <> "OldNamesCurrentlyNotKnown"]} | (mcUUID, mcName) <- names]
           c <- addMinecraftNames (map (\(u,n) -> (n,u)) names)
           when ((b && c) || null unknown) $ void $ executeManyLog "INSERT INTO `minecraft` (`uuid`, `hypixel_role`) VALUES (?,?) ON DUPLICATE KEY UPDATE `hypixel_role`=VALUES(`hypixel_role`)" members
           void $ executeLog "UPDATE `minecraft` SET `hypixel_role` = NULL WHERE `uuid` NOT IN ?" (In (map fst members))

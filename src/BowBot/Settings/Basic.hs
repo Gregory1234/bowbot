@@ -1,58 +1,13 @@
 {-# LANGUAGE TypeFamilies #-}
 
-module BowBot.Settings.Basic where
+module BowBot.Settings.Basic(
+  module BowBot.Settings.Basic, module BowBot.Settings.Single
+) where
 
-import Discord.Types (UserId)
-import BowBot.Discord.Orphans ()
+import BowBot.Settings.Single
+import BowBot.Settings.Table
 import BowBot.DB.Typed
-import BowBot.Utils
-import qualified Database.MySQL.Base.Types as T
-
-data SettingBin = Yes | No
-  deriving (Show, Eq, Ord, Enum)
-  deriving (QueryParams, QueryResults) via (SimpleValue SettingBin)
-
-instance Param SettingBin
-instance Result SettingBin
-
-instance ToField SettingBin where
-  toField Yes = "yes"
-  toField No = "no"
-
-instance FromField SettingBin where
-  fromField = ([T.Enum, T.String], \case
-    "yes" -> Right Yes
-    "no" -> Right No
-    _ -> Left "Wrong permission level")
-
-data SettingTer = Never | WhenSensible | Always
-  deriving (Show, Eq, Ord, Enum)
-  deriving (QueryParams, QueryResults) via (SimpleValue SettingTer)
-
-instance Param SettingTer
-instance Result SettingTer
-
-instance ToField SettingTer where
-  toField Always = "always"
-  toField Never = "never"
-  toField WhenSensible = "sensibly"
-
-instance FromField SettingTer where
-  fromField = ([T.Enum, T.String], \case
-    "always" -> Right Always
-    "never" -> Right Never
-    "sensibly" -> Right WhenSensible
-    _ -> Left "Wrong permission level")
-
-onlyIfBin :: SettingBin -> a -> Maybe a
-onlyIfBin Yes a = Just a
-onlyIfBin No _ = Nothing
-
-onlyIfTer :: SettingTer -> Bool -> a -> Maybe a
-onlyIfTer Always _ a = Just a
-onlyIfTer Never _ _ = Nothing
-onlyIfTer WhenSensible True a = Just a
-onlyIfTer WhenSensible False _ = Nothing
+import BowBot.Discord.Utils
 
 data Settings = Settings
   { sWins :: !SettingBin, sLosses :: !SettingBin, sWLR :: !SettingTer, sWinsUntil :: !SettingTer
@@ -68,17 +23,16 @@ instance QueryResults Settings where
   convertResults = Settings <$> convert <*> convert <*> convert <*> convert
     <*> convert <*> convert <*> convert <*> convert <*> convert <*> convert
 
-instance DatabaseTable Settings where
-  type PrimaryKey Settings = UserId
-  databaseTableName _ = "settings"
-  databaseColumnNames _ = ["wins", "losses", "wlr", "wins_until", "best_streak", "current_streak", "best_daily_streak", "bow_hits", "bow_shots", "accuracy"]
-  databasePrimaryKey _ = ["discord_id"]
+instance InTable SettingsTable Settings where
+  columnRep = ColRep [SomeCol SettingsTWins, SomeCol SettingsTLosses, SomeCol SettingsTWLR, SomeCol SettingsTWinsUntil
+    , SomeCol SettingsTBestStreak, SomeCol SettingsTCurrentStreak, SomeCol SettingsTBestDailyStreak
+    , SomeCol SettingsTBowHits, SomeCol SettingsTBowShots, SomeCol SettingsTAccuracy]
 
 getSettingsByDiscord :: (MonadIOReader m r, Has Connection r) => UserId -> m Settings
-getSettingsByDiscord discord = fromMaybe defSettings <$> queryOnlyLogT selectByPrimaryQuery discord
+getSettingsByDiscord discord = fromMaybe defSettings <$> queryOnlyLogT selectByPrimaryQuery (SettingsTPrimary discord)
 
 setSettingsByDiscord :: (MonadIOReader m r, Has Connection r) => UserId -> Settings -> m Bool
-setSettingsByDiscord discord settings = (>0) <$> executeLogT insertQueryKeyed (KeyedRow discord settings)
+setSettingsByDiscord discord settings = (>0) <$> executeLogT insertQuery' (SettingsTPrimary discord, settings)
 
 defSettings :: Settings
 defSettings = Settings

@@ -1,8 +1,11 @@
+{-# LANGUAGE TypeFamilies #-}
+
 module BowBot.Discord.Name where
 
 import BowBot.Discord.Utils
-import BowBot.DB.Basic
+import BowBot.DB.Typed
 import qualified Data.Text as T
+import BowBot.Discord.Table
 
 data DiscordName = DiscordName
   { discordUsername :: !Text
@@ -14,6 +17,10 @@ instance QueryParams DiscordName where
   renderParams DiscordName {..} = [render discordUsername, render (fromMaybe "0" discordDiscrim), render discordNickname]
 instance QueryResults DiscordName where
   convertResults = DiscordName <$> convert <*> fmap (filterMaybe (/="0")) convert <*> convert
+instance InTable DiscordTable DiscordName where
+  columnRep = ColRep [SomeCol DiscordTName, SomeCol DiscordTDiscrim, SomeCol DiscordTNickname]
+
+type instance MainTable DiscordName = DiscordTable
 
 guildMemberToDiscordName :: GuildMember -> DiscordName
 guildMemberToDiscordName GuildMember { memberUser = Just user, .. } = let u = userToDiscordName user in u { discordNickname = memberNick <|> discordNickname u }

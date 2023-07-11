@@ -14,6 +14,8 @@ import Control.Concurrent (threadDelay)
 import Control.Concurrent.Async (mapConcurrently)
 import Data.Time.Clock (UTCTime(..))
 import BowBot.Hypixel.LeaderboardStatus
+import BowBot.Hypixel.Table
+import Data.Coerce
 
 data HypixelBowLeaderboardEntry = HypixelBowLeaderboardEntry
   { bowLbWins :: !Integer,
@@ -27,11 +29,8 @@ instance QueryParams HypixelBowLeaderboardEntry where
   renderParams HypixelBowLeaderboardEntry {..} = [render bowLbWins, render bowLbLosses, render bowLbWinstreak, render bowLbTimestamp, render bowLbWinstreakTimestamp]
 instance QueryResults HypixelBowLeaderboardEntry where
   convertResults = HypixelBowLeaderboardEntry <$> convert <*> convert <*> convert <*> convert <*> convert
-instance DatabaseTable HypixelBowLeaderboardEntry where
-  type PrimaryKey HypixelBowLeaderboardEntry = UUID
-  databaseTableName _ = "hypixel_bow_stats"
-  databaseColumnNames _ = ["wins", "losses", "winstreak", "last_update", "last_winstreak_update"]
-  databasePrimaryKey _ = ["minecraft_uuid"]
+instance InTable StatsTable HypixelBowLeaderboardEntry where
+  columnRep = ColRep [SomeCol StatsTWins, SomeCol StatsTLosses, SomeCol StatsTWinstreak, SomeCol StatsTLastUpdate, SomeCol StatsTLastWinstreakUpdate]
 
 bowLbWLR :: HypixelBowLeaderboardEntry -> WLR Integer
 bowLbWLR HypixelBowLeaderboardEntry {..} = WLR bowLbWins bowLbLosses
@@ -45,7 +44,7 @@ completeHypixelBowStats s Nothing = s
 completeHypixelBowStats s (Just HypixelBowLeaderboardEntry {..}) = s { bestWinstreak = completeCachedMaybe bowLbWinstreakTimestamp (bestWinstreak s) bowLbWinstreak }
 
 getHypixelBowLeaderboards :: (MonadIOReader m r, HasAll '[Connection] r) => m (HM.HashMap UUID HypixelBowLeaderboardEntry)
-getHypixelBowLeaderboards = HM.fromList . map (\(KeyedRow a b) -> (a,b)) <$> queryLogT_ selectAllQueryKeyed
+getHypixelBowLeaderboards = HM.fromList . coerce <$> queryLogT_ (selectAllQuery' @(PrimaryKey StatsTable, HypixelBowLeaderboardEntry))
 
 updateHypixelBowLeaderboards :: (MonadIOReader m r, HasAll '[Manager, CounterState, Connection] r) => m ()
 updateHypixelBowLeaderboards = do
@@ -65,14 +64,13 @@ updateHypixelBowLeaderboards = do
     wait
     newVals <- fmap (catMaybes . concat) $ liftIO $ for chunked $ \chunk -> mapConcurrently (fmap (`runReaderT` ctx) helper) chunk
     liftIO $ (`runReaderT` ctx) $ withTransaction $ do
-      let queryParams = map (uncurry KeyedRow) newVals
-      void $ executeManyLogT insertQueryKeyed queryParams
+      void $ executeManyLogT (insertQuery' @(PrimaryKey StatsTable, HypixelBowLeaderboardEntry)) (coerce newVals)
 
 getHypixelBowLeaderboardEntryByUUID :: (MonadIOReader m r, Has Connection r) => UUID -> m (Maybe HypixelBowLeaderboardEntry)
-getHypixelBowLeaderboardEntryByUUID = queryOnlyLogT selectByPrimaryQuery
+getHypixelBowLeaderboardEntryByUUID uuid = queryOnlyLogT selectByPrimaryQuery (StatsTPrimary uuid)
 
 setHypixelBowLeaderboardEntryByUUID :: (MonadIOReader m r, Has Connection r) => UUID -> HypixelBowLeaderboardEntry -> m Bool
-setHypixelBowLeaderboardEntryByUUID uuid entry = (>0) <$> executeLogT insertQueryKeyed (KeyedRow uuid entry)
+setHypixelBowLeaderboardEntryByUUID uuid entry = (>0) <$> executeLogT insertQuery' (StatsTPrimary uuid, entry)
 
 removeHypixelBowLeaderboardEntryByUUID :: (MonadIOReader m r, Has Connection r) => UUID -> m Bool
 removeHypixelBowLeaderboardEntryByUUID uuid = (>0) <$> executeLog "DELETE FROM `hypixel_bow_stats` WHERE `minecraft` = ?" uuid
