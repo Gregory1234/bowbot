@@ -10,14 +10,10 @@ data DiscordName = DiscordName
   , discordNickname :: !(Maybe Text)
   } deriving (Show, Eq)
 
-instance QueryParams DiscordName where
-  renderParams DiscordName {..} = renderParams (discordUsername, fromMaybe "0" discordDiscrim, discordNickname)
-instance QueryResults DiscordName where
-  convertResults fields strings = let
-    (discordUsername, filterMaybe (/="0") -> discordDiscrim, discordNickname) = convertResults fields strings
-      in DiscordName {..}
-instance QueryResultsSize DiscordName where
-  queryResultsSize _ = 3
+instance ToMysql DiscordName where
+  toActions DiscordName {..} = toActions discordUsername ++ toActions (fromMaybe "0" discordDiscrim) ++ toActions discordNickname
+instance FromMysql DiscordName where
+  rowParser = DiscordName <$> rowParser <*> rowParser <*> rowParser
 
 guildMemberToDiscordName :: GuildMember -> DiscordName
 guildMemberToDiscordName GuildMember { memberUser = Just user, .. } = let u = userToDiscordName user in u { discordNickname = memberNick <|> discordNickname u }

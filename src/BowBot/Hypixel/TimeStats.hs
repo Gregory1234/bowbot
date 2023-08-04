@@ -17,6 +17,9 @@ data StatsTimeRange = DailyStats | WeeklyStats | MonthlyStats deriving (Show, Eq
 instance Param StatsTimeRange
 instance Result StatsTimeRange
 
+deriving via (SimpleValue StatsTimeRange) instance ToMysql StatsTimeRange
+deriving via (SimpleValue StatsTimeRange) instance FromMysql StatsTimeRange
+
 instance ToField StatsTimeRange where
   toField DailyStats = "daily"
   toField WeeklyStats = "weekly"
@@ -35,14 +38,10 @@ data HypixelBowTimeStats = HypixelBowTimeStats
     bowTimeTimestamp :: Maybe UTCTime
   } deriving (Show, Eq)
 
-instance QueryParams HypixelBowTimeStats where
-  renderParams HypixelBowTimeStats {..} = renderParams (bowTimeWins, bowTimeLosses, bowTimeTimestamp)
-instance QueryResults HypixelBowTimeStats where
-  convertResults fields strings = let
-    (bowTimeWins, bowTimeLosses, nullZeroTime -> bowTimeTimestamp) = convertResults fields strings
-      in HypixelBowTimeStats {..}
-instance QueryResultsSize HypixelBowTimeStats where
-  queryResultsSize _ = 3
+instance ToMysql HypixelBowTimeStats where
+  toActions HypixelBowTimeStats {..} = toActions bowTimeWins ++ toActions bowTimeLosses ++ toActions bowTimeTimestamp
+instance FromMysql HypixelBowTimeStats where
+  rowParser = HypixelBowTimeStats <$> rowParser <*> rowParser <*> (nullZeroTime <$> rowParser)
 instance DatabaseTable HypixelBowTimeStats where
   type PrimaryKey HypixelBowTimeStats = (UUID, StatsTimeRange)
   databaseTableName _ = "hypixel_bow_timed_stats"
@@ -90,7 +89,7 @@ showMaybeHypixelBowTimeStats MonthlyStats _ _ Nothing = "- **Monthly data isn't 
 showMaybeHypixelBowTimeStats tm s t (Just v) = showHypixelBowTimeStats tm s t v
 
 updateHypixelBowTimeStats :: (MonadIOReader m r, Has Connection r) => StatsTimeRange -> m ()
-updateHypixelBowTimeStats time = void $ executeLogT (insertSelectQueryKeyed @HypixelBowTimeStats (TypedQuery "SELECT `minecraft_uuid`,?,`wins`,`losses`,`last_update` FROM `hypixel_bow_stats`")) (Only time)
+updateHypixelBowTimeStats time = void $ executeLogT (insertSelectQueryKeyed @HypixelBowTimeStats (TypedQuery "SELECT `minecraft_uuid`,?,`wins`,`losses`,`last_update` FROM `hypixel_bow_stats`")) time
 
 getHypixelBowTimeStatsByUUID :: (MonadIOReader m r, Has Connection r) => StatsTimeRange -> UUID -> m (Maybe HypixelBowTimeStats)
 getHypixelBowTimeStatsByUUID time uuid = queryOnlyLogT selectByPrimaryQuery (uuid, time)

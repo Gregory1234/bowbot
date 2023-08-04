@@ -13,6 +13,9 @@ data IsBanned
 instance Param IsBanned
 instance Result IsBanned
 
+deriving via (SimpleValue IsBanned) instance ToMysql IsBanned
+deriving via (SimpleValue IsBanned) instance FromMysql IsBanned
+
 instance ToField IsBanned where
   toField NotBanned = "normal"
   toField Banned = "ban"
@@ -24,10 +27,10 @@ instance FromField IsBanned where
     _ -> Left "Wrong ban status")
 
 getHypixelIsBannedByUUID :: (MonadIOReader m r, Has Connection r) => UUID -> m IsBanned
-getHypixelIsBannedByUUID uuid = maybe NotBanned fromOnly <$> queryOnlyLog "SELECT `hypixel` FROM `minecraft` WHERE `uuid` = ?" (Only uuid)
+getHypixelIsBannedByUUID uuid = fromMaybe NotBanned <$> queryOnlyLog "SELECT `hypixel` FROM `minecraft` WHERE `uuid` = ?" uuid
 
 setHypixelIsBannedByUUID :: (MonadIOReader m r, Has Connection r) => UUID -> IsBanned -> m Bool
 setHypixelIsBannedByUUID uuid banned = (>0) <$> executeLog "UPDATE `minecraft` SET `hypixel` = ? WHERE `uuid` = ?" (banned, uuid)
 
 getHypixelUnbanned :: (MonadIOReader m r, Has Connection r) => m [UUID]
-getHypixelUnbanned = map fromOnly <$> queryLog_ "SELECT `uuid` FROM `minecraft` WHERE `hypixel` = 'normal'"
+getHypixelUnbanned = queryLog_ "SELECT `uuid` FROM `minecraft` WHERE `hypixel` = 'normal'"

@@ -13,6 +13,9 @@ data SettingBin = Yes | No deriving (Show, Eq, Ord, Enum)
 instance Param SettingBin
 instance Result SettingBin
 
+deriving via (SimpleValue SettingBin) instance ToMysql SettingBin
+deriving via (SimpleValue SettingBin) instance FromMysql SettingBin
+
 instance ToField SettingBin where
   toField Yes = "yes"
   toField No = "no"
@@ -27,6 +30,9 @@ data SettingTer = Never | WhenSensible | Always deriving (Show, Eq, Ord, Enum)
 
 instance Param SettingTer
 instance Result SettingTer
+
+deriving via (SimpleValue SettingTer) instance ToMysql SettingTer
+deriving via (SimpleValue SettingTer) instance FromMysql SettingTer
 
 instance ToField SettingTer where
   toField Always = "always"
@@ -56,25 +62,21 @@ data Settings = Settings
   , sBowHits :: !SettingBin, sBowShots :: !SettingBin, sAccuracy :: !SettingTer
   } deriving (Show, Eq)
 
-instance QueryParams Settings where
-  renderParams Settings {..} = renderParams (sWins, sLosses, sWLR, sWinsUntil, sBestStreak, sCurrentStreak, sBestDailyStreak, sBowHits, sBowShots, sAccuracy)
-instance QueryResults Settings where
-  convertResults fields strings = let
-    (sWins, sLosses, sWLR, sWinsUntil, sBestStreak, sCurrentStreak, sBestDailyStreak, sBowHits, sBowShots, sAccuracy) = convertResults fields strings
-      in Settings {..}
-instance QueryResultsSize Settings where
-  queryResultsSize _ = 10
+instance ToMysql Settings where
+  toActions Settings {..} = toActions sWins ++ toActions sLosses ++ toActions sWLR ++ toActions sWinsUntil ++ toActions sBestStreak ++ toActions sCurrentStreak ++ toActions sBestDailyStreak ++ toActions sBowHits ++ toActions sBowShots ++ toActions sAccuracy
+instance FromMysql Settings where
+  rowParser = Settings <$> rowParser <*> rowParser <*> rowParser <*> rowParser <*> rowParser <*> rowParser <*> rowParser <*> rowParser <*> rowParser <*> rowParser
 instance DatabaseTable Settings where
-  type PrimaryKey Settings = Only UserId
+  type PrimaryKey Settings = UserId
   databaseTableName _ = "settings"
   databaseColumnNames _ = ["wins", "losses", "wlr", "wins_until", "best_streak", "current_streak", "best_daily_streak", "bow_hits", "bow_shots", "accuracy"]
   databasePrimaryKey _ = ["discord_id"]
 
 getSettingsByDiscord :: (MonadIOReader m r, Has Connection r) => UserId -> m Settings
-getSettingsByDiscord discord = fromMaybe defSettings <$> queryOnlyLogT selectByPrimaryQuery (Only discord)
+getSettingsByDiscord discord = fromMaybe defSettings <$> queryOnlyLogT selectByPrimaryQuery discord
 
 setSettingsByDiscord :: (MonadIOReader m r, Has Connection r) => UserId -> Settings -> m Bool
-setSettingsByDiscord discord settings = (>0) <$> executeLogT insertQueryKeyed (KeyedRow (Only discord) settings)
+setSettingsByDiscord discord settings = (>0) <$> executeLogT insertQueryKeyed (KeyedRow discord settings)
 
 defSettings :: Settings
 defSettings = Settings

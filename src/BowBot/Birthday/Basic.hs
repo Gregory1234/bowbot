@@ -14,6 +14,9 @@ data BirthdayDate = BirthdayDate { birthdayDay :: !Int, birthdayMonth :: !Int } 
 instance Param BirthdayDate
 instance Result BirthdayDate
 
+deriving via (SimpleValue BirthdayDate) instance ToMysql BirthdayDate
+deriving via (SimpleValue BirthdayDate) instance FromMysql BirthdayDate
+
 instance ToField BirthdayDate where
   toField = T.encodeUtf8 . birthdayString
 
@@ -39,7 +42,7 @@ setBirthday did bd = do
   for_ bid' $ \bid -> executeLog "INSERT INTO `account` (`id`, `birthday`) VALUES (?,?) ON DUPLICATE KEY UPDATE `birthday`=VALUES(`birthday`)" (bid, bd)
 
 getBirthdaysByDate :: (MonadIOReader m r, Has Connection r) => BirthdayDate -> m [UserId]
-getBirthdaysByDate date = map fromOnly <$> queryLog "SELECT `account_discord`.`discord_id` FROM `account_discord` JOIN `account` ON `account`.`id`=`account_discord`.`account_id` WHERE `birthday` = ?" (Only date)
+getBirthdaysByDate date = queryLog "SELECT `account_discord`.`discord_id` FROM `account_discord` JOIN `account` ON `account`.`id`=`account_discord`.`account_id` WHERE `birthday` = ?" date
 
 getBirthdayByDiscord :: (MonadIOReader m r, Has Connection r) => UserId -> m (Maybe BirthdayDate)
-getBirthdayByDiscord discord = (fromOnly =<<) <$> queryOnlyLog "SELECT `birthday` FROM `account_discord` JOIN `account` ON `account`.`id`=`account_discord`.`account_id` WHERE `account_discord`.`discord_id` = ?" (Only discord)
+getBirthdayByDiscord discord = queryOnlyLog "SELECT `birthday` FROM `account_discord` JOIN `account` ON `account`.`id`=`account_discord`.`account_id` WHERE `account_discord`.`discord_id` = ?" discord

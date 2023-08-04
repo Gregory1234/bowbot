@@ -10,7 +10,7 @@ import Discord.Types
 import Control.DeepSeq (NFData(..), deepseq)
 import GHC.Generics (Generic)
 import Data.Hashable (Hashable)
-import Database.MySQL.Simple (Param, Result)
+import Language.MySQL.Query (Param, Result, ToMysql, FromMysql, StateT(..))
 import TextShow (TextShow(..))
 import TextShow.Generic (FromGeneric(..))
 import Discord (RestCallErrorCode(..))
@@ -192,10 +192,14 @@ deriving newtype instance Hashable Snowflake
 deriving newtype instance TextShow Snowflake
 deriving newtype instance Param Snowflake
 deriving newtype instance Result Snowflake
+deriving newtype instance ToMysql Snowflake
+deriving newtype instance FromMysql Snowflake
 deriving newtype instance Hashable (DiscordId a)
 deriving newtype instance TextShow (DiscordId a)
 deriving newtype instance Param (DiscordId a)
 deriving newtype instance Result (DiscordId a)
+deriving newtype instance ToMysql (DiscordId a)
+deriving newtype instance FromMysql (DiscordId a)
 
 deriving stock instance Generic RestCallErrorCode
 deriving via (FromGeneric RestCallErrorCode) instance TextShow RestCallErrorCode

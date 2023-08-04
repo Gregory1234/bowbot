@@ -19,22 +19,22 @@ newtype TypedQuery i o = TypedQuery { getTypedQuery :: Query }
 
 type TypedQuery' i = TypedQuery i NoOutput
 
-queryLogT :: (QueryParams q, QueryResults r, MonadIOReader m rd, Has Connection rd) => TypedQuery q r -> q -> m [r]
+queryLogT :: (ToMysql q, FromMysql r, MonadIOReader m rd, Has Connection rd) => TypedQuery q r -> q -> m [r]
 queryLogT = queryLog . getTypedQuery
 
-queryLogT_ :: (QueryResults r, MonadIOReader m rd, Has Connection rd) => TypedQuery () r -> m [r]
+queryLogT_ :: (FromMysql r, MonadIOReader m rd, Has Connection rd) => TypedQuery () r -> m [r]
 queryLogT_ = queryLog_ . getTypedQuery
 
-queryOnlyLogT :: (QueryParams q, QueryResults r, MonadIOReader m rd, Has Connection rd) => TypedQuery q r -> q -> m (Maybe r)
+queryOnlyLogT :: (ToMysql q, FromMysql r, MonadIOReader m rd, Has Connection rd) => TypedQuery q r -> q -> m (Maybe r)
 queryOnlyLogT = queryOnlyLog . getTypedQuery
 
-executeLogT :: (QueryParams q, MonadIOReader m r, Has Connection r) => TypedQuery' q -> q -> m Int64
+executeLogT :: (ToMysql q, MonadIOReader m r, Has Connection r) => TypedQuery' q -> q -> m Int64
 executeLogT = executeLog . getTypedQuery
 
 executeLogT_ :: (MonadIOReader m r, Has Connection r) => TypedQuery' () -> m Int64
 executeLogT_ = executeLog_ . getTypedQuery
 
-executeManyLogT :: (QueryParams q, MonadIOReader m r, Has Connection r) => TypedQuery' q -> [q] -> m Int64
+executeManyLogT :: (ToMysql q, MonadIOReader m r, Has Connection r) => TypedQuery' q -> [q] -> m Int64
 executeManyLogT = executeManyLog . getTypedQuery
 
 class DatabaseTable a where
@@ -45,14 +45,10 @@ class DatabaseTable a where
 
 data KeyedRow a = KeyedRow { keyedRowKey :: PrimaryKey a, keyedRowValue :: a }
 
-instance (QueryParams (PrimaryKey a), QueryParams a) => QueryParams (KeyedRow a) where
-  renderParams KeyedRow {..} = renderParams (Concat (keyedRowKey, keyedRowValue))
-instance (QueryResultsSize (PrimaryKey a), QueryResults a) => QueryResults (KeyedRow a) where
-  convertResults fields strings = let
-    Concat (keyedRowKey, keyedRowValue) = convertResults fields strings
-      in KeyedRow {..}
-instance (QueryResultsSize (PrimaryKey a), QueryResultsSize a) => QueryResultsSize (KeyedRow a) where
-  queryResultsSize _ = queryResultsSize (Proxy @(PrimaryKey a)) + queryResultsSize (Proxy @a)
+instance (ToMysql (PrimaryKey a), ToMysql a) => ToMysql (KeyedRow a) where
+  toActions KeyedRow {..} = toActions keyedRowKey ++ toActions keyedRowValue
+instance (FromMysql (PrimaryKey a), FromMysql a) => FromMysql (KeyedRow a) where
+  rowParser = KeyedRow <$> rowParser <*> rowParser
 
 queryNameBrackets :: ByteString -> ByteString
 queryNameBrackets x = "`" <> x <> "`"
@@ -79,10 +75,10 @@ selectAllQuery = selectQueryWithSuffix ""
 selectAllQueryKeyed :: DatabaseTable a => TypedQuery () (KeyedRow a)
 selectAllQueryKeyed = selectQueryKeyedWithSuffix ""
 
-selectByQuery :: DatabaseTable a => ByteString -> TypedQuery (Only b) a
+selectByQuery :: DatabaseTable a => ByteString -> TypedQuery b a
 selectByQuery col = selectQueryWithSuffix $ " WHERE " <> queryNameBrackets col <> " = ?"
 
-selectByQueryKeyed :: DatabaseTable a => ByteString -> TypedQuery (Only b) (KeyedRow a)
+selectByQueryKeyed :: DatabaseTable a => ByteString -> TypedQuery b (KeyedRow a)
 selectByQueryKeyed col = selectQueryKeyedWithSuffix $ " WHERE " <> queryNameBrackets col <> " = ?"
 
 selectByPrimaryQuery :: forall a. DatabaseTable a => TypedQuery (PrimaryKey a) a

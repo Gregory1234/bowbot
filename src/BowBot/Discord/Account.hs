@@ -11,26 +11,21 @@ import BowBot.BotData.Info
 import qualified Discord.Requests as R
 import Data.List (deleteFirstsBy)
 import BowBot.Discord.Name
-import Data.Proxy
 
 data DiscordAccount = DiscordAccount { discordId :: !UserId, discordName :: !DiscordName, discordIsMember :: !Bool } deriving (Show, Eq)
 
-instance QueryParams DiscordAccount where
-  renderParams DiscordAccount {..} = renderParams $ Concat (Only discordId, discordName, Only discordIsMember)
-instance QueryResults DiscordAccount where
-  convertResults fields strings = let
-    Concat (Only discordId, discordName, Only discordIsMember) = convertResults fields strings
-      in DiscordAccount {..}
-instance QueryResultsSize DiscordAccount where
-  queryResultsSize _ = 2 + queryResultsSize (Proxy @DiscordName)
+instance ToMysql DiscordAccount where
+  toActions DiscordAccount {..} = toActions discordId ++ toActions discordName ++ toActions discordIsMember
+instance FromMysql DiscordAccount where
+  rowParser = DiscordAccount <$> rowParser <*> rowParser <*> rowParser
 instance DatabaseTable DiscordAccount where
-  type PrimaryKey DiscordAccount = Only UserId
+  type PrimaryKey DiscordAccount = UserId
   databaseTableName _ = "discord"
   databaseColumnNames _ = ["id", "name", "discriminator", "nickname", "member"]
   databasePrimaryKey _ = ["id"]
 
 getDiscordAccountById :: (MonadIOReader m r, Has Connection r) => UserId -> m (Maybe DiscordAccount)
-getDiscordAccountById did = queryOnlyLogT selectByPrimaryQuery (Only did)
+getDiscordAccountById did = queryOnlyLogT selectByPrimaryQuery did
 
 getDiscordGuildMemberAccounts :: (MonadIOReader m r, Has Connection r) => m [DiscordAccount]
 getDiscordGuildMemberAccounts = queryLogT_ (selectQueryWithSuffix " WHERE `member` = 1")

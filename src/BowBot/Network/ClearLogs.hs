@@ -24,4 +24,4 @@ clearLogs = do -- TODO: timezones?
     date <- getTime "%d %b %Y %H:%M"
     let subject = "Bowbot logs " <> pack date
     renderSendMailCustom "/usr/sbin/sendmail" ["-t", "-i"] $ simpleMail from [to] [] [] subject [plainPart "...", filePartBS "application/octet-stream" "logs.gz" zippedLogsFile]
-  void $ executeLog "DELETE FROM `logs`" ()
+  void $ executeLog_ "DELETE FROM `logs`"

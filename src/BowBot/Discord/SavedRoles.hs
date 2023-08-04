@@ -26,6 +26,9 @@ newtype SavedRole = SavedRole { savedRoleName :: Text } deriving (Eq, Ord, Show)
 instance Param [SavedRole]
 instance Result [SavedRole]
 
+deriving via (SimpleValue [SavedRole]) instance ToMysql [SavedRole]
+deriving via (SimpleValue [SavedRole]) instance FromMysql [SavedRole]
+
 instance ToField [SavedRole] where
   toField = T.encodeUtf8 . T.intercalate "," . map savedRoleName
 
