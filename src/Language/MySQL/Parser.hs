@@ -27,7 +27,7 @@ typeNameNotFunParser = withSpace $ flip label "type name" $ try $ do
     else return $ TypeName n
 
 typeNameParser :: Parser TypeName
-typeNameParser = typeNameNotFunParser <|> parensParser typeNameGenParser
+typeNameParser = typeNameNotFunParser <|> try (parensParser typeNameGenParser)
 
 varNameParser :: Parser VarName
 varNameParser = withSpace $ flip label "variable name" $ fmap VarName $ (:) <$> satisfy (\x -> isLower x || x == '_') <*> many (satisfy (\x -> isAlphaNum x || x == '_'))
@@ -60,8 +60,8 @@ expressionParser :: Parser Expression
 expressionParser = boolCompExprParser `chainl1` (reservedParser "AND" $> AndExpr)
 
 complexExpressionParser :: Parser ComplexExpression
-complexExpressionParser = (typeNameParser >>= (\t -> option (ImplicitComplexExpr t) $ ComplexExpr (Just t) <$> withSpace (inParens complexExpressionListParser)))
-  <|> ComplexExpr Nothing <$> withSpace (inParens complexExpressionListParser)
+complexExpressionParser = (typeNameParser >>= (\t -> option (ImplicitComplexExpr t) $ ComplexExpr (Just t) <$> parensParser complexExpressionListParser))
+  <|> ComplexExpr Nothing <$> parensParser complexExpressionListParser
   <|> SimpleExpr <$> expressionParser
 
 complexExpressionListParser :: Parser [ComplexExpression]
@@ -94,7 +94,7 @@ whereClauseParser :: Parser WhereClause
 whereClauseParser = WhereClause <$> optionMaybe (reservedParser "WHERE" *> expressionParser)
 
 selectQueryParser :: Parser SelectQuery
-selectQueryParser = SelectQuery <$> (reservedParser "SELECT" *> complexExpressionListParser) <*> (reservedParser "FROM" *> joinTablesParser) <*> whereClauseParser
+selectQueryParser = SelectQuery <$> (reservedParser "SELECT" *> (implicitTupleExpr <$> complexExpressionListParser)) <*> (reservedParser "FROM" *> joinTablesParser) <*> whereClauseParser
 
 insertTargetParser :: Parser InsertTarget
 insertTargetParser = ColTarget <$> option DontUpdate (reservedParser "^" $> DoUpdate) <*> columnNameParser
@@ -113,7 +113,7 @@ insertSourceParser = ValuesSource <$> (reservedParser "VALUES" *> many1 valuesRo
   <|> SelectSource <$> selectQueryParser
 
 insertQueryParser :: Parser InsertQuery
-insertQueryParser = InsertQuery <$> (reservedParser "INSERT" *> reservedParser "INTO" *> tableNameParser) <*> withSpace (inParens insertTargetListParser) <*> insertSourceParser
+insertQueryParser = InsertQuery <$> (reservedParser "INSERT" *> reservedParser "INTO" *> tableNameParser) <*> (implicitTupleTarget <$> parensParser insertTargetListParser) <*> insertSourceParser
 
 anyQueryParser :: Parser AnyQuery
 anyQueryParser = SelectAnyQuery <$> selectQueryParser

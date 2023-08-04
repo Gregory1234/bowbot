@@ -1,4 +1,4 @@
-{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE QuasiQuotes #-}
 
 module BowBot.Perms.Basic where
 
@@ -35,11 +35,5 @@ instance FromField PermissionLevel where
     "admin" -> Right AdminLevel
     _ -> Left "Wrong permission level")
 
-instance DatabaseTable PermissionLevel where
-  type PrimaryKey PermissionLevel = UserId
-  databaseTableName _ = "permissions"
-  databaseColumnNames _ = ["level"]
-  databasePrimaryKey _ = ["discord_id"]
-
 getPermissionLevelByDiscord :: (MonadIOReader m r, Has Connection r) => UserId -> m PermissionLevel
-getPermissionLevelByDiscord discord = fromMaybe DefaultLevel <$> queryOnlyLogT selectByPrimaryQuery discord
+getPermissionLevelByDiscord discord = fromMaybe DefaultLevel <$> queryOnlyLogT [mysql|SELECT `level` FROM `permissions` WHERE `discord_id` = discord|]

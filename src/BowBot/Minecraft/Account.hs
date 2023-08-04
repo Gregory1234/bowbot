@@ -1,4 +1,5 @@
-{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE QuasiQuotes #-}
 
 module BowBot.Minecraft.Account where
 
@@ -17,28 +18,26 @@ instance ToMysql MinecraftAccount where
   toActions MinecraftAccount {..} = toActions mcUUID ++ toActions (T.intercalate "," mcNames) -- TODO: this is not good
 instance FromMysql MinecraftAccount where
   rowParser = MinecraftAccount <$> rowParser <*> (T.splitOn "," <$> rowParser)
-instance DatabaseTable MinecraftAccount where
-  type PrimaryKey MinecraftAccount = UUID
-  databaseTableName _ = "minecraft"
-  databaseColumnNames _ = ["uuid", "names"]
-  databasePrimaryKey _ = ["uuid"]
+
+$(pure [])
 
 getMinecraftAccountByUUID :: (MonadIOReader m r, Has Connection r) => UUID -> m (Maybe MinecraftAccount)
-getMinecraftAccountByUUID uuid = queryOnlyLogT selectByPrimaryQuery uuid
+getMinecraftAccountByUUID uuid = queryOnlyLogT [mysql|SELECT MinecraftAccount FROM `minecraft` WHERE `uuid` = uuid|]
 
 storeMinecraftAccount :: (MonadIOReader m r, Has Connection r) => MinecraftAccount -> m ()
-storeMinecraftAccount acc = void $ executeLogT insertQuery acc
+storeMinecraftAccount acc = void $ executeLogT [mysql|INSERT INTO `minecraft`(MinecraftAccount) VALUES acc|]
 
 updateMinecraftAccountCache :: (MonadIOReader m r, HasAll '[Manager, Connection] r) => Int -> m ()
 updateMinecraftAccountCache index = do
   let helper MinecraftAccount {..} = do
         newName <- mojangUUIDToCurrentName mcUUID
         return MinecraftAccount {mcNames = if newName == listToMaybe mcNames then mcNames else maybeToList newName ++ mcNames , ..}
-  cache <- queryLogT_ selectAllQuery
+  cache <- queryLogT [mysql|SELECT MinecraftAccount FROM `minecraft`|]
   let bigchunked = chunksOf 150 $ sortOn (uuidString . mcUUID) cache
   let chunk = if index >= length bigchunked then [] else bigchunked !! index
   updatedAccounts <- for chunk helper
-  void $ executeManyLogT insertQuery $ filter (`notElem` cache) updatedAccounts
+  let toInsert = filter (`notElem` cache) updatedAccounts
+  void $ executeLogT [mysql|INSERT INTO `minecraft`(MinecraftAccount) VALUES toInsert..|]
 
 mcNameToUUID :: (MonadIOReader m r, HasAll '[Manager, Connection] r) => Text -> m (Maybe UUID)
 mcNameToUUID name = do
@@ -61,7 +60,7 @@ freshMinecraftAccountByName name = do
   join <$> for uuid freshMinecraftAccountByUUID
 
 getMinecraftAccountByCurrentName :: (MonadIOReader m r, Has Connection r) => Text -> m (Maybe MinecraftAccount)
-getMinecraftAccountByCurrentName name = queryOnlyLogT (selectQueryWithSuffix " WHERE substring_index(`names`,',',1) = ?") name
+getMinecraftAccountByCurrentName name = queryOnlyLogT [mysql|SELECT MinecraftAccount FROM `minecraft` WHERE SUBSTRING_INDEX(`names`,",",1) = name|]
 
 addMinecraftName :: (MonadIOReader m r, Has Connection r) => Text -> UUID -> m Bool
 addMinecraftName name uuid = addMinecraftNames [(name, uuid)]
@@ -80,7 +79,7 @@ autocorrectFromAccountDirect acc = MinecraftAutocorrect { autocorrectAccount = a
 
 minecraftAutocorrect :: (MonadIOReader m r, Has Connection r) => Text -> m (Maybe MinecraftAutocorrect)
 minecraftAutocorrect name = do
-  people <- queryLogT_ selectAllQuery -- TODO: start using minecraftName table
+  people <- queryLogT [mysql|SELECT MinecraftAccount FROM `minecraft`|] -- TODO: start using minecraftName table
   let process isPast = map snd . sortOn fst $ do
         acc@MinecraftAccount {..} <- people
         n <- (if isPast then drop 1 else take 1) mcNames

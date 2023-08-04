@@ -1,3 +1,5 @@
+{-# LANGUAGE QuasiQuotes #-}
+
 module BowBot.Hypixel.Guild where
 
 import BowBot.BotData.Info
@@ -30,7 +32,8 @@ updateHypixelRoles = do
           known <- queryLog_ "SELECT `uuid` FROM `minecraft`"
           let unknown = map fst members \\ known
           names <- catMaybes <$> traverse (\x -> fmap (x,) <$> mojangUUIDToCurrentName x) unknown
-          b <- (>0) <$> executeManyLogT insertQuery [MinecraftAccount {mcUUID, mcNames = [mcName, mcName <> "OldNamesCurrentlyNotKnown"]} | (mcUUID, mcName) <- names]
+          let toInsert = [MinecraftAccount {mcUUID, mcNames = [mcName, mcName <> "OldNamesCurrentlyNotKnown"]} | (mcUUID, mcName) <- names]
+          b <- (>0) <$> executeLogT [mysql|INSERT INTO `minecraft`(MinecraftAccount) VALUES toInsert..|]
           c <- addMinecraftNames (map (\(u,n) -> (n,u)) names)
           when ((b && c) || null unknown) $ void $ executeManyLog "INSERT INTO `minecraft` (`uuid`, `hypixel_role`) VALUES (?,?) ON DUPLICATE KEY UPDATE `hypixel_role`=VALUES(`hypixel_role`)" members
           void $ executeLog "UPDATE `minecraft` SET `hypixel_role` = NULL WHERE `uuid` NOT IN ?" (In (map fst members))

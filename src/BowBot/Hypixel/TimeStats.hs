@@ -1,4 +1,5 @@
-{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE QuasiQuotes #-}
 
 module BowBot.Hypixel.TimeStats where
 
@@ -35,18 +36,15 @@ instance FromField StatsTimeRange where
 data HypixelBowTimeStats = HypixelBowTimeStats
   { bowTimeWins :: Integer,
     bowTimeLosses :: Integer,
-    bowTimeTimestamp :: Maybe UTCTime
+    bowTimeTimestamp :: UTCTime
   } deriving (Show, Eq)
 
 instance ToMysql HypixelBowTimeStats where
   toActions HypixelBowTimeStats {..} = toActions bowTimeWins ++ toActions bowTimeLosses ++ toActions bowTimeTimestamp
 instance FromMysql HypixelBowTimeStats where
-  rowParser = HypixelBowTimeStats <$> rowParser <*> rowParser <*> (nullZeroTime <$> rowParser)
-instance DatabaseTable HypixelBowTimeStats where
-  type PrimaryKey HypixelBowTimeStats = (UUID, StatsTimeRange)
-  databaseTableName _ = "hypixel_bow_timed_stats"
-  databaseColumnNames _ = ["wins", "losses", "last_update"]
-  databasePrimaryKey _ = ["minecraft_uuid", "time"]
+  rowParser = HypixelBowTimeStats <$> rowParser <*> rowParser <*> rowParser
+
+$(pure [])
 
 statsTimeRangeName :: StatsTimeRange -> Text
 statsTimeRangeName DailyStats = "Day"
@@ -61,7 +59,7 @@ hypixelBowLeaderboardToTimeStats HypixelBowLeaderboardEntry {..} = HypixelBowTim
 
 showHypixelBowTimeStats :: StatsTimeRange -> Settings -> HypixelBowStats -> HypixelBowTimeStats -> Text
 showHypixelBowTimeStats timeRange Settings {..} HypixelBowStats {..} HypixelBowTimeStats {..} = T.unlines $ catMaybes
-  [ ("- *Since:* " <>) . discordFormatTimestampFull <$> bowTimeTimestamp
+  [ Just $ ("- *Since:* " <>) . discordFormatTimestampFull $ bowTimeTimestamp
   , onlyIfBin sWins
   $ " - *Bow Duels " <> time <> " Wins:* **"
   <> showt (bowWins - bowTimeWins)
@@ -89,10 +87,10 @@ showMaybeHypixelBowTimeStats MonthlyStats _ _ Nothing = "- **Monthly data isn't 
 showMaybeHypixelBowTimeStats tm s t (Just v) = showHypixelBowTimeStats tm s t v
 
 updateHypixelBowTimeStats :: (MonadIOReader m r, Has Connection r) => StatsTimeRange -> m ()
-updateHypixelBowTimeStats time = void $ executeLogT (insertSelectQueryKeyed @HypixelBowTimeStats (TypedQuery "SELECT `minecraft_uuid`,?,`wins`,`losses`,`last_update` FROM `hypixel_bow_stats`")) time
+updateHypixelBowTimeStats time = void $ executeLogT [mysql|INSERT INTO `hypixel_bow_timed_stats`(`minecraft_uuid`,`time`,HypixelBowTimeStats) SELECT `minecraft_uuid`,time, (`wins`,`losses`,`last_update`) FROM `hypixel_bow_stats`|]
 
 getHypixelBowTimeStatsByUUID :: (MonadIOReader m r, Has Connection r) => StatsTimeRange -> UUID -> m (Maybe HypixelBowTimeStats)
-getHypixelBowTimeStatsByUUID time uuid = queryOnlyLogT selectByPrimaryQuery (uuid, time)
+getHypixelBowTimeStatsByUUID time uuid = queryOnlyLogT [mysql|SELECT HypixelBowTimeStats FROM `hypixel_bow_timed_stats` WHERE `time` = time AND `minecraft_uuid` = uuid|]
 
 data FullHypixelBowTimeStats = FullHypixelBowTimeStats
   { currentHypixelBowStats :: HypixelBowStats

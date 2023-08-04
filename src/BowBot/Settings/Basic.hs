@@ -1,4 +1,5 @@
-{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE QuasiQuotes #-}
 
 module BowBot.Settings.Basic where
 
@@ -66,17 +67,14 @@ instance ToMysql Settings where
   toActions Settings {..} = toActions sWins ++ toActions sLosses ++ toActions sWLR ++ toActions sWinsUntil ++ toActions sBestStreak ++ toActions sCurrentStreak ++ toActions sBestDailyStreak ++ toActions sBowHits ++ toActions sBowShots ++ toActions sAccuracy
 instance FromMysql Settings where
   rowParser = Settings <$> rowParser <*> rowParser <*> rowParser <*> rowParser <*> rowParser <*> rowParser <*> rowParser <*> rowParser <*> rowParser <*> rowParser
-instance DatabaseTable Settings where
-  type PrimaryKey Settings = UserId
-  databaseTableName _ = "settings"
-  databaseColumnNames _ = ["wins", "losses", "wlr", "wins_until", "best_streak", "current_streak", "best_daily_streak", "bow_hits", "bow_shots", "accuracy"]
-  databasePrimaryKey _ = ["discord_id"]
+
+$(pure [])
 
 getSettingsByDiscord :: (MonadIOReader m r, Has Connection r) => UserId -> m Settings
-getSettingsByDiscord discord = fromMaybe defSettings <$> queryOnlyLogT selectByPrimaryQuery discord
+getSettingsByDiscord discord = fromMaybe defSettings <$> queryOnlyLogT [mysql|SELECT Settings FROM `settings` WHERE `discord_id` = discord|]
 
 setSettingsByDiscord :: (MonadIOReader m r, Has Connection r) => UserId -> Settings -> m Bool
-setSettingsByDiscord discord settings = (>0) <$> executeLogT insertQueryKeyed (KeyedRow discord settings)
+setSettingsByDiscord discord settings = (>0) <$> executeLogT [mysql|INSERT INTO `settings`(`discord_id`, Settings) VALUES (discord, settings)|]
 
 defSettings :: Settings
 defSettings = Settings

@@ -1,3 +1,5 @@
+{-# LANGUAGE TemplateHaskellQuotes #-}
+
 module Language.MySQL.Typechecker where
 
 import Language.MySQL.AST
@@ -25,7 +27,7 @@ class (MonadIO m, MonadFail m) => MonadQ m where liftQ :: Q a -> m a
 instance MonadQ EarlyTypecheck where liftQ = lift
 instance MonadQ Typecheck where liftQ = lift . lift
 
-newtype Schema = Schema [(TableName, ColumnName, Type)] deriving (Show, Eq)
+newtype Schema = Schema [(TableName, ColumnName, Either String Type)] deriving (Show, Eq)
 
 newtype SqlFuns = SqlFuns (M.Map FunName ([ParsedType], ParsedType))
 
@@ -71,21 +73,33 @@ getColumnType :: FullColumnName -> Typecheck Type
 getColumnType fcn@(FullColumnName t c) = do
   (Schema s, _) <- ask
   case filter (\(t',c',_) -> c == c' && (isNothing t || t == Just t')) s of
-    [(_,_,typ)] -> return typ
+    [(_,_,Right typ)] -> return typ
+    [(_,_,Left e)] -> fail e
     [] -> fail $ "Couldn't find column: " ++ ppFullColumnName fcn ++ "!"
     _ -> fail $ "Ambigous column: " ++ ppFullColumnName fcn ++ "!"
 
-typecheckType :: MonadQ m => ParsedType -> m Type
-typecheckType (ParsedType t) = do
-  realTypes <- mapM (fmap ConT . typecheckTypeName) t
-  return $ foldl1 AppT realTypes
+forceEither :: MonadFail m => Either String a -> m a
+forceEither (Left e) = fail e
+forceEither (Right t) = return t
 
-typecheckTypeName :: MonadQ m => TypeName -> m Name
-typecheckTypeName (TypeName n) = do
+typecheckType' :: MonadQ m => ParsedType -> m (Either String Type)
+typecheckType' (ParsedType t) = do
+  realTypes <- fmap (map (\x -> if x == mkName "List" then ListT else ConT x)) . sequence <$> mapM typecheckTypeName' t
+  return $ foldl1 AppT <$> realTypes
+
+typecheckType :: MonadQ m => ParsedType -> m Type
+typecheckType = typecheckType' >=> forceEither
+
+typecheckTypeName' :: MonadQ m => TypeName -> m (Either String Name)
+typecheckTypeName' (TypeName "List") = return $ Right (mkName "List")
+typecheckTypeName' (TypeName n) = do
   n' <- liftQ $ lookupTypeName n
   case n' of
-    Nothing -> fail $ "Type not found: " ++ n ++ "!"
-    Just n'' -> return n''
+    Nothing -> return $ Left $ "Type not found: " ++ n ++ "!"
+    Just n'' -> return $ Right n''
+
+typecheckTypeName :: MonadQ m => TypeName -> m Name
+typecheckTypeName = typecheckTypeName' >=> forceEither
 
 typecheckVarName :: MonadQ m => VarName -> m Name
 typecheckVarName (VarName n) = do
@@ -183,6 +197,7 @@ typeConstructorArgs n = do
     _ -> fail $ "Unexpected declaration when reifying: " ++ show n ++ "!"
   where
     deconstructConstructor (NormalC _ s) = return $ map (deconstructType . snd) s
+    deconstructConstructor (RecC _ s) = return $ map (deconstructType . (\(_,_,t) -> t)) s
     deconstructConstructor c = fail $ "Unsupported constructor: " ++ show c ++ "!"
     deconstructMultiApp (AppT a b) = let (f,args) = deconstructMultiApp a in (f, args ++ [b])
     deconstructMultiApp t = (t,[])
@@ -229,7 +244,7 @@ typecheckComplexExpr dc (ImplicitComplexExpr nUntyped) t = do
 typecheckTableName :: [(TableName, [(ColumnName, ParsedType)])] -> AliasedTable -> EarlyTypecheck Schema
 typecheckTableName schemaAll (AliasedTable t a) = Schema <$> case lookup t schemaAll of
     Nothing -> fail $ "Table not found: " ++ ppTableName t ++ "!"
-    Just s -> mapM (\(cn, ct) -> (fromMaybe t a, cn,) <$> typecheckType ct) s
+    Just s -> mapM (\(cn, ct) -> (fromMaybe t a, cn,) <$> typecheckType' ct) s
 
 typecheckJoinTables :: [(TableName, [(ColumnName, ParsedType)])] -> SqlFuns -> JoinTables -> EarlyTypecheck Schema
 typecheckJoinTables schemaAll funs (JoinTables x xs) = do
@@ -250,8 +265,7 @@ typecheckSelectQuery :: [(TableName, [(ColumnName, ParsedType)])] -> SqlFuns -> 
 typecheckSelectQuery schemaAll funs dc expectedType (SelectQuery s t w) = do
   schema <- typecheckJoinTables schemaAll funs t
   flip runReaderT (schema, funs) $ do
-    s' <- mapM (\e -> typecheckComplexExpr dc e Nothing) s
-    for_ expectedType $ flip partialTypeEqual (implicitTupleType $ map typedComplexExprType s')
+    s' <- typecheckComplexExpr dc s expectedType
     TypedSelectQuery s' t <$> typecheckWhereClause w
 
 typecheckValuesRow :: SqlFuns -> PartialType -> ValuesRow -> EarlyTypecheck TypedValuesRow
@@ -318,8 +332,8 @@ typecheckInsertTarget dc t (ImplicitComplexTarget nUntyped) = do
 typecheckInsertQuery :: [(TableName, [(ColumnName, ParsedType)])] -> SqlFuns -> DefColumns -> InsertQuery -> EarlyTypecheck TypedInsertQuery
 typecheckInsertQuery schemaAll funs dc (InsertQuery tn t s) = do
   schema <- typecheckTableName schemaAll (AliasedTable tn Nothing)
-  (t', u) <- flip runReaderT (schema, funs) $ combineTypedInsertTargets <$> mapM (typecheckInsertTarget dc Nothing) t
-  s' <- typecheckInsertSouce schemaAll funs dc (implicitTupleType $ map typedInsertTargetType t') s
+  (t', u) <- flip runReaderT (schema, funs) $ typecheckInsertTarget dc Nothing t
+  s' <- typecheckInsertSouce schemaAll funs dc (typedInsertTargetType t') s
   return $ TypedInsertQuery tn t' s' (UpdateOnDuplicateList u)
 
 

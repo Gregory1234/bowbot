@@ -55,7 +55,7 @@ data JoinTables
 
 newtype WhereClause = WhereClause (Maybe Expression) deriving (Show, Eq)
 
-data SelectQuery = SelectQuery [ComplexExpression] JoinTables WhereClause deriving (Show, Eq)
+data SelectQuery = SelectQuery ComplexExpression JoinTables WhereClause deriving (Show, Eq)
 
 data UpdateOnDuplicateKey = DoUpdate | DontUpdate deriving (Show, Eq)
 
@@ -64,6 +64,10 @@ data InsertTarget
   | ComplexTarget (Maybe TypeName) [InsertTarget]
   | ImplicitComplexTarget TypeName
   deriving (Show, Eq)
+
+implicitTupleTarget :: [InsertTarget] -> InsertTarget
+implicitTupleTarget [e] = e
+implicitTupleTarget es = ComplexTarget Nothing es
 
 data ValuesRowType = ValuesRowMany | ValuesRowSingle deriving (Show, Eq)
 
@@ -74,7 +78,7 @@ data InsertSource
   | SelectSource SelectQuery
   deriving (Show, Eq)
 
-data InsertQuery = InsertQuery TableName [InsertTarget] InsertSource deriving (Show, Eq)
+data InsertQuery = InsertQuery TableName InsertTarget InsertSource deriving (Show, Eq)
 
 data AnyQuery
   = SelectAnyQuery SelectQuery

@@ -30,8 +30,8 @@ completeCachedMaybe :: Maybe UTCTime -> CachedMaybe a -> Maybe a -> CachedMaybe 
 completeCachedMaybe time CachedNothing (Just a) = CachedJust time a
 completeCachedMaybe _ c _ = c
 
-cachedTimestamp :: Maybe UTCTime -> CachedMaybe a -> Maybe UTCTime
-cachedTimestamp time (NewJust _) = time
+cachedTimestamp :: UTCTime -> CachedMaybe a -> Maybe UTCTime
+cachedTimestamp time (NewJust _) = Just time
 cachedTimestamp _ (CachedJust time _) = time
 cachedTimestamp _ CachedNothing = Nothing
 
@@ -46,13 +46,13 @@ data HypixelBowStats = HypixelBowStats
     bestDailyWinstreak :: !(Maybe Integer),
     bowHits :: !Integer,
     bowShots :: !Integer,
-    bowStatsTimestamp :: !(Maybe UTCTime)
+    bowStatsTimestamp :: UTCTime
   } deriving (Show)
 
 
 requestHypixelBowStats :: (MonadIOReader m r, Has Manager r) => UUID -> m (Maybe HypixelBowStats)
 requestHypixelBowStats uuid = do
-  bowStatsTimestamp <- Just <$> liftIO getCurrentTime
+  bowStatsTimestamp <- liftIO getCurrentTime
   hypixelWithPlayerData uuid $ \o -> do
     pl <- o .: "player"
     stats <- pl .: "stats"

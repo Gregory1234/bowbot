@@ -124,7 +124,7 @@ whereClauseRenderer (TypedWhereClause Nothing) = emit ""
 whereClauseRenderer (TypedWhereClause (Just e)) = emit "WHERE " *> expressionRenderer e
 
 selectQueryStringRenderer :: TypedSelectQuery -> StrRenderer ()
-selectQueryStringRenderer (TypedSelectQuery s t w) = withSpaces [emit "SELECT", listRenderer $ map complexExpressionRenderer s, emit "FROM", joinTablesRenderer t, whereClauseRenderer w]
+selectQueryStringRenderer (TypedSelectQuery s t w) = withSpaces [emit "SELECT", complexExpressionRenderer s, emit "FROM", joinTablesRenderer t, whereClauseRenderer w]
 
 renderTypecheckConstraint :: TypecheckConstraint -> Q Exp -> Q Exp
 renderTypecheckConstraint (NameHasType n t) e = [| reqEqType' @($(pure t)) $(varE n) $e |]
@@ -150,9 +150,8 @@ renderSelectQuery :: TypedSelectQuery -> [TypecheckConstraint] -> Q Exp
 renderSelectQuery q@(TypedSelectQuery s _ _) tc = do
   conn <- newName "conn"
   (str, vars) <- runStateT (runRenderer $ runStrRenderer $ selectQueryStringRenderer q) M.empty
-  let t = TupleType (map typedComplexExprType s)
-  lam1E (varP conn) $ doE $ map (\(origName, (strName, varType)) -> renderVar conn origName strName varType) (M.toList vars)
-    ++ [noBindS $ foldr renderTypecheckConstraint [| return (mkQuery $(renderTypeInhabitant t) $(pure str)) |] tc]
+  lam1E (if null vars then wildP else varP conn) $ doE $ map (\(origName, (strName, varType)) -> renderVar conn origName strName varType) (M.toList vars)
+    ++ [noBindS $ foldr renderTypecheckConstraint [| return (mkQuery $(renderTypeInhabitant (typedComplexExprType s)) $(pure str)) |] tc]
 
 insertTargetRenderer :: TypedInsertTarget -> StrRenderer ()
 insertTargetRenderer (TypedColTarget c _) = emit $ ppColumnName c
@@ -194,7 +193,7 @@ insertSourceRenderer (TypedValuesSource rows) = emit "VALUES" *> evalStateT (map
 insertSourceRenderer (TypedSelectSource q) = selectQueryStringRenderer q
 
 insertQueryStringRenderer :: TypedInsertQuery -> StrRenderer ()
-insertQueryStringRenderer (TypedInsertQuery tn t s u) = withSpaces [emit "INSERT INTO", emit $ ppTableName tn, parensRenderer $ listRenderer $ map insertTargetRenderer t, insertSourceRenderer s, updateOnDuplicateListRenderer u]
+insertQueryStringRenderer (TypedInsertQuery tn t s u) = withSpaces [emit "INSERT INTO", emit $ ppTableName tn, parensRenderer $ insertTargetRenderer t, insertSourceRenderer s, updateOnDuplicateListRenderer u]
 
 insertSourceCheckRenderer :: TypedInsertSource -> Q Exp -> Q Exp
 insertSourceCheckRenderer (TypedValuesSource (mapM (\case (TypedValuesRowVar n ValuesRowMany) -> Just n; _ -> Nothing) -> Just lists)) e 
@@ -205,7 +204,7 @@ renderInsertQuery :: TypedInsertQuery -> [TypecheckConstraint] -> Q Exp
 renderInsertQuery q@(TypedInsertQuery _ _ s _) tc = do
   conn <- newName "conn"
   (str, vars) <- runStateT (runRenderer $ runStrRenderer $ insertQueryStringRenderer q) M.empty
-  lam1E (varP conn) $ insertSourceCheckRenderer s $ doE $ map (\(origName, (strName, varType)) -> renderVar conn origName strName varType) (M.toList vars)
+  lam1E (if null vars then wildP else varP conn) $ insertSourceCheckRenderer s $ doE $ map (\(origName, (strName, varType)) -> renderVar conn origName strName varType) (M.toList vars)
     ++ [noBindS $ foldr renderTypecheckConstraint [| return (Command (Just $(pure str))) |] tc]
 
 renderAnyQuery :: TypedAnyQuery -> [TypecheckConstraint] -> Q Exp

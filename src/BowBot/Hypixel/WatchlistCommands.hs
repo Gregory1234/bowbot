@@ -1,3 +1,4 @@
+{-# LANGUAGE QuasiQuotes #-}
 module BowBot.Hypixel.WatchlistCommands where
 
 import BowBot.Command
@@ -6,6 +7,7 @@ import BowBot.Hypixel.Watchlist
 import qualified Data.Text as T
 import BowBot.DB.Typed
 import BowBot.Discord.Utils
+import BowBot.Minecraft.Basic
 
 listCommand :: Command
 listCommand = Command CommandInfo
@@ -25,7 +27,7 @@ onlineCommand = Command CommandInfo
   , commandTimeout = 30
   } $ noArguments $ do
     online <- liftMaybe "**Processing list of online players. Please send command again later.**" =<< getOnlinePlayers
-    mcs <- queryLogT (selectQueryWithSuffix " WHERE `uuid` IN ?") (In online)
+    mcs <- queryLogT [mysql|SELECT MinecraftAccount FROM `minecraft` WHERE `uuid` IN online|]
     let onlineStr = case T.unwords (map (head . mcNames) mcs) of
           "" -> "None of the watchListed players are currently in bow duels."
           str -> str

@@ -62,7 +62,7 @@ typedComplexExprType (TypedSimpleExpr e) = typedExprType e
 
 newtype TypedWhereClause = TypedWhereClause (Maybe TypedExpression) deriving (Show, Eq)
 
-data TypedSelectQuery = TypedSelectQuery [TypedComplexExpression] JoinTables TypedWhereClause deriving (Show, Eq)
+data TypedSelectQuery = TypedSelectQuery TypedComplexExpression JoinTables TypedWhereClause deriving (Show, Eq)
 
 data TypedValuesRow = TypedValuesRowVar Name ValuesRowType | TypedValuesRowExpr TypedComplexExpression deriving (Show, Eq)
 
@@ -82,7 +82,7 @@ data TypedInsertSource
 
 newtype UpdateOnDuplicateList = UpdateOnDuplicateList [ColumnName] deriving (Show, Eq)
 
-data TypedInsertQuery = TypedInsertQuery TableName [TypedInsertTarget] TypedInsertSource UpdateOnDuplicateList deriving (Show, Eq)
+data TypedInsertQuery = TypedInsertQuery TableName TypedInsertTarget TypedInsertSource UpdateOnDuplicateList deriving (Show, Eq)
 
 data TypedAnyQuery
   = TypedSelectAnyQuery TypedSelectQuery
