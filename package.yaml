@@ -47,6 +47,10 @@ default-extensions:
 - DataKinds
 - ViewPatterns
 
+ghc-options:
+- -Wall
+- -O2
+
 executables:
   bowbot-exe:
     main:                Main.hs
@@ -55,6 +59,5 @@ executables:
     - -threaded
     - -rtsopts
     - -with-rtsopts=-N
-    - -O2
     dependencies:
     - bowbot
