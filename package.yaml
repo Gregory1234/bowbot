@@ -33,6 +33,9 @@ dependencies:
 - smtp-mail
 - mime-mail
 - zlib
+# only for mysql quasi quoter
+- template-haskell
+- parsec
 
 library:
   source-dirs: src
