@@ -26,8 +26,12 @@ data Expression
   | ColExpr FullColumnName
   | AndExpr Expression Expression
   | EqExpr Expression Expression
+  | GtExpr Expression Expression
   | FunExpr FunName [Expression]
   | InExpr Expression ListExpression
+  | IsNullExpr Expression
+  | IsNotNullExpr Expression
+  | OverrideExpr Expression ParsedType
   deriving (Show, Eq)
 
 data ListExpression

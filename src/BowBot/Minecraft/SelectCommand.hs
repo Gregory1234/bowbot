@@ -1,13 +1,15 @@
+{-# LANGUAGE QuasiQuotes #-}
+
 module BowBot.Minecraft.SelectCommand where
 
 import BowBot.Command
 import BowBot.Minecraft.Account
 import BowBot.Discord.Utils
-import BowBot.DB.Basic
-import BowBot.Minecraft.Basic (uuidString)
+import BowBot.DB.Typed
 import BowBot.Command.Utils
 import Control.Monad.Except
 import BowBot.Account.Basic
+import BowBot.Minecraft.Basic
 
 selectMinecraftCommand :: Command
 selectMinecraftCommand = Command CommandInfo
@@ -21,5 +23,6 @@ selectMinecraftCommand = Command CommandInfo
     mc <- liftMaybe thePlayerDoesNotExistMessage =<< getMinecraftAccountByCurrentName str
     when (mcUUID mc `notElem` allMinecrafts mcs) $ throwError "*This account doesn't belong to you! If you own this account, ask an admin to add it for you.*"
     when (mcUUID mc == selectedMinecraft mcs) $ throwError "*This account is selected already!*"
-    a <- (>0) <$> executeLog "INSERT INTO `account_minecraft` (`minecraft_uuid`, `selected`) VALUES (?,0),(?,1) ON DUPLICATE KEY UPDATE `selected`=VALUES(`selected`)" (uuidString $ selectedMinecraft mcs, uuidString $ mcUUID mc)
+    let selectedUUID = selectedMinecraft mcs; newUUID = mcUUID mc
+    a <- (>0) <$> executeLogT [mysql|INSERT INTO `account_minecraft` (`minecraft_uuid`, ^`selected`) VALUES (selectedUUID,0),(newUUID,1)|]
     respond $ if a then "*Selected account updated!*" else somethingWentWrongMessage

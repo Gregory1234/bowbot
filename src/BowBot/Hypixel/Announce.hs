@@ -1,3 +1,5 @@
+{-# LANGUAGE QuasiQuotes #-}
+
 module BowBot.Hypixel.Announce where
 
 import qualified Discord.Requests as R
@@ -10,7 +12,7 @@ import BowBot.Minecraft.Basic
 import BowBot.Minecraft.Account
 import Data.Bifunctor (first)
 import qualified Data.Text as T
-import BowBot.DB.Basic
+import BowBot.DB.Typed
 
 milestonesChannelInfo :: InfoType ChannelId
 milestonesChannelInfo = InfoType { infoName = "milestones_channel", infoDefault = 0, infoParse = first pack . readEither . unpack }
@@ -26,7 +28,7 @@ getHypixelBowMilestones = do
   ctx <- ask
   milestoneNames <- askInfo milestoneNamesInfo
   milestonePairs <- liftIO $ (`runReaderT` ctx) $ withTransaction $ do
-    res :: [(UUID, Integer, Integer)] <- queryLog_ "SELECT `minecraft_uuid`, `announcement_wins`, `wins` FROM `hypixel_bow_stats` WHERE `announcement_wins` IS NOT NULL AND `wins` > `announcement_wins`"
+    res :: [(UUID, Integer, Integer)] <- queryLogT [mysql|SELECT `minecraft_uuid`, `announcement_wins` OVERRIDE Integer, `wins` FROM `hypixel_bow_stats` WHERE `announcement_wins` IS NOT NULL AND `wins` > `announcement_wins` OVERRIDE Integer|]
     void $ executeLog_ "UPDATE `hypixel_bow_stats` SET `announcement_wins`=`wins`"
     return res
   return [(uuid, milestone) | (uuid, low, high) <- milestonePairs, milestone <- milestoneNamesFromWins milestoneNames low high]

@@ -66,7 +66,7 @@ addMinecraftName :: (MonadIOReader m r, Has Connection r) => Text -> UUID -> m B
 addMinecraftName name uuid = addMinecraftNames [(name, uuid)]
 
 addMinecraftNames :: (MonadIOReader m r, Has Connection r) => [(Text, UUID)] -> m Bool
-addMinecraftNames namePairs = (>0) <$> executeManyLog "INSERT INTO `minecraft_name` (`name`, `minecraft_uuid`) VALUES (?,?) ON DUPLICATE KEY UPDATE `minecraft_uuid`=VALUES(`minecraft_uuid`)" namePairs
+addMinecraftNames namePairs = (>0) <$> executeLogT [mysql|INSERT INTO `minecraft_name` (`name`, ^`minecraft_uuid`) VALUES namePairs..|]
 
 data MinecraftAutocorrect = MinecraftAutocorrect 
   { autocorrectAccount :: MinecraftAccount

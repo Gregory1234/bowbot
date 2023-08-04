@@ -50,11 +50,18 @@ listExpressionParser :: Parser ListExpression
 listExpressionParser = VarListExpr <$> varNameParser
   <|> ListExpr <$> parensParser (sepBy expressionParser commaParser)
 
+overrideExprParser :: Parser Expression
+overrideExprParser = do
+  e1 <- baseExpressionParser
+  option e1 (OverrideExpr e1 <$> (reservedParser "OVERRIDE" *> typeParser))
+
 boolCompExprParser :: Parser Expression
 boolCompExprParser = do
-  e1 <- baseExpressionParser
-  option e1 (EqExpr e1 <$> (reservedParser "=" *> baseExpressionParser)
-    <|> InExpr e1 <$> (reservedParser "IN" *> listExpressionParser))
+  e1 <- overrideExprParser
+  option e1 (EqExpr e1 <$> (reservedParser "=" *> overrideExprParser)
+    <|> GtExpr e1 <$> (reservedParser ">" *> overrideExprParser)
+    <|> InExpr e1 <$> (reservedParser "IN" *> listExpressionParser)
+    <|> (reservedParser "IS" *> option (IsNullExpr e1) (IsNotNullExpr e1 <$ reservedParser "NOT") <* reservedParser "NULL"))
 
 expressionParser :: Parser Expression
 expressionParser = boolCompExprParser `chainl1` (reservedParser "AND" $> AndExpr)
@@ -109,7 +116,7 @@ valuesRowParser = ValuesRowVar <$> varNameParser <*> option ValuesRowSingle (res
   <|> ValuesRowExpr <$> parensParser complexExpressionListParser
 
 insertSourceParser :: Parser InsertSource
-insertSourceParser = ValuesSource <$> (reservedParser "VALUES" *> many1 valuesRowParser)
+insertSourceParser = ValuesSource <$> (reservedParser "VALUES" *> sepBy1 valuesRowParser commaParser)
   <|> SelectSource <$> selectQueryParser
 
 insertQueryParser :: Parser InsertQuery

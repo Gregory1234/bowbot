@@ -1,3 +1,5 @@
+{-# LANGUAGE QuasiQuotes #-}
+
 module BowBot.Birthday.Announce where
 
 import BowBot.Birthday.Basic
@@ -7,7 +9,7 @@ import qualified Data.Map as M
 import qualified Data.HashMap.Strict as HM
 import BowBot.Discord.Utils
 import BowBot.BotData.Info
-import BowBot.DB.Basic
+import BowBot.DB.Typed
 import BowBot.Discord.Account
 import Data.List (partition)
 import Data.Bifunctor (first)
@@ -23,7 +25,7 @@ announceBirthdays = do
   birthdayChannel <- askInfo birthdayChannelInfo
   dcMembers <- HM.fromList . map (\x -> (discordId x, x)) <$> getDiscordGuildMemberAccounts
   logInfoFork $ "Announcing birthdays: " <> T.intercalate ", " (map (showDiscordName . discordName) . filter discordIsMember . mapMaybe (dcMembers HM.!?) $ birthdays)
-  pns :: HM.HashMap UserId BowBotId <- HM.fromList <$> queryLog_ "SELECT `discord_id`, `account_id` FROM `account_discord`"
+  pns :: HM.HashMap UserId BowBotId <- HM.fromList <$> queryLogT [mysql|SELECT `discord_id`, `account_id` FROM `account_discord`|]
   let (registered, unregistered) = partition (isJust . (pns HM.!?)) birthdays
   let peopleMap = M.toList $ M.filter (not . null) $ M.map (filter discordIsMember . mapMaybe (dcMembers HM.!?)) $ groupByToMap (pns HM.!) registered
   for_ peopleMap $ \(_, p) -> call $ R.CreateMessage birthdayChannel $ "**Happy birthday** to " <> T.intercalate ", " (map (showDiscordNameDiscord . discordName) p) <> "!"

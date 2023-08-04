@@ -41,7 +41,7 @@ commaParser = try $ char ',' *> spaces
 backQuoteNameLit :: Stream s m Char => ParsecT s u m String
 backQuoteNameLit = flip label "back quoted name" $ do
   _ <- char '`'
-  str <- many1 $ satisfy (\x -> isAsciiLower x || x == '_')
+  str <- many1 $ satisfy (\x -> isAlphaNum x || x == '_')
   _ <- char '`'
   return str
 

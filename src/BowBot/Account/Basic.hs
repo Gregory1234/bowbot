@@ -1,10 +1,10 @@
-{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE QuasiQuotes #-}
 
 module BowBot.Account.Basic where
 
 import BowBot.Minecraft.Basic (UUID(..))
 import Discord.Internal.Rest (UserId)
-import BowBot.DB.Basic
+import BowBot.DB.Typed
 import BowBot.Utils
 import BowBot.Discord.Orphans ()
 import Data.Hashable (Hashable)
@@ -22,28 +22,33 @@ minecraftListFromList mcs = fmap (\selectedMinecraft -> MinecraftList {..}) sele
     allMinecrafts = map fst mcs
 
 getSelectedMinecraftUUIDByDiscord :: (MonadIOReader m r, Has Connection r) => UserId -> m (Maybe UUID)
-getSelectedMinecraftUUIDByDiscord did = queryOnlyLog "SELECT `minecraft_uuid` FROM `account_minecraft` JOIN `account_discord` ON `account_minecraft`.`account_id`=`account_discord`.`account_id` WHERE `account_discord`.`discord_id` = ? AND `account_minecraft`.`selected` = 1" did
+getSelectedMinecraftUUIDByDiscord did = queryOnlyLogT [mysql|SELECT `minecraft_uuid` FROM `account_minecraft` 
+  JOIN `account_discord` ON `account_id`=`account_minecraft`.`account_id` WHERE `account_discord`.`discord_id` = did AND `account_minecraft`.`selected`|]
 
 getMinecraftUUIDsByDiscord :: (MonadIOReader m r, Has Connection r) => UserId -> m [UUID]
-getMinecraftUUIDsByDiscord did = queryLog "SELECT `minecraft_uuid` FROM `account_minecraft` JOIN `account_discord` ON `account_minecraft`.`account_id`=`account_discord`.`account_id` WHERE `account_discord`.`discord_id` = ?" did
+getMinecraftUUIDsByDiscord did = queryLogT [mysql|SELECT `minecraft_uuid` FROM `account_minecraft` 
+  JOIN `account_discord` ON `account_id`=`account_minecraft`.`account_id` WHERE `account_discord`.`discord_id` = did|]
 
 getMinecraftListByDiscord :: (MonadIOReader m r, Has Connection r) => UserId -> m (Maybe MinecraftList)
-getMinecraftListByDiscord did = minecraftListFromList <$> queryLog "SELECT `minecraft_uuid`,`selected` FROM `account_minecraft` JOIN `account_discord` ON `account_minecraft`.`account_id`=`account_discord`.`account_id` WHERE `account_discord`.`discord_id` = ?" did
+getMinecraftListByDiscord did = minecraftListFromList <$> queryLogT [mysql|SELECT `minecraft_uuid`,`selected` FROM `account_minecraft` 
+  JOIN `account_discord` ON `account_id`=`account_minecraft`.`account_id` WHERE `account_discord`.`discord_id` = did|]
 
 getMinecraftListByBowBotId :: (MonadIOReader m r, Has Connection r) => BowBotId -> m (Maybe MinecraftList)
-getMinecraftListByBowBotId bid = minecraftListFromList <$> queryLog "SELECT `minecraft_uuid`,`selected` FROM `account_minecraft` WHERE `account_id` = ?" bid
+getMinecraftListByBowBotId bid = minecraftListFromList <$> queryLogT [mysql|SELECT `minecraft_uuid`,`selected` FROM `account_minecraft` WHERE `account_id` = bid|]
 
 getDiscordIdsByMinecraft :: (MonadIOReader m r, Has Connection r) => UUID -> m [UserId]
-getDiscordIdsByMinecraft uuid = queryLog "SELECT `discord_id` FROM `account_discord` JOIN `account_minecraft` ON `account_minecraft`.`account_id`=`account_discord`.`account_id` WHERE `account_minecraft`.`minecraft_uuid` = ?" uuid
+getDiscordIdsByMinecraft uuid = queryLogT [mysql|SELECT `discord_id` FROM `account_discord` 
+  JOIN `account_minecraft` ON `account_id`=`account_discord`.`account_id` WHERE `account_minecraft`.`minecraft_uuid` = uuid|]
 
 getDiscordIdsByBowBotId :: (MonadIOReader m r, Has Connection r) => BowBotId -> m [UserId]
-getDiscordIdsByBowBotId bid = queryLog "SELECT `discord_id` FROM `account_discord` WHERE `account_id` = ?" bid
+getDiscordIdsByBowBotId bid = queryLogT [mysql|SELECT `discord_id` FROM `account_discord` WHERE `account_id` = bid|]
 
 getDiscordIdsByDiscord :: (MonadIOReader m r, Has Connection r) => UserId -> m [UserId]
-getDiscordIdsByDiscord uuid = queryLog "SELECT `account_discord2`.`discord_id` FROM `account_discord` JOIN `account_discord` AS `account_discord2` ON `account_discord`.`account_id` = `account_discord2`.`account_id` WHERE `account_discord`.`discord_id` = ?" uuid
+getDiscordIdsByDiscord did = queryLogT [mysql|SELECT `account_discord2`.`discord_id` FROM `account_discord` 
+  JOIN `account_discord` AS `account_discord2` ON `account_id` = `account_discord`.`account_id` WHERE `account_discord`.`discord_id` = did|]
 
 getBowBotIdByDiscord :: (MonadIOReader m r, Has Connection r) => UserId -> m (Maybe BowBotId)
-getBowBotIdByDiscord did = queryOnlyLog "SELECT `account_id` FROM `account_discord` WHERE `discord_id` = ?" did
+getBowBotIdByDiscord did = queryOnlyLogT [mysql|SELECT `account_id` FROM `account_discord` WHERE `discord_id` = did|]
 
 getBowBotIdByMinecraft :: (MonadIOReader m r, Has Connection r) => UUID -> m (Maybe BowBotId)
-getBowBotIdByMinecraft uuid = queryOnlyLog "SELECT `account_id` FROM `account_minecraft` WHERE `minecraft_uuid` = ?" uuid
+getBowBotIdByMinecraft uuid = queryOnlyLogT [mysql|SELECT `account_id` FROM `account_minecraft` WHERE `minecraft_uuid` = uuid|]

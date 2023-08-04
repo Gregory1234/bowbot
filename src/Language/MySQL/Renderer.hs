@@ -92,8 +92,12 @@ expressionRenderer (TypedVarExpr n _) = do
 expressionRenderer (TypedColExpr n _) = emit $ ppFullColumnName n
 expressionRenderer (TypedAndExpr e1 e2) = expressionRenderer e1 *> emit " AND " *> expressionRenderer e2
 expressionRenderer (TypedEqExpr e1 e2) = expressionRenderer e1 *> emit "=" *> expressionRenderer e2
+expressionRenderer (TypedGtExpr e1 e2) = expressionRenderer e1 *> emit ">" *> expressionRenderer e2
 expressionRenderer (TypedFunExpr (TypedFunction (FunName n) _ _) s) = emit n *> parensRenderer (listRenderer (map expressionRenderer s))
 expressionRenderer (TypedInExpr e1 e2) = listExpressionInRenderer e2 (expressionRenderer e1)
+expressionRenderer (TypedIsNullExpr e) = expressionRenderer e *> emit " IS NULL"
+expressionRenderer (TypedIsNotNullExpr e) = expressionRenderer e *> emit " IS NOT NULL"
+expressionRenderer (TypedOverrideExpr e _) = expressionRenderer e
 
 listExpressionInRenderer :: TypedListExpression -> StrRenderer () -> StrRenderer ()
 listExpressionInRenderer (TypedVarListExpr n) e = do
@@ -114,7 +118,7 @@ aliasedTableRenderer (AliasedTable t (Just a)) = emit $ ppTableName t ++ " AS " 
 
 tableJoinRenderer :: (AliasedTable, TableJoinOn) -> StrRenderer ()
 tableJoinRenderer (t@(AliasedTable tn ta), TableJoinOn c c') = 
-  aliasedTableRenderer t *> emit (ppTableName (fromMaybe tn ta) ++ "." ++ ppColumnName c ++ "=" ++ ppFullColumnName c')
+  aliasedTableRenderer t *> emit (" ON " ++ ppTableName (fromMaybe tn ta) ++ "." ++ ppColumnName c ++ "=" ++ ppFullColumnName c')
 
 joinTablesRenderer :: JoinTables -> StrRenderer ()
 joinTablesRenderer (JoinTables t ts) = joinSep " JOIN " $ aliasedTableRenderer t : map tableJoinRenderer ts

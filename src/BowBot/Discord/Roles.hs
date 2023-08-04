@@ -1,3 +1,5 @@
+{-# LANGUAGE QuasiQuotes #-}
+
 module BowBot.Discord.Roles where
 
 import qualified Data.Map as M
@@ -8,7 +10,7 @@ import BowBot.Discord.Utils
 import BowBot.Counter.Basic
 import BowBot.Account.Basic
 import qualified Data.HashMap.Strict as HM
-import BowBot.DB.Basic
+import BowBot.DB.Typed
 import BowBot.Hypixel.Guild
 import BowBot.Network.Basic
 import qualified Data.Text as T
@@ -39,7 +41,7 @@ giveRolesDivisionTitle gmem maxWins = do
 
 applyRolesDivisionTitleByBowBotId' :: (MonadIOReader m r, HasAll '[Connection, DiscordHandle, InfoCache] r) => BowBotId -> [GuildMember] -> m ()
 applyRolesDivisionTitleByBowBotId' bid gmems = do
-  wins :: [Integer] <- queryLog "SELECT `wins` FROM `hypixel_bow_stats` JOIN `account_minecraft` ON `hypixel_bow_stats`.`minecraft_uuid` = `account_minecraft`.`minecraft_uuid` WHERE `account_id` = ?" bid
+  wins :: [Integer] <- queryLogT [mysql|SELECT `wins` FROM `hypixel_bow_stats` JOIN `account_minecraft` ON `minecraft_uuid` = `hypixel_bow_stats`.`minecraft_uuid` WHERE `account_id` = bid|]
   for_ gmems $ \gmem -> do
     giveRolesDivisionTitle gmem (foldl' max 0 wins)
 
@@ -89,9 +91,10 @@ giveIllegalRole gmem = do
 
 applyRolesByBowBotId' :: (MonadIOReader m r, HasAll '[Connection, DiscordHandle, Manager, CounterState, InfoCache] r) => Maybe BowBotId -> [GuildMember] -> m ()
 applyRolesByBowBotId' (Just bid) gmems = do
-  wins :: [Integer] <- queryLog "SELECT `wins` FROM `hypixel_bow_stats` JOIN `account_minecraft` ON `hypixel_bow_stats`.`minecraft_uuid` = `account_minecraft`.`minecraft_uuid` WHERE `account_id` = ?" bid
-  savedRoles :: [SavedRole] <- fromMaybe [] <$> queryOnlyLog "SELECT `roles` FROM `account` WHERE `id` = ?" bid
-  hypixelRoles :: [HypixelRole] <- queryLog "SELECT `hypixel_role` FROM `minecraft` JOIN `account_minecraft` ON `account_minecraft`.`minecraft_uuid` = `minecraft`.`uuid` WHERE `account_minecraft`.`account_id` = ? AND `hypixel_role` IS NOT NULL" bid
+  wins :: [Integer] <- queryLogT [mysql|SELECT `wins` FROM `hypixel_bow_stats` JOIN `account_minecraft` ON `minecraft_uuid` = `hypixel_bow_stats`.`minecraft_uuid` WHERE `account_id` = bid|]
+  savedRoles :: [SavedRole] <- fromMaybe [] <$> queryOnlyLogT [mysql|SELECT `roles` FROM `account` WHERE `id` = bid|]
+  -- TODO: support smart casts for IS NOT NULL
+  hypixelRoles :: [HypixelRole] <- queryLogT [mysql|SELECT `hypixel_role` OVERRIDE HypixelRole FROM `minecraft` JOIN `account_minecraft` ON `minecraft_uuid` = `minecraft`.`uuid` WHERE `account_minecraft`.`account_id` = bid AND `hypixel_role` IS NOT NULL|]
   for_ gmems $ \gmem -> do
     giveSavedRoles gmem savedRoles (Just hypixelRoles)
     giveRolesDivisionTitle gmem (foldl' max 0 wins)
@@ -117,11 +120,12 @@ applyRoles gmem = do
 applyRolesAll :: (MonadIOReader m r, HasAll '[Connection, DiscordHandle, Manager, CounterState, InfoCache] r) => m ()
 applyRolesAll = do
   lb <- getHypixelBowLeaderboards
-  savedRoles :: M.Map UserId [SavedRole] <- M.fromList <$> queryLog_ "SELECT `discord_id`, `roles` FROM `account` JOIN `account_discord` ON `account`.`id` = `account_discord`.`account_id`"
+  -- TODO: support smart casts for IS NOT NULL
+  savedRoles :: M.Map UserId [SavedRole] <- M.fromList <$> queryLogT [mysql|SELECT `discord_id`, `roles` FROM `account` JOIN `account_discord` ON `account_id` = `account`.`id`|]
   gid <- askInfo discordGuildIdInfo
   gmems <- discordGuildMembers gid
-  roles :: [(UUID, HypixelRole)] <- queryLog_ "SELECT `uuid`, `hypixel_role` FROM `minecraft` WHERE `hypixel_role` IS NOT NULL"
-  accountMinecrafts :: M.Map UserId [UUID] <- M.map (map snd) . groupByToMap fst <$> queryLog_ "SELECT `account_discord`.`discord_id`, `account_minecraft`.`minecraft_uuid` FROM `account_minecraft` JOIN `account_discord` ON `account_discord`.`account_id` = `account_minecraft`.`account_id`"
+  roles :: [(UUID, HypixelRole)] <- queryLogT [mysql|SELECT `uuid`, `hypixel_role` OVERRIDE HypixelRole FROM `minecraft` WHERE `hypixel_role` IS NOT NULL|]
+  accountMinecrafts :: M.Map UserId [UUID] <- M.map (map snd) . groupByToMap fst <$> queryLogT [mysql|SELECT `account_discord`.`discord_id`, `account_minecraft`.`minecraft_uuid` FROM `account_minecraft` JOIN `account_discord` ON `account_id` = `account_minecraft`.`account_id`|]
   for_ gmems $ \gmem -> do
     let discord = maybe 0 userId (memberUser gmem)
     case accountMinecrafts M.!? discord of

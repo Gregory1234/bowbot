@@ -1,3 +1,5 @@
+{-# LANGUAGE QuasiQuotes #-}
+
 module BowBot.Discord.SavedRoles where
 
 import BowBot.Discord.Utils
@@ -6,7 +8,7 @@ import qualified Data.Map as M
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
 import Data.Bifunctor (first)
-import BowBot.DB.Basic
+import BowBot.DB.Typed
 import BowBot.Account.Basic
 import BowBot.Account.Register
 import qualified Database.MySQL.Base.Types as T
@@ -46,11 +48,11 @@ savedRolesFromIds roleids = do
 setSavedRolesByDiscord :: (MonadIOReader m r, Has Connection r) => UserId -> [SavedRole] -> m ()
 setSavedRolesByDiscord discord roles = do
   bid' <- if null roles then getBowBotIdByDiscord discord else getOrCreateDummyBowBotAccount discord -- NOTE: do not create an account if roles is empty
-  for_ bid' $ \bid -> executeLog "INSERT INTO `account` (`id`, `roles`) VALUES (?,?) ON DUPLICATE KEY UPDATE `roles`=VALUES(`roles`)" (bid, roles)
+  for_ bid' $ \bid -> executeLogT [mysql|INSERT INTO `account` (`id`, ^`roles`) VALUES (bid, roles)|]
 
 updateSavedRolesAll :: (MonadIOReader m r, HasAll '[Connection, DiscordHandle, InfoCache] r) => m ()
 updateSavedRolesAll = do
-  savedRoles :: M.Map UserId [SavedRole] <- M.fromList <$> queryLog_ "SELECT `discord_id`, `roles` FROM `account` JOIN `account_discord` ON `account`.`id` = `account_discord`.`account_id`"
+  savedRoles :: M.Map UserId [SavedRole] <- M.fromList <$> queryLogT [mysql|SELECT `discord_id`, `roles` FROM `account` JOIN `account_discord` ON `account_id` = `account`.`id`|]
   gid <- askInfo discordGuildIdInfo
   members <- discordGuildMembers gid
   for_ members $ \GuildMember {..} -> case memberUser of

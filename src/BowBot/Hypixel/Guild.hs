@@ -29,18 +29,16 @@ updateHypixelRoles = do
       case members' of
         Nothing -> return ()
         Just members -> do
-          known <- queryLog_ "SELECT `uuid` FROM `minecraft`"
+          known <- queryLogT [mysql|SELECT `uuid` FROM `minecraft`|]
           let unknown = map fst members \\ known
           names <- catMaybes <$> traverse (\x -> fmap (x,) <$> mojangUUIDToCurrentName x) unknown
           let toInsert = [MinecraftAccount {mcUUID, mcNames = [mcName, mcName <> "OldNamesCurrentlyNotKnown"]} | (mcUUID, mcName) <- names]
           b <- (>0) <$> executeLogT [mysql|INSERT INTO `minecraft`(MinecraftAccount) VALUES toInsert..|]
           c <- addMinecraftNames (map (\(u,n) -> (n,u)) names)
+          -- TODO: automatically cast to Maybe
           when ((b && c) || null unknown) $ void $ executeManyLog "INSERT INTO `minecraft` (`uuid`, `hypixel_role`) VALUES (?,?) ON DUPLICATE KEY UPDATE `hypixel_role`=VALUES(`hypixel_role`)" members
           void $ executeLog "UPDATE `minecraft` SET `hypixel_role` = NULL WHERE `uuid` NOT IN ?" (In (map fst members))
     _ -> return ()
 
-getHypixelRoleByUUID :: (MonadIOReader m r, HasAll '[Manager, CounterState, Connection] r) => UUID -> m (Maybe HypixelRole)
-getHypixelRoleByUUID uuid = queryOnlyLog "SELECT `hypixel_role` FROM `minecraft` WHERE `uuid` = ?" uuid
-
 getHypixelGuildMembers :: (MonadIOReader m r, HasAll '[Manager, CounterState, Connection] r) => m [UUID]
-getHypixelGuildMembers = queryLog_ "SELECT `uuid` FROM `minecraft` WHERE `hypixel_role` IS NOT NULL"
+getHypixelGuildMembers = queryLogT [mysql|SELECT `uuid` FROM `minecraft` WHERE `hypixel_role` IS NOT NULL|]

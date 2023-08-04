@@ -164,6 +164,11 @@ typecheckExpr (EqExpr e1 e2) t = do
   t1 <- typecheckExpr e1 Nothing
   t2 <- typecheckExpr e2 (Just (typedExprType t1))
   return $ TypedEqExpr t1 t2
+typecheckExpr (GtExpr e1 e2) t = do
+  for_ t $ partialTypeEqual boolType
+  t1 <- typecheckExpr e1 Nothing
+  t2 <- typecheckExpr e2 (Just (typedExprType t1))
+  return $ TypedGtExpr t1 t2
 typecheckExpr (FunExpr n e) t = do
   f@(TypedFunction (FunName strName) args ret) <- getTypedFunction n
   when (length args /= length e) $ fail $ arityMismatch (mkName strName) args e -- TODO: this is a hack
@@ -175,6 +180,16 @@ typecheckExpr (InExpr e1 e2) t = do
   t1 <- typecheckExpr e1 Nothing
   t2 <- typecheckListExpr e2 (typedExprType t1)
   return $ TypedInExpr t1 t2
+typecheckExpr (IsNullExpr e) t = do
+  for_ t $ partialTypeEqual boolType
+  TypedIsNullExpr <$> typecheckExpr e Nothing
+typecheckExpr (IsNotNullExpr e) t = do
+  for_ t $ partialTypeEqual boolType
+  TypedIsNotNullExpr <$> typecheckExpr e Nothing
+typecheckExpr (OverrideExpr e tUntyped) t' = do
+  t <- typecheckType tUntyped
+  for_ t' $ flip partialTypeEqual (RealType t)
+  TypedOverrideExpr <$> typecheckExpr e Nothing <*> pure t 
 
 data DefColumnsCol = DefColumnsCol UpdateOnDuplicateKey ColumnName | DefColumnsType TypeName deriving (Show, Eq)
 

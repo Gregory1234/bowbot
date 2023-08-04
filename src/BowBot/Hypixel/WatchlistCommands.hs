@@ -1,4 +1,5 @@
 {-# LANGUAGE QuasiQuotes #-}
+
 module BowBot.Hypixel.WatchlistCommands where
 
 import BowBot.Command

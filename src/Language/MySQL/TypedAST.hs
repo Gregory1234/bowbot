@@ -28,8 +28,12 @@ data TypedExpression
   | TypedColExpr FullColumnName Type
   | TypedAndExpr TypedExpression TypedExpression
   | TypedEqExpr TypedExpression TypedExpression
+  | TypedGtExpr TypedExpression TypedExpression
   | TypedFunExpr TypedFunction [TypedExpression]
   | TypedInExpr TypedExpression TypedListExpression
+  | TypedIsNullExpr TypedExpression
+  | TypedIsNotNullExpr TypedExpression
+  | TypedOverrideExpr TypedExpression Type
   deriving (Show, Eq)
 
 typedExprType :: TypedExpression -> PartialType
@@ -39,8 +43,12 @@ typedExprType (TypedVarExpr _ t) = t
 typedExprType (TypedColExpr _ t) = RealType t
 typedExprType (TypedAndExpr _ _) = boolType
 typedExprType (TypedEqExpr _ _) = boolType
+typedExprType (TypedGtExpr _ _) = boolType
 typedExprType (TypedFunExpr (TypedFunction _ _ t) _) = RealType t
 typedExprType (TypedInExpr _ _) = boolType
+typedExprType (TypedIsNullExpr _) = boolType
+typedExprType (TypedIsNotNullExpr _) = boolType
+typedExprType (TypedOverrideExpr _ t) = RealType t
 
 data TypedListExpression
   = TypedVarListExpr Name
