@@ -56,14 +56,20 @@ overrideExprParser = do
   e1 <- baseExpressionParser
   option e1 (OverrideExpr e1 <$> (reservedParser "OVERRIDE" *> typeParser))
 
+compOpParser :: Parser CompOp
+compOpParser = EqCompOp <$ reservedParser "="
+  <|> NeqCompOp <$ reservedParser "<>"
+  <|> LeqCompOp <$ reservedParser "<="
+  <|> GeqCompOp <$ reservedParser ">="
+  <|> LtCompOp <$ reservedParser "<"
+  <|> GtCompOp <$ reservedParser ">"
+
 boolCompExprParser :: Parser Expression
 boolCompExprParser = do
   e1 <- overrideExprParser
-  option e1 (EqExpr e1 <$> (reservedParser "=" *> overrideExprParser)
-    <|> GtExpr e1 <$> (reservedParser ">" *> overrideExprParser)
+  option e1 (CompExpr e1 <$> compOpParser <*> overrideExprParser
     <|> InExpr e1 <$> (reservedParser "IN" *> listExpressionParser)
-    <|> NotInExpr e1 <$> (reservedParser "NOT" *> reservedParser "IN" *> listExpressionParser)
-    <|> (reservedParser "IS" *> option (IsNullExpr e1) (IsNotNullExpr e1 <$ reservedParser "NOT") <* reservedParser "NULL"))
+    <|> NotInExpr e1 <$> (reservedParser "NOT" *> reservedParser "IN" *> listExpressionParser))
 
 expressionParser :: Parser Expression
 expressionParser = boolCompExprParser `chainl1` (reservedParser "AND" $> AndExpr)

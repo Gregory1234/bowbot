@@ -27,13 +27,10 @@ data TypedExpression
   | TypedVarExpr Name PartialType
   | TypedColExpr FullColumnName Type
   | TypedAndExpr TypedExpression TypedExpression
-  | TypedEqExpr TypedExpression TypedExpression
-  | TypedGtExpr TypedExpression TypedExpression
+  | TypedCompExpr TypedExpression CompOp TypedExpression
   | TypedFunExpr TypedFunction [TypedExpression]
   | TypedInExpr TypedExpression TypedListExpression
   | TypedNotInExpr TypedExpression TypedListExpression
-  | TypedIsNullExpr TypedExpression
-  | TypedIsNotNullExpr TypedExpression
   | TypedOverrideExpr TypedExpression Type
   | TypedNullExpr PartialType
   deriving (Show, Eq)
@@ -44,13 +41,10 @@ typedExprType (TypedIntExpr _ t) = t
 typedExprType (TypedVarExpr _ t) = t
 typedExprType (TypedColExpr _ t) = RealType t
 typedExprType (TypedAndExpr _ _) = boolType
-typedExprType (TypedEqExpr _ _) = boolType
-typedExprType (TypedGtExpr _ _) = boolType
+typedExprType (TypedCompExpr{}) = boolType
 typedExprType (TypedFunExpr (TypedFunction _ _ t) _) = RealType t
 typedExprType (TypedInExpr _ _) = boolType
 typedExprType (TypedNotInExpr _ _) = boolType
-typedExprType (TypedIsNullExpr _) = boolType
-typedExprType (TypedIsNotNullExpr _) = boolType
 typedExprType (TypedOverrideExpr _ t) = RealType t
 typedExprType (TypedNullExpr t) = t
 

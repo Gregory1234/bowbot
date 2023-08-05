@@ -82,6 +82,13 @@ addVar n t = do
       modify (M.insert n (n', t))
       return n'
   
+compOpRenderer :: CompOp -> StrRenderer ()
+compOpRenderer EqCompOp = emit "="
+compOpRenderer LtCompOp = emit "<"
+compOpRenderer GtCompOp = emit ">"
+compOpRenderer LeqCompOp = emit "<="
+compOpRenderer GeqCompOp = emit ">="
+compOpRenderer NeqCompOp = emit "<>"
 
 expressionRenderer :: TypedExpression -> StrRenderer ()
 expressionRenderer (TypedStringExpr e _) = emit e
@@ -91,13 +98,12 @@ expressionRenderer (TypedVarExpr n _) = do
   tell [VarE n']
 expressionRenderer (TypedColExpr n _) = emit $ ppFullColumnName n
 expressionRenderer (TypedAndExpr e1 e2) = expressionRenderer e1 *> emit " AND " *> expressionRenderer e2
-expressionRenderer (TypedEqExpr e1 e2) = expressionRenderer e1 *> emit "=" *> expressionRenderer e2
-expressionRenderer (TypedGtExpr e1 e2) = expressionRenderer e1 *> emit ">" *> expressionRenderer e2
+expressionRenderer (TypedCompExpr e1 EqCompOp (TypedNullExpr _)) = expressionRenderer e1 *> emit " IS NULL"
+expressionRenderer (TypedCompExpr e1 NeqCompOp (TypedNullExpr _)) = expressionRenderer e1 *> emit " IS NOT NULL" -- TODO: account for other weird behaviours of NULL
+expressionRenderer (TypedCompExpr e1 op e2) = expressionRenderer e1 *> compOpRenderer op *> expressionRenderer e2
 expressionRenderer (TypedFunExpr (TypedFunction (FunName n) _ _) s) = emit n *> parensRenderer (listRenderer (map expressionRenderer s))
 expressionRenderer (TypedInExpr e1 e2) = listExpressionInRenderer True e2 (expressionRenderer e1)
 expressionRenderer (TypedNotInExpr e1 e2) = listExpressionInRenderer False e2 (expressionRenderer e1)
-expressionRenderer (TypedIsNullExpr e) = expressionRenderer e *> emit " IS NULL"
-expressionRenderer (TypedIsNotNullExpr e) = expressionRenderer e *> emit " IS NOT NULL"
 expressionRenderer (TypedOverrideExpr e _) = expressionRenderer e
 expressionRenderer (TypedNullExpr _) = emit "NULL"
 

@@ -180,17 +180,11 @@ typecheckExpr (AndExpr e1 e2) t = do
   partialTypeEqual' t (Just boolType)
   TypedAndExpr <$> typecheckExpr e1 (Just $ StrictnessType EqStrict boolType) <*> typecheckExpr e2 (Just $ StrictnessType EqStrict boolType)
 
-typecheckExpr (EqExpr e1 e2) t = do
+typecheckExpr (CompExpr e1 op e2) t = do
   partialTypeEqual' t (Just boolType)
-  t1 <- typecheckExpr e1 Nothing
-  t2 <- typecheckExpr e2 (Just $ StrictnessType EqLax $ typedExprType t1)
-  return $ TypedEqExpr t1 t2
-
-typecheckExpr (GtExpr e1 e2) t = do
-  partialTypeEqual' t (Just boolType)
-  t1 <- typecheckExpr e1 Nothing
-  t2 <- typecheckExpr e2 (Just $ StrictnessType EqLax $ typedExprType t1)
-  return $ TypedGtExpr t1 t2
+  t1 <- typecheckExpr e1 Nothing -- TODO: dont allow comparison with null
+  t2 <- typecheckExpr e2 (Just $ StrictnessType EqLax $ typedExprType t1) -- TODO: make this strict for non-equality
+  return $ TypedCompExpr t1 op t2
 
 typecheckExpr (FunExpr n e) t = do
   f@(TypedFunction (FunName strName) args ret) <- getTypedFunction n
@@ -210,14 +204,6 @@ typecheckExpr (NotInExpr e1 e2) t = do
   t1 <- typecheckExpr e1 Nothing
   t2 <- typecheckListExpr e2 (StrictnessType EqLax $ typedExprType t1)
   return $ TypedNotInExpr t1 t2
-
-typecheckExpr (IsNullExpr e) t = do
-  partialTypeEqual' t (Just boolType)
-  TypedIsNullExpr <$> typecheckExpr e Nothing
-
-typecheckExpr (IsNotNullExpr e) t = do
-  partialTypeEqual' t (Just boolType)
-  TypedIsNotNullExpr <$> typecheckExpr e Nothing
 
 typecheckExpr (OverrideExpr e tUntyped) t' = do
   t <- typecheckType tUntyped

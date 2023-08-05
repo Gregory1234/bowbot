@@ -37,4 +37,4 @@ updateHypixelRoles = do
     _ -> return ()
 
 getHypixelGuildMembers :: (MonadIOReader m r, HasAll '[Manager, CounterState, Connection] r) => m [UUID]
-getHypixelGuildMembers = queryLogT [mysql|SELECT `uuid` FROM `minecraft` WHERE `hypixel_role` IS NOT NULL|]
+getHypixelGuildMembers = queryLogT [mysql|SELECT `uuid` FROM `minecraft` WHERE `hypixel_role` <> NULL|]

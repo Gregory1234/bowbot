@@ -19,19 +19,18 @@ ppFullColumnName :: FullColumnName -> String
 ppFullColumnName (FullColumnName Nothing c) = ppColumnName c
 ppFullColumnName (FullColumnName (Just t) c) = ppTableName t ++ "." ++ ppColumnName c
 
+data CompOp = EqCompOp | GtCompOp | LtCompOp | GeqCompOp | LeqCompOp | NeqCompOp deriving (Show, Eq)
+
 data Expression
   = StringExpr String (Maybe ParsedType)
   | IntExpr String (Maybe ParsedType)
   | VarExpr VarName (Maybe ParsedType)
   | ColExpr FullColumnName
   | AndExpr Expression Expression
-  | EqExpr Expression Expression
-  | GtExpr Expression Expression
+  | CompExpr Expression CompOp Expression
   | FunExpr FunName [Expression]
   | InExpr Expression ListExpression
-  | NotInExpr Expression ListExpression -- TODO: allow normal comparisons with null (have to render IS)
-  | IsNullExpr Expression
-  | IsNotNullExpr Expression
+  | NotInExpr Expression ListExpression
   | OverrideExpr Expression ParsedType
   | NullExpr (Maybe ParsedType)
   deriving (Show, Eq)

@@ -93,7 +93,7 @@ applyRolesByBowBotId' (Just bid) gmems = do
   wins :: [Integer] <- queryLogT [mysql|SELECT `wins` FROM `hypixel_bow_stats` JOIN `account_minecraft` ON `minecraft_uuid` = `hypixel_bow_stats`.`minecraft_uuid` WHERE `account_id` = bid|]
   savedRoles :: [SavedRole] <- fromMaybe [] <$> queryOnlyLogT [mysql|SELECT `roles` FROM `account` WHERE `id` = bid|]
   -- TODO: support smart casts for IS NOT NULL
-  hypixelRoles :: [HypixelRole] <- queryLogT [mysql|SELECT `hypixel_role` OVERRIDE HypixelRole FROM `minecraft` JOIN `account_minecraft` ON `minecraft_uuid` = `minecraft`.`uuid` WHERE `account_minecraft`.`account_id` = bid AND `hypixel_role` IS NOT NULL|]
+  hypixelRoles :: [HypixelRole] <- queryLogT [mysql|SELECT `hypixel_role` OVERRIDE HypixelRole FROM `minecraft` JOIN `account_minecraft` ON `minecraft_uuid` = `minecraft`.`uuid` WHERE `account_minecraft`.`account_id` = bid AND `hypixel_role` <> NULL|]
   for_ gmems $ \gmem -> do
     giveSavedRoles gmem savedRoles (Just hypixelRoles)
     giveRolesDivisionTitle gmem (foldl' max 0 wins)
@@ -123,7 +123,7 @@ applyRolesAll = do
   savedRoles :: M.Map UserId [SavedRole] <- M.fromList <$> queryLogT [mysql|SELECT `discord_id`, `roles` FROM `account` JOIN `account_discord` ON `account_id` = `account`.`id`|]
   gid <- askInfo discordGuildIdInfo
   gmems <- discordGuildMembers gid
-  roles :: [(UUID, HypixelRole)] <- queryLogT [mysql|SELECT `uuid`, `hypixel_role` OVERRIDE HypixelRole FROM `minecraft` WHERE `hypixel_role` IS NOT NULL|]
+  roles :: [(UUID, HypixelRole)] <- queryLogT [mysql|SELECT `uuid`, `hypixel_role` OVERRIDE HypixelRole FROM `minecraft` WHERE `hypixel_role` <> NULL|]
   accountMinecrafts :: M.Map UserId [UUID] <- M.map (map snd) . groupByToMap fst <$> queryLogT [mysql|SELECT `account_discord`.`discord_id`, `account_minecraft`.`minecraft_uuid` FROM `account_minecraft` JOIN `account_discord` ON `account_id` = `account_minecraft`.`account_id`|]
   for_ gmems $ \gmem -> do
     let discord = maybe 0 userId (memberUser gmem)

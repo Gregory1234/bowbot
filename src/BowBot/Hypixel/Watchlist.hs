@@ -23,7 +23,7 @@ clearOnlinePlayers = void $ executeLogT [mysql|UPDATE `watchlist` SET `online` =
 
 getOnlinePlayers :: (MonadIOReader m r, HasAll [Connection, Manager, CounterState] r) => m (Maybe [UUID])
 getOnlinePlayers = do
-  unknownPlayers :: [UUID] <- queryLogT [mysql|SELECT `minecraft_uuid` FROM `watchlist` WHERE `online` IS NULL|]
+  unknownPlayers :: [UUID] <- queryLogT [mysql|SELECT `minecraft_uuid` FROM `watchlist` WHERE `online` = NULL|]
   unless (null unknownPlayers) $ do
     ctx <- ask
     cv <- tryIncreaseCounter HypixelApi (fromIntegral $ length unknownPlayers)
