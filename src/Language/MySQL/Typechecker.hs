@@ -24,6 +24,7 @@ data TypecheckConstraint
   | VarIsInt Name
   | VarIsTuple Name [Name]
   | VarIsList Name Name
+  | VarNotNull Name
   deriving (Show, Eq)
 
 class (MonadIO m, MonadFail m) => MonadQ m where liftQ :: Q a -> m a
@@ -48,6 +49,16 @@ partialTypeIsInt (RealType t) = tell [TypeIsInt t]
 partialTypeIsInt (VarType t) = tell [VarIsInt t]
 partialTypeIsInt (TupleType _) = fail "Tuple type is never int!"
 
+partialTypeNotNull :: PartialType -> Typecheck ()
+partialTypeNotNull (RealType t@(AppT (ConT m) _)) | m == ''Maybe = fail $ "Type is nullable: " ++ show t ++ "!"
+partialTypeNotNull (RealType _) = pure ()
+partialTypeNotNull (VarType n) = tell [VarNotNull n]
+partialTypeNotNull (TupleType _) = pure ()
+
+removeMaybeFromType :: PartialType -> PartialType
+removeMaybeFromType (RealType (AppT (ConT m) v)) | m == ''Maybe = RealType v
+removeMaybeFromType x = x
+
 couldntMatchTypes :: PartialType -> PartialType -> String
 couldntMatchTypes t1 t2 = "Couldn't match types: " ++ show t1 ++ " and " ++ show t2 -- TODO: nicer errors?
 
@@ -59,7 +70,7 @@ partialTypeEqual :: (MonadWriter [TypecheckConstraint] m, MonadQ m) => Strictnes
 partialTypeEqual (StrictnessType s (RealType t1)) (RealType t2)
   | t1 == t2 = pure ()
   | t1 == AppT (ConT ''Maybe) t2 = pure ()
-  | s == EqLax, AppT (ConT ''Maybe) t1 == t2 = pure () -- TODO: make this better
+  | s == EqLax, AppT (ConT ''Maybe) t1 == t2 = pure ()
   | otherwise = fail $ couldntMatchTypes (RealType t1) (RealType t2)
 partialTypeEqual (StrictnessType EqStrict (RealType t1)) (VarType t2) = tell [NameHasType t1 t2]
 partialTypeEqual (StrictnessType EqLax (RealType t1)) (VarType t2) = tell [NameHasTypeLax t1 t2]
@@ -180,10 +191,24 @@ typecheckExpr (AndExpr e1 e2) t = do
   partialTypeEqual' t (Just boolType)
   TypedAndExpr <$> typecheckExpr e1 (Just $ StrictnessType EqStrict boolType) <*> typecheckExpr e2 (Just $ StrictnessType EqStrict boolType)
 
+typecheckExpr (EqExpr e1 op e2@(NullExpr _)) t = do
+  partialTypeEqual' t (Just boolType)
+  t1 <- typecheckExpr e1 Nothing
+  t2 <- typecheckExpr e2 (Just $ StrictnessType EqStrict $ typedExprType t1)
+  return $ TypedEqExpr t1 op t2
+typecheckExpr (EqExpr e1 op e2) t = do
+  partialTypeEqual' t (Just boolType)
+  t1 <- typecheckExpr e1 Nothing
+  t2 <- typecheckExpr e2 (Just $ StrictnessType EqStrict $ removeMaybeFromType $ typedExprType t1)
+  partialTypeNotNull $ typedExprType t2
+  return $ TypedEqExpr t1 op t2
+
 typecheckExpr (CompExpr e1 op e2) t = do
   partialTypeEqual' t (Just boolType)
-  t1 <- typecheckExpr e1 Nothing -- TODO: dont allow comparison with null
-  t2 <- typecheckExpr e2 (Just $ StrictnessType EqLax $ typedExprType t1) -- TODO: make this strict for non-equality
+  t1 <- typecheckExpr e1 Nothing
+  partialTypeNotNull $ typedExprType t1
+  t2 <- typecheckExpr e2 (Just $ StrictnessType EqStrict $ typedExprType t1)
+  partialTypeNotNull $ typedExprType t2
   return $ TypedCompExpr t1 op t2
 
 typecheckExpr (FunExpr n e) t = do

@@ -179,6 +179,10 @@ mkQuery :: r -> ByteString -> Query r
 mkQuery _ = Query
 {-# INLINE mkQuery #-}
 
+type family TypeNullable t :: Bool where
+  TypeNullable (Maybe _) = 'True
+  TypeNullable _ = 'False
+
 type family SqlTypeFits exp got :: Bool where
   SqlTypeFits exp exp = 'True
   SqlTypeFits (Maybe exp) exp = 'True
@@ -209,3 +213,7 @@ reqEqTypeLax _ _ = id
 reqEqTypeLax' :: SqlTypeEqLax t1 t2 ~ 'True => t2 -> a -> a
 reqEqTypeLax' _ = id
 {-# INLINE reqEqTypeLax' #-}
+
+reqNotNullable :: TypeNullable x ~ 'False => x -> a -> a
+reqNotNullable _ = id
+{-# INLINE reqNotNullable #-}

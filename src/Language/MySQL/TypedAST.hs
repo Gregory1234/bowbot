@@ -27,6 +27,7 @@ data TypedExpression
   | TypedVarExpr Name PartialType
   | TypedColExpr FullColumnName Type
   | TypedAndExpr TypedExpression TypedExpression
+  | TypedEqExpr TypedExpression EqOp TypedExpression
   | TypedCompExpr TypedExpression CompOp TypedExpression
   | TypedFunExpr TypedFunction [TypedExpression]
   | TypedInExpr TypedExpression TypedListExpression
@@ -41,6 +42,7 @@ typedExprType (TypedIntExpr _ t) = t
 typedExprType (TypedVarExpr _ t) = t
 typedExprType (TypedColExpr _ t) = RealType t
 typedExprType (TypedAndExpr _ _) = boolType
+typedExprType (TypedEqExpr{}) = boolType
 typedExprType (TypedCompExpr{}) = boolType
 typedExprType (TypedFunExpr (TypedFunction _ _ t) _) = RealType t
 typedExprType (TypedInExpr _ _) = boolType

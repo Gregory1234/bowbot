@@ -81,14 +81,16 @@ addVar n t = do
       n' <- liftQ $ newName (nameBase n ++ "Str")
       modify (M.insert n (n', t))
       return n'
+
+eqOpRenderer :: EqOp -> StrRenderer ()
+eqOpRenderer EqOp = emit "="
+eqOpRenderer NeqOp = emit "<>"
   
 compOpRenderer :: CompOp -> StrRenderer ()
-compOpRenderer EqCompOp = emit "="
-compOpRenderer LtCompOp = emit "<"
-compOpRenderer GtCompOp = emit ">"
-compOpRenderer LeqCompOp = emit "<="
-compOpRenderer GeqCompOp = emit ">="
-compOpRenderer NeqCompOp = emit "<>"
+compOpRenderer LtOp = emit "<"
+compOpRenderer GtOp = emit ">"
+compOpRenderer LeqOp = emit "<="
+compOpRenderer GeqOp = emit ">="
 
 expressionRenderer :: TypedExpression -> StrRenderer ()
 expressionRenderer (TypedStringExpr e _) = emit e
@@ -98,8 +100,9 @@ expressionRenderer (TypedVarExpr n _) = do
   tell [VarE n']
 expressionRenderer (TypedColExpr n _) = emit $ ppFullColumnName n
 expressionRenderer (TypedAndExpr e1 e2) = expressionRenderer e1 *> emit " AND " *> expressionRenderer e2
-expressionRenderer (TypedCompExpr e1 EqCompOp (TypedNullExpr _)) = expressionRenderer e1 *> emit " IS NULL"
-expressionRenderer (TypedCompExpr e1 NeqCompOp (TypedNullExpr _)) = expressionRenderer e1 *> emit " IS NOT NULL" -- TODO: account for other weird behaviours of NULL
+expressionRenderer (TypedEqExpr e1 EqOp (TypedNullExpr _)) = expressionRenderer e1 *> emit " IS NULL"
+expressionRenderer (TypedEqExpr e1 NeqOp (TypedNullExpr _)) = expressionRenderer e1 *> emit " IS NOT NULL" -- TODO: account for other weird behaviours of NULL
+expressionRenderer (TypedEqExpr e1 op e2) = expressionRenderer e1 *> eqOpRenderer op *> expressionRenderer e2
 expressionRenderer (TypedCompExpr e1 op e2) = expressionRenderer e1 *> compOpRenderer op *> expressionRenderer e2
 expressionRenderer (TypedFunExpr (TypedFunction (FunName n) _ _) s) = emit n *> parensRenderer (listRenderer (map expressionRenderer s))
 expressionRenderer (TypedInExpr e1 e2) = listExpressionInRenderer True e2 (expressionRenderer e1)
@@ -156,6 +159,7 @@ renderTypecheckConstraint (VarIsString n) e = [| reqMysqlString $(varE n) $e |]
 renderTypecheckConstraint (VarIsInt n) e = [| reqMysqlInt $(varE n) $e |]
 renderTypecheckConstraint (VarIsTuple n ns) e = [| let $(tupP (map varP ns)) = $(varE n) in $e |]
 renderTypecheckConstraint (VarIsList n n') e = [| let $(varP n') = head $(varE n) in $e |]
+renderTypecheckConstraint (VarNotNull n) e = [| reqNotNullable $(varE n) $e |]
 
 renderTypeInhabitant :: PartialType -> Q Exp
 renderTypeInhabitant (TupleType [t]) = renderTypeInhabitant t

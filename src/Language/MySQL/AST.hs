@@ -19,7 +19,9 @@ ppFullColumnName :: FullColumnName -> String
 ppFullColumnName (FullColumnName Nothing c) = ppColumnName c
 ppFullColumnName (FullColumnName (Just t) c) = ppTableName t ++ "." ++ ppColumnName c
 
-data CompOp = EqCompOp | GtCompOp | LtCompOp | GeqCompOp | LeqCompOp | NeqCompOp deriving (Show, Eq)
+data EqOp = EqOp | NeqOp deriving (Show, Eq)
+
+data CompOp = GtOp | LtOp | GeqOp | LeqOp deriving (Show, Eq)
 
 data Expression
   = StringExpr String (Maybe ParsedType)
@@ -27,6 +29,7 @@ data Expression
   | VarExpr VarName (Maybe ParsedType)
   | ColExpr FullColumnName
   | AndExpr Expression Expression
+  | EqExpr Expression EqOp Expression
   | CompExpr Expression CompOp Expression
   | FunExpr FunName [Expression]
   | InExpr Expression ListExpression
