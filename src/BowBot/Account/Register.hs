@@ -29,7 +29,7 @@ createDummyBowBotAccount did = do
 
 addFirstMinecraftAccount :: (MonadIOReader m r, Has Connection r) => BowBotId -> Text -> UUID -> m Bool
 addFirstMinecraftAccount bid name uuid = do
-  _ <- executeLog "UPDATE `account` SET `name` = ? WHERE `id` = ?" (name, bid)
+  _ <- executeLogT [mysql|UPDATE `account` SET `name` = name WHERE `id` = bid|]
   (>0) <$> executeLogT [mysql|INSERT INTO `account_minecraft`(`account_id`,`minecraft_uuid`,`type`,`selected`,`verified`) VALUES (bid, uuid, 'main', 1, 0)|]
 
 addAltToBowBotAccount :: (MonadIOReader m r, Has Connection r) => BowBotId -> UUID -> m Bool

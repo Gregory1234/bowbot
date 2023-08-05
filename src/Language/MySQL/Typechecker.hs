@@ -180,6 +180,11 @@ typecheckExpr (InExpr e1 e2) t = do
   t1 <- typecheckExpr e1 Nothing
   t2 <- typecheckListExpr e2 (typedExprType t1)
   return $ TypedInExpr t1 t2
+typecheckExpr (NotInExpr e1 e2) t = do
+  for_ t $ partialTypeEqual boolType
+  t1 <- typecheckExpr e1 Nothing
+  t2 <- typecheckListExpr e2 (typedExprType t1)
+  return $ TypedNotInExpr t1 t2
 typecheckExpr (IsNullExpr e) t = do
   for_ t $ partialTypeEqual boolType
   TypedIsNullExpr <$> typecheckExpr e Nothing
@@ -189,7 +194,14 @@ typecheckExpr (IsNotNullExpr e) t = do
 typecheckExpr (OverrideExpr e tUntyped) t' = do
   t <- typecheckType tUntyped
   for_ t' $ flip partialTypeEqual (RealType t)
-  TypedOverrideExpr <$> typecheckExpr e Nothing <*> pure t 
+  TypedOverrideExpr <$> typecheckExpr e Nothing <*> pure t
+typecheckExpr (NullExpr t1Untyped) t2 = do
+  t1 <- mapM typecheckType t1Untyped
+  for_ t1 $ \t1' -> for_ t2 $ \t2' -> partialTypeEqual (RealType t1') t2'
+  let t = RealType <$> t1 <|> t2
+  case t of
+    Nothing -> fail "Couldn't deduce type of NULL!"
+    Just t' -> return $ TypedNullExpr t'
 
 data DefColumnsCol = DefColumnsCol UpdateOnDuplicateKey ColumnName | DefColumnsType TypeName deriving (Show, Eq)
 
@@ -351,7 +363,23 @@ typecheckInsertQuery schemaAll funs dc (InsertQuery tn t s) = do
   s' <- typecheckInsertSouce schemaAll funs dc (typedInsertTargetType t') s
   return $ TypedInsertQuery tn t' s' (UpdateOnDuplicateList u)
 
+typecheckColumnUpdate :: ColumnUpdate -> Typecheck TypedColumnUpdate
+typecheckColumnUpdate (ColumnUpdate c e) = do
+  t <- getColumnType c
+  TypedColumnUpdate c <$> typecheckExpr e (Just (RealType t))
+
+typecheckUpdateQuery :: [(TableName, [(ColumnName, ParsedType)])] -> SqlFuns -> UpdateQuery -> EarlyTypecheck TypedUpdateQuery
+typecheckUpdateQuery schemaAll funs (UpdateQuery t u w) = do
+  schema <- typecheckJoinTables schemaAll funs t
+  flip runReaderT (schema, funs) $ TypedUpdateQuery t <$> mapM typecheckColumnUpdate u <*> typecheckWhereClause w
+
+typecheckDeleteQuery :: [(TableName, [(ColumnName, ParsedType)])] -> SqlFuns -> DeleteQuery -> EarlyTypecheck TypedDeleteQuery
+typecheckDeleteQuery schemaAll funs (DeleteQuery t w) = do
+  schema <- typecheckTableName schemaAll (AliasedTable t Nothing)
+  flip runReaderT (schema, funs) $ TypedDeleteQuery t <$> typecheckWhereClause w
 
 typecheckAnyQuery :: [(TableName, [(ColumnName, ParsedType)])] -> SqlFuns -> DefColumns -> AnyQuery -> EarlyTypecheck TypedAnyQuery
 typecheckAnyQuery schema funs dc (SelectAnyQuery q) = TypedSelectAnyQuery <$> typecheckSelectQuery schema funs dc Nothing q
 typecheckAnyQuery schema funs dc (InsertAnyQuery q) = TypedInsertAnyQuery <$> typecheckInsertQuery schema funs dc q
+typecheckAnyQuery schema funs _ (UpdateAnyQuery q) = TypedUpdateAnyQuery <$> typecheckUpdateQuery schema funs q
+typecheckAnyQuery schema funs _ (DeleteAnyQuery q) = TypedDeleteAnyQuery <$> typecheckDeleteQuery schema funs q

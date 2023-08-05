@@ -44,6 +44,7 @@ baseExpressionParser = StringExpr <$> withSpace (stringLit '"') <*> optionMaybe 
   <|> IntExpr <$> withSpace numberLit <*> optionMaybe typeParser
   <|> ColExpr <$> fullColumnNameParser
   <|> VarExpr <$> varNameParser <*> optionMaybe typeParser
+  <|> NullExpr <$> (reservedParser "NULL" *> optionMaybe typeParser)
   <|> FunExpr <$> funNameParser <*> parensParser (sepBy expressionParser commaParser)
 
 listExpressionParser :: Parser ListExpression
@@ -61,6 +62,7 @@ boolCompExprParser = do
   option e1 (EqExpr e1 <$> (reservedParser "=" *> overrideExprParser)
     <|> GtExpr e1 <$> (reservedParser ">" *> overrideExprParser)
     <|> InExpr e1 <$> (reservedParser "IN" *> listExpressionParser)
+    <|> NotInExpr e1 <$> (reservedParser "NOT" *> reservedParser "IN" *> listExpressionParser)
     <|> (reservedParser "IS" *> option (IsNullExpr e1) (IsNotNullExpr e1 <$ reservedParser "NOT") <* reservedParser "NULL"))
 
 expressionParser :: Parser Expression
@@ -122,6 +124,17 @@ insertSourceParser = ValuesSource <$> (reservedParser "VALUES" *> sepBy1 valuesR
 insertQueryParser :: Parser InsertQuery
 insertQueryParser = InsertQuery <$> (reservedParser "INSERT" *> reservedParser "INTO" *> tableNameParser) <*> (implicitTupleTarget <$> parensParser insertTargetListParser) <*> insertSourceParser
 
+columnUpdateParser :: Parser ColumnUpdate
+columnUpdateParser = ColumnUpdate <$> fullColumnNameParser <*> (reservedParser "=" *> expressionParser)
+
+updateQueryParser :: Parser UpdateQuery
+updateQueryParser = UpdateQuery <$> (reservedParser "UPDATE" *> joinTablesParser) <*> (reservedParser "SET" *> sepBy1 columnUpdateParser commaParser) <*> whereClauseParser
+
+deleteQueryParser :: Parser DeleteQuery
+deleteQueryParser = DeleteQuery <$> (reservedParser "DELETE" *> reservedParser "FROM" *> tableNameParser) <*> whereClauseParser
+
 anyQueryParser :: Parser AnyQuery
 anyQueryParser = SelectAnyQuery <$> selectQueryParser
   <|> InsertAnyQuery <$> insertQueryParser
+  <|> UpdateAnyQuery <$> updateQueryParser
+  <|> DeleteAnyQuery <$> deleteQueryParser

@@ -19,7 +19,7 @@ getWatchlistAccounts :: (MonadIOReader m r, Has Connection r) => m [MinecraftAcc
 getWatchlistAccounts = queryLogT [mysql|SELECT MinecraftAccount FROM `minecraft` JOIN `watchlist` ON `minecraft_uuid`=`minecraft`.`uuid`|]
 
 clearOnlinePlayers :: (MonadIOReader m r, Has Connection r) => m ()
-clearOnlinePlayers = void $ executeLog_ "UPDATE `watchlist` SET `online` = NULL"
+clearOnlinePlayers = void $ executeLogT [mysql|UPDATE `watchlist` SET `online` = NULL|]
 
 getOnlinePlayers :: (MonadIOReader m r, HasAll [Connection, Manager, CounterState] r) => m (Maybe [UUID])
 getOnlinePlayers = do

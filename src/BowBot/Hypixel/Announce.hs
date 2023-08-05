@@ -29,7 +29,7 @@ getHypixelBowMilestones = do
   milestoneNames <- askInfo milestoneNamesInfo
   milestonePairs <- liftIO $ (`runReaderT` ctx) $ withTransaction $ do
     res :: [(UUID, Integer, Integer)] <- queryLogT [mysql|SELECT `minecraft_uuid`, `announcement_wins` OVERRIDE Integer, `wins` FROM `hypixel_bow_stats` WHERE `announcement_wins` IS NOT NULL AND `wins` > `announcement_wins` OVERRIDE Integer|]
-    void $ executeLog_ "UPDATE `hypixel_bow_stats` SET `announcement_wins`=`wins`"
+    void $ executeLogT [mysql|UPDATE `hypixel_bow_stats` SET `announcement_wins`=`wins` OVERRIDE (Maybe Integer)|]
     return res
   return [(uuid, milestone) | (uuid, low, high) <- milestonePairs, milestone <- milestoneNamesFromWins milestoneNames low high]
 

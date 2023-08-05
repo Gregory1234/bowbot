@@ -37,7 +37,8 @@ updateHypixelRoles = do
           c <- addMinecraftNames (map (\(u,n) -> (n,u)) names)
           -- TODO: automatically cast to Maybe
           when ((b && c) || null unknown) $ void $ executeManyLog "INSERT INTO `minecraft` (`uuid`, `hypixel_role`) VALUES (?,?) ON DUPLICATE KEY UPDATE `hypixel_role`=VALUES(`hypixel_role`)" members
-          void $ executeLog "UPDATE `minecraft` SET `hypixel_role` = NULL WHERE `uuid` NOT IN ?" (In (map fst members))
+          let memberUUIDs = map fst members
+          void $ executeLogT [mysql|UPDATE `minecraft` SET `hypixel_role` = NULL WHERE `uuid` NOT IN memberUUIDs|]
     _ -> return ()
 
 getHypixelGuildMembers :: (MonadIOReader m r, HasAll '[Manager, CounterState, Connection] r) => m [UUID]

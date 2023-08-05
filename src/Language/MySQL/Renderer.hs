@@ -94,18 +94,26 @@ expressionRenderer (TypedAndExpr e1 e2) = expressionRenderer e1 *> emit " AND " 
 expressionRenderer (TypedEqExpr e1 e2) = expressionRenderer e1 *> emit "=" *> expressionRenderer e2
 expressionRenderer (TypedGtExpr e1 e2) = expressionRenderer e1 *> emit ">" *> expressionRenderer e2
 expressionRenderer (TypedFunExpr (TypedFunction (FunName n) _ _) s) = emit n *> parensRenderer (listRenderer (map expressionRenderer s))
-expressionRenderer (TypedInExpr e1 e2) = listExpressionInRenderer e2 (expressionRenderer e1)
+expressionRenderer (TypedInExpr e1 e2) = listExpressionInRenderer True e2 (expressionRenderer e1)
+expressionRenderer (TypedNotInExpr e1 e2) = listExpressionInRenderer False e2 (expressionRenderer e1)
 expressionRenderer (TypedIsNullExpr e) = expressionRenderer e *> emit " IS NULL"
 expressionRenderer (TypedIsNotNullExpr e) = expressionRenderer e *> emit " IS NOT NULL"
 expressionRenderer (TypedOverrideExpr e _) = expressionRenderer e
+expressionRenderer (TypedNullExpr _) = emit "NULL"
 
-listExpressionInRenderer :: TypedListExpression -> StrRenderer () -> StrRenderer ()
-listExpressionInRenderer (TypedVarListExpr n) e = do
+listExpressionInRenderer :: Bool -> TypedListExpression -> StrRenderer () -> StrRenderer ()
+listExpressionInRenderer True (TypedVarListExpr n) e = do
   n' <- addVar n ListVar
   e' <- reifyRender e
   emitQ [| if null $(varE n') then "0" else $(pure e') <> " IN (" <> BS.intercalate "," $(varE n') <> ")" |]
-listExpressionInRenderer (TypedListExpr []) _ = emit "0"
-listExpressionInRenderer (TypedListExpr s) e = e *> emit " IN " *> parensRenderer (listRenderer (map expressionRenderer s))
+listExpressionInRenderer True (TypedListExpr []) _ = emit "0"
+listExpressionInRenderer True (TypedListExpr s) e = e *> emit " IN " *> parensRenderer (listRenderer (map expressionRenderer s))
+listExpressionInRenderer False (TypedVarListExpr n) e = do
+  n' <- addVar n ListVar
+  e' <- reifyRender e
+  emitQ [| if null $(varE n') then "1" else $(pure e') <> " NOT IN (" <> BS.intercalate "," $(varE n') <> ")" |]
+listExpressionInRenderer False (TypedListExpr []) _ = emit "1"
+listExpressionInRenderer False (TypedListExpr s) e = e *> emit " NOT IN " *> parensRenderer (listRenderer (map expressionRenderer s))
 
 
 complexExpressionRenderer :: TypedComplexExpression -> StrRenderer ()
@@ -150,12 +158,16 @@ renderVar :: Name -> Name -> Name -> TypeOfVar -> Q Stmt
 renderVar conn origName strName SingleVar = bindS (varP strName) [| toMysql $(varE conn) $(varE origName) |]
 renderVar conn origName strName ListVar = bindS (varP strName) [| mapM (toMysql $(varE conn)) $(varE origName) |]
 
+renderQuery :: [TypecheckConstraint] -> M.Map Name (Name, TypeOfVar) -> Q Exp -> Q Exp
+renderQuery tc vars q = do
+  conn <- newName "conn"
+  lam1E (if null vars then wildP else varP conn) $ doE $ map (\(origName, (strName, varType)) -> renderVar conn origName strName varType) (M.toList vars)
+    ++ [noBindS $ foldr renderTypecheckConstraint [| return $q |] tc]
+
 renderSelectQuery :: TypedSelectQuery -> [TypecheckConstraint] -> Q Exp
 renderSelectQuery q@(TypedSelectQuery s _ _) tc = do
-  conn <- newName "conn"
   (str, vars) <- runStateT (runRenderer $ runStrRenderer $ selectQueryStringRenderer q) M.empty
-  lam1E (if null vars then wildP else varP conn) $ doE $ map (\(origName, (strName, varType)) -> renderVar conn origName strName varType) (M.toList vars)
-    ++ [noBindS $ foldr renderTypecheckConstraint [| return (mkQuery $(renderTypeInhabitant (typedComplexExprType s)) $(pure str)) |] tc]
+  renderQuery tc vars [| mkQuery $(renderTypeInhabitant (typedComplexExprType s)) $(pure str) |]
 
 insertTargetRenderer :: TypedInsertTarget -> StrRenderer ()
 insertTargetRenderer (TypedColTarget c _) = emit $ ppColumnName c
@@ -201,16 +213,35 @@ insertQueryStringRenderer (TypedInsertQuery tn t s u) = withSpaces [emit "INSERT
 
 insertSourceCheckRenderer :: TypedInsertSource -> Q Exp -> Q Exp
 insertSourceCheckRenderer (TypedValuesSource (mapM (\case (TypedValuesRowVar n ValuesRowMany) -> Just n; _ -> Nothing) -> Just lists)) e 
-  = [| if $(foldl1 (\a b -> [| $a && $b |]) (map (\n -> [| null $(varE n) |]) lists)) then return (Command Nothing) else $e |]
+  = [| if $(foldl1 (\a b -> [| $a && $b |]) (map (\n -> [| null $(varE n) |]) lists)) then \_ -> return (Command Nothing) else $e |]
 insertSourceCheckRenderer _ e = e
 
 renderInsertQuery :: TypedInsertQuery -> [TypecheckConstraint] -> Q Exp
 renderInsertQuery q@(TypedInsertQuery _ _ s _) tc = do
-  conn <- newName "conn"
   (str, vars) <- runStateT (runRenderer $ runStrRenderer $ insertQueryStringRenderer q) M.empty
-  lam1E (if null vars then wildP else varP conn) $ insertSourceCheckRenderer s $ doE $ map (\(origName, (strName, varType)) -> renderVar conn origName strName varType) (M.toList vars)
-    ++ [noBindS $ foldr renderTypecheckConstraint [| return (Command (Just $(pure str))) |] tc]
+  insertSourceCheckRenderer s $ renderQuery tc vars [| Command (Just $(pure str)) |]
+
+columnUpdateRenderer :: TypedColumnUpdate -> StrRenderer ()
+columnUpdateRenderer (TypedColumnUpdate c e) = emit (ppFullColumnName c ++ "=") *> expressionRenderer e
+
+updateQueryStringRenderer :: TypedUpdateQuery -> StrRenderer ()
+updateQueryStringRenderer (TypedUpdateQuery t u w) = withSpaces [emit "UPDATE", joinTablesRenderer t, emit "SET", listRenderer $ map columnUpdateRenderer u, whereClauseRenderer w]
+
+renderUpdateQuery :: TypedUpdateQuery -> [TypecheckConstraint] -> Q Exp
+renderUpdateQuery q tc = do
+  (str, vars) <- runStateT (runRenderer $ runStrRenderer $ updateQueryStringRenderer q) M.empty
+  renderQuery tc vars [| Command (Just $(pure str)) |]
+
+deleteQueryStringRenderer :: TypedDeleteQuery -> StrRenderer ()
+deleteQueryStringRenderer (TypedDeleteQuery t w) = withSpaces [emit $ "DELETE FROM " ++ ppTableName t, whereClauseRenderer w]
+
+renderDeleteQuery :: TypedDeleteQuery -> [TypecheckConstraint] -> Q Exp
+renderDeleteQuery q tc = do
+  (str, vars) <- runStateT (runRenderer $ runStrRenderer $ deleteQueryStringRenderer q) M.empty
+  renderQuery tc vars [| Command (Just $(pure str)) |]
 
 renderAnyQuery :: TypedAnyQuery -> [TypecheckConstraint] -> Q Exp
 renderAnyQuery (TypedSelectAnyQuery q) = renderSelectQuery q
 renderAnyQuery (TypedInsertAnyQuery q) = renderInsertQuery q
+renderAnyQuery (TypedUpdateAnyQuery q) = renderUpdateQuery q
+renderAnyQuery (TypedDeleteAnyQuery q) = renderDeleteQuery q

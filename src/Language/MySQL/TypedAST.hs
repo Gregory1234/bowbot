@@ -31,9 +31,11 @@ data TypedExpression
   | TypedGtExpr TypedExpression TypedExpression
   | TypedFunExpr TypedFunction [TypedExpression]
   | TypedInExpr TypedExpression TypedListExpression
+  | TypedNotInExpr TypedExpression TypedListExpression
   | TypedIsNullExpr TypedExpression
   | TypedIsNotNullExpr TypedExpression
   | TypedOverrideExpr TypedExpression Type
+  | TypedNullExpr PartialType
   deriving (Show, Eq)
 
 typedExprType :: TypedExpression -> PartialType
@@ -46,9 +48,11 @@ typedExprType (TypedEqExpr _ _) = boolType
 typedExprType (TypedGtExpr _ _) = boolType
 typedExprType (TypedFunExpr (TypedFunction _ _ t) _) = RealType t
 typedExprType (TypedInExpr _ _) = boolType
+typedExprType (TypedNotInExpr _ _) = boolType
 typedExprType (TypedIsNullExpr _) = boolType
 typedExprType (TypedIsNotNullExpr _) = boolType
 typedExprType (TypedOverrideExpr _ t) = RealType t
+typedExprType (TypedNullExpr t) = t
 
 data TypedListExpression
   = TypedVarListExpr Name
@@ -92,8 +96,16 @@ newtype UpdateOnDuplicateList = UpdateOnDuplicateList [ColumnName] deriving (Sho
 
 data TypedInsertQuery = TypedInsertQuery TableName TypedInsertTarget TypedInsertSource UpdateOnDuplicateList deriving (Show, Eq)
 
+data TypedColumnUpdate = TypedColumnUpdate FullColumnName TypedExpression deriving (Show, Eq)
+
+data TypedUpdateQuery = TypedUpdateQuery JoinTables [TypedColumnUpdate] TypedWhereClause deriving (Show, Eq)
+
+data TypedDeleteQuery = TypedDeleteQuery TableName TypedWhereClause deriving (Show, Eq)
+
 data TypedAnyQuery
   = TypedSelectAnyQuery TypedSelectQuery
   | TypedInsertAnyQuery TypedInsertQuery
+  | TypedUpdateAnyQuery TypedUpdateQuery
+  | TypedDeleteAnyQuery TypedDeleteQuery
   deriving (Show, Eq)
   

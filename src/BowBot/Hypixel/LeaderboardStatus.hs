@@ -35,7 +35,7 @@ getHypixelIsBannedByUUID :: (MonadIOReader m r, Has Connection r) => UUID -> m I
 getHypixelIsBannedByUUID uuid = fromMaybe NotBanned <$> queryOnlyLogT [mysql|SELECT `hypixel` FROM `minecraft` WHERE `uuid` = uuid|]
 
 setHypixelIsBannedByUUID :: (MonadIOReader m r, Has Connection r) => UUID -> IsBanned -> m Bool
-setHypixelIsBannedByUUID uuid banned = (>0) <$> executeLog "UPDATE `minecraft` SET `hypixel` = ? WHERE `uuid` = ?" (banned, uuid)
+setHypixelIsBannedByUUID uuid banned = (>0) <$> executeLogT [mysql|UPDATE `minecraft` SET `hypixel` = banned WHERE `uuid` = uuid|]
 
 getHypixelUnbanned :: (MonadIOReader m r, Has Connection r) => m [UUID]
 getHypixelUnbanned = queryLogT [mysql|SELECT `uuid` FROM `minecraft` WHERE `hypixel` = 'normal'|]

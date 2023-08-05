@@ -29,9 +29,11 @@ data Expression
   | GtExpr Expression Expression
   | FunExpr FunName [Expression]
   | InExpr Expression ListExpression
+  | NotInExpr Expression ListExpression -- TODO: allow normal comparisons with null (have to render IS)
   | IsNullExpr Expression
   | IsNotNullExpr Expression
   | OverrideExpr Expression ParsedType
+  | NullExpr (Maybe ParsedType)
   deriving (Show, Eq)
 
 data ListExpression
@@ -84,7 +86,15 @@ data InsertSource
 
 data InsertQuery = InsertQuery TableName InsertTarget InsertSource deriving (Show, Eq)
 
+data ColumnUpdate = ColumnUpdate FullColumnName Expression deriving (Show, Eq)
+
+data UpdateQuery = UpdateQuery JoinTables [ColumnUpdate] WhereClause deriving (Show, Eq)
+
+data DeleteQuery = DeleteQuery TableName WhereClause deriving (Show, Eq)
+
 data AnyQuery
   = SelectAnyQuery SelectQuery
   | InsertAnyQuery InsertQuery
+  | UpdateAnyQuery UpdateQuery
+  | DeleteAnyQuery DeleteQuery
   deriving (Show, Eq)

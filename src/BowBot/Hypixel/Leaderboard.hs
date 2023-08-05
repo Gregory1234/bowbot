@@ -72,4 +72,4 @@ setHypixelBowLeaderboardEntryByUUID :: (MonadIOReader m r, Has Connection r) => 
 setHypixelBowLeaderboardEntryByUUID uuid entry = (>0) <$> executeLogT [mysql|INSERT INTO `hypixel_bow_stats`(`minecraft_uuid`, HypixelBowLeaderboardEntry) VALUES (uuid,entry)|]
 
 removeHypixelBowLeaderboardEntryByUUID :: (MonadIOReader m r, Has Connection r) => UUID -> m Bool
-removeHypixelBowLeaderboardEntryByUUID uuid = (>0) <$> executeLog "DELETE FROM `hypixel_bow_stats` WHERE `minecraft` = ?" uuid
+removeHypixelBowLeaderboardEntryByUUID uuid = (>0) <$> executeLogT [mysql|DELETE FROM `hypixel_bow_stats` WHERE `minecraft_uuid` = uuid|]
