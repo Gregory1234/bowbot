@@ -1,4 +1,5 @@
 {-# LANGUAGE AllowAmbiguousTypes #-}
+{-# LANGUAGE TypeFamilies #-}
 
 module Language.MySQL.Query(
   module Language.MySQL.Query, Q.Connection, Q.Param(..), Q.Result(..), StateT(..)
@@ -178,10 +179,33 @@ mkQuery :: r -> ByteString -> Query r
 mkQuery _ = Query
 {-# INLINE mkQuery #-}
 
-reqEqType :: a -> a -> b -> b
-reqEqType _ _ = id
-{-# INLINE reqEqType #-}
+type family SqlTypeFits exp got :: Bool where
+  SqlTypeFits exp exp = 'True
+  SqlTypeFits (Maybe exp) exp = 'True
+  SqlTypeFits _ _ = 'False -- TODO: make type errors better
 
-reqEqType' :: a -> b -> b
-reqEqType' _ = id
-{-# INLINE reqEqType' #-}
+type family SqlTypeEqLax t1 t2 :: Bool where
+  SqlTypeEqLax (Maybe t1) t2 = SqlTypeEqLax t1 t2
+  SqlTypeEqLax t1 (Maybe t2) = SqlTypeEqLax t1 t2
+  SqlTypeEqLax t t = 'True
+  SqlTypeEqLax _ _ = 'False
+
+reqSqlTypeFits :: SqlTypeFits exp got ~ 'True => exp -> got -> a -> a
+reqSqlTypeFits _ _ = id
+{-# INLINE reqSqlTypeFits #-}
+
+reqSqlTypeFits1 :: forall got exp a. SqlTypeFits exp got ~ 'True => exp -> a -> a
+reqSqlTypeFits1 _ = id
+{-# INLINE reqSqlTypeFits1 #-}
+
+reqSqlTypeFits2 :: forall exp got a. SqlTypeFits exp got ~ 'True => got -> a -> a
+reqSqlTypeFits2 _ = id
+{-# INLINE reqSqlTypeFits2 #-}
+
+reqEqTypeLax :: SqlTypeEqLax t1 t2 ~ 'True => t1 -> t2 -> a -> a
+reqEqTypeLax _ _ = id
+{-# INLINE reqEqTypeLax #-}
+
+reqEqTypeLax' :: SqlTypeEqLax t1 t2 ~ 'True => t2 -> a -> a
+reqEqTypeLax' _ = id
+{-# INLINE reqEqTypeLax' #-}

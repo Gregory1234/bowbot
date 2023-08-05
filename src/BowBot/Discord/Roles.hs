@@ -11,13 +11,12 @@ import BowBot.Counter.Basic
 import BowBot.Account.Basic
 import qualified Data.HashMap.Strict as HM
 import BowBot.DB.Typed
-import BowBot.Hypixel.Guild
 import BowBot.Network.Basic
 import qualified Data.Text as T
 import Data.Bifunctor (first)
 import BowBot.Minecraft.Basic (UUID)
 import BowBot.Discord.SavedRoles
-
+import BowBot.Hypixel.Basic
 
 
 divisionTitleRolesInfo :: InfoType [(Integer, RoleId)]

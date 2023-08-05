@@ -12,7 +12,7 @@ import BowBot.DB.Typed
 import BowBot.Account.Basic
 import BowBot.Account.Register
 import qualified Database.MySQL.Base.Types as T
-import BowBot.Hypixel.Guild
+import BowBot.Hypixel.Basic
 
 toggleableRolesInfo :: InfoType (M.Map SavedRole RoleId)
 toggleableRolesInfo = InfoType { infoName = "toggleable_roles", infoDefault = M.empty, infoParse = \s -> fmap M.fromList $ for (T.lines s) $ \l -> case T.splitOn "->" l of [a, b] -> (SavedRole a,) <$> fmap fromInteger ((first pack . readEither . unpack) b); _ -> Left "wrong format" }

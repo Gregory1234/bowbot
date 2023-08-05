@@ -1,9 +1,10 @@
 module BowBot.Hypixel.Basic where
 
 import BowBot.Minecraft.Basic (UUID(..))
-import BowBot.Network.Basic
+import BowBot.Network.Basic hiding (Result)
 import BowBot.Utils
 import BowBot.Counter.Basic
+import BowBot.DB.Basic
 
 data HypixelApi = HypixelApi
 
@@ -26,8 +27,12 @@ hypixelWithPlayerStatus (UUID uuid) f = do
   let cleanUrl = "https://api.hypixel.net/status?key=[REDACTED]&uuid=" <> uuid
   res <- sendRequestTo url cleanUrl
   decodeParse res f
-  
-hypixelGuildMemberList :: (MonadIOReader m r, Has Manager r) => Text -> m (Maybe [(UUID, Text)])
+
+newtype HypixelRole = HypixelRole { fromHypixelRole :: Text }
+  deriving (Eq, Ord, Show)
+  deriving newtype (Param, Result, FromMysql, ToMysql)
+
+hypixelGuildMemberList :: (MonadIOReader m r, Has Manager r) => Text -> m (Maybe [(UUID, HypixelRole)])
 hypixelGuildMemberList gid = do
   apiKey <- liftIO $ maybe "" pack <$> getEnv "HYPIXEL_API"
   let url = "https://api.hypixel.net/guild?key=" <> apiKey <> "&id=" <> gid
@@ -39,4 +44,4 @@ hypixelGuildMemberList gid = do
     for members $ \m -> do
       uuid <- UUID <$> m .: "uuid"
       rank <- m .: "rank"
-      return (uuid, rank)
+      return (uuid, HypixelRole rank)

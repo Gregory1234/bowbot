@@ -139,8 +139,11 @@ selectQueryStringRenderer :: TypedSelectQuery -> StrRenderer ()
 selectQueryStringRenderer (TypedSelectQuery s t w) = withSpaces [emit "SELECT", complexExpressionRenderer s, emit "FROM", joinTablesRenderer t, whereClauseRenderer w]
 
 renderTypecheckConstraint :: TypecheckConstraint -> Q Exp -> Q Exp
-renderTypecheckConstraint (NameHasType n t) e = [| reqEqType' @($(pure t)) $(varE n) $e |]
-renderTypecheckConstraint (NameTypesEq n1 n2) e = [| reqEqType $(varE n1) $(varE n2) $e |]
+renderTypecheckConstraint (NameHasType t n) e = [| reqSqlTypeFits2 @($(pure t)) $(varE n) $e |]
+renderTypecheckConstraint (NameFitsType n t) e = [| reqSqlTypeFits1 @($(pure t)) $(varE n) $e |]
+renderTypecheckConstraint (NameTypesEq n1 n2) e = [| reqSqlTypeFits $(varE n1) $(varE n2) $e |]
+renderTypecheckConstraint (NameHasTypeLax t n) e = [| reqEqTypeLax' @($(pure t)) $(varE n) $e |]
+renderTypecheckConstraint (NameTypesEqLax n1 n2) e = [| reqEqTypeLax $(varE n1) $(varE n2) $e |]
 renderTypecheckConstraint (TypeIsString t) e = [| reqMysqlString' @($(pure t)) $e |]
 renderTypecheckConstraint (TypeIsInt t) e = [| reqMysqlInt' @($(pure t)) $e |]
 renderTypecheckConstraint (VarIsString n) e = [| reqMysqlString $(varE n) $e |]
