@@ -17,10 +17,17 @@ import Data.Bifunctor (first)
 import BowBot.Minecraft.Basic (UUID)
 import BowBot.Discord.SavedRoles
 import BowBot.Hypixel.Basic
+import Data.Ord (Down(..))
 
 
 divisionTitleRolesInfo :: InfoType [(Integer, RoleId)]
 divisionTitleRolesInfo = InfoType { infoName = "division_title_roles", infoDefault = [], infoParse = \s -> for (T.lines s) $ \l -> case T.splitOn "->" l of [a, b] -> (,) <$> (first pack . readEither . unpack) a <*> fmap fromInteger ((first pack . readEither . unpack) b); _ -> Left "wrong format" }
+
+bowWinsLbSpotRolesInfo :: InfoType [(Integer, RoleId)]
+bowWinsLbSpotRolesInfo = InfoType { infoName = "bow_wins_lb_spot_roles", infoDefault = [], infoParse = \s -> for (T.lines s) $ \l -> case T.splitOn "->" l of [a, b] -> (,) <$> (first pack . readEither . unpack) a <*> fmap fromInteger ((first pack . readEither . unpack) b); _ -> Left "wrong format" }
+
+bowWinstreakLbSpotRolesInfo :: InfoType [(Integer, RoleId)]
+bowWinstreakLbSpotRolesInfo = InfoType { infoName = "bow_winstreak_lb_spot_roles", infoDefault = [], infoParse = \s -> for (T.lines s) $ \l -> case T.splitOn "->" l of [a, b] -> (,) <$> (first pack . readEither . unpack) a <*> fmap fromInteger ((first pack . readEither . unpack) b); _ -> Left "wrong format" }
 
 illegalRoleInfo :: InfoType RoleId
 illegalRoleInfo = InfoType { infoName = "illegal_role", infoDefault = 0, infoParse = fmap fromInteger . (first pack . readEither . unpack) }
@@ -82,9 +89,11 @@ giveIllegalRole gmem = do
   memberRole <- askInfo memberRoleInfo
   savedHypixelRoles <- map (snd . snd) . M.toList <$> askInfo savedHypixelRolesInfo
   divisionTitleRoles <- map snd <$> askInfo divisionTitleRolesInfo
+  winsLbRoles <- map snd <$> askInfo bowWinsLbSpotRolesInfo
+  winstreakLbRoles <- map snd <$> askInfo bowWinstreakLbSpotRolesInfo
   illegalRole <- askInfo illegalRoleInfo
   gid <- askInfo discordGuildIdInfo
-  addRemoveDiscordRoles gid gmem [illegalRole] $ [illegalRole | not . null $ intersect (memberRoles gmem) (memberRole:savedHypixelRoles ++ divisionTitleRoles)]
+  addRemoveDiscordRoles gid gmem [illegalRole] $ [illegalRole | not . null $ intersect (memberRoles gmem) (memberRole:savedHypixelRoles ++ divisionTitleRoles ++ winsLbRoles ++ winstreakLbRoles)]
 
 -- TODO: clean this up
 
@@ -138,3 +147,26 @@ applyRolesAll = do
         giveRolesDivisionTitle gmem (foldl' max 0 (mapMaybe (fmap bowLbWins . (lb HM.!?)) mcs))
         giveRolesMember gmem (not $ null hypixelRoles)
         removeIllegalRole gmem
+  applyLeaderboardRoles gmems accountMinecrafts
+
+applyLeaderboardRolesSingle :: (MonadIOReader m r, HasAll '[DiscordHandle, InfoCache] r) => [GuildMember] -> M.Map UserId [UUID] -> M.Map UUID Integer -> [(Integer, RoleId)] -> m ()
+applyLeaderboardRolesSingle gmems accountMinecrafts places roles = do
+  gid <- askInfo discordGuildIdInfo
+  for_ gmems $ \gmem -> do
+    let discord = maybe 0 userId (memberUser gmem)
+    case accountMinecrafts M.!? discord of
+      Nothing -> pure ()
+      Just mcs -> do
+        let bestPlace = foldl' min 100000000 $ mapMaybe (places M.!?) mcs
+        let placeRoles = map snd $ dropWhile ((< bestPlace) . fst) roles
+        addRemoveDiscordRoles gid gmem (map snd roles) placeRoles
+
+applyLeaderboardRoles :: (MonadIOReader m r, HasAll '[Connection, DiscordHandle, InfoCache] r) => [GuildMember] -> M.Map UserId [UUID] -> m ()
+applyLeaderboardRoles gmems mcs = do
+  bowLb <- getHypixelBowLeaderboards
+  winsRoles <- askInfo bowWinsLbSpotRolesInfo
+  let winsLb = M.fromList . zipWith (\n (uuid, _) -> (uuid, n)) [1..] . sortOn (Down . bowLbWins . snd) $ HM.toList bowLb -- TODO: what if multiple people have the same score?
+  applyLeaderboardRolesSingle gmems mcs winsLb winsRoles
+  winstreakRoles <- askInfo bowWinstreakLbSpotRolesInfo
+  let winstreakLb = M.fromList . zipWith (\n (uuid, _) -> (uuid, n)) [1..] . sortOn (Down . bowLbWinstreak . snd) $ HM.toList bowLb
+  applyLeaderboardRolesSingle gmems mcs winstreakLb winstreakRoles
