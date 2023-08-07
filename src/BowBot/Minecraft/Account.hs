@@ -25,12 +25,8 @@ deriving via (SimpleValue [Text]) instance FromMysql [Text]
 data MinecraftAccount = MinecraftAccount
   { mcUUID :: !UUID
   , mcNames :: ![Text]
-  } deriving (Show, Eq)
-
-instance ToMysql MinecraftAccount where
-  toActions MinecraftAccount {..} = toActions mcUUID ++ toActions mcNames
-instance FromMysql MinecraftAccount where
-  rowParser = MinecraftAccount <$> rowParser <*> rowParser
+  } deriving stock (Show, Eq, Generic)
+    deriving (ToMysql, FromMysql) via (Generically MinecraftAccount)
 
 $(pure [])
 

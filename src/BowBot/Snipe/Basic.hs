@@ -11,12 +11,8 @@ data SnipeMessage = SnipeMessage
   , snipeMessageContent :: !Text
   , snipeMessageWasEdited :: !Bool
   , snipeMessageTimestamp :: !UTCTime
-  } deriving Show
-
-instance ToMysql SnipeMessage where
-  toActions SnipeMessage {..} = toActions snipeMessageAuthor ++ toActions snipeMessageContent ++ toActions snipeMessageWasEdited ++ toActions snipeMessageTimestamp
-instance FromMysql SnipeMessage where
-  rowParser = SnipeMessage <$> rowParser <*> rowParser <*> rowParser <*> rowParser
+  } deriving stock (Show, Eq, Generic)
+    deriving (ToMysql, FromMysql) via (Generically SnipeMessage)
 
 $(pure [])
 

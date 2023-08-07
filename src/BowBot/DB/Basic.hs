@@ -1,5 +1,5 @@
 module BowBot.DB.Basic(
-  module BowBot.DB.Basic, Connection, Param, Result, ToField(..), textSqlTypes, FromField(..), In(..), ToMysql(..), FromMysql(..), StateT(..), SimpleValue(..)
+  module BowBot.DB.Basic, Connection, Param, Result, ToField(..), textSqlTypes, FromField(..), ToMysql(..), FromMysql(..), StateT(..), SimpleValue(..), Generic(..), Generically(..)
 ) where
 
 import BowBot.Utils
@@ -7,9 +7,6 @@ import Database.MySQL.Simple hiding (withTransaction, commit, rollback, insertID
 import qualified Database.MySQL.Simple as M (withTransaction, commit, rollback, insertID)
 import Database.MySQL.Simple.Types (Query(..))
 import Data.Int (Int64)
-import qualified Data.ByteString.Lazy as BS
-import qualified Data.Text.Encoding as T
-import qualified Data.ByteString.Search as BS
 import Control.Exception.Base (bracket)
 import Control.Concurrent (forkIO)
 import Data.Time (getCurrentTime)
@@ -59,9 +56,6 @@ logErrorFork msg = void $ liftIO $ do
   putStrLn (unpack msg)
   time <- getCurrentTime
   forkIO $ withDB $ \conn -> void $ execute conn "INSERT INTO `logs`(`message`,`timestamp`,`type`) VALUES (?,?,'error')" (msg, time)
-
-replaceQuery :: Text -> Text -> Query -> Query
-replaceQuery from to q = Query $ BS.toStrict $ BS.replace (T.encodeUtf8 from) (BS.fromStrict $ T.encodeUtf8 to :: BS.ByteString) (fromQuery q)
 
 queryLog :: forall q r m rd. (ToMysql q, FromMysql r, MonadIOReader m rd, Has Connection rd) => Query -> q -> m [r]
 queryLog q d = do

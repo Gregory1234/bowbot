@@ -22,12 +22,8 @@ data HypixelBowLeaderboardEntry = HypixelBowLeaderboardEntry
     bowLbWinstreak :: !(Maybe Integer),
     bowLbTimestamp :: UTCTime,
     bowLbWinstreakTimestamp :: !(Maybe UTCTime)
-  } deriving (Show, Eq)
-
-instance ToMysql HypixelBowLeaderboardEntry where
-  toActions HypixelBowLeaderboardEntry {..} = toActions bowLbWins ++ toActions bowLbLosses ++ toActions bowLbWinstreak ++ toActions bowLbTimestamp ++ toActions bowLbWinstreakTimestamp
-instance FromMysql HypixelBowLeaderboardEntry where
-  rowParser = HypixelBowLeaderboardEntry <$> rowParser <*> rowParser <*> rowParser <*> rowParser <*> rowParser
+  } deriving stock (Show, Eq, Generic)
+    deriving (ToMysql, FromMysql) via (Generically HypixelBowLeaderboardEntry)
 
 $(pure [])
 

@@ -60,12 +60,8 @@ data Settings = Settings
   { sWins :: !SettingBin, sLosses :: !SettingBin, sWLR :: !SettingTer, sWinsUntil :: !SettingTer
   , sBestStreak :: !SettingTer, sCurrentStreak :: !SettingTer, sBestDailyStreak :: !SettingTer
   , sBowHits :: !SettingBin, sBowShots :: !SettingBin, sAccuracy :: !SettingTer
-  } deriving (Show, Eq)
-
-instance ToMysql Settings where
-  toActions Settings {..} = toActions sWins ++ toActions sLosses ++ toActions sWLR ++ toActions sWinsUntil ++ toActions sBestStreak ++ toActions sCurrentStreak ++ toActions sBestDailyStreak ++ toActions sBowHits ++ toActions sBowShots ++ toActions sAccuracy
-instance FromMysql Settings where
-  rowParser = Settings <$> rowParser <*> rowParser <*> rowParser <*> rowParser <*> rowParser <*> rowParser <*> rowParser <*> rowParser <*> rowParser <*> rowParser
+  } deriving stock (Show, Eq, Generic)
+    deriving (ToMysql, FromMysql) via (Generically Settings)
 
 $(pure [])
 

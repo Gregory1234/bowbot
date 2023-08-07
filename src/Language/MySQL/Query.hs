@@ -1,8 +1,9 @@
 {-# LANGUAGE AllowAmbiguousTypes #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE UndecidableInstances #-}
 
 module Language.MySQL.Query(
-  module Language.MySQL.Query, Q.Connection, Q.Param(..), Q.Result(..), StateT(..)
+  module Language.MySQL.Query, Q.Connection, Q.Param(..), Q.Result(..), StateT(..), Generic(..), Generically(..)
 ) where
 
 import qualified Database.MySQL.Simple.Param as Q
@@ -25,6 +26,8 @@ import Data.Time.Clock (UTCTime)
 import Data.Time.LocalTime (TimeOfDay)
 import Data.Functor.Identity
 import Data.List (intersperse)
+import GHC.Generics
+import Data.Coerce
 
 -- TODO: stop depending on mysql-simple
 
@@ -78,6 +81,18 @@ instance (ToMysql a, ToMysql b, ToMysql c, ToMysql d) => ToMysql (a,b,c,d) where
 instance (ToMysql a, ToMysql b, ToMysql c, ToMysql d, ToMysql e) => ToMysql (a,b,c,d,e) where
   toActions (a,b,c,d,e) = toActions a ++ toActions b ++ toActions c ++ toActions d ++ toActions e
 
+instance (Generic a, ToMysql (Rep a ())) => ToMysql (Generically a) where
+  toActions (Generically a) = toActions (from a :: Rep a ())
+
+instance ToMysql c => ToMysql (K1 i c p) where
+  toActions (K1 x) = toActions x
+
+instance (ToMysql (f p), ToMysql (g p)) => ToMysql ((f :*: g) p) where
+  toActions (f :*: g) = toActions f ++ toActions g
+
+instance ToMysql (f p) => ToMysql (M1 i t f p) where
+  toActions (M1 f) = toActions f
+
 type RowParser = State ([Q.Field], [Maybe ByteString])
 
 textSqlTypes :: [Q.Type]
@@ -122,6 +137,18 @@ instance (FromMysql a, FromMysql b, FromMysql c, FromMysql d) => FromMysql (a,b,
 
 instance (FromMysql a, FromMysql b, FromMysql c, FromMysql d, FromMysql e) => FromMysql (a,b,c,d,e) where
   rowParser = (,,,,) <$> rowParser <*> rowParser <*> rowParser <*> rowParser <*> rowParser
+
+instance (Generic a, FromMysql (Rep a ())) => FromMysql (Generically a) where
+  rowParser = Generically . to @a @() <$> rowParser
+
+instance FromMysql c => FromMysql (K1 i c p) where
+  rowParser = coerce (rowParser @c)
+
+instance (FromMysql (f p), FromMysql (g p)) => FromMysql ((f :*: g) p) where
+  rowParser = (:*:) <$> rowParser <*> rowParser
+
+instance FromMysql (f p) => FromMysql (M1 i t f p) where
+  rowParser = coerce (rowParser @(f p))
 
 newtype SimpleValue a = SimpleValue { fromSimpleValue :: a }
 

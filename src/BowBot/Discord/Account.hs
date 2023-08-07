@@ -13,12 +13,10 @@ import qualified Discord.Requests as R
 import Data.List (deleteFirstsBy)
 import BowBot.Discord.Name
 
-data DiscordAccount = DiscordAccount { discordId :: !UserId, discordName :: !DiscordName, discordIsMember :: !Bool } deriving (Show, Eq)
+data DiscordAccount = DiscordAccount { discordId :: !UserId, discordName :: !DiscordName, discordIsMember :: !Bool }
+  deriving stock (Show, Eq, Generic)
+  deriving (ToMysql, FromMysql) via (Generically DiscordAccount)
 
-instance ToMysql DiscordAccount where
-  toActions DiscordAccount {..} = toActions discordId ++ toActions discordName ++ toActions discordIsMember
-instance FromMysql DiscordAccount where
-  rowParser = DiscordAccount <$> rowParser <*> rowParser <*> rowParser
 
 $(pure [])
 

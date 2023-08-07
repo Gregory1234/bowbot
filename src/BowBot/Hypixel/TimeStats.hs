@@ -36,12 +36,8 @@ data HypixelBowTimeStats = HypixelBowTimeStats
   { bowTimeWins :: Integer,
     bowTimeLosses :: Integer,
     bowTimeTimestamp :: UTCTime
-  } deriving (Show, Eq)
-
-instance ToMysql HypixelBowTimeStats where
-  toActions HypixelBowTimeStats {..} = toActions bowTimeWins ++ toActions bowTimeLosses ++ toActions bowTimeTimestamp
-instance FromMysql HypixelBowTimeStats where
-  rowParser = HypixelBowTimeStats <$> rowParser <*> rowParser <*> rowParser
+  } deriving stock (Show, Eq, Generic)
+    deriving (ToMysql, FromMysql) via (Generically HypixelBowTimeStats)
 
 $(pure [])
 

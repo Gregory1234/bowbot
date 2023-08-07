@@ -8,12 +8,8 @@ data DiscordName = DiscordName
   { discordUsername :: !Text
   , discordDiscrim :: !(Maybe Text)
   , discordNickname :: !(Maybe Text)
-  } deriving (Show, Eq)
-
-instance ToMysql DiscordName where
-  toActions DiscordName {..} = toActions discordUsername ++ toActions discordDiscrim ++ toActions discordNickname
-instance FromMysql DiscordName where
-  rowParser = DiscordName <$> rowParser <*> rowParser <*> rowParser
+  } deriving stock (Show, Eq, Generic)
+    deriving (ToMysql, FromMysql) via (Generically DiscordName)
 
 guildMemberToDiscordName :: GuildMember -> DiscordName
 guildMemberToDiscordName GuildMember { memberUser = Just user, .. } = let u = userToDiscordName user in u { discordNickname = memberNick <|> discordNickname u }
