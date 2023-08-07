@@ -5,7 +5,6 @@ module BowBot.Hypixel.LeaderboardStatus where
 import BowBot.Utils
 import BowBot.DB.Typed
 import Language.MySQL.Query
-import qualified Database.MySQL.Base.Types as T
 import BowBot.Minecraft.Basic
 
 data IsBanned
@@ -26,7 +25,7 @@ instance ToField IsBanned where
   toField Banned = "ban"
 
 instance FromField IsBanned where
-  fromField = ([T.Enum, T.String], \case
+  fromField = (textSqlTypes, \case
     "normal" -> Right NotBanned
     "ban" -> Right Banned
     _ -> Left "Wrong ban status")

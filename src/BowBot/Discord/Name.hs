@@ -11,9 +11,9 @@ data DiscordName = DiscordName
   } deriving (Show, Eq)
 
 instance ToMysql DiscordName where
-  toActions DiscordName {..} = toActions discordUsername ++ toActions (fromMaybe "0" discordDiscrim) ++ toActions discordNickname
+  toActions DiscordName {..} = toActions discordUsername ++ toActions discordDiscrim ++ toActions discordNickname
 instance FromMysql DiscordName where
-  rowParser = DiscordName <$> rowParser <*> (filterMaybe (/= "0") <$> rowParser) <*> rowParser
+  rowParser = DiscordName <$> rowParser <*> rowParser <*> rowParser
 
 guildMemberToDiscordName :: GuildMember -> DiscordName
 guildMemberToDiscordName GuildMember { memberUser = Just user, .. } = let u = userToDiscordName user in u { discordNickname = memberNick <|> discordNickname u }

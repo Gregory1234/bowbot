@@ -11,7 +11,6 @@ import BowBot.Utils
 import BowBot.Settings.Basic
 import BowBot.Discord.Utils
 import qualified Data.Text as T
-import qualified Database.MySQL.Base.Types as T
 
 data StatsTimeRange = DailyStats | WeeklyStats | MonthlyStats deriving (Show, Eq)
 
@@ -27,7 +26,7 @@ instance ToField StatsTimeRange where
   toField MonthlyStats = "monthly"
 
 instance FromField StatsTimeRange where
-  fromField = ([T.Enum, T.String], \case
+  fromField = (textSqlTypes, \case
     "ban" -> Right DailyStats
     "default" -> Right WeeklyStats
     "mod" -> Right MonthlyStats

@@ -1,5 +1,5 @@
 module BowBot.DB.Basic(
-  module BowBot.DB.Basic, Connection, Param, Result, ToField(..), FromField(..), In(..), ToMysql(..), FromMysql(..), StateT(..), SimpleValue(..)
+  module BowBot.DB.Basic, Connection, Param, Result, ToField(..), textSqlTypes, FromField(..), In(..), ToMysql(..), FromMysql(..), StateT(..), SimpleValue(..)
 ) where
 
 import BowBot.Utils

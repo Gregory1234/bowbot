@@ -6,7 +6,6 @@ import Discord.Types (UserId)
 import BowBot.Discord.Orphans ()
 import BowBot.Utils
 import BowBot.DB.Typed
-import qualified Database.MySQL.Base.Types as T
 
 data PermissionLevel
   = BanLevel
@@ -28,7 +27,7 @@ instance ToField PermissionLevel where
   toField AdminLevel = "admin"
 
 instance FromField PermissionLevel where
-  fromField = ([T.Enum, T.String], \case
+  fromField = (textSqlTypes, \case
     "ban" -> Right BanLevel
     "default" -> Right DefaultLevel
     "mod" -> Right ModLevel

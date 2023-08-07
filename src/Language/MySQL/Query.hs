@@ -80,6 +80,9 @@ instance (ToMysql a, ToMysql b, ToMysql c, ToMysql d, ToMysql e) => ToMysql (a,b
 
 type RowParser = State ([Q.Field], [Maybe ByteString])
 
+textSqlTypes :: [Q.Type]
+textSqlTypes = [Q.VarChar,Q.TinyBlob,Q.MediumBlob,Q.LongBlob,Q.Blob,Q.VarString,Q.String,Q.Set,Q.Enum,Q.Json]
+
 class FromMysql a where
   rowParser :: RowParser a
 

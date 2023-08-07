@@ -7,7 +7,6 @@ import Discord.Types (UserId)
 import BowBot.Discord.Orphans ()
 import BowBot.DB.Typed
 import BowBot.Utils
-import qualified Database.MySQL.Base.Types as T
 
 data SettingBin = Yes | No deriving (Show, Eq, Ord, Enum)
 
@@ -22,7 +21,7 @@ instance ToField SettingBin where
   toField No = "no"
 
 instance FromField SettingBin where
-  fromField = ([T.Enum, T.String], \case
+  fromField = (textSqlTypes, \case
     "yes" -> Right Yes
     "no" -> Right No
     _ -> Left "Wrong permission level")
@@ -41,7 +40,7 @@ instance ToField SettingTer where
   toField WhenSensible = "sensibly"
 
 instance FromField SettingTer where
-  fromField = ([T.Enum, T.String], \case
+  fromField = (textSqlTypes, \case
     "always" -> Right Always
     "never" -> Right Never
     "sensibly" -> Right WhenSensible

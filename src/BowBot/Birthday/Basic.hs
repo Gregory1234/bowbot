@@ -9,7 +9,6 @@ import BowBot.Account.Basic
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
 import qualified Data.ByteString.Char8 as BS
-import qualified Database.MySQL.Base.Types as T
 
 
 data BirthdayDate = BirthdayDate { birthdayDay :: !Int, birthdayMonth :: !Int } deriving (Show, Eq)
@@ -24,7 +23,7 @@ instance ToField BirthdayDate where
   toField = T.encodeUtf8 . birthdayString
 
 instance FromField BirthdayDate where
-  fromField = ([T.String], \case
+  fromField = (textSqlTypes, \case
     (BS.split '.' -> [readMaybe . BS.unpack -> Just birthdayDay, readMaybe . BS.unpack -> Just birthdayMonth]) -> Right BirthdayDate {..}
     _ -> Left "Wrong birthday date")
 

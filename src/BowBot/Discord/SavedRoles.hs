@@ -11,7 +11,6 @@ import Data.Bifunctor (first)
 import BowBot.DB.Typed
 import BowBot.Account.Basic
 import BowBot.Account.Register
-import qualified Database.MySQL.Base.Types as T
 import BowBot.Hypixel.Basic
 
 toggleableRolesInfo :: InfoType (M.Map SavedRole RoleId)
@@ -35,7 +34,7 @@ instance ToField [SavedRole] where
   toField = T.encodeUtf8 . T.intercalate "," . map savedRoleName
 
 instance FromField [SavedRole] where
-  fromField = ([T.String, T.Blob], Right . map SavedRole . filter (not . T.null) . T.splitOn "," . T.decodeUtf8)
+  fromField = (textSqlTypes, Right . map SavedRole . filter (not . T.null) . T.splitOn "," . T.decodeUtf8)
 
 savedRolesFromIds :: (MonadIOReader m r, Has InfoCache r) => [RoleId] -> m [SavedRole]
 savedRolesFromIds roleids = do

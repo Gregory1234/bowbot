@@ -1,13 +1,26 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE QuasiQuotes #-}
+{-# OPTIONS_GHC -Wno-orphans #-}
 
 module BowBot.Minecraft.Account where
 
 import BowBot.Minecraft.Basic
 import BowBot.DB.Typed
-import BowBot.Network.Basic
+import BowBot.Network.Basic (Manager)
 import BowBot.Utils
 import qualified Data.Text as T
+import qualified Data.Text.Encoding as T
+
+instance ToField [Text] where
+  toField = T.encodeUtf8 . T.intercalate ","
+
+instance FromField [Text] where
+  fromField = (textSqlTypes, Right . T.splitOn "," . T.decodeUtf8)
+
+instance Param [Text]
+instance Result [Text]
+deriving via (SimpleValue [Text]) instance ToMysql [Text]
+deriving via (SimpleValue [Text]) instance FromMysql [Text]
 
 data MinecraftAccount = MinecraftAccount
   { mcUUID :: !UUID
@@ -15,9 +28,9 @@ data MinecraftAccount = MinecraftAccount
   } deriving (Show, Eq)
 
 instance ToMysql MinecraftAccount where
-  toActions MinecraftAccount {..} = toActions mcUUID ++ toActions (T.intercalate "," mcNames) -- TODO: this is not good
+  toActions MinecraftAccount {..} = toActions mcUUID ++ toActions mcNames
 instance FromMysql MinecraftAccount where
-  rowParser = MinecraftAccount <$> rowParser <*> (T.splitOn "," <$> rowParser)
+  rowParser = MinecraftAccount <$> rowParser <*> rowParser
 
 $(pure [])
 
