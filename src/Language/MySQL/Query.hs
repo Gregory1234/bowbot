@@ -217,3 +217,7 @@ reqEqTypeLax' _ = id
 reqNotNullable :: TypeNullable x ~ 'False => x -> a -> a
 reqNotNullable _ = id
 {-# INLINE reqNotNullable #-}
+
+reqNullable :: Maybe x -> a -> a
+reqNullable _ = id
+{-# INLINE reqNullable #-}

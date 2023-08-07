@@ -160,6 +160,7 @@ renderTypecheckConstraint (VarIsInt n) e = [| reqMysqlInt $(varE n) $e |]
 renderTypecheckConstraint (VarIsTuple n ns) e = [| let $(tupP (map varP ns)) = $(varE n) in $e |]
 renderTypecheckConstraint (VarIsList n n') e = [| let $(varP n') = head $(varE n) in $e |]
 renderTypecheckConstraint (VarNotNull n) e = [| reqNotNullable $(varE n) $e |]
+renderTypecheckConstraint (VarIsMaybe n) e = [| reqNullable $(varE n) $e |]
 
 renderTypeInhabitant :: PartialType -> Q Exp
 renderTypeInhabitant (TupleType [t]) = renderTypeInhabitant t

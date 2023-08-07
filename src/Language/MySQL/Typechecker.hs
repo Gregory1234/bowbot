@@ -25,6 +25,7 @@ data TypecheckConstraint
   | VarIsTuple Name [Name]
   | VarIsList Name Name
   | VarNotNull Name
+  | VarIsMaybe Name
   deriving (Show, Eq)
 
 class (MonadIO m, MonadFail m) => MonadQ m where liftQ :: Q a -> m a
@@ -58,6 +59,12 @@ partialTypeNotNull (TupleType _) = pure ()
 removeMaybeFromType :: PartialType -> PartialType
 removeMaybeFromType (RealType (AppT (ConT m) v)) | m == ''Maybe = RealType v
 removeMaybeFromType x = x
+
+partialTypeIsMaybe :: (MonadWriter [TypecheckConstraint] m, MonadFail m) => PartialType -> m ()
+partialTypeIsMaybe (RealType (AppT (ConT m) _)) | m == ''Maybe = pure ()
+partialTypeIsMaybe (RealType t) = fail $ "Type is not nullable: " ++ show t ++ "!"
+partialTypeIsMaybe (VarType n) = tell [VarIsMaybe n]
+partialTypeIsMaybe (TupleType _) = fail "Tuple type is never nullable!"
 
 couldntMatchTypes :: PartialType -> PartialType -> String
 couldntMatchTypes t1 t2 = "Couldn't match types: " ++ show t1 ++ " and " ++ show t2 -- TODO: nicer errors?
@@ -194,7 +201,7 @@ typecheckExpr (AndExpr e1 e2) t = do
 typecheckExpr (EqExpr e1 op e2@(NullExpr _)) t = do
   partialTypeEqual' t (Just boolType)
   t1 <- typecheckExpr e1 Nothing
-  t2 <- typecheckExpr e2 (Just $ StrictnessType EqStrict $ typedExprType t1)
+  t2 <- typecheckExpr e2 (Just $ StrictnessType EqLax $ typedExprType t1)
   return $ TypedEqExpr t1 op t2
 typecheckExpr (EqExpr e1 op e2) t = do
   partialTypeEqual' t (Just boolType)
@@ -237,8 +244,10 @@ typecheckExpr (OverrideExpr e tUntyped) t' = do
 
 typecheckExpr (NullExpr t1Untyped) t2 = do
   t1 <- mapM typecheckType t1Untyped
-  partialTypeEqual' t2 (RealType <$> t1)
-  let t = RealType <$> t1 <|> strictnessTypeType <$> t2
+  let maybeT1 = RealType . AppT (ConT ''Maybe) <$> t1
+  partialTypeEqual' t2 maybeT1
+  let t = maybeT1 <|> strictnessTypeType <$> t2
+  for_ t2 $ \t2' -> when (strictnessTypeStrictness t2' == EqStrict) $ partialTypeIsMaybe $ strictnessTypeType t2'
   case t of
     Nothing -> fail "Couldn't deduce type of NULL!"
     Just t' -> return $ TypedNullExpr t'
