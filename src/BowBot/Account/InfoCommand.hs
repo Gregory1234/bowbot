@@ -52,6 +52,6 @@ infoCommand = Command CommandInfo
       dcAccs <- T.unlines . map showDcAcc <$> getDiscordAccountsByBowBotId bid
       
       let infos = [ "- Bow Bot id: " <> showt (unBowBotId bid)
-                  , "- Minecraft accounts:\n```\n" <> mcAccs <> "```"
+                  , "- Minecraft accounts:\n```\n" <> (if T.null mcAccs then "No Minecraft accounts registered, this is a placeholder BowBot account" else mcAccs) <> "```"
                   , "- Discord accounts:\n```\n" <> dcAccs <> "```"]
       respond $ header <> T.unlines infos
