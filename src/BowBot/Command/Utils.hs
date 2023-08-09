@@ -42,25 +42,31 @@ addMinecraftAccount acc@MinecraftAccount {..} = do
 
 commandMinecraftByNameWithSkipTip :: (MinecraftAccount -> ExceptT Text CommandHandler ()) -> (MinecraftAutocorrect -> ExceptT Text CommandHandler ()) -> Text -> ExceptT Text CommandHandler ()
 commandMinecraftByNameWithSkipTip new old n = do
-  autocorrect <- minecraftAutocorrect n
-  case autocorrect of
+  accBySavedCurrentName <- getMinecraftAccountByCurrentName n
+  case accBySavedCurrentName of
+    Just acc -> do
+      showSelfSkipTip acc
+      old $ autocorrectFromAccountDirect acc
     Nothing -> do
-      uuid <- liftMaybe thePlayerDoesNotExistMessage =<< mojangNameToUUID n
-      acc' <- getMinecraftAccountByUUID uuid
-      case acc' of
+      uuidByName <- mojangNameToUUID n
+      case uuidByName of
+        Just uuid -> do
+          accByUUID <- getMinecraftAccountByUUID uuid
+          case accByUUID of
+            Nothing -> do
+              acc <- liftMaybe thePlayerDoesNotExistMessage =<< freshMinecraftAccountByUUID uuid
+              new acc
+            Just acc -> do
+              newName <- liftMaybe somethingWentWrongMessage =<< mojangUUIDToCurrentName uuid
+              let newAcc = acc { mcNames = newName : mcNames acc }
+              storeMinecraftAccount newAcc
+              void $ addMinecraftName newName uuid
+              showSelfSkipTip newAcc
+              old (autocorrectFromAccountDirect newAcc)
         Nothing -> do
-          acc <- liftMaybe thePlayerDoesNotExistMessage =<< freshMinecraftAccountByUUID uuid
-          new acc
-        Just acc -> do
-          newName <- liftMaybe thePlayerDoesNotExistMessage =<< mojangUUIDToCurrentName uuid
-          let newAcc = acc { mcNames = newName : mcNames acc }
-          storeMinecraftAccount newAcc
-          void $ addMinecraftName newName uuid
-          showSelfSkipTip newAcc
-          old (autocorrectFromAccountDirect newAcc)
-    Just ac@MinecraftAutocorrect {..} -> do
-      showSelfSkipTip autocorrectAccount
-      old ac
+          autocorrect@MinecraftAutocorrect {..} <- liftMaybe thePlayerDoesNotExistMessage =<< minecraftAutocorrect n
+          showSelfSkipTip autocorrectAccount
+          old autocorrect
 
 commandMinecraftByUUID :: (MinecraftAccount -> ExceptT Text CommandHandler ()) -> (MinecraftAccount -> ExceptT Text CommandHandler ()) -> UUID -> ExceptT Text CommandHandler ()
 commandMinecraftByUUID new old uuid = do
