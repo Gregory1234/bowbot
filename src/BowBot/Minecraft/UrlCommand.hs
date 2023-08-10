@@ -24,4 +24,4 @@ urlCommand name desc url = Command CommandInfo
       acc <- liftMaybe theUserIsntRegisteredMessage =<< getSelectedMinecraftByDiscord did
       respond $ url $ mcUUID acc
     Just n -> do
-      commandMinecraftByNameWithSkipTip (respond . url . mcUUID) (respond . url . mcUUID . autocorrectAccount) n
+      commandMinecraftAutocorrectByNameWithSkipTip (respond . url . mcUUID) (respond . url . mcUUID . autocorrectAccount) n

@@ -166,3 +166,6 @@ only _ = Nothing
 
 filterMaybe :: (a -> Bool) -> a -> Maybe a
 filterMaybe f a = if f a then Just a else Nothing
+
+tryError :: MonadError e m => m a -> m (Either e a)
+tryError action = (Right <$> action) `catchError` (pure . Left)

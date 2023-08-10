@@ -39,21 +39,21 @@ statsCommandTemplate StatsCommandSettings {..} src name desc = Command CommandIn
       displayStats (minecraftAccountToHeader acc Nothing) stats
       updateStatsUnlessBanned (mcUUID acc) stats
     Just (uuidFromString -> Just uuid) -> do
-      commandMinecraftByUUID handlerNewAccount (handlerOldAccount . autocorrectFromAccountDirect) uuid
+      stats <- requestStats False uuid
+      commandMinecraftByUUID (handlerNewAccount stats) (handlerOldAccount stats . autocorrectFromAccountDirect) uuid
     Just (discordIdFromString -> Just did) -> do
       acc <- liftMaybe theUserIsntRegisteredMessage =<< getSelectedMinecraftByDiscord did
-      handlerOldAccount (autocorrectFromAccountDirect acc)
-    Just n -> do
-      commandMinecraftByNameWithSkipTip handlerNewAccount handlerOldAccount n
-  where
-    handlerOldAccount :: MinecraftAutocorrect -> ExceptT Text CommandHandler ()
-    handlerOldAccount ac@MinecraftAutocorrect {autocorrectAccount = acc} = do
       stats <- requestStats False (mcUUID acc)
+      handlerOldAccount stats (autocorrectFromAccountDirect acc)
+    Just n -> do
+      commandMinecraftByNameWithExtraWithSkipTip (requestStats False) handlerNewAccount handlerOldAccount n
+  where
+    handlerOldAccount :: a -> MinecraftAutocorrect -> ExceptT Text CommandHandler ()
+    handlerOldAccount stats ac@MinecraftAutocorrect {autocorrectAccount = acc} = do
       displayStats (minecraftAutocorrectToHeader ac) stats
       updateStatsUnlessBanned (mcUUID acc) stats
-    handlerNewAccount :: MinecraftAccount -> ExceptT Text CommandHandler ()
-    handlerNewAccount acc = do
-      stats <- requestStats False (mcUUID acc)
+    handlerNewAccount :: a -> MinecraftAccount -> ExceptT Text CommandHandler ()
+    handlerNewAccount stats acc = do
       let toAdd = shouldAddAccount stats
       when toAdd $ addMinecraftAccount acc
       displayStats (minecraftAccountToHeader acc Nothing) stats

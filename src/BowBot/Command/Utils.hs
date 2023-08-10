@@ -40,6 +40,8 @@ addMinecraftAccount acc@MinecraftAccount {..} = do
   storeMinecraftAccount acc
   void $ addMinecraftName (head mcNames) mcUUID
 
+-- TODO: remove repetition
+
 commandMinecraftByNameWithSkipTip :: (MinecraftAccount -> ExceptT Text CommandHandler ()) -> (MinecraftAutocorrect -> ExceptT Text CommandHandler ()) -> Text -> ExceptT Text CommandHandler ()
 commandMinecraftByNameWithSkipTip new old n = do
   accBySavedCurrentName <- getMinecraftAccountByCurrentName n
@@ -67,6 +69,76 @@ commandMinecraftByNameWithSkipTip new old n = do
           autocorrect@MinecraftAutocorrect {..} <- liftMaybe thePlayerDoesNotExistMessage =<< minecraftAutocorrect n
           showSelfSkipTip autocorrectAccount
           old autocorrect
+
+commandMinecraftByNameWithExtraWithSkipTip :: (UUID -> ExceptT Text CommandHandler extra) -> (extra -> MinecraftAccount -> ExceptT Text CommandHandler ()) -> (extra -> MinecraftAutocorrect -> ExceptT Text CommandHandler ()) -> Text -> ExceptT Text CommandHandler ()
+commandMinecraftByNameWithExtraWithSkipTip getExtra new old n = do
+  let autocorrectFallback err = do
+        ac <- minecraftAutocorrect n
+        case ac of
+          Nothing -> throwError err
+          Just autocorrect@MinecraftAutocorrect {..} -> do
+            extra2' <- tryError $ getExtra (mcUUID autocorrectAccount)
+            case extra2' of
+              Left _ -> throwError err
+              Right extra2 -> do
+                showSelfSkipTip autocorrectAccount
+                old extra2 autocorrect
+  accBySavedCurrentName <- getMinecraftAccountByCurrentName n
+  case accBySavedCurrentName of
+    Just acc -> do
+      extra' <- tryError $ getExtra (mcUUID acc)
+      case extra' of
+        Right extra -> do
+          showSelfSkipTip acc
+          old extra $ autocorrectFromAccountDirect acc
+        Left err -> autocorrectFallback err
+    Nothing -> do
+      uuidByName <- mojangNameToUUID n
+      case uuidByName of
+        Just uuid -> do
+          extra' <- tryError $ getExtra uuid
+          case extra' of
+            Left err -> autocorrectFallback err
+            Right extra -> do
+              accByUUID <- getMinecraftAccountByUUID uuid
+              case accByUUID of
+                Nothing -> do
+                  acc <- liftMaybe thePlayerDoesNotExistMessage =<< freshMinecraftAccountByUUID uuid
+                  new extra acc
+                Just acc -> do
+                  newName <- liftMaybe somethingWentWrongMessage =<< mojangUUIDToCurrentName uuid
+                  let newAcc = acc { mcNames = newName : mcNames acc }
+                  storeMinecraftAccount newAcc
+                  void $ addMinecraftName newName uuid
+                  showSelfSkipTip newAcc
+                  old extra $ autocorrectFromAccountDirect newAcc
+        Nothing -> do
+          autocorrect@MinecraftAutocorrect {..} <- liftMaybe thePlayerDoesNotExistMessage =<< minecraftAutocorrect n
+          extra <- getExtra (mcUUID autocorrectAccount)
+          showSelfSkipTip autocorrectAccount
+          old extra autocorrect
+
+commandMinecraftAutocorrectByNameWithSkipTip :: (MinecraftAccount -> ExceptT Text CommandHandler ()) -> (MinecraftAutocorrect -> ExceptT Text CommandHandler ()) -> Text -> ExceptT Text CommandHandler ()
+commandMinecraftAutocorrectByNameWithSkipTip new old n = do
+  ac <- minecraftAutocorrect n
+  case ac of
+    Just autocorrect@MinecraftAutocorrect {..} -> do
+      showSelfSkipTip autocorrectAccount
+      old autocorrect
+    Nothing -> do
+      uuid <- liftMaybe thePlayerDoesNotExistMessage =<< mojangNameToUUID n
+      accByUUID <- getMinecraftAccountByUUID uuid
+      case accByUUID of
+        Nothing -> do
+          acc <- liftMaybe thePlayerDoesNotExistMessage =<< freshMinecraftAccountByUUID uuid
+          new acc
+        Just acc -> do
+          newName <- liftMaybe somethingWentWrongMessage =<< mojangUUIDToCurrentName uuid
+          let newAcc = acc { mcNames = newName : mcNames acc }
+          storeMinecraftAccount newAcc
+          void $ addMinecraftName newName uuid
+          showSelfSkipTip newAcc
+          old (autocorrectFromAccountDirect newAcc)
 
 commandMinecraftByUUID :: (MinecraftAccount -> ExceptT Text CommandHandler ()) -> (MinecraftAccount -> ExceptT Text CommandHandler ()) -> UUID -> ExceptT Text CommandHandler ()
 commandMinecraftByUUID new old uuid = do
