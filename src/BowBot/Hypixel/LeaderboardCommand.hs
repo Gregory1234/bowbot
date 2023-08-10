@@ -69,8 +69,12 @@ leaderboardCommand lbt@LeaderboardType {..} name = Command CommandInfo
       handlerMinecraft (autocorrectFromAccountDirect acc)
     Just (discordIdFromString -> Just did) -> do
       mcs <- getMinecraftUUIDsByDiscord did
-      lb <- generateLeaderboard mcs
-      displayLeaderboard Nothing "" lb
+      case mcs of
+        [] -> throwError theUserIsntRegisteredMessage
+        _ -> do
+          lb <- generateLeaderboard mcs
+          unless (any lbRowSelected lb) $ throwError thePlayerIsntOnThisLeaderboardMessage
+          displayLeaderboard Nothing "" lb
     Just n -> do
       ac <- liftMaybe thePlayerIsntOnThisLeaderboardMessage =<< minecraftAutocorrect n
       showSelfSkipTip (autocorrectAccount ac)
