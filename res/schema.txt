@@ -10,4 +10,3 @@ minecraft_name: name Text, minecraft_uuid UUID
 permissions: discord_id UserId, level PermissionLevel
 settings: discord_id UserId, wins SettingBin, losses SettingBin, wlr SettingTer, wins_until SettingTer, best_streak SettingTer, current_streak SettingTer, best_daily_streak SettingTer, bow_hits SettingBin, bow_shots SettingBin, accuracy SettingTer
 snipe: channel ChannelId, author UserId, content Text, time UTCTime, edited Bool
-watchlist: minecraft_uuid UUID, online Maybe Bool

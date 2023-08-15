@@ -11,7 +11,6 @@ import BowBot.Discord.Account
 import Discord
 import Control.Monad.Reader
 import BowBot.Hypixel.TimeStats
-import BowBot.Hypixel.Watchlist
 import Control.Concurrent.Async (concurrently_)
 import BowBot.Utils
 
@@ -28,4 +27,3 @@ updateBotData times = (ask >>=) $ \ctx -> liftIO $ foldl1 concurrently_ $
 clearBotCaches :: (MonadIOReader m r, HasAll '[CounterState, Connection, Manager] r) => m ()
 clearBotCaches = do
   clearCounter HypixelApi
-  clearOnlinePlayers

@@ -23,7 +23,6 @@ import BowBot.Discord.Roles
 import BowBot.Discord.SavedRoles
 import BowBot.Hypixel.LeaderboardCommand
 import BowBot.Hypixel.TimeStats
-import BowBot.Hypixel.WatchlistCommands
 import BowBot.Discord.Account
 import BowBot.Command.HelpCommand
 import BowBot.Minecraft.Basic
@@ -200,8 +199,6 @@ commands =
   , nameCommand
   , urlCommand "head" "show player's head" $ \s -> "https://crafatar.com/avatars/" <> uuidString s <> "?overlay"
   , urlCommand "skin" "show player's full skin" $ \s -> "https://crafatar.com/renders/body/" <> uuidString s <> "?overlay"
-  , listCommand
-  , onlineCommand
   , helpCommand commands DefaultLevel (Just $ \prefix -> "*Visibility 'maybe' and 'defined' hide the stat when the value is undefined.*\n"
                                                 <> "**Stat names:** wins, losses, wlr, winsuntil, beststreak, currentstreak, bestdailystreak, bowhits, bowshots, accuracy\n"
                                                 <> "**Example:** `" <> prefix <> "show accuracy` makes accuracy visible in the `" <> prefix <> "s` command\n" ) "settings" "settings"
