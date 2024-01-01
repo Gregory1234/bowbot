@@ -13,7 +13,7 @@ import qualified Data.Text as T
 
 discordGuildMembers :: (MonadIOReader m r, Has DiscordHandle r) => GuildId -> m [GuildMember]
 discordGuildMembers gid = do
-  members <- call $ R.ListGuildMembers gid R.GuildMembersTiming { R.guildMembersTimingLimit = Just 500, R.guildMembersTimingAfter = Nothing } -- TODO: what if there are more?
+  members <- call $ R.ListGuildMembers gid R.GuildMembersTiming { R.guildMembersTimingLimit = Just 1000, R.guildMembersTimingAfter = Nothing } -- TODO: what if there are more?
   case members of
     Left e -> do
       logErrorFork $ showt e
