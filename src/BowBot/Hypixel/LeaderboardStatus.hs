@@ -3,7 +3,7 @@
 module BowBot.Hypixel.LeaderboardStatus where
 
 import BowBot.Utils
-import BowBot.DB.Typed
+import BowBot.DB.Basic
 import Language.MySQL.Query
 import BowBot.Minecraft.Basic
 
@@ -31,10 +31,10 @@ instance FromField IsBanned where
     _ -> Left "Wrong ban status")
 
 getHypixelIsBannedByUUID :: (MonadIOReader m r, Has Connection r) => UUID -> m IsBanned
-getHypixelIsBannedByUUID uuid = fromMaybe NotBanned <$> queryOnlyLogT [mysql|SELECT `hypixel` FROM `minecraft` WHERE `uuid` = uuid|]
+getHypixelIsBannedByUUID uuid = fromMaybe NotBanned <$> queryOnlyLog [mysql|SELECT `hypixel` FROM `minecraft` WHERE `uuid` = uuid|]
 
 setHypixelIsBannedByUUID :: (MonadIOReader m r, Has Connection r) => UUID -> IsBanned -> m Bool
-setHypixelIsBannedByUUID uuid banned = (>0) <$> executeLogT [mysql|UPDATE `minecraft` SET `hypixel` = banned WHERE `uuid` = uuid|]
+setHypixelIsBannedByUUID uuid banned = (>0) <$> executeLog [mysql|UPDATE `minecraft` SET `hypixel` = banned WHERE `uuid` = uuid|]
 
 getHypixelUnbanned :: (MonadIOReader m r, Has Connection r) => m [UUID]
-getHypixelUnbanned = queryLogT [mysql|SELECT `uuid` FROM `minecraft` WHERE `hypixel` = 'normal'|]
+getHypixelUnbanned = queryLog [mysql|SELECT `uuid` FROM `minecraft` WHERE `hypixel` = 'normal'|]

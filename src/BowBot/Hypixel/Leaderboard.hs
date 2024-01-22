@@ -6,7 +6,7 @@ module BowBot.Hypixel.Leaderboard where
 import BowBot.Hypixel.Stats
 import qualified Data.HashMap.Strict as HM
 import BowBot.Minecraft.Basic (UUID(..))
-import BowBot.DB.Typed
+import BowBot.DB.Basic
 import BowBot.Utils
 import BowBot.Hypixel.Basic (HypixelApi(..))
 import BowBot.Network.Basic
@@ -39,7 +39,7 @@ completeHypixelBowStats s Nothing = s
 completeHypixelBowStats s (Just HypixelBowLeaderboardEntry {..}) = s { bestWinstreak = completeCachedMaybe bowLbWinstreakTimestamp (bestWinstreak s) bowLbWinstreak }
 
 getHypixelBowLeaderboards :: (MonadIOReader m r, HasAll '[Connection] r) => m (HM.HashMap UUID HypixelBowLeaderboardEntry)
-getHypixelBowLeaderboards = HM.fromList <$> queryLogT [mysql|SELECT `minecraft_uuid`, HypixelBowLeaderboardEntry FROM `hypixel_bow_stats`|]
+getHypixelBowLeaderboards = HM.fromList <$> queryLog [mysql|SELECT `minecraft_uuid`, HypixelBowLeaderboardEntry FROM `hypixel_bow_stats`|]
 
 updateHypixelBowLeaderboards :: (MonadIOReader m r, HasAll '[Manager, CounterState, Connection] r) => m ()
 updateHypixelBowLeaderboards = do
@@ -59,13 +59,13 @@ updateHypixelBowLeaderboards = do
     wait
     newVals <- fmap (catMaybes . concat) $ liftIO $ for chunked $ \chunk -> mapConcurrently (fmap (`runReaderT` ctx) helper) chunk
     liftIO $ (`runReaderT` ctx) $ withTransaction $ do
-      void $ executeLogT [mysql|INSERT INTO `hypixel_bow_stats`(`minecraft_uuid`, HypixelBowLeaderboardEntry) VALUES newVals..|]
+      void $ executeLog [mysql|INSERT INTO `hypixel_bow_stats`(`minecraft_uuid`, HypixelBowLeaderboardEntry) VALUES newVals..|]
 
 getHypixelBowLeaderboardEntryByUUID :: (MonadIOReader m r, Has Connection r) => UUID -> m (Maybe HypixelBowLeaderboardEntry)
-getHypixelBowLeaderboardEntryByUUID uuid = queryOnlyLogT [mysql|SELECT HypixelBowLeaderboardEntry FROM `hypixel_bow_stats` WHERE `minecraft_uuid` = uuid|]
+getHypixelBowLeaderboardEntryByUUID uuid = queryOnlyLog [mysql|SELECT HypixelBowLeaderboardEntry FROM `hypixel_bow_stats` WHERE `minecraft_uuid` = uuid|]
 
 setHypixelBowLeaderboardEntryByUUID :: (MonadIOReader m r, Has Connection r) => UUID -> HypixelBowLeaderboardEntry -> m Bool
-setHypixelBowLeaderboardEntryByUUID uuid entry = (>0) <$> executeLogT [mysql|INSERT INTO `hypixel_bow_stats`(`minecraft_uuid`, HypixelBowLeaderboardEntry) VALUES (uuid,entry)|]
+setHypixelBowLeaderboardEntryByUUID uuid entry = (>0) <$> executeLog [mysql|INSERT INTO `hypixel_bow_stats`(`minecraft_uuid`, HypixelBowLeaderboardEntry) VALUES (uuid,entry)|]
 
 removeHypixelBowLeaderboardEntryByUUID :: (MonadIOReader m r, Has Connection r) => UUID -> m Bool
-removeHypixelBowLeaderboardEntryByUUID uuid = (>0) <$> executeLogT [mysql|DELETE FROM `hypixel_bow_stats` WHERE `minecraft_uuid` = uuid|]
+removeHypixelBowLeaderboardEntryByUUID uuid = (>0) <$> executeLog [mysql|DELETE FROM `hypixel_bow_stats` WHERE `minecraft_uuid` = uuid|]

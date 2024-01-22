@@ -1,3 +1,5 @@
+{-# LANGUAGE QuasiQuotes #-}
+
 module BowBot.Network.ClearLogs where
 
 import BowBot.Utils
@@ -12,7 +14,7 @@ import qualified Data.ByteString as BS
 
 clearLogs :: (MonadIOReader m r, Has Connection r) => m ()
 clearLogs = do -- TODO: timezones?
-  logs :: [(UTCTime, Text, Text)] <- queryLog_ "SELECT `timestamp`,`message`,`type` FROM `logs`"
+  logs :: [(UTCTime, Text, Text)] <- queryLog [mysql|SELECT `timestamp`,`message`,`type` FROM `logs`|]
   let showLogLine (time, msg, typ) = "[" <> typ <> ", " <> pack (formatTime defaultTimeLocale "%d %b %Y %H:%M:%S" time) <> "]: " <> msg
   let logsFile = T.unlines $ map showLogLine logs
   let zippedLogsFile = compress $ BS.fromStrict $ T.encodeUtf8 logsFile
@@ -24,4 +26,4 @@ clearLogs = do -- TODO: timezones?
     date <- getTime "%d %b %Y %H:%M"
     let subject = "Bowbot logs " <> pack date
     renderSendMailCustom "/usr/sbin/sendmail" ["-t", "-i"] $ simpleMail from [to] [] [] subject [plainPart "...", filePartBS "application/octet-stream" "logs.gz" zippedLogsFile]
-  void $ executeLog_ "DELETE FROM `logs`"
+  void $ executeLog [mysql|DELETE FROM `logs`|]

@@ -6,7 +6,7 @@ module BowBot.Hypixel.TimeStats where
 import BowBot.Hypixel.Stats
 import BowBot.Hypixel.Leaderboard
 import BowBot.Minecraft.Basic
-import BowBot.DB.Typed
+import BowBot.DB.Basic
 import BowBot.Utils
 import BowBot.Settings.Basic
 import BowBot.Discord.Utils
@@ -82,10 +82,10 @@ showMaybeHypixelBowTimeStats MonthlyStats _ _ Nothing = "- **Monthly data isn't 
 showMaybeHypixelBowTimeStats tm s t (Just v) = showHypixelBowTimeStats tm s t v
 
 updateHypixelBowTimeStats :: (MonadIOReader m r, Has Connection r) => StatsTimeRange -> m ()
-updateHypixelBowTimeStats time = void $ executeLogT [mysql|INSERT INTO `hypixel_bow_timed_stats`(`minecraft_uuid`,`time`,HypixelBowTimeStats) SELECT `minecraft_uuid`,time, (`wins`,`losses`,`last_update`) FROM `hypixel_bow_stats`|]
+updateHypixelBowTimeStats time = void $ executeLog [mysql|INSERT INTO `hypixel_bow_timed_stats`(`minecraft_uuid`,`time`,HypixelBowTimeStats) SELECT `minecraft_uuid`,time, (`wins`,`losses`,`last_update`) FROM `hypixel_bow_stats`|]
 
 getHypixelBowTimeStatsByUUID :: (MonadIOReader m r, Has Connection r) => StatsTimeRange -> UUID -> m (Maybe HypixelBowTimeStats)
-getHypixelBowTimeStatsByUUID time uuid = queryOnlyLogT [mysql|SELECT HypixelBowTimeStats FROM `hypixel_bow_timed_stats` WHERE `time` = time AND `minecraft_uuid` = uuid|]
+getHypixelBowTimeStatsByUUID time uuid = queryOnlyLog [mysql|SELECT HypixelBowTimeStats FROM `hypixel_bow_timed_stats` WHERE `time` = time AND `minecraft_uuid` = uuid|]
 
 data FullHypixelBowTimeStats = FullHypixelBowTimeStats
   { currentHypixelBowStats :: HypixelBowStats

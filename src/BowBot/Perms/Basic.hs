@@ -5,7 +5,7 @@ module BowBot.Perms.Basic where
 import Discord.Types (UserId)
 import BowBot.Discord.Orphans ()
 import BowBot.Utils
-import BowBot.DB.Typed
+import BowBot.DB.Basic
 
 data PermissionLevel
   = BanLevel
@@ -35,4 +35,4 @@ instance FromField PermissionLevel where
     _ -> Left "Wrong permission level")
 
 getPermissionLevelByDiscord :: (MonadIOReader m r, Has Connection r) => UserId -> m PermissionLevel
-getPermissionLevelByDiscord discord = fromMaybe DefaultLevel <$> queryOnlyLogT [mysql|SELECT `level` FROM `permissions` WHERE `discord_id` = discord|]
+getPermissionLevelByDiscord discord = fromMaybe DefaultLevel <$> queryOnlyLog [mysql|SELECT `level` FROM `permissions` WHERE `discord_id` = discord|]

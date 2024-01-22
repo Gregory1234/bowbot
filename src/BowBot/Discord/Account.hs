@@ -7,7 +7,7 @@ module BowBot.Discord.Account (
 ) where
 
 import BowBot.Discord.Utils
-import BowBot.DB.Typed
+import BowBot.DB.Basic
 import BowBot.BotData.Info
 import qualified Discord.Requests as R
 import Data.List (deleteFirstsBy)
@@ -21,10 +21,10 @@ data DiscordAccount = DiscordAccount { discordId :: !UserId, discordName :: !Dis
 $(pure [])
 
 getDiscordAccountById :: (MonadIOReader m r, Has Connection r) => UserId -> m (Maybe DiscordAccount)
-getDiscordAccountById did = queryOnlyLogT [mysql|SELECT DiscordAccount FROM `discord` WHERE `id` = did|]
+getDiscordAccountById did = queryOnlyLog [mysql|SELECT DiscordAccount FROM `discord` WHERE `id` = did|]
 
 getDiscordGuildMemberAccounts :: (MonadIOReader m r, Has Connection r) => m [DiscordAccount]
-getDiscordGuildMemberAccounts = queryLogT [mysql|SELECT DiscordAccount FROM `discord` WHERE `member`|]
+getDiscordGuildMemberAccounts = queryLog [mysql|SELECT DiscordAccount FROM `discord` WHERE `member`|]
 
 guildMemberToDiscordAccount :: GuildMember -> DiscordAccount
 guildMemberToDiscordAccount gmem = DiscordAccount
@@ -41,13 +41,13 @@ userToDiscordAccount user@User {..} = DiscordAccount
   }
 
 storeDiscordAccount :: (MonadIOReader m r, Has Connection r) => DiscordAccount -> m ()
-storeDiscordAccount acc = void $ executeLogT [mysql|INSERT INTO `discord`(DiscordAccount) VALUES acc|]
+storeDiscordAccount acc = void $ executeLog [mysql|INSERT INTO `discord`(DiscordAccount) VALUES acc|]
 
 updateDiscordAccountCache :: (MonadIOReader m r, HasAll '[InfoCache, DiscordHandle, Connection] r) => m ()
 updateDiscordAccountCache = do
   gid <- askInfo discordGuildIdInfo
   members <- map guildMemberToDiscordAccount . filter (\GuildMember {..} -> fmap userIsBot memberUser == Just False) <$> discordGuildMembers gid
-  current :: [DiscordAccount] <- queryLogT [mysql|SELECT DiscordAccount FROM `discord`|]
+  current :: [DiscordAccount] <- queryLog [mysql|SELECT DiscordAccount FROM `discord`|]
   updatedNonMembers <- for (deleteFirstsBy (\a b -> discordId a == discordId b) current members) $ \du -> do
     u' <- call $ R.GetUser (discordId du)
     case u' of
@@ -56,4 +56,4 @@ updateDiscordAccountCache = do
         return du
       Right u -> return $ userToDiscordAccount u
   let toInsert = filter (`notElem` current) $ members ++ updatedNonMembers
-  void $ executeLogT [mysql|INSERT INTO `discord`(DiscordAccount) VALUES toInsert..|] 
+  void $ executeLog [mysql|INSERT INTO `discord`(DiscordAccount) VALUES toInsert..|] 

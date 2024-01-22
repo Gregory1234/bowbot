@@ -3,7 +3,7 @@
 module BowBot.Birthday.Basic where
 
 import BowBot.Discord.Utils
-import BowBot.DB.Typed
+import BowBot.DB.Basic
 import BowBot.Account.Register
 import BowBot.Account.Basic
 import qualified Data.Text as T
@@ -41,10 +41,10 @@ currentBirthdayDate = fromJust . birthdayFromString . pack <$> getTime "%d.%m"
 setBirthday :: (MonadIOReader m r, Has Connection r) => UserId -> BirthdayDate -> m ()
 setBirthday did bd = do
   bid' <- getOrCreateDummyBowBotAccount did
-  for_ bid' $ \bid -> executeLogT [mysql|INSERT INTO `account` (`id`, ^`birthday`) VALUES (bid, bd)|]
+  for_ bid' $ \bid -> executeLog [mysql|INSERT INTO `account` (`id`, ^`birthday`) VALUES (bid, bd)|]
 
 getBirthdaysByDate :: (MonadIOReader m r, Has Connection r) => BirthdayDate -> m [UserId]
-getBirthdaysByDate date = queryLogT [mysql|SELECT `account_discord`.`discord_id` FROM `account_discord` JOIN `account` ON `id`=`account_discord`.`account_id` WHERE `birthday` = date|]
+getBirthdaysByDate date = queryLog [mysql|SELECT `account_discord`.`discord_id` FROM `account_discord` JOIN `account` ON `id`=`account_discord`.`account_id` WHERE `birthday` = date|]
 
 getBirthdayByDiscord :: (MonadIOReader m r, Has Connection r) => UserId -> m (Maybe BirthdayDate)
-getBirthdayByDiscord discord = queryOnlyLogT [mysql|SELECT `birthday` FROM `account_discord` JOIN `account` ON `id`=`account_discord`.`account_id` WHERE `account_discord`.`discord_id` = discord|]
+getBirthdayByDiscord discord = queryOnlyLog [mysql|SELECT `birthday` FROM `account_discord` JOIN `account` ON `id`=`account_discord`.`account_id` WHERE `account_discord`.`discord_id` = discord|]

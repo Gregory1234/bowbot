@@ -10,7 +10,7 @@ import BowBot.Discord.Utils
 import BowBot.Counter.Basic
 import BowBot.Account.Basic
 import qualified Data.HashMap.Strict as HM
-import BowBot.DB.Typed
+import BowBot.DB.Basic
 import BowBot.Network.Basic
 import qualified Data.Text as T
 import Data.Bifunctor (first)
@@ -47,7 +47,7 @@ giveRolesDivisionTitle gmem maxWins = do
 
 applyRolesDivisionTitleByBowBotId' :: (MonadIOReader m r, HasAll '[Connection, DiscordHandle, InfoCache] r) => BowBotId -> [GuildMember] -> m ()
 applyRolesDivisionTitleByBowBotId' bid gmems = do
-  wins :: [Integer] <- queryLogT [mysql|SELECT `wins` FROM `hypixel_bow_stats` JOIN `account_minecraft` ON `minecraft_uuid` = `hypixel_bow_stats`.`minecraft_uuid` WHERE `account_id` = bid|]
+  wins :: [Integer] <- queryLog [mysql|SELECT `wins` FROM `hypixel_bow_stats` JOIN `account_minecraft` ON `minecraft_uuid` = `hypixel_bow_stats`.`minecraft_uuid` WHERE `account_id` = bid|]
   for_ gmems $ \gmem -> do
     giveRolesDivisionTitle gmem (foldl' max 0 wins)
 
@@ -99,10 +99,10 @@ giveIllegalRole gmem = do
 
 applyRolesByBowBotId' :: (MonadIOReader m r, HasAll '[Connection, DiscordHandle, Manager, CounterState, InfoCache] r) => Maybe BowBotId -> [GuildMember] -> m ()
 applyRolesByBowBotId' (Just bid) gmems = do
-  wins :: [Integer] <- queryLogT [mysql|SELECT `wins` FROM `hypixel_bow_stats` JOIN `account_minecraft` ON `minecraft_uuid` = `hypixel_bow_stats`.`minecraft_uuid` WHERE `account_id` = bid|]
-  savedRoles :: [SavedRole] <- fromMaybe [] <$> queryOnlyLogT [mysql|SELECT `roles` FROM `account` WHERE `id` = bid|]
+  wins :: [Integer] <- queryLog [mysql|SELECT `wins` FROM `hypixel_bow_stats` JOIN `account_minecraft` ON `minecraft_uuid` = `hypixel_bow_stats`.`minecraft_uuid` WHERE `account_id` = bid|]
+  savedRoles :: [SavedRole] <- fromMaybe [] <$> queryOnlyLog [mysql|SELECT `roles` FROM `account` WHERE `id` = bid|]
   -- TODO: support smart casts for IS NOT NULL
-  hypixelRoles :: [HypixelRole] <- queryLogT [mysql|SELECT `hypixel_role` OVERRIDE HypixelRole FROM `minecraft` JOIN `account_minecraft` ON `minecraft_uuid` = `minecraft`.`uuid` WHERE `account_minecraft`.`account_id` = bid AND `hypixel_role` <> NULL|]
+  hypixelRoles :: [HypixelRole] <- queryLog [mysql|SELECT `hypixel_role` OVERRIDE HypixelRole FROM `minecraft` JOIN `account_minecraft` ON `minecraft_uuid` = `minecraft`.`uuid` WHERE `account_minecraft`.`account_id` = bid AND `hypixel_role` <> NULL|]
   for_ gmems $ \gmem -> do
     giveSavedRoles gmem savedRoles (Just hypixelRoles)
     giveRolesDivisionTitle gmem (foldl' max 0 wins)
@@ -129,11 +129,11 @@ applyRolesAll :: (MonadIOReader m r, HasAll '[Connection, DiscordHandle, Manager
 applyRolesAll = do
   lb <- getHypixelBowLeaderboards
   -- TODO: support smart casts for IS NOT NULL
-  savedRoles :: M.Map UserId [SavedRole] <- M.fromList <$> queryLogT [mysql|SELECT `discord_id`, `roles` FROM `account` JOIN `account_discord` ON `account_id` = `account`.`id`|]
+  savedRoles :: M.Map UserId [SavedRole] <- M.fromList <$> queryLog [mysql|SELECT `discord_id`, `roles` FROM `account` JOIN `account_discord` ON `account_id` = `account`.`id`|]
   gid <- askInfo discordGuildIdInfo
   gmems <- discordGuildMembers gid
-  roles :: [(UUID, HypixelRole)] <- queryLogT [mysql|SELECT `uuid`, `hypixel_role` OVERRIDE HypixelRole FROM `minecraft` WHERE `hypixel_role` <> NULL|]
-  accountMinecrafts :: M.Map UserId [UUID] <- M.map (map snd) . groupByToMap fst <$> queryLogT [mysql|SELECT `account_discord`.`discord_id`, `account_minecraft`.`minecraft_uuid` FROM `account_minecraft` JOIN `account_discord` ON `account_id` = `account_minecraft`.`account_id`|]
+  roles :: [(UUID, HypixelRole)] <- queryLog [mysql|SELECT `uuid`, `hypixel_role` OVERRIDE HypixelRole FROM `minecraft` WHERE `hypixel_role` <> NULL|]
+  accountMinecrafts :: M.Map UserId [UUID] <- M.map (map snd) . groupByToMap fst <$> queryLog [mysql|SELECT `account_discord`.`discord_id`, `account_minecraft`.`minecraft_uuid` FROM `account_minecraft` JOIN `account_discord` ON `account_id` = `account_minecraft`.`account_id`|]
   for_ gmems $ \gmem -> do
     let discord = maybe 0 userId (memberUser gmem)
     case accountMinecrafts M.!? discord of

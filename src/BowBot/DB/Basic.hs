@@ -1,17 +1,22 @@
+{-# LANGUAGE QuasiQuotes #-}
+
 module BowBot.DB.Basic(
-  module BowBot.DB.Basic, Connection, Param, Result, ToField(..), textSqlTypes, FromField(..), ToMysql(..), FromMysql(..), StateT(..), SimpleValue(..), Generic(..), Generically(..)
+  module BowBot.DB.Basic, module Language.MySQL.Quasi, Connection, Q.Param, Q.Result, Q.ToField(..), textSqlTypes, Q.FromField(..), ToMysql(..), FromMysql(..), StateT(..), SimpleValue(..), Generic(..), Generically(..)
 ) where
 
 import BowBot.Utils
-import Database.MySQL.Simple hiding (withTransaction, commit, rollback, insertID)
-import qualified Database.MySQL.Simple as M (withTransaction, commit, rollback, insertID)
-import Database.MySQL.Simple.Types (Query(..))
+import Database.MySQL.Base (ConnectInfo(..), connect, close, defaultConnectInfo)
+import qualified Database.MySQL.Simple as Q
+import qualified Database.MySQL.Simple.Types as Q
 import Data.Int (Int64)
 import Control.Exception.Base (bracket)
 import Control.Concurrent (forkIO)
-import Data.Time (getCurrentTime)
-import Language.MySQL.Query hiding (RenderedQuery(..), Query, RenderedCommand(..), Command)
+import Data.Time (getCurrentTime, UTCTime)
+import Language.MySQL.Query
+import Language.MySQL.Quasi
 import Data.Coerce (coerce)
+import Data.ByteString
+import qualified Data.Text.IO as T
 
 
 withDB :: MonadHoistIO m => (Connection -> m a) -> m a -- TODO: report connection errors
@@ -23,111 +28,85 @@ withDB f = do
   connectDatabase <- liftIO $ getEnvOrThrow "DB_NAME"
   hoistIOWithArg (bracket (liftIO $ connect $ defaultConnectInfo { connectHost, connectUser, connectPassword, connectDatabase }) close) f
 
-logInfo' :: MonadIO m => Connection -> Text -> m ()
-logInfo' conn msg = liftIO $ void $ do
-  putStrLn (unpack msg)
-  time <- getCurrentTime
-  execute conn "INSERT INTO `logs`(`message`, `timestamp`) VALUES (?,?)" (msg, time)
+query' :: forall r. FromMysql r => Connection -> RenderedQuery r -> IO [r]
+query' conn (RenderedQuery q) = coerce $ Q.query_ @(Flattened r) conn (Q.Query q)
+
+execute' :: Connection -> RenderedCommand -> IO (Maybe Int64)
+execute' _ (RenderedCommand Nothing) = pure Nothing
+execute' conn (RenderedCommand (Just q)) = Just <$> Q.execute_ conn (Q.Query q)
+
+withoutLogging :: (MonadIOReader m rd, Has Connection rd) => (Connection -> q -> IO r) -> (Connection -> IO q) -> m r
+withoutLogging exec q = do
+  conn <- asks getter
+  q' <- liftIO $ q conn
+  liftIO $ exec conn q'
+
+query :: (MonadIOReader m rd, Has Connection rd, FromMysql r) => Query r -> m [r]
+query = withoutLogging query'
+
+execute :: (MonadIOReader m r, Has Connection r) => Command -> m Int64
+execute = fmap (fromMaybe 0) . withoutLogging execute'
+
+-- TODO: remove repetition
 
 logInfo :: (MonadIOReader m r, Has Connection r) => Text -> m ()
 logInfo msg = do
-  conn <- asks getter
-  logInfo' conn msg
-
-logInfoFork :: MonadIO m => Text -> m ()
-logInfoFork msg = void $ liftIO $ do
-  putStrLn (unpack msg)
-  time <- getCurrentTime
-  forkIO $ withDB $ \conn -> void $ execute conn "INSERT INTO `logs`(`message`, `timestamp`) VALUES (?,?)" (msg, time)
-
-logError' :: MonadIO m => Connection -> Text -> m ()
-logError' conn msg = liftIO $ void $ do
-  putStrLn (unpack msg)
-  time <- getCurrentTime
-  execute conn "INSERT INTO `logs`(`message`,`timestamp`,`type`) VALUES (?,?,'error')" (msg, time)
+  liftIO $ T.putStrLn msg
+  time <- liftIO getCurrentTime
+  void $ execute [mysql|INSERT INTO `logs`(`message`, `timestamp`) VALUES (msg, time)|]
 
 logError :: (MonadIOReader m r, Has Connection r) => Text -> m ()
 logError msg = do
-  conn <- asks getter
-  logError' conn msg
+  liftIO $ T.putStrLn msg
+  time <- liftIO getCurrentTime
+  void $ execute [mysql|INSERT INTO `logs`(`message`, `timestamp`,`type`) VALUES (msg, time, "error")|]
+
+logInfoFork :: MonadIO m => Text -> m ()
+logInfoFork msg = do
+  liftIO $ T.putStrLn msg
+  time <- liftIO getCurrentTime
+  liftIO $ void $ forkIO $ withDB $ runReaderT $ void $ execute [mysql|INSERT INTO `logs`(`message`, `timestamp`) VALUES (msg, time)|]
 
 logErrorFork :: MonadIO m => Text -> m ()
-logErrorFork msg = void $ liftIO $ do
-  putStrLn (unpack msg)
-  time <- getCurrentTime
-  forkIO $ withDB $ \conn -> void $ execute conn "INSERT INTO `logs`(`message`,`timestamp`,`type`) VALUES (?,?,'error')" (msg, time)
+logErrorFork msg = do
+  liftIO $ T.putStrLn msg
+  time <- liftIO getCurrentTime
+  liftIO $ void $ forkIO $ withDB $ runReaderT $ void $ execute [mysql|INSERT INTO `logs`(`message`, `timestamp`,`type`) VALUES (msg, time, "error")|]
 
-queryLog :: forall q r m rd. (ToMysql q, FromMysql r, MonadIOReader m rd, Has Connection rd) => Query -> q -> m [r]
-queryLog q d = do
+withLogging :: (MonadIOReader m rd, Has Connection rd) => (Connection -> q -> IO r) -> (q -> Maybe ByteString) -> (Connection -> IO q) -> m r
+withLogging exec toShow q = do
   conn <- asks getter
-  trueQuery <- liftIO $ formatQuery @(Flattened q) conn q (coerce d)
-  logInfo' conn $ "Executing query: " <> showt trueQuery
-  liftIO $ coerce $ query @(Flattened q) @(Flattened r) conn q (coerce d)
+  q' <- liftIO $ q conn
+  logInfo $ case toShow q' of
+    Nothing -> "Tried executing query with no data!"
+    Just str -> "Executing query: " <> showt str
+  liftIO $ exec conn q'
 
-queryLog_ :: forall r m rd. (FromMysql r, MonadIOReader m rd, Has Connection rd) => Query -> m [r]
-queryLog_ q = do
-  conn <- asks getter
-  logInfo' conn $ "Executing query: " <> showt (fromQuery q)
-  liftIO $ coerce $ query_ @(Flattened r) conn q
+queryLog :: (MonadIOReader m rd, Has Connection rd, FromMysql r) => Query r -> m [r]
+queryLog = withLogging query' (\(RenderedQuery q) -> Just q)
 
-queryOnlyLog :: forall q r m rd. (ToMysql q, FromMysql r, MonadIOReader m rd, Has Connection rd) => Query -> q -> m (Maybe r)
-queryOnlyLog q d = do
-  res <- queryLog q d
-  when (length res > 1) $ logError "More query results than expected!"
-  return $ only res
+queryOnlyLog :: (MonadIOReader m rd, Has Connection rd, FromMysql r) => Query r -> m (Maybe r)
+queryOnlyLog = fmap only . queryLog
 
-executeLog :: forall q r m. (ToMysql q, MonadIOReader m r, Has Connection r) => Query -> q -> m Int64
-executeLog q d = do
-  conn <- asks getter
-  trueQuery <- liftIO $ formatQuery @(Flattened q) conn q (coerce d)
-  logInfo' conn $ "Executing query: " <> showt trueQuery
-  liftIO $ execute @(Flattened q) conn q (coerce d)
-
-executeLog_ :: forall r m. (MonadIOReader m r, Has Connection r) => Query -> m Int64
-executeLog_ q = do
-  conn <- asks getter
-  logInfo' conn $ "Executing query: " <> showt (fromQuery q)
-  liftIO $ execute_ conn q
-
-executeManyLog :: forall q r m. (ToMysql q, MonadIOReader m r, Has Connection r) => Query -> [q] -> m Int64
-executeManyLog q [] = do
-  logInfo $ "Tried executing query with no data: " <> showt (fromQuery q)
-  return 0
-executeManyLog q d = do
-  conn <- asks getter
-  trueQuery <- liftIO $ formatMany @(Flattened q) conn q (coerce d)
-  logInfo' conn $ "Executing query: " <> showt trueQuery
-  liftIO $ executeMany @(Flattened q) conn q (coerce d)
-
-withTransaction' :: (MonadHoistIO m) => Connection -> m a -> m a
-withTransaction' conn a = do
-  hoistIO (M.withTransaction conn) a
+executeLog :: (MonadIOReader m rd, Has Connection rd) => Command -> m Int64
+executeLog = fmap (fromMaybe 0) . withLogging execute' (\(RenderedCommand q) -> q)
 
 withTransaction :: (MonadHoistIOReader m r, Has Connection r) => m a -> m a
 withTransaction a = do
   conn <- asks getter
-  withTransaction' conn a
-
-commit' :: (MonadIO m) => Connection -> m ()
-commit' conn = liftIO $ M.commit conn
+  hoistIO (Q.withTransaction conn) a
 
 commit :: (MonadIOReader m r, Has Connection r) => m ()
 commit = do
   conn <- asks getter
-  commit' conn
-
-rollback' :: (MonadIO m) => Connection -> m ()
-rollback' conn = liftIO $ M.rollback conn
+  liftIO $ Q.commit conn
 
 rollback :: (MonadIOReader m r, Has Connection r) => m ()
 rollback = do
   conn <- asks getter
-  rollback' conn
-
-insertID' :: (MonadIO m, Num a) => Connection -> m a
-insertID' conn = liftIO $ fromIntegral <$> M.insertID conn
+  liftIO $ Q.rollback conn
 
 insertID :: (MonadIOReader m r, Has Connection r, Num a) => m a
 insertID = do
   conn <- asks getter
-  insertID' conn
+  liftIO $ fromIntegral <$> Q.insertID conn

@@ -16,7 +16,7 @@ import qualified Data.Text as T
 import Data.Bifunctor (second)
 import BowBot.Command.Utils
 import Data.Ord
-import BowBot.DB.Typed
+import BowBot.DB.Basic
 
 data LeaderboardType s a = LeaderboardType
   { leaderboardName :: !Text
@@ -92,7 +92,7 @@ leaderboardCommand lbt@LeaderboardType {..} name = Command CommandInfo
                 gmems <- getHypixelGuildMembers
                 return $ filter ((`elem` gmems) . fst) lbFull
               else return lbFull
-      accs <- HM.fromList . map (\x -> (mcUUID x, x)) <$> queryLogT [mysql|SELECT MinecraftAccount FROM `minecraft`|]
+      accs <- HM.fromList . map (\x -> (mcUUID x, x)) <$> queryLog [mysql|SELECT MinecraftAccount FROM `minecraft`|]
       let lbParsed = mapMaybe (sequence . second leaderboardParser) lb
       let lbSorted = sortOn (Down . snd) lbParsed
       return $ zipWith (\lbRowIndex (uuid, lbRowValue) -> LeaderboardRow {lbRowAccount = accs HM.! uuid, lbRowSelected = uuid `elem` selected, ..}) [1..] lbSorted

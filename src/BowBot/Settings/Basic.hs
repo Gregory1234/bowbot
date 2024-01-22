@@ -5,7 +5,7 @@ module BowBot.Settings.Basic where
 
 import Discord.Types (UserId)
 import BowBot.Discord.Orphans ()
-import BowBot.DB.Typed
+import BowBot.DB.Basic
 import BowBot.Utils
 
 data SettingBin = Yes | No deriving (Show, Eq, Ord, Enum)
@@ -66,10 +66,10 @@ data Settings = Settings
 $(pure [])
 
 getSettingsByDiscord :: (MonadIOReader m r, Has Connection r) => UserId -> m Settings
-getSettingsByDiscord discord = fromMaybe defSettings <$> queryOnlyLogT [mysql|SELECT Settings FROM `settings` WHERE `discord_id` = discord|]
+getSettingsByDiscord discord = fromMaybe defSettings <$> queryOnlyLog [mysql|SELECT Settings FROM `settings` WHERE `discord_id` = discord|]
 
 setSettingsByDiscord :: (MonadIOReader m r, Has Connection r) => UserId -> Settings -> m Bool
-setSettingsByDiscord discord settings = (>0) <$> executeLogT [mysql|INSERT INTO `settings`(`discord_id`, Settings) VALUES (discord, settings)|]
+setSettingsByDiscord discord settings = (>0) <$> executeLog [mysql|INSERT INTO `settings`(`discord_id`, Settings) VALUES (discord, settings)|]
 
 defSettings :: Settings
 defSettings = Settings

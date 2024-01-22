@@ -4,7 +4,7 @@ module BowBot.BotData.Info(
   module BowBot.BotData.Info, readEither
 ) where
 
-import BowBot.DB.Typed
+import BowBot.DB.Basic
 import Discord.Internal.Rest (GuildId)
 import BowBot.Utils
 import Text.Read (readEither)
@@ -18,7 +18,7 @@ newtype InfoCache = InfoCache (TVar (M.Map Text Text))
 refreshInfoCache :: (MonadIOReader m r, HasAll '[InfoCache, Connection] r) => m ()
 refreshInfoCache = do
   InfoCache cache <- asks getter
-  res :: [(Text, Text)] <- queryLogT [mysql|SELECT `name`, `value` FROM `bot_info`|]
+  res :: [(Text, Text)] <- queryLog [mysql|SELECT `name`, `value` FROM `bot_info`|]
   liftIO $ atomically $ writeTVar cache (M.fromList res)
 
 downloadInfoCache :: IO InfoCache
