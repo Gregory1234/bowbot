@@ -30,7 +30,6 @@ dependencies:
 - data-has
 - text-show
 - mysql
-- smtp-mail
 - mime-mail
 - zlib
 # only for mysql quasi quoter

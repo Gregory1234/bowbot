@@ -3,7 +3,6 @@
 module BowBot.Network.ClearLogs where
 
 import BowBot.Utils
-import Network.Mail.SMTP
 import Network.Mail.Mime hiding (simpleMail)
 import BowBot.DB.Basic
 import Data.Time
@@ -25,5 +24,7 @@ clearLogs = do -- TODO: timezones?
     let to = Address Nothing (pack mailTo)
     date <- getTime "%d %b %Y %H:%M"
     let subject = "Bowbot logs " <> pack date
-    renderSendMailCustom "/usr/sbin/sendmail" ["-t", "-i"] $ simpleMail from [to] [] [] subject [plainPart "...", filePartBS "application/octet-stream" "logs.gz" zippedLogsFile]
+    renderSendMailCustom "/usr/sbin/sendmail" ["-t", "-i"] 
+        $ addAttachmentBS "application/octet-stream" "logs.gz" zippedLogsFile 
+        $ simpleMail' to from subject "..."
   void $ executeLog [mysql|DELETE FROM `logs`|]
