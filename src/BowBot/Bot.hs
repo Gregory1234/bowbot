@@ -81,13 +81,13 @@ backgroundMinutely mint = do
           (0, _, _) -> [DailyStats]
           _ -> []
     when (hour == 5) announceBirthdays
-    updateBotData times
-    announceMilestones
-    updateSavedRolesAll
-    applyRolesAll
+    when (even hour) $ do
+      updateBotData times
+      announceMilestones
+      updateSavedRolesAll
+      applyRolesAll
     updateMinecraftAccountCache hour
-    dev <- ifDev False $ return True
-    unless dev $ when (hour `mod` 8 == 0) clearLogs
+    when (hour `mod` 8 == 0) clearLogs
     logInfo "finished update"
 
 onStartup :: Manager -> CounterState -> InfoCache -> DiscordHandle -> IO ()

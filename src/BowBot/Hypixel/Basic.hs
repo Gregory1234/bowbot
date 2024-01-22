@@ -9,7 +9,7 @@ import BowBot.DB.Basic
 data HypixelApi = HypixelApi
 
 instance Counted HypixelApi where
-  counterLimit _ = 100
+  counterLimit _ = 50 -- TODO: use the limits provided in the response instead of counters
   counterName _ = "Hypixel"
 
 hypixelWithPlayerData :: (MonadIOReader m r, Has Manager r) => UUID -> (Object -> Parser a) -> m (Maybe a)

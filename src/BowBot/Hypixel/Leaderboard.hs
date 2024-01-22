@@ -46,7 +46,7 @@ updateHypixelBowLeaderboards = do
   ctx <- ask
   let helper uuid = fmap ((uuid,) . hypixelBowStatsToLeaderboards) <$> requestHypixelBowStats uuid
   toUpdate <- getHypixelUnbanned
-  let bigchunked = chunksOf 50 toUpdate
+  let bigchunked = chunksOf 30 toUpdate
   sequence_ $ intersperse (liftIO $ logInfoFork "Started 1 minute wait in Hypixel lb update" >> threadDelay 60000000) $ flip map bigchunked $ \bigchunk -> do
     let chunked = chunksOf 10 bigchunk
     let wait = do
