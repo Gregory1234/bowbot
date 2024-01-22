@@ -5,8 +5,7 @@ module BowBot.BotData.Info(
 ) where
 
 import BowBot.DB.Basic
-import Discord.Internal.Rest (GuildId)
-import BowBot.Utils
+import BowBot.Discord.Utils
 import Text.Read (readEither)
 import Data.Bifunctor (first)
 import qualified Data.Map.Strict as M

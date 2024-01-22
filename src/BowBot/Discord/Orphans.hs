@@ -188,12 +188,16 @@ instance NFData (R.GuildRequest a) where
   rnf (R.ModifyGuildWidget a b) = a `deepseq` b `deepseq` ()
   rnf (R.GetGuildVanityURL a) = a `deepseq` ()
 
+-- TODO: reduce the number of orphaned instances
+
+deriving newtype instance Num Snowflake
 deriving newtype instance Hashable Snowflake
 deriving newtype instance TextShow Snowflake
 deriving newtype instance Param Snowflake
 deriving newtype instance Result Snowflake
 deriving newtype instance ToMysql Snowflake
 deriving newtype instance FromMysql Snowflake
+deriving newtype instance Num (DiscordId a)
 deriving newtype instance Hashable (DiscordId a)
 deriving newtype instance TextShow (DiscordId a)
 deriving newtype instance Param (DiscordId a)
@@ -203,3 +207,4 @@ deriving newtype instance FromMysql (DiscordId a)
 
 deriving stock instance Generic RestCallErrorCode
 deriving via (FromGeneric RestCallErrorCode) instance TextShow RestCallErrorCode
+

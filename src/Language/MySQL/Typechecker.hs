@@ -11,6 +11,7 @@ import Control.Applicative
 import Data.Foldable (for_, foldlM)
 import Control.Monad.Reader
 import qualified Data.Map as M
+import Control.Monad
 
 data TypecheckConstraint
   = NameHasType Type Name

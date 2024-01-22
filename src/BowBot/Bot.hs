@@ -105,7 +105,7 @@ updateDiscordStatus = do
   discordStatus <- askInfo discordStatusInfo
   liftDiscord $ sendCommand (UpdateStatus $ UpdateStatusOpts {
         updateStatusOptsSince = Nothing,
-        updateStatusOptsGame = Just (def {activityName = discordStatus}),
+        updateStatusOptsActivities = [mkActivity discordStatus ActivityTypeGame],
         updateStatusOptsNewStatus = UpdateStatusOnline,
         updateStatusOptsAFK = False
       })

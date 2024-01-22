@@ -3,7 +3,7 @@
 module BowBot.Utils(
   module BowBot.Utils, module BowBot.HoistIO, getEnv, for, for_, readMaybe, (<|>), ($>), foldl',
   STM, atomically, TVar, newTVar, readTVar, writeTVar, modifyTVar, pack, unpack, Has(..), Text, TextShow(..),
-  module Data.Char, module Data.List, module Data.List.Split, module Data.Maybe, module Control.Monad.Reader
+  module Data.Char, module Data.List, module Data.List.Split, module Data.Maybe, module Control.Monad.Reader, module Control.Monad, module Control.Monad.Trans
 ) where
 
 import Data.Maybe
@@ -36,6 +36,8 @@ import TextShow
 import Data.ByteString.Char8 (ByteString)
 import qualified Data.ByteString.Char8 as BS
 import Control.Monad.Except (ExceptT, runExceptT)
+import Control.Monad
+import Control.Monad.Trans
 
 dist :: Text -> Text -> Int
 dist a b =
@@ -166,6 +168,3 @@ only _ = Nothing
 
 filterMaybe :: (a -> Bool) -> a -> Maybe a
 filterMaybe f a = if f a then Just a else Nothing
-
-tryError :: MonadError e m => m a -> m (Either e a)
-tryError action = (Right <$> action) `catchError` (pure . Left)
