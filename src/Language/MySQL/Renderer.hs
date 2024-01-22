@@ -181,7 +181,7 @@ renderQuery tc vars q = do
 renderSelectQuery :: TypedSelectQuery -> [TypecheckConstraint] -> Q Exp
 renderSelectQuery q@(TypedSelectQuery s _ _) tc = do
   (str, vars) <- runStateT (runRenderer $ runStrRenderer $ selectQueryStringRenderer q) M.empty
-  renderQuery tc vars [| mkQuery $(renderTypeInhabitant (typedComplexExprType s)) $(pure str) |]
+  [| forceQueryType $(renderTypeInhabitant (typedComplexExprType s)) $(renderQuery tc vars [| RenderedQuery $(pure str) |]) |]
 
 insertTargetRenderer :: TypedInsertTarget -> StrRenderer ()
 insertTargetRenderer (TypedColTarget c _) = emit $ ppColumnName c
@@ -227,13 +227,13 @@ insertQueryStringRenderer (TypedInsertQuery tn t s u) = withSpaces [emit "INSERT
 
 insertSourceCheckRenderer :: TypedInsertSource -> Q Exp -> Q Exp
 insertSourceCheckRenderer (TypedValuesSource (mapM (\case (TypedValuesRowVar n ValuesRowMany) -> Just n; _ -> Nothing) -> Just lists)) e 
-  = [| if $(foldl1 (\a b -> [| $a && $b |]) (map (\n -> [| null $(varE n) |]) lists)) then \_ -> return (Command Nothing) else $e |]
+  = [| if $(foldl1 (\a b -> [| $a && $b |]) (map (\n -> [| null $(varE n) |]) lists)) then \_ -> return (RenderedCommand Nothing) else $e |]
 insertSourceCheckRenderer _ e = e
 
 renderInsertQuery :: TypedInsertQuery -> [TypecheckConstraint] -> Q Exp
 renderInsertQuery q@(TypedInsertQuery _ _ s _) tc = do
   (str, vars) <- runStateT (runRenderer $ runStrRenderer $ insertQueryStringRenderer q) M.empty
-  insertSourceCheckRenderer s $ renderQuery tc vars [| Command (Just $(pure str)) |]
+  [| $(insertSourceCheckRenderer s $ renderQuery tc vars [| RenderedCommand (Just $(pure str)) |]) :: Command |]
 
 columnUpdateRenderer :: TypedColumnUpdate -> StrRenderer ()
 columnUpdateRenderer (TypedColumnUpdate c e) = emit (ppFullColumnName c ++ "=") *> expressionRenderer e
@@ -244,7 +244,7 @@ updateQueryStringRenderer (TypedUpdateQuery t u w) = withSpaces [emit "UPDATE", 
 renderUpdateQuery :: TypedUpdateQuery -> [TypecheckConstraint] -> Q Exp
 renderUpdateQuery q tc = do
   (str, vars) <- runStateT (runRenderer $ runStrRenderer $ updateQueryStringRenderer q) M.empty
-  renderQuery tc vars [| Command (Just $(pure str)) |]
+  [| $(renderQuery tc vars [| RenderedCommand (Just $(pure str)) |]) :: Command |]
 
 deleteQueryStringRenderer :: TypedDeleteQuery -> StrRenderer ()
 deleteQueryStringRenderer (TypedDeleteQuery t w) = withSpaces [emit $ "DELETE FROM " ++ ppTableName t, whereClauseRenderer w]
@@ -252,7 +252,7 @@ deleteQueryStringRenderer (TypedDeleteQuery t w) = withSpaces [emit $ "DELETE FR
 renderDeleteQuery :: TypedDeleteQuery -> [TypecheckConstraint] -> Q Exp
 renderDeleteQuery q tc = do
   (str, vars) <- runStateT (runRenderer $ runStrRenderer $ deleteQueryStringRenderer q) M.empty
-  renderQuery tc vars [| Command (Just $(pure str)) |]
+  [| $(renderQuery tc vars [| RenderedCommand (Just $(pure str)) |]) :: Command |]
 
 renderAnyQuery :: TypedAnyQuery -> [TypecheckConstraint] -> Q Exp
 renderAnyQuery (TypedSelectAnyQuery q) = renderSelectQuery q

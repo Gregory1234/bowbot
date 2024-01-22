@@ -12,19 +12,19 @@ import Data.Int (Int64)
 import Language.MySQL.Query
 import Language.MySQL.Quasi
 
-queryLogT :: (FromMysql r, MonadIOReader m rd, Has Connection rd) => (Connection -> IO (Query r)) -> m [r]
+queryLogT :: (FromMysql r, MonadIOReader m rd, Has Connection rd) => Query r -> m [r]
 queryLogT q = do
   conn <- asks getter
-  (Query q') <- liftIO $ q conn
+  (RenderedQuery q') <- liftIO $ q conn
   queryLog_ (Q.Query q')
 
-queryOnlyLogT :: (FromMysql r, MonadIOReader m rd, Has Connection rd) => (Connection -> IO (Query r)) -> m (Maybe r)
+queryOnlyLogT :: (FromMysql r, MonadIOReader m rd, Has Connection rd) => Query r -> m (Maybe r)
 queryOnlyLogT = fmap only . queryLogT
 
-executeLogT :: (MonadIOReader m r, Has Connection r) => (Connection -> IO Command) -> m Int64
+executeLogT :: (MonadIOReader m r, Has Connection r) => Command -> m Int64
 executeLogT q = do
   conn <- asks getter
-  (Command q') <- liftIO $ q conn
+  (RenderedCommand q') <- liftIO $ q conn
   case q' of
     Nothing -> 0 <$ logInfo "Tried executing query with no data!" -- TODO: provide more info
     Just q'' -> executeLog_ (Q.Query q'')

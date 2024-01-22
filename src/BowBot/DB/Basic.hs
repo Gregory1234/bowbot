@@ -10,7 +10,7 @@ import Data.Int (Int64)
 import Control.Exception.Base (bracket)
 import Control.Concurrent (forkIO)
 import Data.Time (getCurrentTime)
-import Language.MySQL.Query hiding (Query(..), Command(..))
+import Language.MySQL.Query hiding (RenderedQuery(..), Query, RenderedCommand(..), Command)
 import Data.Coerce (coerce)
 
 

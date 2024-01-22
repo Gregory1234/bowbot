@@ -201,13 +201,16 @@ instance MysqlInt Word32
 instance MysqlInt Word
 instance MysqlInt Word64
 
-newtype Query o = Query { fromQuery :: ByteString } deriving Show
+newtype RenderedQuery o = RenderedQuery { fromRenderedQuery :: ByteString } deriving Show
 
-newtype Command = Command { fromCommand :: Maybe ByteString } deriving Show
+newtype RenderedCommand = RenderedCommand { fromRenderedCommand :: Maybe ByteString } deriving Show
 
-mkQuery :: r -> ByteString -> Query r
-mkQuery _ = Query
-{-# INLINE mkQuery #-}
+type Query o = Q.Connection -> IO (RenderedQuery o)
+type Command = Q.Connection -> IO RenderedCommand
+
+forceQueryType :: r -> Query r -> Query r
+forceQueryType _ = id
+{-# INLINE forceQueryType #-}
 
 type family TypeNullable t :: Bool where
   TypeNullable (Maybe _) = 'True
