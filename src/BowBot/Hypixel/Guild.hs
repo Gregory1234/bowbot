@@ -15,7 +15,7 @@ import BowBot.DB.Basic
 hypixelGuildIdInfo :: InfoType Text
 hypixelGuildIdInfo = InfoType { infoName = "hypixel_guild_id", infoDefault = "", infoParse = Right }
 
-updateHypixelRoles :: (MonadHoistIOReader m r, HasAll '[InfoCache, Manager, CounterState, Connection] r) => m ()
+updateHypixelRoles :: (MonadHoistIOReader m r, HasAll '[InfoCache, Manager, CounterState, SafeMysqlConn] r) => m ()
 updateHypixelRoles = do
   cv <- tryIncreaseCounter HypixelApi 1
   case cv of
@@ -36,5 +36,5 @@ updateHypixelRoles = do
           void $ executeLog [mysql|UPDATE `minecraft` SET `hypixel_role` = NULL WHERE `uuid` NOT IN memberUUIDs|]
     _ -> return ()
 
-getHypixelGuildMembers :: (MonadIOReader m r, HasAll '[Manager, CounterState, Connection] r) => m [UUID]
+getHypixelGuildMembers :: (MonadIOReader m r, HasAll '[Manager, CounterState, SafeMysqlConn] r) => m [UUID]
 getHypixelGuildMembers = queryLog [mysql|SELECT `uuid` FROM `minecraft` WHERE `hypixel_role` <> NULL|]

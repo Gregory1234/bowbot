@@ -11,7 +11,7 @@ import Codec.Compression.GZip
 import qualified Data.Text.Encoding as T
 import qualified Data.ByteString as BS
 
-clearLogs :: (MonadIOReader m r, Has Connection r) => m ()
+clearLogs :: (MonadIOReader m r, Has SafeMysqlConn r) => m ()
 clearLogs = do -- TODO: timezones?
   logs :: [(UTCTime, Text, Text)] <- queryLog [mysql|SELECT `timestamp`,`message`,`type` FROM `logs`|]
   let showLogLine (time, msg, typ) = "[" <> typ <> ", " <> pack (formatTime defaultTimeLocale "%d %b %Y %H:%M:%S" time) <> "]: " <> msg

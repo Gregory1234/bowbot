@@ -12,25 +12,18 @@ import BowBot.Settings.Basic
 import BowBot.Discord.Utils
 import qualified Data.Text as T
 
-data StatsTimeRange = DailyStats | WeeklyStats | MonthlyStats deriving (Show, Eq)
+data StatsTimeRange = DailyStats | WeeklyStats | MonthlyStats
+  deriving (Show, Eq)
+  deriving (ToMysqlSimple, FromMysqlSimple, ToMysql, FromMysql) via (EnumValue StatsTimeRange)
 
-instance Param StatsTimeRange
-instance Result StatsTimeRange
-
-deriving via (SimpleValue StatsTimeRange) instance ToMysql StatsTimeRange
-deriving via (SimpleValue StatsTimeRange) instance FromMysql StatsTimeRange
-
-instance ToField StatsTimeRange where
-  toField DailyStats = "daily"
-  toField WeeklyStats = "weekly"
-  toField MonthlyStats = "monthly"
-
-instance FromField StatsTimeRange where
-  fromField = (textSqlTypes, \case
-    "ban" -> Right DailyStats
-    "default" -> Right WeeklyStats
-    "mod" -> Right MonthlyStats
-    _ -> Left "Wrong stats time range")
+instance MysqlEnum StatsTimeRange where
+  toMysqlEnum DailyStats = "daily"
+  toMysqlEnum WeeklyStats = "weekly"
+  toMysqlEnum MonthlyStats = "monthly"
+  fromMysqlEnum "ban" = DailyStats
+  fromMysqlEnum "default" = WeeklyStats
+  fromMysqlEnum "mod" = MonthlyStats
+  fromMysqlEnum _ = error "Wrong stats time range"
 
 data HypixelBowTimeStats = HypixelBowTimeStats
   { bowTimeWins :: Integer,
@@ -81,10 +74,10 @@ showMaybeHypixelBowTimeStats WeeklyStats _ _ Nothing = "- **Weekly data isn't av
 showMaybeHypixelBowTimeStats MonthlyStats _ _ Nothing = "- **Monthly data isn't avaliable yet for this player! Wait until next month!**"
 showMaybeHypixelBowTimeStats tm s t (Just v) = showHypixelBowTimeStats tm s t v
 
-updateHypixelBowTimeStats :: (MonadIOReader m r, Has Connection r) => StatsTimeRange -> m ()
+updateHypixelBowTimeStats :: (MonadIOReader m r, Has SafeMysqlConn r) => StatsTimeRange -> m ()
 updateHypixelBowTimeStats time = void $ executeLog [mysql|INSERT INTO `hypixel_bow_timed_stats`(`minecraft_uuid`,`time`,HypixelBowTimeStats) SELECT `minecraft_uuid`,time, (`wins`,`losses`,`last_update`) FROM `hypixel_bow_stats`|]
 
-getHypixelBowTimeStatsByUUID :: (MonadIOReader m r, Has Connection r) => StatsTimeRange -> UUID -> m (Maybe HypixelBowTimeStats)
+getHypixelBowTimeStatsByUUID :: (MonadIOReader m r, Has SafeMysqlConn r) => StatsTimeRange -> UUID -> m (Maybe HypixelBowTimeStats)
 getHypixelBowTimeStatsByUUID time uuid = queryOnlyLog [mysql|SELECT HypixelBowTimeStats FROM `hypixel_bow_timed_stats` WHERE `time` = time AND `minecraft_uuid` = uuid|]
 
 data FullHypixelBowTimeStats = FullHypixelBowTimeStats

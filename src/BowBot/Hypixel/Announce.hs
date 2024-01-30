@@ -23,7 +23,7 @@ milestoneNamesInfo = InfoType { infoName = "division_title_milestones", infoDefa
 milestoneNamesFromWins :: [(Integer, Text)] -> Integer -> Integer -> [Text]
 milestoneNamesFromWins names low high = map snd $ filter (\(needed, _) -> low < needed && needed <= high) names
 
-getHypixelBowMilestones :: (MonadIOReader m r, HasAll [InfoCache, Connection] r) => m [(UUID, Text)]
+getHypixelBowMilestones :: (MonadIOReader m r, HasAll [InfoCache, SafeMysqlConn] r) => m [(UUID, Text)]
 getHypixelBowMilestones = do
   ctx <- ask
   milestoneNames <- askInfo milestoneNamesInfo
@@ -33,7 +33,7 @@ getHypixelBowMilestones = do
     return res
   return [(uuid, milestone) | (uuid, low, high) <- milestonePairs, milestone <- milestoneNamesFromWins milestoneNames low high]
 
-announceMilestones :: (MonadIOReader m r, HasAll [DiscordHandle, Connection, InfoCache] r) => m ()
+announceMilestones :: (MonadIOReader m r, HasAll [DiscordHandle, SafeMysqlConn, InfoCache] r) => m ()
 announceMilestones = do
   milestonesChannel <- askInfo milestonesChannelInfo
   toAnnounce <- getHypixelBowMilestones

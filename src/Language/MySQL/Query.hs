@@ -3,16 +3,9 @@
 {-# LANGUAGE UndecidableInstances #-}
 
 module Language.MySQL.Query(
-  module Language.MySQL.Query, Q.Connection, Q.Param(..), Q.Result(..), StateT(..), Generic(..), Generically(..)
+  module Language.MySQL.Query, StateT(..), Generic(..), Generically(..)
 ) where
 
-import qualified Database.MySQL.Simple.Param as Q
-import qualified Database.MySQL.Simple.Result as Q
-import qualified Database.MySQL.Simple.QueryParams as Q
-import qualified Database.MySQL.Simple.QueryResults as Q
-import qualified Database.MySQL.Base.Types as Q
-import qualified Database.MySQL.Simple as Q
-import qualified Database.MySQL.Simple.Types as Q
 import qualified Data.ByteString as SB
 import qualified Data.ByteString.Lazy as LB
 import qualified Data.Text as ST
@@ -21,31 +14,75 @@ import Control.Monad.State.Strict
 import Data.ByteString (ByteString)
 import GHC.Int
 import GHC.Word
-import Data.Time.Calendar (Day)
-import Data.Time.Clock (UTCTime)
-import Data.Time.LocalTime (TimeOfDay)
+import Data.Time
 import Data.Functor.Identity
-import Data.List (intersperse)
 import GHC.Generics
 import Data.Coerce
+import qualified Database.MySQL.Base as Q
+import Data.Binary.Put (runPut)
 
--- TODO: stop depending on mysql-simple
+newtype SimpleValue a = SimpleValue { fromSimpleValue :: a }
+
+instance ToMysqlSimple a => ToMysql (SimpleValue a) where
+  toMysqlParam = Q.One . toMysqlValue . fromSimpleValue
+
+instance FromMysqlSimple a => FromMysql (SimpleValue a) where
+  rowParser = state $ \case
+    (x:xs) -> let !v = fromMysqlValue x in (SimpleValue v, xs)
+    _ -> undefined -- TODO: better errors
+
+newtype EnumValue a = EnumValue { fromEnumValue :: a }
+  deriving (ToMysql, FromMysql) via (SimpleValue (EnumValue a))
+
+class MysqlEnum a where
+  fromMysqlEnum :: ST.Text -> a
+  toMysqlEnum :: a -> ST.Text
+
+instance MysqlEnum a => ToMysqlSimple (EnumValue a) where
+  toMysqlValue (EnumValue a) = Q.MySQLText $ toMysqlEnum a 
+
+instance MysqlEnum a => FromMysqlSimple (EnumValue a) where
+  fromMysqlValue (Q.MySQLText x) = EnumValue $ fromMysqlEnum x
+  fromMysqlValue v = error $ "Unexpected value: " ++ show v
+
+class ToMysqlSimple a where
+  toMysqlValue :: a -> Q.MySQLValue
 
 class ToMysql a where
-  toActions :: a -> [Q.Action]
+  toMysqlParam :: a -> Q.Param
 
-toMysql :: ToMysql a => Q.Connection -> a -> IO ByteString
-toMysql conn = Q.formatQuery conn "?" . Q.Only . Q.Many . intersperse (Q.Plain ",") . toActions
+toMysql :: ToMysql a => a -> ByteString
+toMysql = LB.toStrict . runPut . Q.render . toMysqlParam
 
-toMysqlList :: [IO ByteString] -> IO ByteString
-toMysqlList xs = SB.intercalate "," <$> sequence xs
+instance ToMysqlSimple a => ToMysqlSimple (Maybe a) where
+  toMysqlValue (Just a) = toMysqlValue a
+  toMysqlValue Nothing = Q.MySQLNull
+instance ToMysqlSimple Bool where 
+  toMysqlValue True = Q.MySQLInt8 1
+  toMysqlValue False = Q.MySQLInt8 0
+instance ToMysqlSimple Int8 where toMysqlValue = Q.MySQLInt8
+instance ToMysqlSimple Int16 where toMysqlValue = Q.MySQLInt16
+instance ToMysqlSimple Int32 where toMysqlValue = Q.MySQLInt32
+instance ToMysqlSimple Int where toMysqlValue = Q.MySQLInt64 . fromIntegral
+instance ToMysqlSimple Int64 where toMysqlValue = Q.MySQLInt64
+instance ToMysqlSimple Integer where toMysqlValue = Q.MySQLInt64 . fromIntegral
+instance ToMysqlSimple Word8 where toMysqlValue = Q.MySQLInt8U
+instance ToMysqlSimple Word16 where toMysqlValue = Q.MySQLInt16U
+instance ToMysqlSimple Word32 where toMysqlValue = Q.MySQLInt32U
+instance ToMysqlSimple Word where toMysqlValue = Q.MySQLInt64U . fromIntegral
+instance ToMysqlSimple Word64 where toMysqlValue = Q.MySQLInt64U
+instance ToMysqlSimple Float where toMysqlValue = Q.MySQLFloat
+instance ToMysqlSimple Double where toMysqlValue = Q.MySQLDouble
+instance ToMysqlSimple SB.ByteString where toMysqlValue = Q.MySQLBytes
+instance ToMysqlSimple LB.ByteString where toMysqlValue = Q.MySQLBytes . LB.toStrict
+instance ToMysqlSimple ST.Text where toMysqlValue = Q.MySQLText
+instance ToMysqlSimple LT.Text where toMysqlValue = Q.MySQLText . LT.toStrict
+instance ToMysqlSimple String where toMysqlValue = Q.MySQLText . ST.pack
+instance ToMysqlSimple UTCTime where toMysqlValue = Q.MySQLDateTime . utcToLocalTime utc
+instance ToMysqlSimple Day where toMysqlValue = Q.MySQLDate
+instance ToMysqlSimple TimeOfDay where toMysqlValue = Q.MySQLTime 0
 
-deriving via (SimpleValue (Q.In [a])) instance Q.Param a => ToMysql (Q.In [a])
-
-deriving via (SimpleValue (Maybe a)) instance Q.Param a => ToMysql (Maybe a)
-deriving via (SimpleValue (Q.Binary SB.ByteString)) instance ToMysql (Q.Binary SB.ByteString)
-deriving via (SimpleValue (Q.Binary LB.ByteString)) instance ToMysql (Q.Binary LB.ByteString)
-deriving via (SimpleValue Q.Null) instance ToMysql Q.Null
+deriving via (SimpleValue (Maybe a)) instance ToMysqlSimple a => ToMysql (Maybe a)
 deriving via (SimpleValue Bool) instance ToMysql Bool
 deriving via (SimpleValue Int8) instance ToMysql Int8
 deriving via (SimpleValue Int16) instance ToMysql Int16
@@ -69,39 +106,141 @@ deriving via (SimpleValue UTCTime) instance ToMysql UTCTime
 deriving via (SimpleValue Day) instance ToMysql Day
 deriving via (SimpleValue TimeOfDay) instance ToMysql TimeOfDay
 
+flattenParam :: [Q.Param] -> [Q.MySQLValue]
+flattenParam (Q.One x:xs) = x:flattenParam xs
+flattenParam (Q.Many x:xs) = x ++ flattenParam xs
+flattenParam [] = []
+
 instance (ToMysql a, ToMysql b) => ToMysql (a,b) where
-  toActions (a,b) = toActions a ++ toActions b
+  toMysqlParam (a,b) = Q.Many $ flattenParam [toMysqlParam a, toMysqlParam b]
 
 instance (ToMysql a, ToMysql b, ToMysql c) => ToMysql (a,b,c) where
-  toActions (a,b,c) = toActions a ++ toActions b ++ toActions c
+  toMysqlParam (a,b,c) = Q.Many $ flattenParam [toMysqlParam a, toMysqlParam b, toMysqlParam c]
 
 instance (ToMysql a, ToMysql b, ToMysql c, ToMysql d) => ToMysql (a,b,c,d) where
-  toActions (a,b,c,d) = toActions a ++ toActions b ++ toActions c ++ toActions d
+  toMysqlParam (a,b,c,d) = Q.Many $ flattenParam [toMysqlParam a, toMysqlParam b, toMysqlParam c, toMysqlParam d]
 
 instance (ToMysql a, ToMysql b, ToMysql c, ToMysql d, ToMysql e) => ToMysql (a,b,c,d,e) where
-  toActions (a,b,c,d,e) = toActions a ++ toActions b ++ toActions c ++ toActions d ++ toActions e
+  toMysqlParam (a,b,c,d,e) = Q.Many $ flattenParam [toMysqlParam a, toMysqlParam b, toMysqlParam c, toMysqlParam d, toMysqlParam e]
 
 instance (Generic a, ToMysql (Rep a ())) => ToMysql (Generically a) where
-  toActions (Generically a) = toActions (from a :: Rep a ())
+  toMysqlParam (Generically a) = toMysqlParam (from a :: Rep a ())
 
 instance ToMysql c => ToMysql (K1 i c p) where
-  toActions (K1 x) = toActions x
+  toMysqlParam (K1 x) = toMysqlParam x
 
 instance (ToMysql (f p), ToMysql (g p)) => ToMysql ((f :*: g) p) where
-  toActions (f :*: g) = toActions f ++ toActions g
+  toMysqlParam (f :*: g) = Q.Many $ flattenParam [toMysqlParam f, toMysqlParam g]
 
 instance ToMysql (f p) => ToMysql (M1 i t f p) where
-  toActions (M1 f) = toActions f
+  toMysqlParam (M1 f) = toMysqlParam f
 
-type RowParser = State ([Q.Field], [Maybe ByteString])
+class FromMysqlSimple a where
+  fromMysqlValue :: Q.MySQLValue -> a -- TODO: make it not throw
 
-textSqlTypes :: [Q.Type]
-textSqlTypes = [Q.VarChar,Q.TinyBlob,Q.MediumBlob,Q.LongBlob,Q.Blob,Q.VarString,Q.String,Q.Set,Q.Enum,Q.Json]
+type RowParser = State [Q.MySQLValue]
 
 class FromMysql a where
   rowParser :: RowParser a
 
-deriving via (SimpleValue (Maybe a)) instance Q.Result a => FromMysql (Maybe a)
+instance FromMysqlSimple a => FromMysqlSimple (Maybe a) where
+  fromMysqlValue Q.MySQLNull = Nothing
+  fromMysqlValue v = Just $ fromMysqlValue v
+instance FromMysqlSimple Bool where
+  fromMysqlValue (Q.MySQLInt8 x) = x /= 0
+  fromMysqlValue v = error $ "Unexpected value: " ++ show v
+instance FromMysqlSimple Int8 where
+  fromMysqlValue (Q.MySQLInt8 x) = x
+  fromMysqlValue v = error $ "Unexpected value: " ++ show v
+instance FromMysqlSimple Int16 where
+  fromMysqlValue (Q.MySQLInt8 x) = fromIntegral x
+  fromMysqlValue (Q.MySQLInt16 x) = x
+  fromMysqlValue v = error $ "Unexpected value: " ++ show v
+instance FromMysqlSimple Int32 where
+  fromMysqlValue (Q.MySQLInt8 x) = fromIntegral x
+  fromMysqlValue (Q.MySQLInt16 x) = fromIntegral x
+  fromMysqlValue (Q.MySQLInt32 x) = x
+  fromMysqlValue v = error $ "Unexpected value: " ++ show v
+instance FromMysqlSimple Int where
+  fromMysqlValue (Q.MySQLInt8 x) = fromIntegral x
+  fromMysqlValue (Q.MySQLInt16 x) = fromIntegral x
+  fromMysqlValue (Q.MySQLInt32 x) = fromIntegral x
+  fromMysqlValue (Q.MySQLInt64 x) = fromIntegral x
+  fromMysqlValue v = error $ "Unexpected value: " ++ show v
+instance FromMysqlSimple Int64 where
+  fromMysqlValue (Q.MySQLInt8 x) = fromIntegral x
+  fromMysqlValue (Q.MySQLInt16 x) = fromIntegral x
+  fromMysqlValue (Q.MySQLInt32 x) = fromIntegral x
+  fromMysqlValue (Q.MySQLInt64 x) = x
+  fromMysqlValue v = error $ "Unexpected value: " ++ show v
+instance FromMysqlSimple Integer where
+  fromMysqlValue (Q.MySQLInt8 x) = toInteger x
+  fromMysqlValue (Q.MySQLInt16 x) = toInteger x
+  fromMysqlValue (Q.MySQLInt32 x) = toInteger x
+  fromMysqlValue (Q.MySQLInt64 x) = toInteger x
+  fromMysqlValue v = error $ "Unexpected value: " ++ show v
+instance FromMysqlSimple Word8 where
+  fromMysqlValue (Q.MySQLInt8U x) = x
+  fromMysqlValue v = error $ "Unexpected value: " ++ show v
+instance FromMysqlSimple Word16 where
+  fromMysqlValue (Q.MySQLInt8U x) = fromIntegral x
+  fromMysqlValue (Q.MySQLInt16U x) = x
+  fromMysqlValue v = error $ "Unexpected value: " ++ show v
+instance FromMysqlSimple Word32 where
+  fromMysqlValue (Q.MySQLInt8U x) = fromIntegral x
+  fromMysqlValue (Q.MySQLInt16U x) = fromIntegral x
+  fromMysqlValue (Q.MySQLInt32U x) = x
+  fromMysqlValue v = error $ "Unexpected value: " ++ show v
+instance FromMysqlSimple Word where
+  fromMysqlValue (Q.MySQLInt8U x) = fromIntegral x
+  fromMysqlValue (Q.MySQLInt16U x) = fromIntegral x
+  fromMysqlValue (Q.MySQLInt32U x) = fromIntegral x
+  fromMysqlValue (Q.MySQLInt64U x) = fromIntegral x
+  fromMysqlValue v = error $ "Unexpected value: " ++ show v
+instance FromMysqlSimple Word64 where
+  fromMysqlValue (Q.MySQLInt8U x) = fromIntegral x
+  fromMysqlValue (Q.MySQLInt16U x) = fromIntegral x
+  fromMysqlValue (Q.MySQLInt32U x) = fromIntegral x
+  fromMysqlValue (Q.MySQLInt64U x) = x
+  fromMysqlValue v = error $ "Unexpected value: " ++ show v
+instance FromMysqlSimple Float where
+  fromMysqlValue (Q.MySQLFloat x) = x
+  fromMysqlValue v = error $ "Unexpected value: " ++ show v
+instance FromMysqlSimple Double where
+  fromMysqlValue (Q.MySQLDouble x) = x
+  fromMysqlValue v = error $ "Unexpected value: " ++ show v
+instance FromMysqlSimple Rational where
+  fromMysqlValue (Q.MySQLDecimal x) = toRational x
+  fromMysqlValue (Q.MySQLFloat x) = toRational x
+  fromMysqlValue (Q.MySQLDouble x) = toRational x
+  fromMysqlValue v = error $ "Unexpected value: " ++ show v
+instance FromMysqlSimple SB.ByteString where
+  fromMysqlValue (Q.MySQLBytes x) = x
+  fromMysqlValue v = error $ "Unexpected value: " ++ show v
+instance FromMysqlSimple LB.ByteString where
+  fromMysqlValue (Q.MySQLBytes x) = LB.fromStrict x
+  fromMysqlValue v = error $ "Unexpected value: " ++ show v
+instance FromMysqlSimple ST.Text where
+  fromMysqlValue (Q.MySQLText x) = x
+  fromMysqlValue v = error $ "Unexpected value: " ++ show v
+instance FromMysqlSimple LT.Text where
+  fromMysqlValue (Q.MySQLText x) = LT.fromStrict x
+  fromMysqlValue v = error $ "Unexpected value: " ++ show v
+instance FromMysqlSimple String where
+  fromMysqlValue (Q.MySQLText x) = ST.unpack x
+  fromMysqlValue v = error $ "Unexpected value: " ++ show v
+instance FromMysqlSimple UTCTime where
+  fromMysqlValue (Q.MySQLDateTime x) = localTimeToUTC utc x
+  fromMysqlValue v = error $ "Unexpected value: " ++ show v
+instance FromMysqlSimple Day where
+  fromMysqlValue (Q.MySQLDate x) = x
+  fromMysqlValue v = error $ "Unexpected value: " ++ show v
+instance FromMysqlSimple TimeOfDay where
+  fromMysqlValue (Q.MySQLTime 0 x) = x
+  fromMysqlValue v = error $ "Unexpected value: " ++ show v
+
+
+deriving via (SimpleValue (Maybe a)) instance FromMysqlSimple a => FromMysql (Maybe a)
 deriving via (SimpleValue Bool) instance FromMysql Bool
 deriving via (SimpleValue Int8) instance FromMysql Int8
 deriving via (SimpleValue Int16) instance FromMysql Int16
@@ -150,24 +289,6 @@ instance (FromMysql (f p), FromMysql (g p)) => FromMysql ((f :*: g) p) where
 instance FromMysql (f p) => FromMysql (M1 i t f p) where
   rowParser = coerce (rowParser @(f p))
 
-newtype SimpleValue a = SimpleValue { fromSimpleValue :: a }
-
-instance Q.Param a => ToMysql (SimpleValue a) where
-  toActions = (:[]) . Q.render . fromSimpleValue
-
-instance Q.Result a => FromMysql (SimpleValue a) where
-  rowParser = state $ \case
-    (f:fs, x:xs) -> let !v = Q.convert f x in (SimpleValue v, (fs, xs))
-    _ -> undefined -- TODO: better errors
-
-newtype Flattened a = Flattened { fromFlattened :: a }
-
-instance ToMysql a => Q.QueryParams (Flattened a) where
-  renderParams = toActions . fromFlattened
-
-instance FromMysql a => Q.QueryResults (Flattened a) where
-  convertResults fs vs = Flattened $ evalState rowParser (fs, vs)
-
 class MysqlString a where
   reqMysqlString :: a -> b -> b
   reqMysqlString _ = id
@@ -201,12 +322,10 @@ instance MysqlInt Word32
 instance MysqlInt Word
 instance MysqlInt Word64
 
-newtype RenderedQuery o = RenderedQuery { fromRenderedQuery :: ByteString } deriving Show
+newtype Query o = Query { fromQuery :: ByteString } deriving Show
 
-newtype RenderedCommand = RenderedCommand { fromRenderedCommand :: Maybe ByteString } deriving Show
-
-type Query o = Q.Connection -> IO (RenderedQuery o)
-type Command = Q.Connection -> IO RenderedCommand
+newtype Command' = Command { fromCommand :: ByteString } deriving Show
+type Command = Either ByteString Command'
 
 forceQueryType :: r -> Query r -> Query r
 forceQueryType _ = id

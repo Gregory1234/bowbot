@@ -14,7 +14,7 @@ data InfoType a = InfoType { infoName :: !Text, infoDefault :: !a, infoParse :: 
 
 newtype InfoCache = InfoCache (TVar (M.Map Text Text))
 
-refreshInfoCache :: (MonadIOReader m r, HasAll '[InfoCache, Connection] r) => m ()
+refreshInfoCache :: (MonadIOReader m r, HasAll '[InfoCache, SafeMysqlConn] r) => m ()
 refreshInfoCache = do
   InfoCache cache <- asks getter
   res :: [(Text, Text)] <- queryLog [mysql|SELECT `name`, `value` FROM `bot_info`|]

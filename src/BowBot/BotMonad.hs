@@ -5,12 +5,12 @@ import Network.HTTP.Conduit (Manager)
 import Control.Monad.Reader (ReaderT(..))
 import Data.Has
 import BowBot.Counter.Basic
-import BowBot.DB.Basic (Connection)
+import BowBot.DB.Basic (SafeMysqlConn)
 import BowBot.BotData.Info
 
 data BotContext = BotContext
   { bctxManager :: !Manager
-  , bctxConnection :: !Connection
+  , bctxConnection :: !SafeMysqlConn
   , bctxDiscord :: !DiscordHandle
   , bctxCounter :: !CounterState
   , bctxInfo :: !InfoCache
@@ -19,7 +19,7 @@ data BotContext = BotContext
 instance Has Manager BotContext where
   getter = bctxManager
   modifier f x = x { bctxManager = f $ bctxManager x }
-instance Has Connection BotContext where
+instance Has SafeMysqlConn BotContext where
   getter = bctxConnection
   modifier f x = x { bctxConnection = f $ bctxConnection x }
 instance Has DiscordHandle BotContext where

@@ -20,10 +20,10 @@ data DiscordAccount = DiscordAccount { discordId :: !UserId, discordName :: !Dis
 
 $(pure [])
 
-getDiscordAccountById :: (MonadIOReader m r, Has Connection r) => UserId -> m (Maybe DiscordAccount)
+getDiscordAccountById :: (MonadIOReader m r, Has SafeMysqlConn r) => UserId -> m (Maybe DiscordAccount)
 getDiscordAccountById did = queryOnlyLog [mysql|SELECT DiscordAccount FROM `discord` WHERE `id` = did|]
 
-getDiscordGuildMemberAccounts :: (MonadIOReader m r, Has Connection r) => m [DiscordAccount]
+getDiscordGuildMemberAccounts :: (MonadIOReader m r, Has SafeMysqlConn r) => m [DiscordAccount]
 getDiscordGuildMemberAccounts = queryLog [mysql|SELECT DiscordAccount FROM `discord` WHERE `member`|]
 
 guildMemberToDiscordAccount :: GuildMember -> DiscordAccount
@@ -40,10 +40,10 @@ userToDiscordAccount user@User {..} = DiscordAccount
   , discordIsMember = False
   }
 
-storeDiscordAccount :: (MonadIOReader m r, Has Connection r) => DiscordAccount -> m ()
+storeDiscordAccount :: (MonadIOReader m r, Has SafeMysqlConn r) => DiscordAccount -> m ()
 storeDiscordAccount acc = void $ executeLog [mysql|INSERT INTO `discord`(DiscordAccount) VALUES acc|]
 
-updateDiscordAccountCache :: (MonadIOReader m r, HasAll '[InfoCache, DiscordHandle, Connection] r) => m ()
+updateDiscordAccountCache :: (MonadIOReader m r, HasAll '[InfoCache, DiscordHandle, SafeMysqlConn] r) => m ()
 updateDiscordAccountCache = do
   gid <- askInfo discordGuildIdInfo
   members <- map guildMemberToDiscordAccount . filter (\GuildMember {..} -> fmap userIsBot memberUser == Just False) <$> discordGuildMembers gid

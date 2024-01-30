@@ -8,7 +8,7 @@ import BowBot.Discord.Basic
 import Data.Text.Encoding (encodeUtf8)
 import BowBot.Discord.Orphans ()
 import BowBot.Counter.Basic
-import BowBot.DB.Basic (Connection)
+import BowBot.DB.Basic (SafeMysqlConn)
 import qualified Data.Text as T
 import BowBot.BotData.Info
 
@@ -38,7 +38,7 @@ commandEnvFromMessage m = CommandEnvironment
 data CommandHandlerContext = CommandHandlerContext
   { cctxEnv :: !CommandEnvironment
   , cctxManager :: !Manager
-  , cctxConnection :: !Connection
+  , cctxConnection :: !SafeMysqlConn
   , cctxDiscord :: !DiscordHandle
   , cctxCounter :: !CounterState
   , cctxInfo :: !InfoCache
@@ -50,7 +50,7 @@ instance Has CommandEnvironment CommandHandlerContext where
 instance Has Manager CommandHandlerContext where
   getter = cctxManager
   modifier f x = x { cctxManager = f $ cctxManager x }
-instance Has Connection CommandHandlerContext where
+instance Has SafeMysqlConn CommandHandlerContext where
   getter = cctxConnection
   modifier f x = x { cctxConnection = f $ cctxConnection x }
 instance Has DiscordHandle CommandHandlerContext where

@@ -43,6 +43,13 @@ type StrRenderer = WriterT [Exp] Renderer
 runStrRenderer :: StrRenderer () -> Renderer Exp
 runStrRenderer r = foldr1 combineString <$> execWriterT r
 
+runStrRendererWithHoles :: StrRenderer () -> Renderer (Exp, Exp)
+runStrRendererWithHoles r = (\es -> (foldr1 combineString es, foldr1 combineString (map addHoles es))) <$> execWriterT r
+  where
+    addHoles (AppendE x y) = AppendE (addHoles x) (addHoles y)
+    addHoles (StringE a) = StringE a
+    addHoles _ = StringE "?"
+
 reifyRender :: StrRenderer () -> StrRenderer Exp
 reifyRender = fmap (foldr1 combineString . snd) . censor (const []) . listen
 
@@ -168,20 +175,19 @@ renderTypeInhabitant (TupleType s) = tupE (map renderTypeInhabitant s)
 renderTypeInhabitant (RealType t) = [| undefined :: $(pure t) |]
 renderTypeInhabitant (VarType n) = varE n
 
-renderVar :: Name -> Name -> Name -> TypeOfVar -> Q Stmt
-renderVar conn origName strName SingleVar = bindS (varP strName) [| toMysql $(varE conn) $(varE origName) |]
-renderVar conn origName strName ListVar = bindS (varP strName) [| mapM (toMysql $(varE conn)) $(varE origName) |]
+renderVar :: Name -> Name -> TypeOfVar -> Q Dec
+renderVar origName strName SingleVar = funD strName [clause [] (normalB [| toMysql $(varE origName) |]) []]
+renderVar origName strName ListVar = funD strName [clause [] (normalB [| map toMysql $(varE origName) |]) []]
 
 renderQuery :: [TypecheckConstraint] -> M.Map Name (Name, TypeOfVar) -> Q Exp -> Q Exp
-renderQuery tc vars q = do
-  conn <- newName "conn"
-  lam1E (if null vars then wildP else varP conn) $ doE $ map (\(origName, (strName, varType)) -> renderVar conn origName strName varType) (M.toList vars)
-    ++ [noBindS $ foldr renderTypecheckConstraint [| return $q |] tc]
+renderQuery tc vars q = letE 
+  (map (\(origName, (strName, varType)) -> renderVar origName strName varType) (M.toList vars)) 
+  (foldr renderTypecheckConstraint q tc)
 
 renderSelectQuery :: TypedSelectQuery -> [TypecheckConstraint] -> Q Exp
 renderSelectQuery q@(TypedSelectQuery s _ _) tc = do
   (str, vars) <- runStateT (runRenderer $ runStrRenderer $ selectQueryStringRenderer q) M.empty
-  [| forceQueryType $(renderTypeInhabitant (typedComplexExprType s)) $(renderQuery tc vars [| RenderedQuery $(pure str) |]) |]
+  [| forceQueryType $(renderTypeInhabitant (typedComplexExprType s)) $(renderQuery tc vars [| Query $(pure str) |]) |]
 
 insertTargetRenderer :: TypedInsertTarget -> StrRenderer ()
 insertTargetRenderer (TypedColTarget c _) = emit $ ppColumnName c
@@ -219,21 +225,21 @@ valuesRowRender (TypedValuesRowVar n ValuesRowMany) = do
       *> (put . Right =<< lift (liftQ [| $(pure isFirst) && null $(varE n)|]))
 
 insertSourceRenderer :: TypedInsertSource -> StrRenderer ()
-insertSourceRenderer (TypedValuesSource rows) = emit "VALUES" *> evalStateT (mapM_ valuesRowRender rows) (Left True)
+insertSourceRenderer (TypedValuesSource rows) = emit "VALUES " *> evalStateT (mapM_ valuesRowRender rows) (Left True)
 insertSourceRenderer (TypedSelectSource q) = selectQueryStringRenderer q
 
 insertQueryStringRenderer :: TypedInsertQuery -> StrRenderer ()
 insertQueryStringRenderer (TypedInsertQuery tn t s u) = withSpaces [emit "INSERT INTO", emit $ ppTableName tn, parensRenderer $ insertTargetRenderer t, insertSourceRenderer s, updateOnDuplicateListRenderer u]
 
-insertSourceCheckRenderer :: TypedInsertSource -> Q Exp -> Q Exp
-insertSourceCheckRenderer (TypedValuesSource (mapM (\case (TypedValuesRowVar n ValuesRowMany) -> Just n; _ -> Nothing) -> Just lists)) e 
-  = [| if $(foldl1 (\a b -> [| $a && $b |]) (map (\n -> [| null $(varE n) |]) lists)) then \_ -> return (RenderedCommand Nothing) else $e |]
-insertSourceCheckRenderer _ e = e
+insertSourceCheckRenderer :: TypedInsertSource -> Q Exp -> Q Exp -> Q Exp
+insertSourceCheckRenderer (TypedValuesSource (mapM (\case (TypedValuesRowVar n ValuesRowMany) -> Just n; _ -> Nothing) -> Just lists)) withHoles e 
+  = [| if $(foldl1 (\a b -> [| $a && $b |]) (map (\n -> [| null $(varE n) |]) lists)) then Left $withHoles else Right $e |]
+insertSourceCheckRenderer _ _ e = [| Right $e |]
 
 renderInsertQuery :: TypedInsertQuery -> [TypecheckConstraint] -> Q Exp
 renderInsertQuery q@(TypedInsertQuery _ _ s _) tc = do
-  (str, vars) <- runStateT (runRenderer $ runStrRenderer $ insertQueryStringRenderer q) M.empty
-  [| $(insertSourceCheckRenderer s $ renderQuery tc vars [| RenderedCommand (Just $(pure str)) |]) :: Command |]
+  ((str, withHoles), vars) <- runStateT (runRenderer $ runStrRendererWithHoles $ insertQueryStringRenderer q) M.empty
+  [| $(insertSourceCheckRenderer s (pure withHoles) $ renderQuery tc vars [| Command $(pure str) |]) :: Command |]
 
 columnUpdateRenderer :: TypedColumnUpdate -> StrRenderer ()
 columnUpdateRenderer (TypedColumnUpdate c e) = emit (ppFullColumnName c ++ "=") *> expressionRenderer e
@@ -244,7 +250,7 @@ updateQueryStringRenderer (TypedUpdateQuery t u w) = withSpaces [emit "UPDATE", 
 renderUpdateQuery :: TypedUpdateQuery -> [TypecheckConstraint] -> Q Exp
 renderUpdateQuery q tc = do
   (str, vars) <- runStateT (runRenderer $ runStrRenderer $ updateQueryStringRenderer q) M.empty
-  [| $(renderQuery tc vars [| RenderedCommand (Just $(pure str)) |]) :: Command |]
+  [| Right $(renderQuery tc vars [| Command $(pure str) |]) :: Command |]
 
 deleteQueryStringRenderer :: TypedDeleteQuery -> StrRenderer ()
 deleteQueryStringRenderer (TypedDeleteQuery t w) = withSpaces [emit $ "DELETE FROM " ++ ppTableName t, whereClauseRenderer w]
@@ -252,7 +258,7 @@ deleteQueryStringRenderer (TypedDeleteQuery t w) = withSpaces [emit $ "DELETE FR
 renderDeleteQuery :: TypedDeleteQuery -> [TypecheckConstraint] -> Q Exp
 renderDeleteQuery q tc = do
   (str, vars) <- runStateT (runRenderer $ runStrRenderer $ deleteQueryStringRenderer q) M.empty
-  [| $(renderQuery tc vars [| RenderedCommand (Just $(pure str)) |]) :: Command |]
+  [| Right $(renderQuery tc vars [| Command $(pure str) |]) :: Command |]
 
 renderAnyQuery :: TypedAnyQuery -> [TypecheckConstraint] -> Q Exp
 renderAnyQuery (TypedSelectAnyQuery q) = renderSelectQuery q

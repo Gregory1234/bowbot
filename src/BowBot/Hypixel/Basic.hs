@@ -30,7 +30,7 @@ hypixelWithPlayerStatus (UUID uuid) f = do
 
 newtype HypixelRole = HypixelRole { fromHypixelRole :: Text }
   deriving (Eq, Ord, Show)
-  deriving newtype (Param, Result, FromMysql, ToMysql)
+  deriving newtype (FromMysqlSimple, ToMysqlSimple, FromMysql, ToMysql)
 
 hypixelGuildMemberList :: (MonadIOReader m r, Has Manager r) => Text -> m (Maybe [(UUID, HypixelRole)])
 hypixelGuildMemberList gid = do

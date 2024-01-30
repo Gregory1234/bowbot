@@ -6,7 +6,6 @@ import BowBot.Discord.Utils
 import BowBot.BotData.Info
 import qualified Data.Map as M
 import qualified Data.Text as T
-import qualified Data.Text.Encoding as T
 import Data.Bifunctor (first)
 import BowBot.DB.Basic
 import BowBot.Account.Basic
@@ -22,19 +21,17 @@ savedRolesInfo = InfoType { infoName = "saved_roles", infoDefault = M.empty, inf
 savedHypixelRolesInfo :: InfoType (M.Map SavedRole ([HypixelRole], RoleId))
 savedHypixelRolesInfo = InfoType { infoName = "hypixel_roles", infoDefault = M.empty, infoParse = \s -> fmap M.fromList $ for (T.lines s) $ \l -> case T.splitOn "->" l of [a, b, c] -> (SavedRole a,) . (map HypixelRole $ T.splitOn "|" b,) <$> fmap fromInteger ((first pack . readEither . unpack) c); _ -> Left "wrong format" }
 
-newtype SavedRole = SavedRole { savedRoleName :: Text } deriving (Eq, Ord, Show)
+newtype SavedRole = SavedRole { savedRoleName :: Text }
+  deriving (Eq, Ord, Show)
 
-instance Param [SavedRole]
-instance Result [SavedRole]
+instance ToMysqlSimple [SavedRole] where
+  toMysqlValue = toMysqlValue . T.intercalate "," . map savedRoleName
+
+instance FromMysqlSimple [SavedRole] where
+  fromMysqlValue = map SavedRole . filter (not . T.null) . T.splitOn "," . fromMysqlValue
 
 deriving via (SimpleValue [SavedRole]) instance ToMysql [SavedRole]
 deriving via (SimpleValue [SavedRole]) instance FromMysql [SavedRole]
-
-instance ToField [SavedRole] where
-  toField = T.encodeUtf8 . T.intercalate "," . map savedRoleName
-
-instance FromField [SavedRole] where
-  fromField = (textSqlTypes, Right . map SavedRole . filter (not . T.null) . T.splitOn "," . T.decodeUtf8)
 
 savedRolesFromIds :: (MonadIOReader m r, Has InfoCache r) => [RoleId] -> m [SavedRole]
 savedRolesFromIds roleids = do
@@ -44,12 +41,12 @@ savedRolesFromIds roleids = do
   return $ map fst $ filter ((`elem` roleids) . snd) $ M.toList toggleableRoles ++ M.toList savedRoles ++ map (\(a,(_,c)) -> (a,c)) (M.toList savedHypixelRoles)
 
 -- TODO: switch the api to be BowBotId based, to not keep asking for user's BowBotId
-setSavedRolesByDiscord :: (MonadIOReader m r, Has Connection r) => UserId -> [SavedRole] -> m ()
+setSavedRolesByDiscord :: (MonadIOReader m r, Has SafeMysqlConn r) => UserId -> [SavedRole] -> m ()
 setSavedRolesByDiscord discord roles = do
   bid' <- if null roles then getBowBotIdByDiscord discord else getOrCreateDummyBowBotAccount discord -- NOTE: do not create an account if roles is empty
   for_ bid' $ \bid -> executeLog [mysql|INSERT INTO `account` (`id`, ^`roles`) VALUES (bid, roles)|]
 
-updateSavedRolesAll :: (MonadIOReader m r, HasAll '[Connection, DiscordHandle, InfoCache] r) => m ()
+updateSavedRolesAll :: (MonadIOReader m r, HasAll '[SafeMysqlConn, DiscordHandle, InfoCache] r) => m ()
 updateSavedRolesAll = do
   savedRoles :: M.Map UserId [SavedRole] <- M.fromList <$> queryLog [mysql|SELECT `discord_id`, `roles` FROM `account` JOIN `account_discord` ON `account_id` = `account`.`id`|]
   gid <- askInfo discordGuildIdInfo
@@ -60,7 +57,7 @@ updateSavedRolesAll = do
       roles <- savedRolesFromIds memberRoles
       when (roles /= fromMaybe [] (savedRoles M.!? userId)) $ setSavedRolesByDiscord userId roles
 
-giveSavedRoles :: (MonadIOReader m r, HasAll '[Connection, DiscordHandle, InfoCache] r) => GuildMember -> [SavedRole] -> Maybe [HypixelRole] -> m ()
+giveSavedRoles :: (MonadIOReader m r, HasAll '[SafeMysqlConn, DiscordHandle, InfoCache] r) => GuildMember -> [SavedRole] -> Maybe [HypixelRole] -> m ()
 giveSavedRoles gmem roles hypixelRoles = do
   gid <- askInfo discordGuildIdInfo
   let partialSetUni roleMapFull roleMapPartial = addRemoveDiscordRoles gid gmem (map snd $ M.toList roleMapFull) (mapMaybe (roleMapPartial M.!?) roles)

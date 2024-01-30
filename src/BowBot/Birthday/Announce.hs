@@ -18,7 +18,7 @@ import qualified Data.Text as T
 birthdayChannelInfo :: InfoType ChannelId
 birthdayChannelInfo = InfoType { infoName = "birthday_channel", infoDefault = 0, infoParse = first pack . readEither . unpack }
 
-announceBirthdays :: (MonadIOReader m r, HasAll [DiscordHandle, Connection, InfoCache] r) => m ()
+announceBirthdays :: (MonadIOReader m r, HasAll [DiscordHandle, SafeMysqlConn, InfoCache] r) => m ()
 announceBirthdays = do
   currentDay <- liftIO currentBirthdayDate
   birthdays <- getBirthdaysByDate currentDay

@@ -11,30 +11,22 @@ data IsBanned
   = NotBanned
   | Banned
   deriving (Eq, Ord, Enum, Bounded, Show)
-
-instance Param IsBanned
-instance Result IsBanned
-
-deriving via (SimpleValue IsBanned) instance ToMysql IsBanned
-deriving via (SimpleValue IsBanned) instance FromMysql IsBanned
+  deriving (ToMysqlSimple, FromMysqlSimple, ToMysql, FromMysql) via (EnumValue IsBanned)
 
 instance MysqlString IsBanned -- TODO: add static correctness checking
 
-instance ToField IsBanned where
-  toField NotBanned = "normal"
-  toField Banned = "ban"
+instance MysqlEnum IsBanned where
+  toMysqlEnum NotBanned = "normal"
+  toMysqlEnum Banned = "ban"
+  fromMysqlEnum "normal" = NotBanned
+  fromMysqlEnum "ban" = Banned
+  fromMysqlEnum _ = error "Wrong ban status"
 
-instance FromField IsBanned where
-  fromField = (textSqlTypes, \case
-    "normal" -> Right NotBanned
-    "ban" -> Right Banned
-    _ -> Left "Wrong ban status")
-
-getHypixelIsBannedByUUID :: (MonadIOReader m r, Has Connection r) => UUID -> m IsBanned
+getHypixelIsBannedByUUID :: (MonadIOReader m r, Has SafeMysqlConn r) => UUID -> m IsBanned
 getHypixelIsBannedByUUID uuid = fromMaybe NotBanned <$> queryOnlyLog [mysql|SELECT `hypixel` FROM `minecraft` WHERE `uuid` = uuid|]
 
-setHypixelIsBannedByUUID :: (MonadIOReader m r, Has Connection r) => UUID -> IsBanned -> m Bool
+setHypixelIsBannedByUUID :: (MonadIOReader m r, Has SafeMysqlConn r) => UUID -> IsBanned -> m Bool
 setHypixelIsBannedByUUID uuid banned = (>0) <$> executeLog [mysql|UPDATE `minecraft` SET `hypixel` = banned WHERE `uuid` = uuid|]
 
-getHypixelUnbanned :: (MonadIOReader m r, Has Connection r) => m [UUID]
+getHypixelUnbanned :: (MonadIOReader m r, Has SafeMysqlConn r) => m [UUID]
 getHypixelUnbanned = queryLog [mysql|SELECT `uuid` FROM `minecraft` WHERE `hypixel` = 'normal'|]

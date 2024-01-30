@@ -5,7 +5,7 @@ import BowBot.Snipe.Basic
 import BowBot.DB.Basic
 import qualified Data.Text as T
 
-detectDeleteMessage :: (MonadIOReader m r, Has Connection r) => Message -> m ()
+detectDeleteMessage :: (MonadIOReader m r, Has SafeMysqlConn r) => Message -> m ()
 detectDeleteMessage m
   | let author = messageAuthor m
   , userAvatar author == Just "a06062af9b11085ab715e340deaab267"

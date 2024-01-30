@@ -8,43 +8,29 @@ import BowBot.Discord.Orphans ()
 import BowBot.DB.Basic
 import BowBot.Utils
 
-data SettingBin = Yes | No deriving (Show, Eq, Ord, Enum)
+data SettingBin = Yes | No
+  deriving (Show, Eq, Ord, Enum)
+  deriving (ToMysqlSimple, FromMysqlSimple, ToMysql, FromMysql) via (EnumValue SettingBin)
 
-instance Param SettingBin
-instance Result SettingBin
+instance MysqlEnum SettingBin where
+  toMysqlEnum Yes = "yes"
+  toMysqlEnum No = "no"
+  fromMysqlEnum "yes" = Yes
+  fromMysqlEnum "no" = No
+  fromMysqlEnum _ = error "Wrong permission level"
 
-deriving via (SimpleValue SettingBin) instance ToMysql SettingBin
-deriving via (SimpleValue SettingBin) instance FromMysql SettingBin
+data SettingTer = Never | WhenSensible | Always
+  deriving (Show, Eq, Ord, Enum)
+  deriving (ToMysqlSimple, FromMysqlSimple, ToMysql, FromMysql) via (EnumValue SettingTer)
 
-instance ToField SettingBin where
-  toField Yes = "yes"
-  toField No = "no"
-
-instance FromField SettingBin where
-  fromField = (textSqlTypes, \case
-    "yes" -> Right Yes
-    "no" -> Right No
-    _ -> Left "Wrong permission level")
-
-data SettingTer = Never | WhenSensible | Always deriving (Show, Eq, Ord, Enum)
-
-instance Param SettingTer
-instance Result SettingTer
-
-deriving via (SimpleValue SettingTer) instance ToMysql SettingTer
-deriving via (SimpleValue SettingTer) instance FromMysql SettingTer
-
-instance ToField SettingTer where
-  toField Always = "always"
-  toField Never = "never"
-  toField WhenSensible = "sensibly"
-
-instance FromField SettingTer where
-  fromField = (textSqlTypes, \case
-    "always" -> Right Always
-    "never" -> Right Never
-    "sensibly" -> Right WhenSensible
-    _ -> Left "Wrong permission level")
+instance MysqlEnum SettingTer where
+  toMysqlEnum Always = "always"
+  toMysqlEnum Never = "never"
+  toMysqlEnum WhenSensible = "sensibly"
+  fromMysqlEnum "always" = Always
+  fromMysqlEnum "never" = Never
+  fromMysqlEnum "sensibly" = WhenSensible
+  fromMysqlEnum _ = error "Wrong permission level"
 
 onlyIfBin :: SettingBin -> a -> Maybe a
 onlyIfBin Yes a = Just a
@@ -65,10 +51,10 @@ data Settings = Settings
 
 $(pure [])
 
-getSettingsByDiscord :: (MonadIOReader m r, Has Connection r) => UserId -> m Settings
+getSettingsByDiscord :: (MonadIOReader m r, Has SafeMysqlConn r) => UserId -> m Settings
 getSettingsByDiscord discord = fromMaybe defSettings <$> queryOnlyLog [mysql|SELECT Settings FROM `settings` WHERE `discord_id` = discord|]
 
-setSettingsByDiscord :: (MonadIOReader m r, Has Connection r) => UserId -> Settings -> m Bool
+setSettingsByDiscord :: (MonadIOReader m r, Has SafeMysqlConn r) => UserId -> Settings -> m Bool
 setSettingsByDiscord discord settings = (>0) <$> executeLog [mysql|INSERT INTO `settings`(`discord_id`, Settings) VALUES (discord, settings)|]
 
 defSettings :: Settings
@@ -101,7 +87,7 @@ allSettings = Settings
 
 data SettingsSource = DefSettings | AllSettings | UserSettings
 
-getSettingsFromSource :: (MonadIOReader m r, Has Connection r) => SettingsSource -> UserId -> m Settings
+getSettingsFromSource :: (MonadIOReader m r, Has SafeMysqlConn r) => SettingsSource -> UserId -> m Settings
 getSettingsFromSource DefSettings _ = return defSettings
 getSettingsFromSource AllSettings _ = return allSettings
 getSettingsFromSource UserSettings discord = getSettingsByDiscord discord

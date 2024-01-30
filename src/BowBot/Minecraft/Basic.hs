@@ -8,7 +8,7 @@ import BowBot.DB.Basic
 
 newtype UUID = UUID { uuidString :: Text }
   deriving (Show, Eq, Ord)
-  deriving newtype (Hashable, Param, Result, FromMysql, ToMysql)
+  deriving newtype (Hashable, FromMysqlSimple, ToMysqlSimple, FromMysql, ToMysql)
 
 uuidFromString :: Text -> Maybe UUID
 uuidFromString str

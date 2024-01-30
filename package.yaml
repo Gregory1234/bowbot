@@ -24,14 +24,15 @@ dependencies:
 - split
 - mtl
 - deepseq
-- mysql-simple
+- mysql-haskell
 - stringsearch
 - hashable
 - data-has
 - text-show
-- mysql
 - mime-mail
 - zlib
+- io-streams
+- binary
 # only for mysql quasi quoter
 - template-haskell
 - parsec

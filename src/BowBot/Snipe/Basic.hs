@@ -16,8 +16,8 @@ data SnipeMessage = SnipeMessage
 
 $(pure [])
 
-getSnipeMessageByChannel :: (MonadIOReader m r, Has Connection r) => ChannelId -> m (Maybe SnipeMessage)
+getSnipeMessageByChannel :: (MonadIOReader m r, Has SafeMysqlConn r) => ChannelId -> m (Maybe SnipeMessage)
 getSnipeMessageByChannel channel = queryOnlyLog [mysql|SELECT SnipeMessage FROM `snipe` WHERE `channel` = channel|]
 
-setSnipeMessageByChannel :: (MonadIOReader m r, Has Connection r) => ChannelId -> SnipeMessage -> m Bool
+setSnipeMessageByChannel :: (MonadIOReader m r, Has SafeMysqlConn r) => ChannelId -> SnipeMessage -> m Bool
 setSnipeMessageByChannel channel message = (>0) <$> executeLog [mysql|INSERT INTO `snipe`(`channel`, SnipeMessage) VALUES (channel, message)|]

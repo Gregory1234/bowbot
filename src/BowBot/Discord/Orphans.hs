@@ -10,7 +10,7 @@ import Discord.Types
 import Control.DeepSeq (NFData(..), deepseq)
 import GHC.Generics (Generic)
 import Data.Hashable (Hashable)
-import Language.MySQL.Query (Param, Result, ToMysql, FromMysql, StateT(..))
+import Language.MySQL.Query (ToMysql, ToMysqlSimple, FromMysql, FromMysqlSimple, StateT(..))
 import TextShow (TextShow(..))
 import TextShow.Generic (FromGeneric(..))
 import Discord (RestCallErrorCode(..))
@@ -193,15 +193,15 @@ instance NFData (R.GuildRequest a) where
 deriving newtype instance Num Snowflake
 deriving newtype instance Hashable Snowflake
 deriving newtype instance TextShow Snowflake
-deriving newtype instance Param Snowflake
-deriving newtype instance Result Snowflake
+deriving newtype instance ToMysqlSimple Snowflake
+deriving newtype instance FromMysqlSimple Snowflake
 deriving newtype instance ToMysql Snowflake
 deriving newtype instance FromMysql Snowflake
 deriving newtype instance Num (DiscordId a)
 deriving newtype instance Hashable (DiscordId a)
 deriving newtype instance TextShow (DiscordId a)
-deriving newtype instance Param (DiscordId a)
-deriving newtype instance Result (DiscordId a)
+deriving newtype instance ToMysqlSimple (DiscordId a)
+deriving newtype instance FromMysqlSimple (DiscordId a)
 deriving newtype instance ToMysql (DiscordId a)
 deriving newtype instance FromMysql (DiscordId a)
 
