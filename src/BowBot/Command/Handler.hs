@@ -11,6 +11,7 @@ import BowBot.Counter.Basic
 import BowBot.DB.Basic (SafeMysqlConn)
 import qualified Data.Text as T
 import BowBot.BotData.Info
+import Data.ByteString (ByteString)
 
 newtype CommandArgs = CommandMessageArgs [Text]
 
@@ -20,7 +21,7 @@ data CommandEnvironment = CommandEnvironment
   , envChannel :: !ChannelId
   , envGuild :: !GuildId
   , envRespond :: forall m r. (MonadIOReader m r, Has DiscordHandle r) => Text -> m ()
-  , envRespondFile :: forall m r. (MonadIOReader m r, Has DiscordHandle r) => Text -> Text -> m ()
+  , envRespondFile :: forall m r. (MonadIOReader m r, Has DiscordHandle r) => Text -> ByteString -> m ()
   , envArgs :: !CommandArgs
   }
 
@@ -31,7 +32,7 @@ commandEnvFromMessage m = CommandEnvironment
   , envChannel = messageChannelId m
   , envGuild = fromMaybe 0 $ messageGuildId m
   , envRespond = call_ . R.CreateMessage (messageChannelId m)
-  , envRespondFile = \n s -> call_ $ R.CreateMessageDetailed (messageChannelId m) def { R.messageDetailedFile = Just (n, encodeUtf8 s) }
+  , envRespondFile = \n s -> call_ $ R.CreateMessageDetailed (messageChannelId m) def { R.messageDetailedFile = Just (n, s) }
   , envArgs = CommandMessageArgs $ tail $ T.words $ messageContent m
   }
 
@@ -75,5 +76,10 @@ respond m = do
 
 respondFile :: (MonadIOReader m r, HasAll [CommandEnvironment, DiscordHandle] r) => Text -> Text -> m ()
 respondFile n m = do
+  res <- envs (\x -> envRespondFile x)
+  res n (encodeUtf8 m)
+
+respondFileBin :: (MonadIOReader m r, HasAll [CommandEnvironment, DiscordHandle] r) => Text -> ByteString -> m ()
+respondFileBin n m = do
   res <- envs (\x -> envRespondFile x)
   res n m

@@ -6,9 +6,12 @@ import BowBot.Minecraft.Account
 import BowBot.Command.Utils
 import BowBot.Discord.Utils
 import BowBot.Account.Utils
+import Control.Monad.Except
+import BowBot.Network.Basic
+import Data.ByteString (toStrict)
 
-urlCommand :: Text -> Text -> (UUID -> Text) -> Command
-urlCommand name desc url = Command CommandInfo
+urlImageCommand :: Text -> Text -> Text -> (UUID -> Text) -> Command
+urlImageCommand name desc filename url = Command CommandInfo
   { commandName = name
   , commandHelpEntries = [HelpEntry { helpUsage = name <> " [name]", helpDescription = desc, helpGroup = "normal" }]
   , commandPerms = DefaultLevel
@@ -17,11 +20,17 @@ urlCommand name desc url = Command CommandInfo
     Nothing -> do
       did <- userId <$> envs envSender
       acc <- liftMaybe youArentRegisteredMessage =<< getSelectedMinecraftByDiscord did
-      respond $ url $ mcUUID acc
+      handler $ mcUUID acc
     Just (uuidFromString -> Just uuid) -> do
-      respond $ url uuid
+      handler uuid
     Just (discordIdFromString -> Just did) -> do
       acc <- liftMaybe theUserIsntRegisteredMessage =<< getSelectedMinecraftByDiscord did
-      respond $ url $ mcUUID acc
+      handler $ mcUUID acc
     Just n -> do
-      commandMinecraftAutocorrectByNameWithSkipTip (respond . url . mcUUID) (respond . url . mcUUID . autocorrectAccount) n
+      commandMinecraftAutocorrectByNameWithSkipTip (handler . mcUUID) (handler . mcUUID . autocorrectAccount) n
+  where
+    handler :: UUID -> ExceptT Text CommandHandler ()
+    handler uuid = do
+      let u = url uuid
+      img <- sendRequestTo u u
+      respondFileBin filename (toStrict img)

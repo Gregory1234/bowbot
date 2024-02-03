@@ -197,8 +197,8 @@ commands =
   , snipeCommand
   , roleCommand
   , nameCommand
-  , urlCommand "head" "show player's head" $ \s -> "https://crafatar.com/avatars/" <> uuidString s <> "?overlay"
-  , urlCommand "skin" "show player's full skin" $ \s -> "https://crafatar.com/renders/body/" <> uuidString s <> "?overlay"
+  , urlImageCommand "head" "show player's head" "head.png" $ \s -> "https://crafatar.com/avatars/" <> uuidString s <> "?overlay"
+  , urlImageCommand "skin" "show player's full skin" "skin.png" $ \s -> "https://crafatar.com/renders/body/" <> uuidString s <> "?overlay"
   , helpCommand commands DefaultLevel (Just $ \prefix -> "*Visibility 'maybe' and 'defined' hide the stat when the value is undefined.*\n"
                                                 <> "**Stat names:** wins, losses, wlr, winsuntil, beststreak, currentstreak, bestdailystreak, bowhits, bowshots, accuracy\n"
                                                 <> "**Example:** `" <> prefix <> "show accuracy` makes accuracy visible in the `" <> prefix <> "s` command\n" ) "settings" "settings"
