@@ -20,9 +20,7 @@ createDummyBowBotAccount :: (MonadIOReader m r, Has SafeMysqlConn r) => UserId -
 createDummyBowBotAccount did = do
   r <- ask
   liftIO $ flip runReaderT r $ withTransaction $ (either (const $ rollback $> Nothing) (pure . Just) =<<) $ runExceptT $ do
-    c1 <- executeLog [mysql|INSERT INTO `account`(`name`) VALUES ("Dummy Account")|]
-    when (c1 <= 0) $ throwError ()
-    bid <- BowBotId <$> insertID
+    bid <- liftMaybe () =<< executeIDLog [mysql|INSERT AI INTO `account`(`name`) VALUES ("Dummy Account")|]
     c3 <- executeLog [mysql|INSERT INTO `account_discord`(`account_id`,`discord_id`) VALUES (bid, did)|]
     when (c3 <= 0) $ throwError ()
     pure bid

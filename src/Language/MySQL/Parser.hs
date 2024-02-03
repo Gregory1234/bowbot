@@ -130,8 +130,12 @@ insertSourceParser :: Parser InsertSource
 insertSourceParser = ValuesSource <$> (reservedParser "VALUES" *> sepBy1 valuesRowParser commaParser)
   <|> SelectSource <$> selectQueryParser
 
+simpleInsertSourceParser :: Parser SimpleInsertSource
+simpleInsertSourceParser = SimpleValuesSource <$> (reservedParser "VALUES" *> parensParser complexExpressionListParser)
+
 insertQueryParser :: Parser InsertQuery
-insertQueryParser = InsertQuery <$> (reservedParser "INSERT" *> reservedParser "INTO" *> tableNameParser) <*> (implicitTupleTarget <$> parensParser insertTargetListParser) <*> insertSourceParser
+insertQueryParser = reservedParser "INSERT" >> (InsertQuery <$> (reservedParser "INTO" *> tableNameParser) <*> (implicitTupleTarget <$> parensParser insertTargetListParser) <*> insertSourceParser
+  <|> InsertAIQuery <$> (reservedParser "AI" *> optionMaybe typeParser) <*> (reservedParser "INTO" *> tableNameParser) <*> (implicitTupleTarget <$> parensParser insertTargetListParser) <*> simpleInsertSourceParser)
 
 columnUpdateParser :: Parser ColumnUpdate
 columnUpdateParser = ColumnUpdate <$> fullColumnNameParser <*> (reservedParser "=" *> expressionParser)

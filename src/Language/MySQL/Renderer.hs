@@ -229,7 +229,11 @@ insertSourceRenderer (TypedValuesSource rows) = emit "VALUES " *> evalStateT (ma
 insertSourceRenderer (TypedSelectSource q) = selectQueryStringRenderer q
 
 insertQueryStringRenderer :: TypedInsertQuery -> StrRenderer ()
-insertQueryStringRenderer (TypedInsertQuery tn t s u) = withSpaces [emit "INSERT INTO", emit $ ppTableName tn, parensRenderer $ insertTargetRenderer t, insertSourceRenderer s, updateOnDuplicateListRenderer u]
+insertQueryStringRenderer q = let
+  (tn, t, s, u) = case q of
+    (TypedInsertQuery a b c d) -> (a, b, c, d)
+    (TypedInsertAIQuery _ a b (TypedSimpleValuesSource c) d) -> (a, b, TypedValuesSource [TypedValuesRowExpr c], d)
+  in withSpaces [emit "INSERT INTO", emit $ ppTableName tn, parensRenderer $ insertTargetRenderer t, insertSourceRenderer s, updateOnDuplicateListRenderer u]
 
 insertSourceCheckRenderer :: TypedInsertSource -> Q Exp -> Q Exp -> Q Exp
 insertSourceCheckRenderer (TypedValuesSource (mapM (\case (TypedValuesRowVar n ValuesRowMany) -> Just n; _ -> Nothing) -> Just lists)) withHoles e 
@@ -240,6 +244,9 @@ renderInsertQuery :: TypedInsertQuery -> [TypecheckConstraint] -> Q Exp
 renderInsertQuery q@(TypedInsertQuery _ _ s _) tc = do
   ((str, withHoles), vars) <- runStateT (runRenderer $ runStrRendererWithHoles $ insertQueryStringRenderer q) M.empty
   [| $(insertSourceCheckRenderer s (pure withHoles) $ renderQuery tc vars [| Command $(pure str) |]) :: Command |]
+renderInsertQuery q@(TypedInsertAIQuery t _ _ _ _) tc = do
+  (str, vars) <- runStateT (runRenderer $ runStrRenderer $ insertQueryStringRenderer q) M.empty
+  [| $(renderQuery tc vars [| CommandAI $(pure str) |]) :: CommandAI $(pure t) |]
 
 columnUpdateRenderer :: TypedColumnUpdate -> StrRenderer ()
 columnUpdateRenderer (TypedColumnUpdate c e) = emit (ppFullColumnName c ++ "=") *> expressionRenderer e

@@ -86,7 +86,12 @@ data InsertSource
   | SelectSource SelectQuery
   deriving (Show, Eq)
 
-data InsertQuery = InsertQuery TableName InsertTarget InsertSource deriving (Show, Eq)
+data SimpleInsertSource = SimpleValuesSource [ComplexExpression] deriving (Show, Eq)
+
+data InsertQuery
+  = InsertQuery TableName InsertTarget InsertSource
+  | InsertAIQuery (Maybe ParsedType) TableName InsertTarget SimpleInsertSource
+  deriving (Show, Eq)
 
 data ColumnUpdate = ColumnUpdate FullColumnName Expression deriving (Show, Eq)
 

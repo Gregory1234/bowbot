@@ -11,7 +11,7 @@ import Data.Hashable (Hashable)
 
 newtype BowBotId = BowBotId { unBowBotId :: Integer }
   deriving stock (Show, Eq, Ord)
-  deriving newtype (Hashable, FromMysqlSimple, ToMysqlSimple, ToMysql, FromMysql)
+  deriving newtype (Hashable, FromMysqlSimple, ToMysqlSimple, ToMysql, FromMysql, MysqlAutoIncrement)
 
 data MinecraftList = MinecraftList { selectedMinecraft :: UUID, allMinecrafts :: [UUID] }
 

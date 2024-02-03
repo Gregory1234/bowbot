@@ -1,7 +1,7 @@
 {-# LANGUAGE QuasiQuotes #-}
 
 module BowBot.DB.Basic(
-  module BowBot.DB.Basic, module Language.MySQL.Quasi, ToMysqlSimple(..), FromMysqlSimple(..), ToMysql(..), FromMysql(..), MysqlEnum(..), StateT(..), SimpleValue(..), EnumValue(..), Generic(..), Generically(..)
+  module BowBot.DB.Basic, module Language.MySQL.Quasi, ToMysqlSimple(..), FromMysqlSimple(..), ToMysql(..), FromMysql(..), MysqlEnum(..), MysqlAutoIncrement(..), StateT(..), SimpleValue(..), EnumValue(..), Generic(..), Generically(..)
 ) where
 
 import BowBot.Utils
@@ -20,7 +20,7 @@ import qualified System.IO.Streams as S
 import Control.Monad.State.Strict (evalState)
 import Control.Exception (onException)
 
-data SafeMysqlConn = SafeMysqlConn { safeMysqlConnVar :: MVar MySQLConn, safeMysqlInsertIdVar :: TVar Int }
+newtype SafeMysqlConn = SafeMysqlConn { safeMysqlConnVar :: MVar MySQLConn }
 
 withDB :: MonadHoistIO m => (SafeMysqlConn -> m a) -> m a -- TODO: report connection errors
 withDB f = do
@@ -31,7 +31,6 @@ withDB f = do
   ciDatabase <- liftIO $ BS.pack <$> getEnvOrThrow "DB_NAME"
   hoistIOWithArg (bracket (liftIO $ connect defaultConnectInfo { ciHost, ciUser, ciPassword, ciDatabase }) close) $ \conn -> do
     safeMysqlConnVar <- liftIO $ newMVar conn
-    safeMysqlInsertIdVar <- liftIO $ atomically $ newTVar 0
     f SafeMysqlConn {..}
 
 streamToList :: S.InputStream a -> IO [a]
@@ -52,12 +51,14 @@ query (Query q) = withSafeConn $ \conn -> do
   map (evalState rowParser) <$> streamToList valsStream
 
 execute' :: (MonadIOReader m r, Has SafeMysqlConn r) => Command' -> m Int
-execute' (Command q) = do
-  SafeMysqlConn {..} <- asks getter
-  withSafeConn $ \conn -> do
-    Q.OK {..} <- Q.execute_ conn $ Q.Query $ BS.fromStrict q
-    atomically $ writeTVar safeMysqlInsertIdVar okLastInsertID
-    return okAffectedRows
+execute' (Command q) = withSafeConn $ \conn -> do
+  Q.OK {..} <- Q.execute_ conn $ Q.Query $ BS.fromStrict q
+  return okAffectedRows
+
+executeID :: (MonadIOReader m rd, Has SafeMysqlConn rd, MysqlAutoIncrement r) => CommandAI r -> m (Maybe r)
+executeID (CommandAI q) = withSafeConn $ \conn -> do
+  Q.OK {..} <- Q.execute_ conn $ Q.Query $ BS.fromStrict q
+  return $ if okAffectedRows == 1 then Just $ fromAutoIncrement okLastInsertID else Nothing
 
 execute :: (MonadIOReader m r, Has SafeMysqlConn r) => Command -> m Int
 execute = either (const (pure 0)) execute'
@@ -108,6 +109,11 @@ executeLog (Right q) = do
   logInfo $ "Executing command: " <> showt (fromCommand q)
   execute' q
 
+executeIDLog :: (MonadIOReader m rd, Has SafeMysqlConn rd, MysqlAutoIncrement r) => CommandAI r -> m (Maybe r)
+executeIDLog q = do
+  logInfo $ "Executing command: " <> showt (fromCommandAI q)
+  executeID q
+
 withTransaction :: (MonadHoistIOReader m r, Has SafeMysqlConn r) => m a -> m a
 withTransaction a = do
   _ <- withSafeConn $ \conn -> Q.execute_ conn "BEGIN"
@@ -123,8 +129,3 @@ commit = withSafeConn $ \conn -> void $ Q.execute_ conn "COMMIT"
 
 rollback :: (MonadIOReader m r, Has SafeMysqlConn r) => m ()
 rollback = withSafeConn $ \conn -> void $ Q.execute_ conn "ROLLBACK"
-
-insertID :: (MonadIOReader m r, Has SafeMysqlConn r, Num a) => m a
-insertID = do
-  SafeMysqlConn {..} <- asks getter
-  liftIO $ atomically $ fromIntegral <$> readTVar safeMysqlInsertIdVar

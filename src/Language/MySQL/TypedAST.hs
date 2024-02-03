@@ -88,9 +88,16 @@ data TypedInsertSource
   | TypedSelectSource TypedSelectQuery
   deriving (Show, Eq)
 
+data TypedSimpleInsertSource
+  = TypedSimpleValuesSource TypedComplexExpression
+  deriving (Show, Eq)
+
 newtype UpdateOnDuplicateList = UpdateOnDuplicateList [ColumnName] deriving (Show, Eq)
 
-data TypedInsertQuery = TypedInsertQuery TableName TypedInsertTarget TypedInsertSource UpdateOnDuplicateList deriving (Show, Eq)
+data TypedInsertQuery
+  = TypedInsertQuery TableName TypedInsertTarget TypedInsertSource UpdateOnDuplicateList
+  | TypedInsertAIQuery Type TableName TypedInsertTarget TypedSimpleInsertSource UpdateOnDuplicateList
+  deriving (Show, Eq)
 
 data TypedColumnUpdate = TypedColumnUpdate FullColumnName TypedExpression deriving (Show, Eq)
 

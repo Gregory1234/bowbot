@@ -1,11 +1,11 @@
-account: id BowBotId, name Text, birthday BirthdayDate, roles List SavedRole
+account: AI id BowBotId, name Text, birthday BirthdayDate, roles List SavedRole
 account_discord: account_id BowBotId, discord_id UserId
 account_minecraft: account_id BowBotId, minecraft_uuid UUID, type Text, selected Bool, verified Int
 bot_info: name Text, value Text
 discord: id UserId, name Text, discriminator Maybe Text, nickname Maybe Text, member Bool
 hypixel_bow_stats: minecraft_uuid UUID, wins Integer, losses Integer, last_update UTCTime, winstreak Maybe Integer, last_winstreak_update Maybe UTCTime, announcement_wins Maybe Integer
 hypixel_bow_timed_stats: minecraft_uuid UUID, wins Integer, losses Integer, last_update UTCTime, time StatsTimeRange
-logs: id Integer, timestamp UTCTime, message Text, type Text
+logs: AI id Integer, timestamp UTCTime, message Text, type Text
 minecraft: uuid UUID, names List Text, hypixel IsBanned, hypixel_role Maybe HypixelRole
 minecraft_name: name Text, minecraft_uuid UUID
 permissions: discord_id UserId, level PermissionLevel

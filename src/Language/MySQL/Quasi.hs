@@ -15,22 +15,23 @@ import qualified Data.Map as M
 
 -- TODO: move to a separate package
 
-getSchema :: FilePath -> Q [(TableName, [(ColumnName, ParsedType)])]
+getSchema :: FilePath -> Q [(TableName, [(ColumnName, ColumnInfo)])]
 getSchema file = do
   addDependentFile file
   f <- liftIO $ readFile file
   mapM helper (lines f)
  where
   columnParser = do
+    ai <- withSpace $ option False $ True <$ string "AI"
     cname <- withSpace $ many1 $ satisfy (\x -> isAsciiLower x || x == '_')
     t <- typeGenParser
-    return (ColumnName cname, t)
+    return (ColumnName cname, ColumnInfo { columnInfoType = t, columnInfoAI = ai })
   schemaParser = do
     tname <- many1 $ satisfy (\x -> isAsciiLower x || x == '_')
     _ <- withSpace $ char ':'
     cols <- sepBy1 columnParser commaParser
     return (TableName tname, cols)
-  helper :: String -> Q (TableName, [(ColumnName, ParsedType)])
+  helper :: String -> Q (TableName, [(ColumnName, ColumnInfo)])
   helper s = case runParser schemaParser () file s of
     Left err -> fail (show err)
     Right v -> return v

@@ -33,6 +33,8 @@ class (MonadIO m, MonadFail m) => MonadQ m where liftQ :: Q a -> m a
 instance MonadQ EarlyTypecheck where liftQ = lift
 instance MonadQ Typecheck where liftQ = lift . lift
 
+data ColumnInfo = ColumnInfo { columnInfoType :: ParsedType, columnInfoAI :: Bool }
+
 newtype Schema = Schema [(TableName, ColumnName, Either String Type)] deriving (Show, Eq)
 
 newtype SqlFuns = SqlFuns (M.Map FunName ([ParsedType], ParsedType))
@@ -318,12 +320,12 @@ typecheckComplexExpr dc (ImplicitComplexExpr nUntyped) t = do
     Nothing -> fail $ "Default columns not found: " ++ show n
     Just e -> typecheckComplexExpr dc e t
 
-typecheckTableName :: [(TableName, [(ColumnName, ParsedType)])] -> AliasedTable -> EarlyTypecheck Schema
+typecheckTableName :: [(TableName, [(ColumnName, ColumnInfo)])] -> AliasedTable -> EarlyTypecheck Schema
 typecheckTableName schemaAll (AliasedTable t a) = Schema <$> case lookup t schemaAll of
     Nothing -> fail $ "Table not found: " ++ ppTableName t ++ "!"
-    Just s -> mapM (\(cn, ct) -> (fromMaybe t a, cn,) <$> typecheckType' ct) s
+    Just s -> mapM (\(cn, ColumnInfo {..}) -> (fromMaybe t a, cn,) <$> typecheckType' columnInfoType) s
 
-typecheckJoinTables :: [(TableName, [(ColumnName, ParsedType)])] -> SqlFuns -> JoinTables -> EarlyTypecheck Schema
+typecheckJoinTables :: [(TableName, [(ColumnName, ColumnInfo)])] -> SqlFuns -> JoinTables -> EarlyTypecheck Schema
 typecheckJoinTables schemaAll funs (JoinTables x xs) = do
   (Schema firstTable) <- typecheckTableName schemaAll x
   Schema <$> foldlM helper firstTable xs
@@ -338,7 +340,7 @@ typecheckJoinTables schemaAll funs (JoinTables x xs) = do
 typecheckWhereClause :: WhereClause -> Typecheck TypedWhereClause
 typecheckWhereClause (WhereClause e) = TypedWhereClause <$> mapM (`typecheckExpr` Just (StrictnessType EqStrict boolType)) e
 
-typecheckSelectQuery :: [(TableName, [(ColumnName, ParsedType)])] -> SqlFuns -> DefColumns -> Maybe StrictnessType -> SelectQuery -> EarlyTypecheck TypedSelectQuery
+typecheckSelectQuery :: [(TableName, [(ColumnName, ColumnInfo)])] -> SqlFuns -> DefColumns -> Maybe StrictnessType -> SelectQuery -> EarlyTypecheck TypedSelectQuery
 typecheckSelectQuery schemaAll funs dc expectedType (SelectQuery s t w) = do
   schema <- typecheckJoinTables schemaAll funs t
   flip runReaderT (schema, funs) $ do
@@ -357,9 +359,9 @@ typecheckValuesRow _ t (ValuesRowVar nUntyped r) = do
       partialTypeEqual t (VarType n')
   return $ TypedValuesRowVar n r
 
-typecheckInsertSouce :: [(TableName, [(ColumnName, ParsedType)])] -> SqlFuns -> DefColumns -> StrictnessType -> InsertSource -> EarlyTypecheck TypedInsertSource
-typecheckInsertSouce _ funs _ t (ValuesSource rows) = TypedValuesSource <$> mapM (typecheckValuesRow funs t) rows
-typecheckInsertSouce schemaAll funs dc t (SelectSource q) = TypedSelectSource <$> typecheckSelectQuery schemaAll funs dc (Just t) q
+typecheckInsertSource :: [(TableName, [(ColumnName, ColumnInfo)])] -> SqlFuns -> DefColumns -> StrictnessType -> InsertSource -> EarlyTypecheck TypedInsertSource
+typecheckInsertSource _ funs _ t (ValuesSource rows) = TypedValuesSource <$> mapM (typecheckValuesRow funs t) rows
+typecheckInsertSource schemaAll funs dc t (SelectSource q) = TypedSelectSource <$> typecheckSelectQuery schemaAll funs dc (Just t) q
 
 combineTypedInsertTargets :: [(TypedInsertTarget, [ColumnName])] -> ([TypedInsertTarget], [ColumnName])
 combineTypedInsertTargets xs = (map fst xs, snd =<< xs)
@@ -406,29 +408,47 @@ typecheckInsertTarget dc t (ImplicitComplexTarget nUntyped) = do
     Nothing -> fail $ "Default columns not found: " ++ show n
     Just e -> typecheckInsertTarget dc t e
 
-typecheckInsertQuery :: [(TableName, [(ColumnName, ParsedType)])] -> SqlFuns -> DefColumns -> InsertQuery -> EarlyTypecheck TypedInsertQuery
+typecheckSimpleInsertSource :: SqlFuns -> StrictnessType -> SimpleInsertSource -> EarlyTypecheck TypedSimpleInsertSource
+typecheckSimpleInsertSource funs t (SimpleValuesSource e) = fmap TypedSimpleValuesSource . flip runReaderT (Schema [], funs) $ typecheckComplexExpr (DefColumns M.empty) (implicitTupleExpr e) (Just t)
+
+typecheckAutoIncrement :: [(TableName, [(ColumnName, ColumnInfo)])] -> TableName -> Maybe ParsedType -> EarlyTypecheck Type
+typecheckAutoIncrement schemaAll tn Nothing = case lookup tn schemaAll of
+  Nothing -> fail $ "Table not found: " ++ ppTableName tn ++ "!"
+  Just cols -> case filter (columnInfoAI . snd) cols of
+    [] -> fail $ "Table has no auto-increment column: " ++ ppTableName tn ++ "!"
+    [(_, ColumnInfo {..})] -> typecheckType columnInfoType
+    _ -> fail $ "Table has multiple auto-increment columns: " ++ ppTableName tn ++ "!"
+typecheckAutoIncrement _ _ (Just t) = typecheckType t
+
+typecheckInsertQuery :: [(TableName, [(ColumnName, ColumnInfo)])] -> SqlFuns -> DefColumns -> InsertQuery -> EarlyTypecheck TypedInsertQuery
 typecheckInsertQuery schemaAll funs dc (InsertQuery tn t s) = do
   schema <- typecheckTableName schemaAll (AliasedTable tn Nothing)
   (t', u) <- flip runReaderT (schema, funs) $ typecheckInsertTarget dc Nothing t
-  s' <- typecheckInsertSouce schemaAll funs dc (StrictnessType EqStrict $ typedInsertTargetType t') s
+  s' <- typecheckInsertSource schemaAll funs dc (StrictnessType EqStrict $ typedInsertTargetType t') s
   return $ TypedInsertQuery tn t' s' (UpdateOnDuplicateList u)
+typecheckInsertQuery schemaAll funs dc (InsertAIQuery ait tn t s) = do
+  schema <- typecheckTableName schemaAll (AliasedTable tn Nothing)
+  ait' <- typecheckAutoIncrement schemaAll tn ait
+  (t', u) <- flip runReaderT (schema, funs) $ typecheckInsertTarget dc Nothing t
+  s' <- typecheckSimpleInsertSource funs (StrictnessType EqStrict $ typedInsertTargetType t') s
+  return $ TypedInsertAIQuery ait' tn t' s' (UpdateOnDuplicateList u)
 
 typecheckColumnUpdate :: ColumnUpdate -> Typecheck TypedColumnUpdate
 typecheckColumnUpdate (ColumnUpdate c e) = do
   t <- getColumnType c
   TypedColumnUpdate c <$> typecheckExpr e (Just $ StrictnessType EqStrict $ RealType t)
 
-typecheckUpdateQuery :: [(TableName, [(ColumnName, ParsedType)])] -> SqlFuns -> UpdateQuery -> EarlyTypecheck TypedUpdateQuery
+typecheckUpdateQuery :: [(TableName, [(ColumnName, ColumnInfo)])] -> SqlFuns -> UpdateQuery -> EarlyTypecheck TypedUpdateQuery
 typecheckUpdateQuery schemaAll funs (UpdateQuery t u w) = do
   schema <- typecheckJoinTables schemaAll funs t
   flip runReaderT (schema, funs) $ TypedUpdateQuery t <$> mapM typecheckColumnUpdate u <*> typecheckWhereClause w
 
-typecheckDeleteQuery :: [(TableName, [(ColumnName, ParsedType)])] -> SqlFuns -> DeleteQuery -> EarlyTypecheck TypedDeleteQuery
+typecheckDeleteQuery :: [(TableName, [(ColumnName, ColumnInfo)])] -> SqlFuns -> DeleteQuery -> EarlyTypecheck TypedDeleteQuery
 typecheckDeleteQuery schemaAll funs (DeleteQuery t w) = do
   schema <- typecheckTableName schemaAll (AliasedTable t Nothing)
   flip runReaderT (schema, funs) $ TypedDeleteQuery t <$> typecheckWhereClause w
 
-typecheckAnyQuery :: [(TableName, [(ColumnName, ParsedType)])] -> SqlFuns -> DefColumns -> AnyQuery -> EarlyTypecheck TypedAnyQuery
+typecheckAnyQuery :: [(TableName, [(ColumnName, ColumnInfo)])] -> SqlFuns -> DefColumns -> AnyQuery -> EarlyTypecheck TypedAnyQuery
 typecheckAnyQuery schema funs dc (SelectAnyQuery q) = TypedSelectAnyQuery <$> typecheckSelectQuery schema funs dc Nothing q
 typecheckAnyQuery schema funs dc (InsertAnyQuery q) = TypedInsertAnyQuery <$> typecheckInsertQuery schema funs dc q
 typecheckAnyQuery schema funs _ (UpdateAnyQuery q) = TypedUpdateAnyQuery <$> typecheckUpdateQuery schema funs q

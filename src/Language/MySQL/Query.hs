@@ -327,6 +327,14 @@ newtype Query o = Query { fromQuery :: ByteString } deriving Show
 newtype Command' = Command { fromCommand :: ByteString } deriving Show
 type Command = Either ByteString Command'
 
+newtype CommandAI i = CommandAI { fromCommandAI :: ByteString } deriving Show
+
+class MysqlAutoIncrement i where
+  fromAutoIncrement :: Int -> i
+
+instance MysqlAutoIncrement Int where fromAutoIncrement = id
+instance MysqlAutoIncrement Integer where fromAutoIncrement = toInteger
+
 forceQueryType :: r -> Query r -> Query r
 forceQueryType _ = id
 {-# INLINE forceQueryType #-}
