@@ -1,0 +1,50 @@
+{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE QuasiQuotes #-}
+
+module BowBot.Ranked.Stats where
+
+import BowBot.Utils
+import BowBot.DB.Basic
+import BowBot.Settings.Basic
+import BowBot.Account.Basic
+import qualified Data.Text as T
+
+data RankedBowStats = RankedBowStats
+  { rankedWins :: Integer
+  , rankedLosses :: Integer
+  , rankedElo :: Integer
+  } deriving stock (Show, Eq, Generic)
+    deriving (ToMysql, FromMysql) via (Generically RankedBowStats)
+
+$(pure [])
+
+rankedWLR :: RankedBowStats -> WLR Integer
+rankedWLR RankedBowStats {..} = WLR rankedWins rankedLosses
+
+getRankedBowStatsByBowBot :: (MonadIOReader m r, Has SafeMysqlConn r) => BowBotId -> m (Maybe RankedBowStats)
+getRankedBowStatsByBowBot bid = queryOnlyLog [mysql|SELECT RankedBowStats FROM `ranked_bow_stats` WHERE `account_id` = bid|]
+
+setRankedBowStatsByBowBot :: (MonadIOReader m r, Has SafeMysqlConn r) => BowBotId -> RankedBowStats -> m Bool
+setRankedBowStatsByBowBot bid entry = (>0) <$> executeLog [mysql|INSERT INTO `ranked_bow_stats`(`account_id`, RankedBowStats) VALUES (bid,entry)|]
+
+showRankedBowStats :: Settings -> RankedBowStats -> Text
+showRankedBowStats Settings {..} RankedBowStats {..} = T.unlines $ catMaybes
+  [ onlyIfBin sWins
+  $ "- *Ranked Bow Wins:* **"
+  <> showt rankedWins
+  <> "**"
+  , onlyIfBin sLosses
+  $ "- *Ranked Bow Losses:* **"
+  <> showt rankedLosses
+  <> "**"
+  , onlyIfTer sWLR (rankedWins + rankedLosses /= 0)
+  $ "- *Ranked Bow Win/Loss Ratio:* **"
+  <> winLossRatio
+  <> "**"
+  , Just -- TODO: add to settings
+  $ "- *Ranked Bow Elo:* **"
+  <> showt rankedElo
+  <> "**"
+  ]
+  where
+    winLossRatio = showWLR (WLR rankedWins rankedLosses)

@@ -3,5 +3,6 @@ DiscordName, discord: ^name, ^discriminator, ^nickname
 HypixelBowLeaderboardEntry, hypixel_bow_stats: ^wins, ^losses, ^winstreak, ^last_update, ^last_winstreak_update
 HypixelBowTimeStats, hypixel_bow_timed_stats: ^wins, ^losses, ^last_update
 MinecraftAccount, minecraft: uuid, ^names
+RankedBowStats, ranked_bow_stats: ^wins, ^losses, ^elo
 Settings, settings: ^wins, ^losses, ^wlr, ^wins_until, ^best_streak, ^current_streak, ^best_daily_streak, ^bow_hits, ^bow_shots, ^accuracy
 SnipeMessage, snipe: ^author, ^content, ^edited, ^time
