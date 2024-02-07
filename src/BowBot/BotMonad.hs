@@ -7,6 +7,7 @@ import Data.Has
 import BowBot.Counter.Basic
 import BowBot.DB.Basic (SafeMysqlConn)
 import BowBot.BotData.Info
+import BowBot.Ranked.Queue
 
 data BotContext = BotContext
   { bctxManager :: !Manager
@@ -14,6 +15,7 @@ data BotContext = BotContext
   , bctxDiscord :: !DiscordHandle
   , bctxCounter :: !CounterState
   , bctxInfo :: !InfoCache
+  , bctxGameQueue :: !GameQueue
   }
 
 instance Has Manager BotContext where
@@ -31,6 +33,9 @@ instance Has CounterState BotContext where
 instance Has InfoCache BotContext where
   getter = bctxInfo
   modifier f x = x { bctxInfo = f $ bctxInfo x }
+instance Has GameQueue BotContext where
+  getter = bctxGameQueue
+  modifier f x = x { bctxGameQueue = f $ bctxGameQueue x }
 
 type BotT = ReaderT BotContext
 

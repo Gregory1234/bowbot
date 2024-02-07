@@ -12,6 +12,7 @@ import BowBot.DB.Basic (SafeMysqlConn)
 import qualified Data.Text as T
 import BowBot.BotData.Info
 import Data.ByteString (ByteString)
+import BowBot.Ranked.Queue
 
 newtype CommandArgs = CommandMessageArgs [Text]
 
@@ -43,6 +44,7 @@ data CommandHandlerContext = CommandHandlerContext
   , cctxDiscord :: !DiscordHandle
   , cctxCounter :: !CounterState
   , cctxInfo :: !InfoCache
+  , cctxGameQueue :: !GameQueue
   }
 
 instance Has CommandEnvironment CommandHandlerContext where
@@ -63,6 +65,9 @@ instance Has CounterState CommandHandlerContext where
 instance Has InfoCache CommandHandlerContext where
   getter = cctxInfo
   modifier f x = x { cctxInfo = f $ cctxInfo x }
+instance Has GameQueue CommandHandlerContext where
+  getter = cctxGameQueue
+  modifier f x = x { cctxGameQueue = f $ cctxGameQueue x }
 
 type CommandHandler = ReaderT CommandHandlerContext IO
 

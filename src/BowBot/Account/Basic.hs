@@ -25,6 +25,9 @@ getSelectedMinecraftUUIDByDiscord :: (MonadIOReader m r, Has SafeMysqlConn r) =>
 getSelectedMinecraftUUIDByDiscord did = queryOnlyLog [mysql|SELECT `minecraft_uuid` FROM `account_minecraft` 
   JOIN `account_discord` ON `account_id`=`account_minecraft`.`account_id` WHERE `account_discord`.`discord_id` = did AND `account_minecraft`.`selected`|]
 
+getSelectedMinecraftUUIDByBowBotId :: (MonadIOReader m r, Has SafeMysqlConn r) => BowBotId -> m (Maybe UUID)
+getSelectedMinecraftUUIDByBowBotId bid = queryOnlyLog [mysql|SELECT `minecraft_uuid` FROM `account_minecraft` WHERE `account_id` = bid AND `account_minecraft`.`selected`|]
+
 getMinecraftUUIDsByDiscord :: (MonadIOReader m r, Has SafeMysqlConn r) => UserId -> m [UUID]
 getMinecraftUUIDsByDiscord did = queryLog [mysql|SELECT `minecraft_uuid` FROM `account_minecraft` 
   JOIN `account_discord` ON `account_id`=`account_minecraft`.`account_id` WHERE `account_discord`.`discord_id` = did|]

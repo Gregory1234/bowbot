@@ -43,6 +43,8 @@ import BowBot.Hypixel.Announce
 import BowBot.Counter.Basic
 import BowBot.Hypixel.Guild
 import BowBot.Command.HashCommand
+import BowBot.Ranked.Queue
+import BowBot.Ranked.QueueCommand
 
 runBowBot :: IO ()
 runBowBot = do
@@ -51,12 +53,13 @@ runBowBot = do
   bctxManager <- newManager managerSettings
   bctxCounter <- atomically newCounterState
   bctxInfo <- downloadInfoCache
+  bctxGameQueue <- emptyGameQueue 2
   logInfoFork "bot started"
   userFacingError <-
     runDiscord $
       def
         { discordToken = pack discordKey,
-          discordOnStart = ReaderT $ onStartup bctxManager bctxCounter bctxInfo,
+          discordOnStart = ReaderT $ onStartup bctxManager bctxCounter bctxInfo bctxGameQueue,
           discordOnEvent = \e -> ReaderT $ \bctxDiscord -> withDB $ \bctxConnection -> runReaderT (eventHandler e) BotContext {..},
           discordOnLog = putStrLn . unpack,
           discordGatewayIntent = def { gatewayIntentMembers = True }
@@ -89,8 +92,8 @@ backgroundMinutely mint = do
     when (hour `mod` 8 == 0) clearLogs
     logInfo "finished update"
 
-onStartup :: Manager -> CounterState -> InfoCache -> DiscordHandle -> IO ()
-onStartup bctxManager bctxCounter bctxInfo bctxDiscord = void $ forkIO $ do
+onStartup :: Manager -> CounterState -> InfoCache -> GameQueue -> DiscordHandle -> IO ()
+onStartup bctxManager bctxCounter bctxInfo bctxGameQueue bctxDiscord = void $ forkIO $ do
   withDB $ \bctxConnection -> runReaderT updateDiscordStatus BotContext {..}
   sec <- read @Int <$> getTime "%S"
   liftIO $ threadDelay ((65 - sec `mod` 60) * 1000000)
@@ -206,6 +209,9 @@ commands =
   , constSettingCommand Yes Always "show" "makes the stat visible"
   , constSettingCommand No Never "hide" "makes the stat hidden"
   , selectMinecraftCommand
+  , helpCommand commands DefaultLevel Nothing "ranked" "rankedhelp"
+  , queueCommand
+  , leaveCommand
   , hashCommand
   , helpCommand commands ModLevel Nothing "normal" "modhelp"
   , addCommand

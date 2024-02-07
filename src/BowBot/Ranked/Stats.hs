@@ -8,6 +8,7 @@ import BowBot.DB.Basic
 import BowBot.Settings.Basic
 import BowBot.Account.Basic
 import qualified Data.Text as T
+import BowBot.Minecraft.Basic (UUID)
 
 data RankedBowStats = RankedBowStats
   { rankedWins :: Integer
@@ -23,6 +24,9 @@ rankedWLR RankedBowStats {..} = WLR rankedWins rankedLosses
 
 getRankedBowStatsByBowBot :: (MonadIOReader m r, Has SafeMysqlConn r) => BowBotId -> m (Maybe RankedBowStats)
 getRankedBowStatsByBowBot bid = queryOnlyLog [mysql|SELECT RankedBowStats FROM `ranked_bow_stats` WHERE `account_id` = bid|]
+
+addRankedPlayer :: (MonadIOReader m r, Has SafeMysqlConn r) => BowBotId -> UUID -> m Bool
+addRankedPlayer bid uuid = (>0) <$> executeLog [mysql|INSERT INTO `ranked_bow_stats`(`account_id`, `ranked_uuid`) VALUES (bid,uuid)|]
 
 setRankedBowStatsByBowBot :: (MonadIOReader m r, Has SafeMysqlConn r) => BowBotId -> RankedBowStats -> m Bool
 setRankedBowStatsByBowBot bid entry = (>0) <$> executeLog [mysql|INSERT INTO `ranked_bow_stats`(`account_id`, RankedBowStats) VALUES (bid,entry)|]
