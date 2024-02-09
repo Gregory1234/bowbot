@@ -1,37 +1,32 @@
-{-# LANGUAGE MultiWayIf #-}
+{-# LANGUAGE QuasiQuotes #-}
+
 module BowBot.Ranked.Queue where
 
-import Control.Concurrent.MVar
 import BowBot.Discord.Utils
+import BowBot.DB.Basic
+import BowBot.Account.Basic
+import Control.Monad.Except
 
-data GameQueue = GameQueue { queueMembers :: MVar [UserId], queueCapacity :: Int }
 
-data AddToQueueRes = AddedToQueue | AlreadyInQueue | QueueFilled [UserId]
+data AddToQueueRes = AddedToQueue | AlreadyInQueue | CurrentlyInGame | QueueFilled [BowBotId]
 
-addToQueue :: (MonadIOReader m r, Has GameQueue r) => UserId -> m AddToQueueRes
-addToQueue did = do
-  GameQueue {..} <- asks getter
-  q <- liftIO $ takeMVar queueMembers
-  let newQ = did : q
-  if
-    | did `elem` q -> return AlreadyInQueue
-    | length newQ == queueCapacity -> do
-        liftIO $ putMVar queueMembers []
-        return $ QueueFilled newQ
-    | otherwise -> do
-        liftIO $ putMVar queueMembers newQ
-        return AddedToQueue
+addToQueue :: (MonadIOReader m r, Has SafeMysqlConn r) => Int -> BowBotId -> m (Maybe AddToQueueRes)
+addToQueue limit bid = do
+  ctx <- ask
+  liftIO $ (`runReaderT` ctx) $ withTransaction $ (either (const $ rollback $> Nothing) (pure . Just) =<<) $ runExceptT $ do
+    (inQueue, currentGame) <- liftMaybe () =<< queryOnlyLog [mysql|SELECT `queue`,`current_game` FROM `ranked_bow_stats` WHERE `account_id` = bid|]
+    case (inQueue, currentGame) of
+      (False, Just _) -> return CurrentlyInGame
+      (True, _) -> return AlreadyInQueue
+      (False, Nothing) -> do
+        queue <- queryLog [mysql|SELECT `account_id` FROM `ranked_bow_stats` WHERE `queue`|]
+        if length queue == limit - 1
+          then do
+            void $ executeLog [mysql|UPDATE `ranked_bow_stats` SET `queue` = 0|]
+            return $ QueueFilled (bid : queue)
+          else do
+            void $ executeLog [mysql|INSERT INTO `ranked_bow_stats`(`account_id`, ^`queue`) VALUES (bid, 1)|]
+            return AddedToQueue
 
-removeFromQueue :: (MonadIOReader m r, Has GameQueue r) => UserId -> m Bool
-removeFromQueue did = asks getter >>= \GameQueue {..} -> liftIO $ do
-  q <- takeMVar queueMembers
-  if did `elem` q
-    then do
-      putMVar queueMembers q
-      return False
-    else do
-      putMVar queueMembers (filter (/= did) q)
-      return True
-
-emptyGameQueue :: MonadIO m => Int -> m GameQueue
-emptyGameQueue queueCapacity = liftIO $ (\queueMembers -> GameQueue {..}) <$> newMVar []
+removeFromQueue :: (MonadIOReader m r, Has SafeMysqlConn r) => BowBotId -> m Bool
+removeFromQueue bid = (>0) <$> executeLog [mysql|INSERT INTO `ranked_bow_stats`(`account_id`, ^`queue`) VALUES (bid, 0)|]

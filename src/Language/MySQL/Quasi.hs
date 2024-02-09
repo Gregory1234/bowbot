@@ -23,11 +23,11 @@ getSchema file = do
  where
   columnParser = do
     ai <- withSpace $ option False $ True <$ string "AI"
-    cname <- withSpace $ many1 $ satisfy (\x -> isAsciiLower x || x == '_')
+    cname <- withSpace $ many1 $ satisfy (\x -> isAsciiLower x || x == '_' || isNumber x)
     t <- typeGenParser
     return (ColumnName cname, ColumnInfo { columnInfoType = t, columnInfoAI = ai })
   schemaParser = do
-    tname <- many1 $ satisfy (\x -> isAsciiLower x || x == '_')
+    tname <- many1 $ satisfy (\x -> isAsciiLower x || x == '_' || isNumber x)
     _ <- withSpace $ char ':'
     cols <- sepBy1 columnParser commaParser
     return (TableName tname, cols)
@@ -67,7 +67,7 @@ getDefColumns file = do
     spaces
     _ <- char ','
     spaces
-    tname <- many1 $ satisfy (\x -> isAsciiLower x || x == '_')
+    tname <- many1 $ satisfy (\x -> isAsciiLower x || x == '_' || isNumber x)
     _ <- char ':'
     spaces
     cols <- sepBy1 columnParser (spaces >> char ',' >> spaces)

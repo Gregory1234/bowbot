@@ -22,11 +22,12 @@ queueCommand = Command CommandInfo
       uuid <- liftMaybe youArentRegisteredMessage =<< getSelectedMinecraftUUIDByBowBotId bid
       r <- addRankedPlayer bid uuid
       unless r $ throwError somethingWentWrongMessage
-    r <- addToQueue did
+    r <- liftMaybe somethingWentWrongMessage =<< addToQueue 2 bid
     case r of
       AlreadyInQueue -> respond "Already in queue!"
       AddedToQueue -> respond "Added to queue!"
-      QueueFilled players -> respond $ "Created game with players: " <> showt players
+      CurrentlyInGame -> respond "Already in game!"
+      QueueFilled players -> respond $ "Created game with players: " <> pack (show players)
 
 leaveCommand :: Command
 leaveCommand = Command CommandInfo
@@ -36,6 +37,6 @@ leaveCommand = Command CommandInfo
   , commandTimeout = 15
   } $ noArguments $ do
     did <- userId <$> envs envSender
-    _ <- liftMaybe youArentRegisteredMessage =<< getBowBotIdByDiscord did
-    r <- removeFromQueue did
+    bid <- liftMaybe youArentRegisteredMessage =<< getBowBotIdByDiscord did
+    r <- removeFromQueue bid
     respond $ if r then "Left queue!" else "You are not in queue!"
