@@ -7,6 +7,7 @@ import BowBot.Command.Utils
 import BowBot.Ranked.Queue
 import BowBot.Ranked.Stats
 import Control.Monad.Except (throwError)
+import BowBot.Ranked.Game
 
 queueCommand :: Command
 queueCommand = Command CommandInfo
@@ -27,7 +28,11 @@ queueCommand = Command CommandInfo
       AlreadyInQueue -> respond "Already in queue!"
       AddedToQueue -> respond "Added to queue!"
       CurrentlyInGame -> respond "Already in game!"
-      QueueFilled players -> respond $ "Created game with players: " <> pack (show players)
+      QueueFilled [p1, p2] -> do
+        gameId <- createRankedGame (p1, p2)
+        game <- for gameId getRankedGame
+        respond $ "Created game: " <> pack (show game)
+      QueueFilled _ -> respond somethingWentWrongMessage
 
 leaveCommand :: Command
 leaveCommand = Command CommandInfo

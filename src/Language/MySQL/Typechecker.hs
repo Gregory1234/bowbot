@@ -255,7 +255,7 @@ typecheckExpr (NullExpr t1Untyped) t2 = do
     Nothing -> fail "Couldn't deduce type of NULL!"
     Just t' -> return $ TypedNullExpr t'
 
-data DefColumnsCol = DefColumnsCol UpdateOnDuplicateKey ColumnName | DefColumnsType TypeName deriving (Show, Eq)
+data DefColumnsCol = DefColumnsCol UpdateOnDuplicateKey ColumnName | DefColumnsType TypeName | DefColumnsTuple [DefColumnsCol] deriving (Show, Eq)
 
 newtype DefColumns = DefColumns (M.Map TypeName (TableName, [DefColumnsCol])) deriving (Show, Eq)
 
@@ -264,6 +264,7 @@ findImplicitComplexExpr (DefColumns dc) t = (\(tn,cols) -> ComplexExpr (Just t) 
   where
     helper tn (DefColumnsCol _ cn) = SimpleExpr $ ColExpr $ FullColumnName (Just tn) cn
     helper _ (DefColumnsType ref) = ImplicitComplexExpr ref
+    helper tn (DefColumnsTuple tup) = ComplexExpr Nothing $ map (helper tn) tup
 
 typeConstructorArgs :: MonadQ m => Name -> m [PartialType]
 typeConstructorArgs n = do
@@ -371,6 +372,7 @@ findImplicitInsertTarget (DefColumns dc) t = (\(_,cols) -> ComplexTarget (Just t
   where
     helper (DefColumnsCol u' cn) = ColTarget u' cn
     helper (DefColumnsType ref) = ImplicitComplexTarget ref
+    helper (DefColumnsTuple tup) = ComplexTarget Nothing $ map helper tup
 
 typecheckInsertTarget :: DefColumns -> Maybe StrictnessType -> InsertTarget -> Typecheck (TypedInsertTarget, [ColumnName])
 typecheckInsertTarget _ t' (ColTarget u c) = do

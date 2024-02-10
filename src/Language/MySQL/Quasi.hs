@@ -60,8 +60,9 @@ getDefColumns file = do
   f <- liftIO $ readFile file
   DefColumns . M.fromList <$> mapM helper (lines f)
  where
-  columnParser = DefColumnsCol <$> option DontUpdate (DoUpdate <$ char '^') <*> withSpace (ColumnName <$> many1 (satisfy (\x -> isAsciiLower x || x == '_')))
+  columnParser = DefColumnsCol <$> option DontUpdate (DoUpdate <$ char '^') <*> withSpace (ColumnName <$> many1 (satisfy (\x -> isAsciiLower x || x == '_' || isNumber x)))
     <|> DefColumnsType <$> typeNameParser
+    <|> DefColumnsTuple <$> inParens (sepBy1 columnParser (spaces >> char ',' >> spaces))
   schemaParser = do
     typeNames <- many1 $ satisfy isAlphaNum -- TODO: remove repetition
     spaces
