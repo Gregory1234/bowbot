@@ -30,7 +30,7 @@ queueCommand = Command CommandInfo
       CurrentlyInGame -> respond "Already in game!"
       QueueFilled [p1, p2] -> do
         gameId <- createRankedGame (p1, p2)
-        game <- for gameId getRankedGame
+        game <- for gameId getRankedGameById
         respond $ "Created game: " <> pack (show game)
       QueueFilled _ -> respond somethingWentWrongMessage
 

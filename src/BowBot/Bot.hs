@@ -44,6 +44,7 @@ import BowBot.Counter.Basic
 import BowBot.Hypixel.Guild
 import BowBot.Command.HashCommand
 import BowBot.Ranked.QueueCommand
+import BowBot.Ranked.Detect
 
 runBowBot :: IO ()
 runBowBot = do
@@ -117,6 +118,7 @@ respond' m = call_ . CreateMessage (messageChannelId m)
 eventHandler :: Event -> Bot ()
 eventHandler (MessageCreate m) = do
   detectDeleteMessage m
+  detectRankedBowReport m
   -- liftIO $ detectRTWData man bdt m
   unless (userIsBot (messageAuthor m)) $ do
     prefix <- askInfo discordCommandPrefixInfo
@@ -152,6 +154,7 @@ eventHandler (GuildMemberRemove gid usr) = do
   maingid <- askInfo discordGuildIdInfo
   when (gid == maingid && not (userIsBot usr)) $ do
     storeDiscordAccount $ userToDiscordAccount usr
+eventHandler (MessageReactionAdd ri) = detectRankedBowReportReaction ri
 eventHandler _ = pure ()
 
 commandTimeoutRun :: (MonadHoistIO m, MonadReader r m, Has DiscordHandle r) => Int -> Message -> m () -> m ()

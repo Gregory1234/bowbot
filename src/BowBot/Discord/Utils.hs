@@ -10,6 +10,7 @@ import qualified Discord.Requests as R
 import BowBot.Utils
 import BowBot.DB.Basic
 import qualified Data.Text as T
+import Data.Either (fromRight)
 
 discordGuildMembers :: (MonadIOReader m r, Has DiscordHandle r) => GuildId -> m [GuildMember]
 discordGuildMembers gid = do
@@ -50,3 +51,9 @@ discordIdFromPing _ = Nothing
 
 discordIdFromString :: Text -> Maybe UserId
 discordIdFromString t = (readMaybe @UserId $ unpack t) <|> discordIdFromPing t
+
+addMessageReaction :: (MonadIOReader m r, Has DiscordHandle r) => ChannelId -> MessageId -> Text -> m ()
+addMessageReaction cid mid reaction = call_ $ R.CreateReaction (cid, mid) reaction
+
+getMessageReactions :: (MonadIOReader m r, Has DiscordHandle r) => ChannelId -> MessageId -> Text -> m [User]
+getMessageReactions cid mid reaction = fmap (fromRight []) $ call $ R.GetReactions (cid, mid) reaction (10, R.LatestReaction)

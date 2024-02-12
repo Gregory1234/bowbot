@@ -4,6 +4,8 @@ HypixelBowLeaderboardEntry, hypixel_bow_stats: ^wins, ^losses, ^winstreak, ^last
 HypixelBowTimeStats, hypixel_bow_timed_stats: ^wins, ^losses, ^last_update
 MinecraftAccount, minecraft: uuid, ^names
 RankedBowGame, ranked_bow_game: id, ^time, (^player1, ^player2), ^status
+RankedBowReport, ranked_bow_report: author, game_id, message_id, RankedBowScore, ^status
+RankedBowScore, ranked_bow_report: ^score1, ^score2
 RankedBowStats, ranked_bow_stats: ^wins, ^losses, ^elo
 Settings, settings: ^wins, ^losses, ^wlr, ^wins_until, ^best_streak, ^current_streak, ^best_daily_streak, ^bow_hits, ^bow_shots, ^accuracy
 SnipeMessage, snipe: ^author, ^content, ^edited, ^time

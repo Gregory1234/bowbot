@@ -10,6 +10,7 @@ minecraft: uuid UUID, names List Text, hypixel IsBanned, hypixel_role Maybe Hypi
 minecraft_name: name Text, minecraft_uuid UUID
 permissions: discord_id UserId, level PermissionLevel
 ranked_bow_game: AI id Integer, time UTCTime, player1 BowBotId, player2 BowBotId, status RankedGameStatus
+ranked_bow_report: author BowBotId, game_id Integer, message_id MessageId, score1 Integer, score2 Integer, status RankedBowReportStatus
 ranked_bow_stats: account_id BowBotId, ranked_uuid UUID, wins Integer, losses Integer, elo Integer, queue Bool, current_game Maybe Integer
 settings: discord_id UserId, wins SettingBin, losses SettingBin, wlr SettingTer, wins_until SettingTer, best_streak SettingTer, current_streak SettingTer, best_daily_streak SettingTer, bow_hits SettingBin, bow_shots SettingBin, accuracy SettingTer
 snipe: channel ChannelId, author UserId, content Text, time UTCTime, edited Bool

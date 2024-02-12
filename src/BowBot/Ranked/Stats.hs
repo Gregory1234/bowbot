@@ -28,9 +28,6 @@ getRankedBowStatsByBowBot bid = queryOnlyLog [mysql|SELECT RankedBowStats FROM `
 addRankedPlayer :: (MonadIOReader m r, Has SafeMysqlConn r) => BowBotId -> UUID -> m Bool
 addRankedPlayer bid uuid = (>0) <$> executeLog [mysql|INSERT INTO `ranked_bow_stats`(`account_id`, `ranked_uuid`) VALUES (bid,uuid)|]
 
-setRankedBowStatsByBowBot :: (MonadIOReader m r, Has SafeMysqlConn r) => BowBotId -> RankedBowStats -> m Bool
-setRankedBowStatsByBowBot bid entry = (>0) <$> executeLog [mysql|INSERT INTO `ranked_bow_stats`(`account_id`, RankedBowStats) VALUES (bid,entry)|]
-
 showRankedBowStats :: Settings -> RankedBowStats -> Text
 showRankedBowStats Settings {..} RankedBowStats {..} = T.unlines $ catMaybes
   [ onlyIfBin sWins

@@ -331,11 +331,14 @@ typecheckJoinTables schemaAll funs (JoinTables x xs) = do
   (Schema firstTable) <- typecheckTableName schemaAll x
   Schema <$> foldlM helper firstTable xs
  where
+  similarType (AppT (ConT ((==''Maybe) -> True)) t1) t2 = similarType t1 t2
+  similarType t1 (AppT (ConT ((==''Maybe) -> True)) t2) = similarType t1 t2
+  similarType t1 t2 = t1 == t2
   helper schema (t, TableJoinOn c1 c2) = do
     (Schema s) <- typecheckTableName schemaAll t
     t1 <- runReaderT (getColumnType (FullColumnName Nothing c1)) (Schema s, funs)
     t2 <- runReaderT (getColumnType c2) (Schema schema, funs)
-    unless (t1 == t2) $ fail $ couldntMatchTypes (RealType t1) (RealType t2)
+    unless (t1 `similarType` t2) $ fail $ couldntMatchTypes (RealType t1) (RealType t2)
     return $ schema ++ s
 
 typecheckWhereClause :: WhereClause -> Typecheck TypedWhereClause
