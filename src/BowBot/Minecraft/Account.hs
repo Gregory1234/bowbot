@@ -83,16 +83,18 @@ data MinecraftAutocorrect = MinecraftAutocorrect
 autocorrectFromAccountDirect :: MinecraftAccount -> MinecraftAutocorrect
 autocorrectFromAccountDirect acc = MinecraftAutocorrect { autocorrectAccount = acc, autocorrectIsDirect = True, autocorrectPastName = Nothing }
 
+minecraftAutocorrectGeneral :: [MinecraftAccount] -> Text -> Maybe MinecraftAutocorrect
+minecraftAutocorrectGeneral people name = listToMaybe $ process False ++ process True
+  where
+    process isPast = map snd . sortOn fst $ do
+      acc@MinecraftAccount {..} <- people
+      n <- (if isPast then drop 1 else take 1) mcNames
+      let d = dist (T.toLower n) (T.toLower name)
+      guard (d <= 2)
+      return (d, MinecraftAutocorrect { autocorrectAccount = acc, autocorrectIsDirect = d == 0, autocorrectPastName = if isPast then Just n else Nothing })
+
 minecraftAutocorrect :: (MonadIOReader m r, Has SafeMysqlConn r) => Text -> m (Maybe MinecraftAutocorrect)
-minecraftAutocorrect name = do
-  people <- queryLog [mysql|SELECT MinecraftAccount FROM `minecraft`|] -- TODO: start using minecraftName table
-  let process isPast = map snd . sortOn fst $ do
-        acc@MinecraftAccount {..} <- people
-        n <- (if isPast then drop 1 else take 1) mcNames
-        let d = dist (T.toLower n) (T.toLower name)
-        guard (d <= 2)
-        return (d, MinecraftAutocorrect { autocorrectAccount = acc, autocorrectIsDirect = d == 0, autocorrectPastName = if isPast then Just n else Nothing })
-  return $ listToMaybe $ process False ++ process True
+minecraftAutocorrect name = minecraftAutocorrectGeneral <$> queryLog [mysql|SELECT MinecraftAccount FROM `minecraft`|] <*> pure name -- TODO: start using minecraftName table
 
 minecraftAccountToHeader :: MinecraftAccount -> Maybe Text -> Text
 minecraftAccountToHeader MinecraftAccount {..} Nothing = "**" <> discordEscape (head mcNames) <> "**:\n"

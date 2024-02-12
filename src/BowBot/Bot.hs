@@ -45,6 +45,8 @@ import BowBot.Hypixel.Guild
 import BowBot.Command.HashCommand
 import BowBot.Ranked.QueueCommand
 import BowBot.Ranked.Detect
+import BowBot.Ranked.StatsCommand
+import BowBot.Ranked.LeaderboardCommand
 
 runBowBot :: IO ()
 runBowBot = do
@@ -213,6 +215,13 @@ commands =
   , helpCommand commands DefaultLevel Nothing "ranked" "rankedhelp"
   , queueCommand
   , leaveCommand
+  , rankedBowStatsCommand UserSettings "rs" "show player's Ranked Bow Duels stats"
+  , rankedBowStatsCommand DefSettings "rsd" "show a default set of player's Ranked Bow Duels stats"
+  , rankedBowStatsCommand AllSettings "rsa" "show all of player's Ranked Bow Duels stats"
+  , leaderboardCommand rankedEloLeaderboardType "rlb"
+  , leaderboardCommand rankedWinsLeaderboardType "rlbw"
+  , leaderboardCommand rankedLossesLeaderboardType "rlbl"
+  , leaderboardCommand rankedWlrLeaderboardType "rlbr"
   , hashCommand
   , helpCommand commands ModLevel Nothing "normal" "modhelp"
   , addCommand

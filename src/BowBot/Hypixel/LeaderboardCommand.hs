@@ -76,7 +76,7 @@ leaderboardCommand lbt@LeaderboardType {..} name = Command CommandInfo
           unless (any lbRowSelected lb) $ throwError thePlayerIsntOnThisLeaderboardMessage
           displayLeaderboard Nothing "" lb
     Just n -> do
-      ac <- liftMaybe thePlayerIsntOnThisLeaderboardMessage =<< minecraftAutocorrect n
+      ac <- liftMaybe thePlayerIsntOnThisLeaderboardMessage =<< minecraftAutocorrect n -- TODO: autocorrect only to people on this leaderboard
       showSelfSkipTip (autocorrectAccount ac)
       handlerMinecraft ac
   where
