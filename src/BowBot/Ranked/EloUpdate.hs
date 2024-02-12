@@ -8,18 +8,15 @@ import BowBot.Discord.Utils
 import BowBot.DB.Basic
 import BowBot.Ranked.Stats
 import BowBot.Account.Basic
+import Data.Ord (clamp)
 
 calculateEloChanges :: (RankedBowStats, RankedBowStats) -> RankedBowScore -> (Integer, Integer)
 calculateEloChanges (stats1, stats2) score = (eloChange player1win (rankedElo stats1), eloChange (not player1win) (rankedElo stats2))
   where
-    clampElo x
-      | x < -25 = -25
-      | -5 < x, x < 0 = -5
-      | 0 < x, x < 5 = 5
-      | 25 < x = 25
-      | otherwise = x
+    clampElo True = clamp (5, 25)
+    clampElo False = clamp (-25, -5)
     avgElo = (rankedElo stats1 + rankedElo stats2) `div` 2
-    eloChange win elo = clampElo $ (if win then 15 else -15) - ((elo - avgElo) `quot` 20)
+    eloChange win elo = clampElo win $ (if win then 15 else -15) - ((elo - avgElo) `quot` 20)
     player1win = rankedScore1 score > rankedScore2 score
 
 applyEloChange :: RankedBowStats -> Integer -> RankedBowStats
