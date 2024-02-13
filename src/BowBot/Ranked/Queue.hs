@@ -8,7 +8,7 @@ import BowBot.Account.Basic
 import Control.Monad.Except
 
 
-data AddToQueueRes = AddedToQueue | AlreadyInQueue | CurrentlyInGame | QueueFilled [BowBotId]
+data AddToQueueRes = AddedToQueue Int | AlreadyInQueue | CurrentlyInGame Integer | QueueFilled [BowBotId]
 
 addToQueue :: (MonadIOReader m r, Has SafeMysqlConn r) => Int -> BowBotId -> m (Maybe AddToQueueRes)
 addToQueue limit bid = do
@@ -16,7 +16,7 @@ addToQueue limit bid = do
   liftIO $ (`runReaderT` ctx) $ withTransaction $ (either (const $ rollback $> Nothing) (pure . Just) =<<) $ runExceptT $ do
     (inQueue, currentGame) <- liftMaybe () =<< queryOnlyLog [mysql|SELECT `queue`,`current_game` FROM `ranked_bow_stats` WHERE `account_id` = bid|]
     case (inQueue, currentGame) of
-      (False, Just _) -> return CurrentlyInGame
+      (False, Just g) -> return $ CurrentlyInGame g
       (True, _) -> return AlreadyInQueue
       (False, Nothing) -> do
         queue <- queryLog [mysql|SELECT `account_id` FROM `ranked_bow_stats` WHERE `queue`|]
@@ -26,7 +26,9 @@ addToQueue limit bid = do
             return $ QueueFilled (bid : queue)
           else do
             void $ executeLog [mysql|INSERT INTO `ranked_bow_stats`(`account_id`, ^`queue`) VALUES (bid, 1)|]
-            return AddedToQueue
+            return $ AddedToQueue (length queue + 1)
 
-removeFromQueue :: (MonadIOReader m r, Has SafeMysqlConn r) => BowBotId -> m Bool
-removeFromQueue bid = (>0) <$> executeLog [mysql|INSERT INTO `ranked_bow_stats`(`account_id`, ^`queue`) VALUES (bid, 0)|]
+removeFromQueue :: (MonadIOReader m r, Has SafeMysqlConn r) => BowBotId -> m (Maybe Int)
+removeFromQueue bid = do
+  c <- (>0) <$> executeLog [mysql|INSERT INTO `ranked_bow_stats`(`account_id`, ^`queue`) VALUES (bid, 0)|]
+  if c then Just . length <$> queryLog [mysql|SELECT `account_id` FROM `ranked_bow_stats` WHERE `queue`|] else return Nothing

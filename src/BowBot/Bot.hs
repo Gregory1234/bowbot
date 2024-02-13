@@ -215,6 +215,7 @@ commands =
   , helpCommand commands DefaultLevel Nothing "ranked" "rankedhelp"
   , queueCommand
   , leaveCommand
+  , listQueueCommand
   , rankedBowStatsCommand UserSettings "rs" "show player's Ranked Bow Duels stats"
   , rankedBowStatsCommand DefSettings "rsd" "show a default set of player's Ranked Bow Duels stats"
   , rankedBowStatsCommand AllSettings "rsa" "show all of player's Ranked Bow Duels stats"
