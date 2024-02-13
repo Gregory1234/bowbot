@@ -9,6 +9,7 @@ logs: AI id Integer, timestamp UTCTime, message Text, type Text
 minecraft: uuid UUID, names List Text, hypixel IsBanned, hypixel_role Maybe HypixelRole
 minecraft_name: name Text, minecraft_uuid UUID
 permissions: discord_id UserId, level PermissionLevel
+ranked_bow_elo: account_id BowBotId, message_id MessageId, elo_change Integer
 ranked_bow_game: AI id Integer, time UTCTime, player1 BowBotId, player2 BowBotId, status RankedGameStatus
 ranked_bow_report: author BowBotId, game_id Integer, message_id MessageId, score1 Integer, score2 Integer, status RankedBowReportStatus
 ranked_bow_stats: account_id BowBotId, ranked_uuid UUID, wins Integer, losses Integer, elo Integer, queue Bool, current_game Maybe Integer

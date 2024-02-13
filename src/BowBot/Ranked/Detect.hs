@@ -60,9 +60,10 @@ detectRankedBowReportReaction ReactionInfo {..} = void $ runExceptT $ do
   guard (report == report')
   if val
     then do
-      guard =<< applyEloByScore game (reportScore report)
-      void $ finalizeRankedGame (rankedGameId game)
+      updates <- liftMaybe () =<< applyEloByScore game (reportScore report)
+      guard =<< finalizeRankedGame (rankedGameId game)
+      guard =<< announceEloUpdate (rankedGameId game) updates
     else do
       guard =<< setRankedBowReportStatusByMessageId reactionMessageId ReportRejected
       rankedModRole <- askInfo rankedModRoleInfo
-      call_ $ R.CreateMessage reactionChannelId $ "<@&" <> showt rankedModRole <> ">"
+      call_ $ R.CreateMessage reactionChannelId $ "<@&" <> showt rankedModRole <> "> **A self report rejected by the other player in Game #" <> showt (reportGameId report) <> "!**"
