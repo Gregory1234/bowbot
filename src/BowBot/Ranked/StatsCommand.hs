@@ -11,6 +11,8 @@ import BowBot.DB.Basic
 import BowBot.Ranked.Stats
 import BowBot.Minecraft.Basic
 import BowBot.Account.Basic
+import BowBot.Ranked.Queue
+import qualified Data.Text as T
 
 youNeverPlayerRankedBowDuels :: Text
 youNeverPlayerRankedBowDuels = "*You have never played Ranked Bow Duels!*"
@@ -27,26 +29,28 @@ rankedBowStatsCommand src name desc = Command CommandInfo
   } $ oneOptionalArgument $ \case
     Nothing -> do
       did <- userId <$> envs envSender
-      (uuid, stats) <- liftMaybe youNeverPlayerRankedBowDuels =<< getStatsByDiscord did
-      acc <- liftMaybe thePlayerDoesNotExistMessage =<< getMinecraftAccountByUUID uuid
+      bid <- liftMaybe youArentRegisteredMessage =<< getBowBotIdByDiscord did
+      stats <- getStatsByDiscord did
+      acc <- liftMaybe youNeverPlayerRankedBowDuels =<< getRankedMinecraftAccountByBowBotId bid
       displayStats (minecraftAccountToHeader acc Nothing) stats
     Just (uuidFromString -> Just uuid) -> do
-      stats <- liftMaybe thePlayerHasNeverPlayerRankedBowDuels =<< getStatsByUUID uuid
+      stats <- getStatsByUUID uuid
       acc <- liftMaybe thePlayerDoesNotExistMessage =<< getMinecraftAccountByUUID uuid
       displayStats (minecraftAccountToHeader acc Nothing) stats
     Just (discordIdFromString -> Just did) -> do
-      (uuid, stats) <- liftMaybe thePlayerHasNeverPlayerRankedBowDuels =<< getStatsByDiscord did
-      acc <- liftMaybe thePlayerDoesNotExistMessage =<< getMinecraftAccountByUUID uuid
+      stats <- getStatsByDiscord did
+      bid <- liftMaybe youArentRegisteredMessage =<< getBowBotIdByDiscord did
+      acc <- liftMaybe youNeverPlayerRankedBowDuels =<< getRankedMinecraftAccountByBowBotId bid
       displayStats (minecraftAccountToHeader acc Nothing) stats
     Just n -> do
-      people <- queryLog [mysql|SELECT MinecraftAccount, RankedBowStats FROM `ranked_bow_stats` JOIN `minecraft` ON `uuid` = `ranked_uuid`|]
-      ac <- liftMaybe thePlayerDoesNotExistMessage $ minecraftAutocorrectGeneral (map fst people) n
-      stats <- liftMaybe somethingWentWrongMessage $ lookup (autocorrectAccount ac) people
+      people <- queryLog [mysql|SELECT MinecraftAccount FROM `ranked_bow` JOIN `minecraft` ON `uuid` = `ranked_uuid`|]
+      ac <- liftMaybe thePlayerDoesNotExistMessage $ minecraftAutocorrectGeneral people n
+      stats <- getStatsByUUID (mcUUID $ autocorrectAccount ac)
       displayStats (minecraftAutocorrectToHeader ac) stats
   where
-    getStatsByDiscord did = queryOnlyLog [mysql|SELECT `ranked_uuid`, RankedBowStats FROM `ranked_bow_stats` JOIN `account_discord` ON `account_id` = `ranked_bow_stats`.`account_id` WHERE `account_discord`.`discord_id` = did|]
-    getStatsByUUID uuid = queryOnlyLog [mysql|SELECT RankedBowStats FROM `ranked_bow_stats` WHERE `ranked_uuid` = uuid|]
+    getStatsByDiscord did = queryLog [mysql|SELECT RankedBowStats FROM `ranked_bow_stats` JOIN `account_discord` ON `account_id` = `ranked_bow_stats`.`account_id` WHERE `account_discord`.`discord_id` = did|]
+    getStatsByUUID uuid = queryLog [mysql|SELECT RankedBowStats FROM `ranked_bow_stats` JOIN `ranked_bow` ON `account_id` = `ranked_bow_stats`.`account_id` WHERE `ranked_uuid` = uuid|]
     displayStats header stats = do
       user <- envs envSender
       settings <- getSettingsFromSource src (userId user)
-      respond $ header <> showRankedBowStats settings stats
+      respond $ header <> T.unlines (showRankedBowStats settings <$> stats)

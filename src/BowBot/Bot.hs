@@ -219,10 +219,10 @@ commands =
   , rankedBowStatsCommand UserSettings "rs" "show player's Ranked Bow Duels stats"
   , rankedBowStatsCommand DefSettings "rsd" "show a default set of player's Ranked Bow Duels stats"
   , rankedBowStatsCommand AllSettings "rsa" "show all of player's Ranked Bow Duels stats"
-  , leaderboardCommand rankedEloLeaderboardType "rlb"
-  , leaderboardCommand rankedWinsLeaderboardType "rlbw"
-  , leaderboardCommand rankedLossesLeaderboardType "rlbl"
-  , leaderboardCommand rankedWlrLeaderboardType "rlbr"
+  , rankedLeaderboardCommand rankedEloLeaderboardType "rlb"
+  , rankedLeaderboardCommand rankedWinsLeaderboardType "rlbw"
+  , rankedLeaderboardCommand rankedLossesLeaderboardType "rlbl"
+  , rankedLeaderboardCommand rankedWlrLeaderboardType "rlbr"
   , hashCommand
   , helpCommand commands ModLevel Nothing "normal" "modhelp"
   , addCommand

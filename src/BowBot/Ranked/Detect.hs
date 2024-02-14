@@ -62,7 +62,7 @@ detectRankedBowReportReaction ReactionInfo {..} = void $ runExceptT $ do
     then do
       updates <- liftMaybe () =<< applyEloByScore game (reportScore report)
       guard =<< finalizeRankedGame (rankedGameId game)
-      guard =<< announceEloUpdate (rankedGameId game) updates
+      guard =<< announceEloUpdate (rankedGameQueue game) (rankedGameId game) updates
     else do
       guard =<< setRankedBowReportStatusByMessageId reactionMessageId ReportRejected
       rankedModRole <- askInfo rankedModRoleInfo

@@ -9,6 +9,7 @@ import BowBot.DB.Basic
 import BowBot.Discord.Utils
 import Control.Monad.Except (runExceptT)
 import Language.MySQL.Query
+import BowBot.Ranked.Queue
 
 data RankedGameStatus = GameActive | GameCompleted | GameAbandoned
   deriving (Show, Eq, Enum)
@@ -27,6 +28,7 @@ instance MysqlEnum RankedGameStatus where
 
 data RankedBowGame = RankedBowGame
   { rankedGameId :: Integer
+  , rankedGameQueue :: QueueName
   , rankedGameTime :: UTCTime
   , rankedPlayers :: (BowBotId, BowBotId)
   , rankedGameStatus :: RankedGameStatus
@@ -35,27 +37,27 @@ data RankedBowGame = RankedBowGame
 
 $(pure [])
 
-createRankedGame :: (MonadIOReader m r, Has SafeMysqlConn r) => (BowBotId, BowBotId) -> m (Maybe Integer)
-createRankedGame players@(p1, p2) = do
+createRankedGame :: (MonadIOReader m r, Has SafeMysqlConn r) => QueueName -> (BowBotId, BowBotId) -> m (Maybe Integer)
+createRankedGame queue players@(p1, p2) = do
   ctx <- ask
   liftIO $ flip runReaderT ctx $ withTransaction $ do
-    ret <- executeIDLog [mysql|INSERT AI INTO `ranked_bow_game`(`player1`, `player2`) VALUES (players)|]
+    ret <- executeIDLog [mysql|INSERT AI INTO `ranked_bow_game`(`queue`, (`player1`, `player2`)) VALUES (queue, players)|]
     if isNothing ret
       then rollback $> Nothing
       else do
-        c <- executeLog [mysql|UPDATE `ranked_bow_stats` SET `current_game` = ret WHERE `account_id` IN (p1, p2) AND `current_game` = NULL|]
+        c <- executeLog [mysql|UPDATE `ranked_bow` SET `current_game` = ret WHERE `account_id` IN (p1, p2) AND `current_game` = NULL|]
         if c == 2 then return ret else rollback $> Nothing
 
 getRankedGameById :: (MonadIOReader m r, Has SafeMysqlConn r) => Integer -> m (Maybe RankedBowGame)
 getRankedGameById gid = queryOnlyLog [mysql|SELECT RankedBowGame FROM `ranked_bow_game` WHERE `id` = gid|]
 
 getRankedGameByBowBotId :: (MonadIOReader m r, Has SafeMysqlConn r) => BowBotId -> m (Maybe RankedBowGame)
-getRankedGameByBowBotId bid = queryOnlyLog [mysql|SELECT RankedBowGame FROM `ranked_bow_game` JOIN `ranked_bow_stats` ON `current_game` = `ranked_bow_game`.`id` WHERE `ranked_bow_stats`.`account_id` = bid|]
+getRankedGameByBowBotId bid = queryOnlyLog [mysql|SELECT RankedBowGame FROM `ranked_bow_game` JOIN `ranked_bow` ON `current_game` = `ranked_bow_game`.`id` WHERE `ranked_bow`.`account_id` = bid|]
 
 finalizeRankedGame :: (MonadIOReader m r, Has SafeMysqlConn r) => Integer -> m Bool
 finalizeRankedGame gid = do
   ctx <- ask
   liftIO $ flip runReaderT ctx $ withTransaction $ fmap (either (const False) (const True)) $ runExceptT @() $ do
     guard . (>0) =<< executeLog [mysql|DELETE FROM `ranked_bow_report` WHERE `game_id` = gid|]
-    guard . (>0) =<< executeLog [mysql|UPDATE `ranked_bow_stats` SET `current_game` = NULL WHERE `current_game` = gid|]
-    guard . (>0) =<< executeLog [mysql|UPDATE `ranked_bow_game` SET `status` = "complete" WHERE `id` = gid|]
+    guard . (>0) =<< executeLog [mysql|UPDATE `ranked_bow` SET `current_game` = NULL WHERE `current_game` = gid|]
+    guard . (>0) =<< executeLog [mysql|UPDATE `ranked_bow_game` SET `status` = "completed" WHERE `id` = gid|]

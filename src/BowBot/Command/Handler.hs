@@ -13,7 +13,7 @@ import qualified Data.Text as T
 import BowBot.BotData.Info
 import Data.ByteString (ByteString)
 
-newtype CommandArgs = CommandMessageArgs [Text]
+newtype CommandArgs = CommandMessageArgs { commandMessageArgs :: [Text] }
 
 data CommandEnvironment = CommandEnvironment
   { envSender :: !User
@@ -83,3 +83,8 @@ respondFileBin :: (MonadIOReader m r, HasAll [CommandEnvironment, DiscordHandle]
 respondFileBin n m = do
   res <- envs (\x -> envRespondFile x)
   res n m
+
+ignoreFirstArgument :: (MonadIOReader m r, Has CommandEnvironment r) => m a -> m a
+ignoreFirstArgument = local (modifier helper)
+  where
+    helper env = env { envArgs = CommandMessageArgs $ tail $ commandMessageArgs $ envArgs env }

@@ -28,7 +28,7 @@ data LeaderboardType s a = LeaderboardType
   }
 
 leaderboardDescription :: LeaderboardType s a -> Text
-leaderboardDescription LeaderboardType {..} = "show Bow Duels " <> leaderboardName <> (if leaderboardIsGuild then " guild" else "") <> " leaderboard"
+leaderboardDescription LeaderboardType {..} = "show " <> leaderboardName <> (if leaderboardIsGuild then " guild" else "") <> " leaderboard"
 
 thePlayerIsntOnThisLeaderboardMessage :: Text
 thePlayerIsntOnThisLeaderboardMessage = "*The player isn't on this leaderboard!*"

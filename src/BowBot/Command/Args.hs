@@ -25,6 +25,13 @@ oneOptionalArgument body = withArguments (\(CommandMessageArgs args) -> assertAr
 twoArguments :: (MonadIOReader m r, HasAll [CommandEnvironment, DiscordHandle] r) => (Text -> Text -> ExceptT Text m ()) -> m ()
 twoArguments body = withArguments (\(CommandMessageArgs args) -> assertArgumentsCount 2 2 args >> body (head args) (args !! 1))
 
+twoOptionalArguments :: (MonadIOReader m r, HasAll [CommandEnvironment, DiscordHandle] r) => (Maybe (Text, Maybe Text) -> ExceptT Text m a) -> m ()
+twoOptionalArguments body = withArguments (\(CommandMessageArgs args) -> assertArgumentsCount 0 2 args >> body (helper args))
+  where
+    helper [] = Nothing
+    helper [a] = Just (a, Nothing)
+    helper (a:b:_) = Just (a, Just b)
+
 argumentsCountMsg :: Int -> Int -> Int -> Text
 argumentsCountMsg mina maxa args
   | mina == maxa = "Got " <> showt args <> " arguments, " <> showt mina <> " expected"
