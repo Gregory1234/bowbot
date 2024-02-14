@@ -16,6 +16,16 @@ import BowBot.Minecraft.Account
 import qualified Data.Text as T
 import BowBot.Account.Utils
 import BowBot.BotData.Info
+import Data.Bifunctor (first)
+
+rankedBowQueueChannelInfo :: InfoType ChannelId
+rankedBowQueueChannelInfo = InfoType { infoName = "ranked_bow_queue_channel", infoDefault = 0, infoParse = first pack . readEither . unpack }
+
+restrictToQueueChannel :: CommandHandler () -> CommandHandler ()
+restrictToQueueChannel body = do
+  rankedBowQueueChannel <- askInfo rankedBowQueueChannelInfo
+  channel <- envs envChannel
+  when (channel == rankedBowQueueChannel) body
 
 queueCommand :: Command
 queueCommand = Command CommandInfo
@@ -23,7 +33,7 @@ queueCommand = Command CommandInfo
   , commandHelpEntries = [HelpEntry { helpUsage = "q [queue]", helpDescription = "enter a Ranked Bow queue", helpGroup = "ranked" }]
   , commandPerms = DefaultLevel
   , commandTimeout = 15
-  } $ oneOptionalArgument $ \case
+  } $ restrictToQueueChannel $ oneOptionalArgument $ \case
     (Just qName) -> do
       queue <- liftMaybe "*Bad queue name!*" =<< getQueueByName qName
       did <- userId <$> envs envSender
@@ -86,7 +96,7 @@ leaveCommand = Command CommandInfo
   , commandHelpEntries = [HelpEntry { helpUsage = "l", helpDescription = "leave all Ranked Bow queues", helpGroup = "ranked" }]
   , commandPerms = DefaultLevel
   , commandTimeout = 15
-  } $ noArguments $ do
+  } $ restrictToQueueChannel $ noArguments $ do
     did <- userId <$> envs envSender
     bid <- liftMaybe youArentRegisteredMessage =<< getBowBotIdByDiscord did
     r <- removeFromAllQueues bid
