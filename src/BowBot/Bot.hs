@@ -47,6 +47,7 @@ import BowBot.Ranked.QueueCommand
 import BowBot.Ranked.Detect
 import BowBot.Ranked.StatsCommand
 import BowBot.Ranked.LeaderboardCommand
+import BowBot.Ranked.ModCommands
 
 runBowBot :: IO ()
 runBowBot = do
@@ -223,6 +224,9 @@ commands =
   , rankedLeaderboardCommand rankedWinsLeaderboardType "rlbw"
   , rankedLeaderboardCommand rankedLossesLeaderboardType "rlbl"
   , rankedLeaderboardCommand rankedWlrLeaderboardType "rlbr"
+  , helpCommand commands DefaultLevel Nothing "rankedmod" "rankedmodhelp"
+  , delQueueCommand
+  , abandonGameCommand
   , hashCommand
   , helpCommand commands ModLevel Nothing "normal" "modhelp"
   , addCommand

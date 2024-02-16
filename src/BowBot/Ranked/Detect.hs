@@ -11,12 +11,10 @@ import BowBot.Ranked.Report
 import Control.Concurrent
 import qualified Discord.Requests as R
 import BowBot.Ranked.EloUpdate
+import BowBot.Ranked.Queue
 
 rankedScoreReportChannelInfo :: InfoType ChannelId
 rankedScoreReportChannelInfo = InfoType { infoName = "ranked_score_report_channel", infoDefault = 0, infoParse = first pack . readEither . unpack }
-
-rankedModRoleInfo :: InfoType RoleId
-rankedModRoleInfo = InfoType { infoName = "ranked_mod_role", infoDefault = 0, infoParse = first pack . readEither . unpack }
 
 positiveReaction, negativeReaction :: Text
 positiveReaction = "✅"
@@ -61,8 +59,8 @@ detectRankedBowReportReaction ReactionInfo {..} = void $ runExceptT $ do
   if val
     then do
       updates <- liftMaybe () =<< applyEloByScore game (reportScore report)
-      guard =<< finalizeRankedGame (rankedGameId game)
-      guard =<< announceEloUpdate (rankedGameQueue game) (rankedGameId game) updates
+      guard =<< finalizeRankedGame GameCompleted (rankedGameId game)
+      guard =<< announceEloUpdate True (rankedGameQueue game) (rankedGameId game) updates
     else do
       guard =<< setRankedBowReportStatusByMessageId reactionMessageId ReportRejected
       rankedModRole <- askInfo rankedModRoleInfo

@@ -54,10 +54,10 @@ getRankedGameById gid = queryOnlyLog [mysql|SELECT RankedBowGame FROM `ranked_bo
 getRankedGameByBowBotId :: (MonadIOReader m r, Has SafeMysqlConn r) => BowBotId -> m (Maybe RankedBowGame)
 getRankedGameByBowBotId bid = queryOnlyLog [mysql|SELECT RankedBowGame FROM `ranked_bow_game` JOIN `ranked_bow` ON `current_game` = `ranked_bow_game`.`id` WHERE `ranked_bow`.`account_id` = bid|]
 
-finalizeRankedGame :: (MonadIOReader m r, Has SafeMysqlConn r) => Integer -> m Bool
-finalizeRankedGame gid = do
+finalizeRankedGame :: (MonadIOReader m r, Has SafeMysqlConn r) => RankedGameStatus -> Integer -> m Bool
+finalizeRankedGame status gid = do
   ctx <- ask
   liftIO $ flip runReaderT ctx $ withTransaction $ fmap (either (const False) (const True)) $ runExceptT @() $ do
-    guard . (>0) =<< executeLog [mysql|DELETE FROM `ranked_bow_report` WHERE `game_id` = gid|]
+    void $ executeLog [mysql|DELETE FROM `ranked_bow_report` WHERE `game_id` = gid|]
     guard . (>0) =<< executeLog [mysql|UPDATE `ranked_bow` SET `current_game` = NULL WHERE `current_game` = gid|]
-    guard . (>0) =<< executeLog [mysql|UPDATE `ranked_bow_game` SET `status` = "completed" WHERE `id` = gid|]
+    guard . (>0) =<< executeLog [mysql|UPDATE `ranked_bow_game` SET `status` = status WHERE `id` = gid|]

@@ -45,25 +45,33 @@ applyEloByScore RankedBowGame { rankedPlayers = (player1, player2), rankedGameQu
       return $ if c then Just [(player1, change1), (player2, change2)] else Nothing
     _ -> return Nothing
 
+applyPureEloUpdate :: (MonadIOReader m r, Has SafeMysqlConn r) => QueueName -> [(BowBotId, Integer)] -> m Bool
+applyPureEloUpdate _ [] = pure True
+applyPureEloUpdate queue updates = do
+  let players = map fst updates
+  stats <- queryLog [mysql|SELECT `account_id`, RankedBowStats FROM `ranked_bow_stats` WHERE `account_id` IN players AND `queue` = queue|]
+  let newStats = map (\(bid, eloUpdate) -> let s = fromMaybe (defRankedBowStats queue) (lookup bid stats) in (bid, s { rankedElo = rankedElo s + eloUpdate })) updates
+  (>0) <$> executeLog [mysql|INSERT INTO `ranked_bow_stats`(`account_id`, RankedBowStats) VALUES newStats..|]
+
 eloChangesChannelInfo :: InfoType ChannelId
 eloChangesChannelInfo = InfoType { infoName = "ranked_bow_elo_changes_channel", infoDefault = 0, infoParse = first pack . readEither . unpack }
 
-createEloUpdateMessage :: QueueName -> Integer -> [(Text, Integer)] -> Text
-createEloUpdateMessage q gameId updates = 
-  "**Game #" <> showt gameId <> " finished (" <> queueName q <> "):**\n" 
-  <> T.unlines (map (\(n,v) -> n <> ": " <> (if v < 0 then showt v else "+" <> showt v)) updates)
+createEloUpdateMessage :: Bool -> QueueName -> Integer -> [(Text, Integer)] -> Text
+createEloUpdateMessage success q gameId updates = 
+  "**Game #" <> showt gameId <> (if success then " finished (" else " abandoned (") <> queueName q <> "):**\n" 
+  <> (if null updates then "*No elo changes*" else T.unlines (map (\(n,v) -> n <> ": " <> (if v < 0 then showt v else "+" <> showt v)) updates))
 
-announceEloUpdate :: (MonadIOReader m r, HasAll '[SafeMysqlConn, InfoCache, DiscordHandle] r) => QueueName -> Integer -> [(BowBotId, Integer)] -> m Bool
-announceEloUpdate q gameId updates = do
+announceEloUpdate :: (MonadIOReader m r, HasAll '[SafeMysqlConn, InfoCache, DiscordHandle] r) => Bool -> QueueName -> Integer -> [(BowBotId, Integer)] -> m Bool
+announceEloUpdate success q gameId updates = do
   eloChangesChannel <- askInfo eloChangesChannelInfo
   let accIds = map fst updates
   names <- queryLog [mysql|SELECT `account_id`, MinecraftAccount FROM `minecraft` JOIN `ranked_bow` ON `ranked_uuid` = `uuid` WHERE `account_id` IN accIds|]
-  let msgText = createEloUpdateMessage q gameId (mapMaybe (\(i, u) -> (, u) . head . mcNames <$> lookup i names) updates)
+  let msgText = createEloUpdateMessage success q gameId (mapMaybe (\(i, u) -> (, u) . head . mcNames <$> lookup i names) updates)
   msg' <- call $ R.CreateMessage eloChangesChannel msgText
   case msg' of
     Left err -> do
       logError $ showt err
       return False
-    Right msg -> do
+    Right msg -> if null updates then return True else do
       let fullUpdates = map (\(i, u) -> (i, messageId msg, u)) updates
       (>0) <$> executeLog [mysql|INSERT INTO `ranked_bow_elo`(`account_id`, `message_id`, `elo_change`) VALUES fullUpdates..|]

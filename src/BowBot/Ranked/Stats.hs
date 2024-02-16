@@ -20,6 +20,9 @@ data RankedBowStats = RankedBowStats
   } deriving stock (Show, Eq, Generic)
     deriving (ToMysql, FromMysql) via (Generically RankedBowStats)
 
+defRankedBowStats :: QueueName -> RankedBowStats
+defRankedBowStats q = RankedBowStats q 0 0 1400
+
 $(pure [])
 
 rankedWLR :: RankedBowStats -> WLR Integer
