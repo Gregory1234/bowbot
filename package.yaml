@@ -33,6 +33,7 @@ dependencies:
 - zlib
 - io-streams
 - binary
+- random
 # only for mysql quasi quoter
 - template-haskell
 - parsec

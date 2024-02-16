@@ -6,7 +6,6 @@ import BowBot.Discord.Utils
 import BowBot.DB.Basic
 import BowBot.Account.Basic
 import BowBot.BotData.Info
-import Data.Coerce (coerce)
 import qualified Data.Text as T
 import qualified Data.Map as M
 import Data.Bifunctor (first)
@@ -17,13 +16,13 @@ newtype QueueName = QueueName { queueName :: Text }
 rankedModRoleInfo :: InfoType RoleId
 rankedModRoleInfo = InfoType { infoName = "ranked_mod_role", infoDefault = 0, infoParse = first pack . readEither . unpack }
 
-rankedBowQueuesInfo :: InfoType [QueueName]
-rankedBowQueuesInfo = InfoType { infoName = "ranked_bow_queues", infoDefault = [], infoParse = Right . coerce . T.splitOn "," }
+rankedBowQueuesInfo :: InfoType (M.Map QueueName [Text])
+rankedBowQueuesInfo = InfoType { infoName = "ranked_bow_queues", infoDefault = M.empty, infoParse = \s -> fmap M.fromList $ for (T.lines s) $ \l -> case T.splitOn "->" l of [a, b] -> Right (QueueName a, T.splitOn "," b); _ -> Left "wrong format" }
 
 getQueueByName :: (MonadIOReader m r, Has InfoCache r) => Text -> m (Maybe QueueName)
 getQueueByName name = do
   rankedBowQueues <- askInfo rankedBowQueuesInfo
-  return $ if QueueName name `elem` rankedBowQueues then Just $ QueueName name else Nothing
+  return $ if QueueName name `elem` M.keys rankedBowQueues then Just $ QueueName name else Nothing
 
 getCurrentQueuesByBowBotId :: (MonadIOReader m r, Has SafeMysqlConn r) => BowBotId -> m [QueueName]
 getCurrentQueuesByBowBotId bid = queryLog [mysql|SELECT `queue` FROM `ranked_bow_stats` WHERE `account_id` = bid AND `in_queue`|]

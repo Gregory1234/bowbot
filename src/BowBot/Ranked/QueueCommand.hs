@@ -17,6 +17,8 @@ import qualified Data.Text as T
 import BowBot.Account.Utils
 import BowBot.BotData.Info
 import Data.Bifunctor (first)
+import qualified Data.Map as M
+import System.Random.Stateful
 
 rankedBowQueueChannelInfo :: InfoType ChannelId
 rankedBowQueueChannelInfo = InfoType { infoName = "ranked_bow_queue_channel", infoDefault = 0, infoParse = first pack . readEither . unpack }
@@ -57,7 +59,7 @@ queueCommand = Command CommandInfo
       acc <- getOrMakeRankedAccount bid
       allQueues <- askInfo rankedBowQueuesInfo
       currentQueues <- getCurrentQueuesByBowBotId bid
-      let queuesToJoin = allQueues \\ currentQueues
+      let queuesToJoin = M.keys allQueues \\ currentQueues
       when (null queuesToJoin) $ throwError "*You are already in all queues!*"
       for_ queuesToJoin $ \queue -> do
         stats <- getRankedBowStatsByBowBot queue bid
@@ -83,12 +85,16 @@ queueCommand = Command CommandInfo
           return mc
         Just mc -> return mc
     createGame queue p1 p2 = do
+      allQueues <- askInfo rankedBowQueuesInfo
+      queueServers <- liftMaybe somethingWentWrongMessage (allQueues M.!? queue)
+      chosenServerNum <- uniformRM (0, length queueServers - 1) globalStdGen
+      let chosenServer = queueServers !! chosenServerNum
       gameId <- liftMaybe somethingWentWrongMessage =<< createRankedGame queue (p1, p2)
       mcAccounts <- queryLog [mysql|SELECT `account_id`, MinecraftAccount FROM `ranked_bow` JOIN `minecraft` ON `uuid` = `ranked_bow`.`ranked_uuid` WHERE `ranked_bow`.`current_game` = gameId|]
       discords <- queryLog [mysql|SELECT `account_discord`.`account_id`, `discord_id` FROM `account_discord` JOIN `ranked_bow` ON `account_id` = `account_discord`.`account_id` WHERE `ranked_bow`.`current_game` = gameId|]
       elos <- queryLog [mysql|SELECT `ranked_bow_stats`.`account_id`, `elo` FROM `ranked_bow_stats` JOIN `ranked_bow` ON `account_id` = `ranked_bow_stats`.`account_id` WHERE `ranked_bow`.`current_game` = gameId AND `queue` = queue|]
       let formatPlayer p = "**" <> discordEscape (head (maybe [] mcNames $ lookup p mcAccounts)) <> "** (" <> maybe "" showt (lookup p elos) <> ") " <> T.unwords (map (\(_, i) -> "<@" <> showt i <> ">") $ filter ((==p) . fst) discords)
-      respond $ "**Ranked Bow Duels Game #" <> showt gameId <> " in queue " <> queueName queue <> " created!**\n" <> formatPlayer p1 <> " vs. " <> formatPlayer p2
+      respond $ "**Ranked Bow Duels Game #" <> showt gameId <> " in queue " <> queueName queue <> " created!**\n" <> formatPlayer p1 <> " vs. " <> formatPlayer p2 <> "\n*Server:* " <> chosenServer
 
 leaveCommand :: Command
 leaveCommand = Command CommandInfo
