@@ -43,11 +43,18 @@ detectRankedBowReportReaction ReactionInfo {..} = void $ runExceptT $ do
   rankedScoreReportChannel <- askInfo rankedScoreReportChannelInfo
   guard (reactionChannelId == rankedScoreReportChannel)
   report <- liftMaybe () =<< getRankedBowReportByMessageId reactionMessageId
-  guard (reportStatus report == ReportActive)
-  bid <- liftMaybe () =<< getBowBotIdByDiscord reactionUserId
-  guard (reportAuthor report /= bid)
   game <- liftMaybe () =<< getRankedGameById (reportGameId report)
-  guard (fst (rankedPlayers game) == bid || snd (rankedPlayers game) == bid)
+  bid <- liftMaybe () =<< getBowBotIdByDiscord reactionUserId
+  if fst (rankedPlayers game) == bid || snd (rankedPlayers game) == bid
+    then do
+      guard (reportAuthor report /= bid)
+      guard (reportStatus report == ReportActive)
+    else do
+      guard val
+      modRole <- askInfo rankedModRoleInfo
+      guildId <- askInfo discordGuildIdInfo
+      guildMember <- liftMaybe () =<< getDiscordGuildMember guildId reactionUserId
+      guard (modRole `elem` memberRoles guildMember)
 
   logInfo "Received a correct report reaction"
   liftIO $ threadDelay 5000000
