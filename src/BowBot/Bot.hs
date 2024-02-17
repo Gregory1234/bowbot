@@ -227,6 +227,7 @@ commands =
   , helpCommand commands DefaultLevel Nothing "rankedmod" "rankedmodhelp"
   , delQueueCommand
   , abandonGameCommand
+  , changeEloCommand
   , hashCommand
   , helpCommand commands ModLevel Nothing "normal" "modhelp"
   , addCommand

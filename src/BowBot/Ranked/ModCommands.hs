@@ -63,6 +63,27 @@ abandonGameCommand = Command CommandInfo
     unless c1 $ throwError somethingWentWrongMessage
     c2 <- applyPureEloUpdate (rankedGameQueue game) eloChanges
     unless c2 $ throwError somethingWentWrongMessage
-    c3 <- announceEloUpdate False (rankedGameQueue game) (rankedGameId game) eloChanges
+    c3 <- announceEloUpdate (rankedGameQueue game) (Just (False, rankedGameId game)) eloChanges
     unless c3 $ throwError somethingWentWrongMessage
     
+changeEloCommand :: Command
+changeEloCommand = Command CommandInfo
+  { commandName = "changeelo"
+  , commandHelpEntries = [ HelpEntry { helpUsage = "changeelo [queue] [player] [change]", helpDescription = "change a player's elo", helpGroup = "rankedmod" } ]
+  , commandPerms = DefaultLevel
+  , commandTimeout = 15
+  } $ threeArguments $ \qName player eloChangeStr -> restrictToRankedMods $ do
+    queue <- liftMaybe "*Bad queue name!*" =<< getQueueByName qName
+    eloChange <- case unpack eloChangeStr of
+      ('+':(readMaybe -> Just elo)) -> return elo
+      ('-':(readMaybe -> Just elo)) -> return $ -elo
+      _ -> throwError "*Wrong elo!*"
+    people <- queryLog [mysql|SELECT MinecraftAccount FROM `ranked_bow` JOIN `minecraft` ON `uuid` = `ranked_uuid`|]
+    ac <- liftMaybe thePlayerDoesNotExistMessage $ minecraftAutocorrectGeneral people player
+    let uuid = mcUUID $ autocorrectAccount ac
+    bid <- liftMaybe somethingWentWrongMessage =<< queryOnlyLog [mysql|SELECT `account_id` FROM `ranked_bow` WHERE `ranked_uuid` = uuid|]
+    let eloChanges = [(bid, eloChange)]
+    c2 <- applyPureEloUpdate queue eloChanges
+    unless c2 $ throwError somethingWentWrongMessage
+    c3 <- announceEloUpdate queue Nothing eloChanges
+    unless c3 $ throwError somethingWentWrongMessage

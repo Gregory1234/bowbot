@@ -33,6 +33,9 @@ twoOptionalArguments body = withArguments (\(CommandMessageArgs args) -> assertA
     helper [a] = Just (a, Nothing)
     helper (a:b:_) = Just (a, Just b)
 
+threeArguments :: (MonadIOReader m r, HasAll [CommandEnvironment, DiscordHandle] r) => (Text -> Text -> Text -> ExceptT Text m ()) -> m ()
+threeArguments body = withArguments (\(CommandMessageArgs args) -> assertArgumentsCount 3 3 args >> body (head args) (args !! 1) (args !! 2))
+
 oneOrThreeArguments :: (MonadIOReader m r, HasAll [CommandEnvironment, DiscordHandle] r) => (Text -> Maybe (Text, Text) -> ExceptT Text m a) -> m ()
 oneOrThreeArguments body = withArguments (\(CommandMessageArgs args) -> assertArgumentsCountExact [1, 3] args >> body (head args) (helper (tail args)))
   where

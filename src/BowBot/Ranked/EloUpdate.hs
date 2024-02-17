@@ -60,17 +60,19 @@ applyPureEloUpdate queue updates = do
 eloChangesChannelInfo :: InfoType ChannelId
 eloChangesChannelInfo = InfoType { infoName = "ranked_bow_elo_changes_channel", infoDefault = 0, infoParse = first pack . readEither . unpack }
 
-createEloUpdateMessage :: Bool -> QueueName -> Integer -> [(Text, Integer)] -> Text
-createEloUpdateMessage success q gameId updates = 
-  "**Game #" <> showt gameId <> (if success then " finished (" else " abandoned (") <> queueName q <> "):**\n" 
-  <> (if null updates then "*No elo changes*" else T.unlines (map (\(n,v) -> n <> ": " <> (if v < 0 then showt v else "+" <> showt v)) updates))
+createEloUpdateMessage :: QueueName -> Maybe (Bool, Integer) -> [(Text, Integer)] -> Text
+createEloUpdateMessage q headerInfo updates = let
+    header = case headerInfo of
+      Nothing -> "**Elo changed:\n**"
+      Just (success, gameId) -> "**Game #" <> showt gameId <> (if success then " finished (" else " abandoned (") <> queueName q <> "):**\n"
+  in header <> (if null updates then "*No elo changes*" else T.unlines (map (\(n,v) -> n <> ": " <> (if v < 0 then showt v else "+" <> showt v)) updates))
 
-announceEloUpdate :: (MonadIOReader m r, HasAll '[SafeMysqlConn, InfoCache, DiscordHandle] r) => Bool -> QueueName -> Integer -> [(BowBotId, Integer)] -> m Bool
-announceEloUpdate success q gameId updates = do
+announceEloUpdate :: (MonadIOReader m r, HasAll '[SafeMysqlConn, InfoCache, DiscordHandle] r) => QueueName -> Maybe (Bool, Integer) -> [(BowBotId, Integer)] -> m Bool
+announceEloUpdate q headerInfo updates = do
   eloChangesChannel <- askInfo eloChangesChannelInfo
   let accIds = map fst updates
   names <- queryLog [mysql|SELECT `account_id`, MinecraftAccount FROM `minecraft` JOIN `ranked_bow` ON `ranked_uuid` = `uuid` WHERE `account_id` IN accIds|]
-  let msgText = createEloUpdateMessage success q gameId (mapMaybe (\(i, u) -> (, u) . head . mcNames <$> lookup i names) updates)
+  let msgText = createEloUpdateMessage q headerInfo (mapMaybe (\(i, u) -> (, u) . head . mcNames <$> lookup i names) updates)
   msg' <- call $ R.CreateMessage eloChangesChannel msgText
   case msg' of
     Left err -> do
