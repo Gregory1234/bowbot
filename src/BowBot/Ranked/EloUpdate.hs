@@ -26,21 +26,25 @@ calculateEloChanges (stats1, stats2) score = (eloChange player1win (rankedElo st
     eloChange win elo = clampElo win $ (if win then 15 else -15) - ((elo - avgElo) `quot` 20)
     player1win = rankedScore1 score > rankedScore2 score
 
-applyEloChange :: RankedBowStats -> Integer -> RankedBowStats
-applyEloChange RankedBowStats {..} change = RankedBowStats
+applyEloChange :: RankedBowStats -> Integer -> Integer -> Integer -> RankedBowStats
+applyEloChange RankedBowStats {..} wins losses change = let winner = wins > losses in RankedBowStats
   { rankedQueue = rankedQueue
   , rankedElo = rankedElo + change
-  , rankedWins = rankedWins + (if change > 0 then 1 else 0)
-  , rankedLosses = rankedLosses + (if change < 0 then 1 else 0)
+  , rankedWins = rankedWins + (if winner then 1 else 0)
+  , rankedLosses = rankedLosses + (if winner then 0 else 1)
+  , rankedSmallWins = rankedSmallWins + wins
+  , rankedSmallLosses = rankedSmallLosses + losses
+  , rankedBestWinstreak = rankedBestWinstreak + (if winner then 1 else 0)
+  , rankedCurrentWinstreak = if winner then rankedCurrentWinstreak + 1 else 0
   }
 
 applyEloByScore :: (MonadIOReader m r, Has SafeMysqlConn r) => RankedBowGame -> RankedBowScore -> m (Maybe [(BowBotId, Integer)])
-applyEloByScore RankedBowGame { rankedPlayers = (player1, player2), rankedGameQueue } score = do
+applyEloByScore RankedBowGame { rankedPlayers = (player1, player2), rankedGameQueue } score@(RankedBowScore score1 score2) = do
   stats <- queryLog [mysql|SELECT `account_id`, RankedBowStats FROM `ranked_bow_stats` WHERE `account_id` IN (player1, player2) AND `queue` = rankedGameQueue|]
   case (lookup player1 stats, lookup player2 stats) of
     (Just stats1, Just stats2) -> do
       let (change1, change2) = calculateEloChanges (stats1, stats2) score
-      let (newStats1, newStats2) = (applyEloChange stats1 change1, applyEloChange stats2 change2)
+      let (newStats1, newStats2) = (applyEloChange stats1 score1 score2 change1, applyEloChange stats2 score2 score1 change2)
       c <- (>0) <$> executeLog [mysql|INSERT INTO `ranked_bow_stats`(`account_id`, RankedBowStats) VALUES (player1, newStats1), (player2, newStats2)|]
       return $ if c then Just [(player1, change1), (player2, change2)] else Nothing
     _ -> return Nothing

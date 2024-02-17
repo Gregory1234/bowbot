@@ -11,8 +11,8 @@ minecraft_name: name Text, minecraft_uuid UUID
 permissions: discord_id UserId, level PermissionLevel
 ranked_bow: account_id BowBotId, ranked_uuid UUID, current_game Maybe Integer
 ranked_bow_elo: account_id BowBotId, queue QueueName, message_id MessageId, elo_change Integer
-ranked_bow_game: AI id Integer, queue QueueName, time UTCTime, player1 BowBotId, player2 BowBotId, status RankedGameStatus
+ranked_bow_game: AI id Integer, queue QueueName, time UTCTime, player1 BowBotId, player2 BowBotId, status RankedGameStatus, score1 Maybe Integer, score2 Maybe Integer
 ranked_bow_report: author BowBotId, game_id Integer, message_id MessageId, score1 Integer, score2 Integer, status RankedBowReportStatus
-ranked_bow_stats: account_id BowBotId, queue QueueName, wins Integer, losses Integer, elo Integer, in_queue Bool
+ranked_bow_stats: account_id BowBotId, queue QueueName, wins Integer, losses Integer, small_wins Integer, small_losses Integer, best_winstreak Integer, current_winstreak Integer, elo Integer, in_queue Bool
 settings: discord_id UserId, wins SettingBin, losses SettingBin, wlr SettingTer, wins_until SettingTer, best_streak SettingTer, current_streak SettingTer, best_daily_streak SettingTer, bow_hits SettingBin, bow_shots SettingBin, accuracy SettingTer
 snipe: channel ChannelId, author UserId, content Text, time UTCTime, edited Bool

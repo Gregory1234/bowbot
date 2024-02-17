@@ -10,6 +10,7 @@ import BowBot.Discord.Utils
 import Control.Monad.Except (runExceptT)
 import Language.MySQL.Query
 import BowBot.Ranked.Queue
+import BowBot.Ranked.Report
 
 data RankedGameStatus = GameActive | GameCompleted | GameAbandoned
   deriving (Show, Eq, Enum)
@@ -61,3 +62,9 @@ finalizeRankedGame status gid = do
     void $ executeLog [mysql|DELETE FROM `ranked_bow_report` WHERE `game_id` = gid|]
     guard . (>0) =<< executeLog [mysql|UPDATE `ranked_bow` SET `current_game` = NULL WHERE `current_game` = gid|]
     guard . (>0) =<< executeLog [mysql|UPDATE `ranked_bow_game` SET `status` = status WHERE `id` = gid|]
+
+setRankedGameScore :: (MonadIOReader m r, Has SafeMysqlConn r) => Integer -> Maybe RankedBowScore -> m Bool
+setRankedGameScore gid score = do
+  let score1 = rankedScore1 <$> score
+  let score2 = rankedScore2 <$> score
+  (>0) <$> executeLog [mysql|UPDATE `ranked_bow_game` SET `score1` = score1, `score2` = score2 WHERE `id` = gid|]

@@ -16,12 +16,16 @@ data RankedBowStats = RankedBowStats
   { rankedQueue :: QueueName
   , rankedWins :: Integer
   , rankedLosses :: Integer
+  , rankedSmallWins :: Integer
+  , rankedSmallLosses :: Integer
+  , rankedBestWinstreak :: Integer
+  , rankedCurrentWinstreak :: Integer
   , rankedElo :: Integer
   } deriving stock (Show, Eq, Generic)
     deriving (ToMysql, FromMysql) via (Generically RankedBowStats)
 
 defRankedBowStats :: QueueName -> RankedBowStats
-defRankedBowStats q = RankedBowStats q 0 0 1400
+defRankedBowStats q = RankedBowStats q 0 0 0 0 0 0 1400
 
 $(pure [])
 
@@ -43,6 +47,10 @@ addRankedPlayerQueue queue bid = (>0) <$> executeLog [mysql|INSERT INTO `ranked_
 showRankedBowStats :: Settings -> RankedBowStats -> Text
 showRankedBowStats Settings {..} RankedBowStats {..} = T.unlines $ catMaybes
   [ Just $ "- Queue " <> queueName rankedQueue <> ":"
+  , Just -- TODO: add to settings
+  $ " - *Ranked Bow Elo:* **"
+  <> showt rankedElo
+  <> "**"
   , onlyIfBin sWins
   $ " - *Ranked Bow Wins:* **"
   <> showt rankedWins
@@ -51,13 +59,25 @@ showRankedBowStats Settings {..} RankedBowStats {..} = T.unlines $ catMaybes
   $ " - *Ranked Bow Losses:* **"
   <> showt rankedLosses
   <> "**"
+  , onlyIfBin sWins
+  $ " - *Ranked Bow Small Wins:* **"
+  <> showt rankedSmallWins
+  <> "**"
+  , onlyIfBin sLosses
+  $ " - *Ranked Bow Small Losses:* **"
+  <> showt rankedSmallLosses
+  <> "**"
   , onlyIfTer sWLR (rankedWins + rankedLosses /= 0)
   $ " - *Ranked Bow Win/Loss Ratio:* **"
   <> winLossRatio
   <> "**"
-  , Just -- TODO: add to settings
-  $ " - *Ranked Bow Elo:* **"
-  <> showt rankedElo
+  , onlyIfTer sBestStreak True
+  $ " - *Best Ranked Bow Winstreak:* **"
+  <> showt rankedBestWinstreak
+  <> "**"
+  , onlyIfTer sCurrentStreak True
+  $ " - *Current Ranked Bow Winstreak:* **"
+  <> showt rankedCurrentWinstreak
   <> "**"
   ]
   where

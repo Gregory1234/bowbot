@@ -6,6 +6,6 @@ MinecraftAccount, minecraft: uuid, ^names
 RankedBowGame, ranked_bow_game: id, ^queue, ^time, (^player1, ^player2), ^status
 RankedBowReport, ranked_bow_report: author, game_id, message_id, RankedBowScore, ^status
 RankedBowScore, ranked_bow_report: ^score1, ^score2
-RankedBowStats, ranked_bow_stats: queue, ^wins, ^losses, ^elo
+RankedBowStats, ranked_bow_stats: queue, ^wins, ^losses, ^small_wins, ^small_losses, ^best_winstreak, ^current_winstreak, ^elo
 Settings, settings: ^wins, ^losses, ^wlr, ^wins_until, ^best_streak, ^current_streak, ^best_daily_streak, ^bow_hits, ^bow_shots, ^accuracy
 SnipeMessage, snipe: ^author, ^content, ^edited, ^time
