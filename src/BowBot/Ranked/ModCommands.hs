@@ -65,6 +65,7 @@ abandonGameCommand = Command CommandInfo
     unless c2 $ throwError somethingWentWrongMessage
     c3 <- announceEloUpdate (rankedGameQueue game) (Just (False, rankedGameId game)) eloChanges
     unless c3 $ throwError somethingWentWrongMessage
+    respond "*Ranked game abandoned!*"
     
 changeEloCommand :: Command
 changeEloCommand = Command CommandInfo
@@ -87,3 +88,4 @@ changeEloCommand = Command CommandInfo
     unless c2 $ throwError somethingWentWrongMessage
     c3 <- announceEloUpdate queue Nothing eloChanges
     unless c3 $ throwError somethingWentWrongMessage
+    respond "*Elo changed!*"
