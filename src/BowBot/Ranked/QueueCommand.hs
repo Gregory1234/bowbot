@@ -69,8 +69,8 @@ queueCommand = Command CommandInfo
       r <- addToQueueMany (map (, 2) queuesToJoin) bid
       case r of
         AddedToQueueMany vs -> do
-          respond $ "**" <> discordEscape (head (mcNames acc)) <> " joined the queues: " <> T.intercalate ", " (map queueName queuesToJoin) 
-            <> "!**\nCurrent queue status:\n" <> T.unlines ["**" <> showt n <> "/2** people in " <> queueName q <> " queue." | (q, n) <- vs]
+          respond $ "**" <> discordEscape (head (mcNames acc)) <> " joined the queues: " <> T.intercalate ", " (map (T.toUpper . queueName) queuesToJoin) 
+            <> "!**\nCurrent queue status:\n" <> T.unlines ["**" <> showt n <> "/2** people in " <> T.toUpper (queueName q) <> " queue." | (q, n) <- vs]
         CurrentlyInGameSome n -> respond $ "*You are currently in game #" <> showt n <> "!*"
         QueueFilledSome queue [p1, p2] -> createGame queue p1 p2
         QueueFilledSome _ _ -> respond somethingWentWrongMessage
@@ -94,7 +94,7 @@ queueCommand = Command CommandInfo
       discords <- queryLog [mysql|SELECT `account_discord`.`account_id`, `discord_id` FROM `account_discord` JOIN `ranked_bow` ON `account_id` = `account_discord`.`account_id` WHERE `ranked_bow`.`current_game` = gameId|]
       elos <- queryLog [mysql|SELECT `ranked_bow_stats`.`account_id`, `elo` FROM `ranked_bow_stats` JOIN `ranked_bow` ON `account_id` = `ranked_bow_stats`.`account_id` WHERE `ranked_bow`.`current_game` = gameId AND `queue` = queue|]
       let formatPlayer p = "**" <> discordEscape (head (maybe [] mcNames $ lookup p mcAccounts)) <> "** (" <> maybe "" showt (lookup p elos) <> ") " <> T.unwords (map (\(_, i) -> "<@" <> showt i <> ">") $ filter ((==p) . fst) discords)
-      respond $ "**Ranked Bow Duels Game #" <> showt gameId <> " in queue " <> queueName queue <> " created!**\n" <> formatPlayer p1 <> " vs. " <> formatPlayer p2 <> "\n*Server:* " <> chosenServer
+      respond $ "**Ranked Bow Duels Game #" <> showt gameId <> " in queue " <> T.toUpper (queueName queue) <> " created!**\n" <> formatPlayer p1 <> " vs. " <> formatPlayer p2 <> "\n*Server:* " <> chosenServer
 
 leaveCommand :: Command
 leaveCommand = Command CommandInfo

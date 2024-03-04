@@ -20,7 +20,7 @@ rankedBowQueuesInfo :: InfoType (M.Map QueueName [Text])
 rankedBowQueuesInfo = InfoType { infoName = "ranked_bow_queues", infoDefault = M.empty, infoParse = \s -> fmap M.fromList $ for (T.lines s) $ \l -> case T.splitOn "->" l of [a, b] -> Right (QueueName a, T.splitOn "," b); _ -> Left "wrong format" }
 
 getQueueByName :: (MonadIOReader m r, Has InfoCache r) => Text -> m (Maybe QueueName)
-getQueueByName name = do
+getQueueByName (T.toLower -> name) = do
   rankedBowQueues <- askInfo rankedBowQueuesInfo
   return $ if QueueName name `elem` M.keys rankedBowQueues then Just $ QueueName name else Nothing
 
