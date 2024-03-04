@@ -17,7 +17,6 @@ import qualified Data.Text as T
 import BowBot.Account.Utils
 import BowBot.BotData.Info
 import Data.Bifunctor (first)
-import qualified Data.Map as M
 import System.Random.Stateful
 
 rankedBowQueueChannelInfo :: InfoType ChannelId
@@ -59,7 +58,7 @@ queueCommand = Command CommandInfo
       acc <- getOrMakeRankedAccount bid
       allQueues <- askInfo rankedBowQueuesInfo
       currentQueues <- getCurrentQueuesByBowBotId bid
-      let queuesToJoin = M.keys allQueues \\ currentQueues
+      let queuesToJoin = map fst allQueues \\ currentQueues
       when (null queuesToJoin) $ throwError "*You are already in all queues!*"
       for_ queuesToJoin $ \queue -> do
         stats <- getRankedBowStatsByBowBot queue bid
@@ -86,7 +85,7 @@ queueCommand = Command CommandInfo
         Just mc -> return mc
     createGame queue p1 p2 = do
       allQueues <- askInfo rankedBowQueuesInfo
-      queueServers <- liftMaybe somethingWentWrongMessage (allQueues M.!? queue)
+      queueServers <- liftMaybe somethingWentWrongMessage (lookup queue allQueues)
       chosenServerNum <- uniformRM (0, length queueServers - 1) globalStdGen
       let chosenServer = queueServers !! chosenServerNum
       gameId <- liftMaybe somethingWentWrongMessage =<< createRankedGame queue (p1, p2)
