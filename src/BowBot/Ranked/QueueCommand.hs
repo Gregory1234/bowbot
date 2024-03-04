@@ -47,9 +47,9 @@ queueCommand = Command CommandInfo
         unless r $ throwError somethingWentWrongMessage
       r <- liftMaybe somethingWentWrongMessage =<< addToQueue 2 queue bid
       case r of
-        AlreadyInQueue -> respond "*You are already in this queue!*"
+        AlreadyInQueue -> respond $ "*You are already in the " <> T.toUpper (queueName queue) <> " queue!*"
         AddedToQueue n -> do
-          respond $ "**" <> discordEscape (head (mcNames acc)) <> " joined the queue!**\nCurrently **" <> showt n <> "/2** people in this queue."
+          respond $ "**" <> discordEscape (head (mcNames acc)) <> " joined the " <> T.toUpper (queueName queue) <> " queue!**\nCurrently **" <> showt n <> "/2** people in that queue."
         CurrentlyInGame n -> respond $ "*You are currently in game #" <> showt n <> "!*"
         QueueFilled [p1, p2] -> createGame queue p1 p2
         QueueFilled _ -> respond somethingWentWrongMessage
@@ -70,7 +70,7 @@ queueCommand = Command CommandInfo
       case r of
         AddedToQueueMany vs -> do
           respond $ "**" <> discordEscape (head (mcNames acc)) <> " joined the queues: " <> T.intercalate ", " (map (T.toUpper . queueName) queuesToJoin) 
-            <> "!**\nCurrent queue status:\n" <> T.unlines ["**" <> showt n <> "/2** people in " <> T.toUpper (queueName q) <> " queue." | (q, n) <- vs]
+            <> "!**\nCurrent queue status:\n" <> T.unlines ["**" <> showt n <> "/2** people in the " <> T.toUpper (queueName q) <> " queue." | (q, n) <- vs]
         CurrentlyInGameSome n -> respond $ "*You are currently in game #" <> showt n <> "!*"
         QueueFilledSome queue [p1, p2] -> createGame queue p1 p2
         QueueFilledSome _ _ -> respond somethingWentWrongMessage
@@ -99,17 +99,27 @@ queueCommand = Command CommandInfo
 leaveCommand :: Command
 leaveCommand = Command CommandInfo
   { commandName = "l"
-  , commandHelpEntries = [HelpEntry { helpUsage = "l", helpDescription = "leave all Ranked Bow queues", helpGroup = "ranked" }]
+  , commandHelpEntries = [HelpEntry { helpUsage = "l [queue]", helpDescription = "leave a Ranked Bow queue", helpGroup = "ranked" }]
   , commandPerms = DefaultLevel
   , commandTimeout = 15
-  } $ restrictToQueueChannel $ noArguments $ do
-    did <- userId <$> envs envSender
-    bid <- liftMaybe youArentRegisteredMessage =<< getBowBotIdByDiscord did
-    r <- removeFromAllQueues bid
-    MinecraftAccount {..} <- liftMaybe somethingWentWrongMessage =<< getRankedMinecraftAccountByBowBotId bid
-    respond $ case r of
-      Just vs -> "**" <> discordEscape (head mcNames) <> " left all queues!**\nCurrent queue status:\n" <> (if null vs then "All queues are empty!" else T.unlines ["**" <> showt n <> "/2** people in " <> queueName q <> " queue." | (q, n) <- vs])
-      Nothing -> "*You are not in this queue!*"
+  } $ restrictToQueueChannel $ oneOptionalArgument $ \case
+    (Just qName) -> do
+      queue <- liftMaybe "*Bad queue name!*" =<< getQueueByName qName
+      did <- userId <$> envs envSender
+      bid <- liftMaybe youArentRegisteredMessage =<< getBowBotIdByDiscord did
+      r <- removeFromQueue queue bid
+      MinecraftAccount {..} <- liftMaybe somethingWentWrongMessage =<< getRankedMinecraftAccountByBowBotId bid
+      respond $ case r of
+        Just n -> "**" <> discordEscape (head mcNames) <> " left the " <> T.toUpper (queueName queue) <> " queue!**\nCurrently **" <> showt n <> "/2** people in that queue."
+        Nothing -> "*You are not in the " <> T.toUpper (queueName queue) <> " queue!*"
+    Nothing -> do
+      did <- userId <$> envs envSender
+      bid <- liftMaybe youArentRegisteredMessage =<< getBowBotIdByDiscord did
+      r <- removeFromAllQueues bid
+      MinecraftAccount {..} <- liftMaybe somethingWentWrongMessage =<< getRankedMinecraftAccountByBowBotId bid
+      respond $ case r of
+        Just vs -> "**" <> discordEscape (head mcNames) <> " left all queues!**\nCurrent queue status:\n" <> (if null vs then "All queues are empty!" else T.unlines ["**" <> showt n <> "/2** people in " <> queueName q <> " queue." | (q, n) <- vs])
+        Nothing -> "*You are not in any queue!*"
 
 listQueueCommand :: Command
 listQueueCommand = Command CommandInfo
