@@ -61,9 +61,8 @@ abandonGameCommand = Command CommandInfo
       _ -> throwError "*Wrong elo!*"
     c1 <- finalizeRankedGame GameAbandoned gameId
     unless c1 $ throwError somethingWentWrongMessage
-    c2 <- applyPureEloUpdate (rankedGameQueue game) eloChanges
-    unless c2 $ throwError somethingWentWrongMessage
-    c3 <- announceEloUpdate (rankedGameQueue game) (Just (False, rankedGameId game)) eloChanges
+    eloChanges' <- liftMaybe somethingWentWrongMessage =<< applyPureEloUpdate (rankedGameQueue game) eloChanges
+    c3 <- announceEloUpdate (rankedGameQueue game) (Just (False, rankedGameId game)) eloChanges'
     unless c3 $ throwError somethingWentWrongMessage
     respond "*Ranked game abandoned!*"
     
@@ -84,8 +83,7 @@ changeEloCommand = Command CommandInfo
     let uuid = mcUUID $ autocorrectAccount ac
     bid <- liftMaybe somethingWentWrongMessage =<< queryOnlyLog [mysql|SELECT `account_id` FROM `ranked_bow` WHERE `ranked_uuid` = uuid|]
     let eloChanges = [(bid, eloChange)]
-    c2 <- applyPureEloUpdate queue eloChanges
-    unless c2 $ throwError somethingWentWrongMessage
-    c3 <- announceEloUpdate queue Nothing eloChanges
+    eloChanges' <- liftMaybe somethingWentWrongMessage =<< applyPureEloUpdate queue eloChanges
+    c3 <- announceEloUpdate queue Nothing eloChanges'
     unless c3 $ throwError somethingWentWrongMessage
     respond "*Elo changed!*"
