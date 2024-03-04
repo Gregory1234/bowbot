@@ -27,15 +27,15 @@ calculateEloChanges (stats1, stats2) score = (eloChange player1win (rankedElo st
     player1win = rankedScore1 score > rankedScore2 score
 
 applyEloChange :: RankedBowStats -> Integer -> Integer -> Integer -> RankedBowStats
-applyEloChange RankedBowStats {..} wins losses change = let winner = wins > losses in RankedBowStats
+applyEloChange RankedBowStats {..} wins losses change = let winner = wins > losses; newWinstreak = if winner then rankedCurrentWinstreak + 1 else 0 in RankedBowStats
   { rankedQueue = rankedQueue
   , rankedElo = rankedElo + change
   , rankedWins = rankedWins + (if winner then 1 else 0)
   , rankedLosses = rankedLosses + (if winner then 0 else 1)
   , rankedSmallWins = rankedSmallWins + wins
   , rankedSmallLosses = rankedSmallLosses + losses
-  , rankedBestWinstreak = rankedBestWinstreak + (if winner then 1 else 0)
-  , rankedCurrentWinstreak = if winner then rankedCurrentWinstreak + 1 else 0
+  , rankedBestWinstreak = max rankedBestWinstreak newWinstreak
+  , rankedCurrentWinstreak = newWinstreak
   }
 
 applyEloByScore :: (MonadIOReader m r, Has SafeMysqlConn r) => RankedBowGame -> RankedBowScore -> m (Maybe [(BowBotId, Integer)])
