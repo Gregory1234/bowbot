@@ -46,7 +46,7 @@ addRankedPlayerQueue queue bid = (>0) <$> executeLog [mysql|INSERT INTO `ranked_
 
 showRankedBowStats :: Settings -> RankedBowStats -> Text
 showRankedBowStats Settings {..} RankedBowStats {..} = T.unlines $ catMaybes
-  [ Just $ "- Queue " <> queueName rankedQueue <> ":"
+  [ Just $ "- Queue " <> T.toUpper (queueName rankedQueue) <> ":"
   , Just -- TODO: add to settings
   $ " - *Ranked Bow Elo:* **"
   <> showt rankedElo
