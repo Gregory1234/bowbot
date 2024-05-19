@@ -12,6 +12,7 @@ import Control.Concurrent
 import qualified Discord.Requests as R
 import BowBot.Ranked.EloUpdate
 import BowBot.Ranked.Queue
+import qualified Data.Text as T
 
 rankedScoreReportChannelInfo :: InfoType ChannelId
 rankedScoreReportChannelInfo = InfoType { infoName = "ranked_score_report_channel", infoDefault = 0, infoParse = first pack . readEither . unpack }
@@ -28,12 +29,17 @@ reactionValue _ = Nothing
 detectRankedBowReport :: (MonadIOReader m r, HasAll '[DiscordHandle, SafeMysqlConn, InfoCache] r) => Message -> m ()
 detectRankedBowReport Message {..} = void $ runExceptT $ do
   guard (not $ userIsBot messageAuthor)
+  let msgParts = T.words messageContent
+  guard (length msgParts == 2)
   rankedScoreReportChannel <- askInfo rankedScoreReportChannelInfo
   guard (messageChannelId == rankedScoreReportChannel)
   bid <- liftMaybe () =<< getBowBotIdByDiscord (userId messageAuthor)
   game <- liftMaybe () =<< getRankedGameByBowBotId bid
   let isFirstPlayer = fst (rankedPlayers game) == bid
-  score <- liftMaybe () $ rankedBowScoreFromString isFirstPlayer messageContent
+  let otherPlayer = (if isFirstPlayer then snd else fst) (rankedPlayers game)
+  otherPlayerDiscords <- getDiscordIdsByBowBotId otherPlayer
+  guard $ discordIdFromPing (msgParts !! 1) `elem` map Just otherPlayerDiscords
+  score <- liftMaybe () $ rankedBowScoreFromString isFirstPlayer (msgParts !! 0)
   guard =<< createRankedBowReport bid (rankedGameId game) messageId score
   for_ [positiveReaction, negativeReaction] $ addMessageReaction messageChannelId messageId
 
