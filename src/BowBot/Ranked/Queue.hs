@@ -37,15 +37,13 @@ addToQueue limit queue bid = do
     Just (False, Just g) -> return $ Just $ CurrentlyInGame g
     Just (True, _) -> return $ Just AlreadyInQueue
     Just (False, Nothing) -> do
+      void $ executeLog [mysql|INSERT INTO `ranked_bow_stats`(`account_id`, `queue`, ^`in_queue`) VALUES (bid, queue, 1)|]
       queueMembers <- queryLog [mysql|SELECT `account_id` FROM `ranked_bow_stats` WHERE `queue` = queue AND `in_queue`|]
-      if length queueMembers == limit - 1
+      if length queueMembers == limit
         then do
-          let queueMembersAll = bid : queueMembers
-          void $ executeLog [mysql|UPDATE `ranked_bow_stats` SET `in_queue` = 0 WHERE `account_id` IN queueMembersAll|]
-          return $ Just $ QueueFilled queueMembersAll
-        else do
-          void $ executeLog [mysql|INSERT INTO `ranked_bow_stats`(`account_id`, `queue`, ^`in_queue`) VALUES (bid, queue, 1)|]
-          return $ Just $ AddedToQueue (length queueMembers + 1)
+          void $ executeLog [mysql|UPDATE `ranked_bow_stats` SET `in_queue` = 0 WHERE `account_id` IN queueMembers|]
+          return $ Just $ QueueFilled queueMembers
+        else return $ Just $ AddedToQueue $ length queueMembers
 
 data AddToQueueManyRes = AddedToQueueMany [(QueueName, Int)] | CurrentlyInGameSome Integer | QueueFilledSome QueueName [BowBotId]
 
@@ -56,18 +54,18 @@ addToQueueMany queues bid = do
   case r of
     Just g -> return $ CurrentlyInGameSome g
     Nothing -> do
+      let q = map ((bid, , True) . fst) queues
+      void $ executeLog [mysql|INSERT INTO `ranked_bow_stats`(`account_id`, `queue`, ^`in_queue`) VALUES q..|]
+
       queueMembers <- M.map (map snd) . groupByToMap fst <$> queryLog [mysql|SELECT `queue`, `account_id` FROM `ranked_bow_stats` WHERE `in_queue` AND `queue` IN queueNames|]
-      let filledQueues = map fst $ filter (\(n, l) -> let mems = fromMaybe [] $ queueMembers M.!? n in length mems == l - 1 && bid `notElem` mems) queues
-      let queuesToFill = filter (\n -> bid `notElem` fromMaybe [] (queueMembers M.!? n)) $ map fst queues
+      let filledQueues = map fst $ filter (\(n, l) -> maybe 0 length (queueMembers M.!? n) == l) queues
+      
       case filledQueues of
-        [] -> do
-          let q = map (bid, , True) queuesToFill
-          void $ executeLog [mysql|INSERT INTO `ranked_bow_stats`(`account_id`, `queue`, ^`in_queue`) VALUES q..|]
-          return $ AddedToQueueMany $ map (\n -> (n, length (fromMaybe [] $ queueMembers M.!? n) + 1)) queuesToFill
+        [] -> return $ AddedToQueueMany $ map (\(n, _) -> (n, length (fromMaybe [] $ queueMembers M.!? n))) queues
         (queue : _) -> do
-          let queueMembersAll = bid : fromMaybe [] (queueMembers M.!? queue)
-          void $ executeLog [mysql|UPDATE `ranked_bow_stats` SET `in_queue` = 0 WHERE `account_id` IN queueMembersAll|]
-          return $ QueueFilledSome queue queueMembersAll
+          let queueMembersThisQueue = fromMaybe [] (queueMembers M.!? queue)
+          void $ executeLog [mysql|UPDATE `ranked_bow_stats` SET `in_queue` = 0 WHERE `account_id` IN queueMembersThisQueue|]
+          return $ QueueFilledSome queue queueMembersThisQueue
       
 
 removeFromQueue :: (MonadIOReader m r, Has SafeMysqlConn r) => QueueName -> BowBotId -> m (Maybe Int)

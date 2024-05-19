@@ -41,9 +41,6 @@ getRankedMinecraftAccountByBowBotId bid = queryOnlyLog [mysql|SELECT MinecraftAc
 addRankedPlayer :: (MonadIOReader m r, Has SafeMysqlConn r) => BowBotId -> UUID -> m Bool
 addRankedPlayer bid uuid = (>0) <$> executeLog [mysql|INSERT INTO `ranked_bow`(`account_id`, `ranked_uuid`) VALUES (bid,uuid)|]
 
-addRankedPlayerQueue :: (MonadIOReader m r, Has SafeMysqlConn r) => QueueName -> BowBotId -> m Bool
-addRankedPlayerQueue queue bid = (>0) <$> executeLog [mysql|INSERT INTO `ranked_bow_stats`(`account_id`, `queue`) VALUES (bid,queue)|]
-
 showRankedBowStats :: Settings -> RankedBowStats -> Text
 showRankedBowStats Settings {..} RankedBowStats {..} = T.unlines $ catMaybes
   [ Just $ "- Queue " <> T.toUpper (queueName rankedQueue) <> ":"

@@ -13,12 +13,13 @@ import BowBot.Minecraft.Basic
 import BowBot.Account.Basic
 import BowBot.Ranked.Queue
 import qualified Data.Text as T
+import Control.Monad.Except (throwError)
 
 youNeverPlayerRankedBowDuels :: Text
 youNeverPlayerRankedBowDuels = "*You have never played Ranked Bow Duels!*"
 
-thePlayerHasNeverPlayerRankedBowDuels :: Text
-thePlayerHasNeverPlayerRankedBowDuels = "*The player has never played Ranked Bow Duels!*"
+thePlayerHasNeverPlayedRankedBowDuels :: Text
+thePlayerHasNeverPlayedRankedBowDuels = "*The player has never played Ranked Bow Duels!*"
 
 rankedBowStatsCommand :: SettingsSource -> Text -> Text -> Command
 rankedBowStatsCommand src name desc = Command CommandInfo
@@ -34,15 +35,18 @@ rankedBowStatsCommand src name desc = Command CommandInfo
       bid <- liftMaybe youArentRegisteredMessage =<< getBowBotIdByDiscord did
       stats <- getStatsByDiscord did
       acc <- liftMaybe youNeverPlayerRankedBowDuels =<< getRankedMinecraftAccountByBowBotId bid
+      when (null stats) $ throwError youNeverPlayerRankedBowDuels
       displayStats (minecraftAccountToHeader acc Nothing) stats
     Just (uuidFromString -> Just uuid, Nothing) -> do
       stats <- getStatsByUUID uuid
       acc <- liftMaybe thePlayerDoesNotExistMessage =<< getMinecraftAccountByUUID uuid
+      when (null stats) $ throwError thePlayerHasNeverPlayedRankedBowDuels
       displayStats (minecraftAccountToHeader acc Nothing) stats
     Just (discordIdFromString -> Just did, Nothing) -> do
       stats <- getStatsByDiscord did
       bid <- liftMaybe youArentRegisteredMessage =<< getBowBotIdByDiscord did
       acc <- liftMaybe youNeverPlayerRankedBowDuels =<< getRankedMinecraftAccountByBowBotId bid
+      when (null stats) $ throwError youNeverPlayerRankedBowDuels
       displayStats (minecraftAccountToHeader acc Nothing) stats
     Just (n, Nothing) -> do
       maybeQueue <- getQueueByName n
@@ -52,39 +56,41 @@ rankedBowStatsCommand src name desc = Command CommandInfo
           bid <- liftMaybe youArentRegisteredMessage =<< getBowBotIdByDiscord did
           stats <- getQueueStatsByDiscord queue did
           acc <- liftMaybe youNeverPlayerRankedBowDuels =<< getRankedMinecraftAccountByBowBotId bid
-          displayStatsQueue (minecraftAccountToHeader acc Nothing) stats
+          displayStatsQueue (minecraftAccountToHeader acc Nothing) queue stats
         Nothing -> do
           people <- queryLog [mysql|SELECT MinecraftAccount FROM `ranked_bow` JOIN `minecraft` ON `uuid` = `ranked_uuid`|]
           ac <- liftMaybe thePlayerDoesNotExistMessage $ minecraftAutocorrectGeneral people n
           stats <- getStatsByUUID (mcUUID $ autocorrectAccount ac)
+          when (null stats) $ throwError thePlayerHasNeverPlayedRankedBowDuels
           displayStats (minecraftAutocorrectToHeader ac) stats
     Just (qName, Just (uuidFromString -> Just uuid)) -> do
       queue <- liftMaybe "*Bad queue name!*" =<< getQueueByName qName
       stats <- getQueueStatsByUUID queue uuid
       acc <- liftMaybe thePlayerDoesNotExistMessage =<< getMinecraftAccountByUUID uuid
-      displayStatsQueue (minecraftAccountToHeader acc Nothing) stats
+      displayStatsQueue (minecraftAccountToHeader acc Nothing) queue stats
     Just (qName, Just (discordIdFromString -> Just did)) -> do
       queue <- liftMaybe "*Bad queue name!*" =<< getQueueByName qName
       stats <- getQueueStatsByDiscord queue did
       bid <- liftMaybe youArentRegisteredMessage =<< getBowBotIdByDiscord did
       acc <- liftMaybe youNeverPlayerRankedBowDuels =<< getRankedMinecraftAccountByBowBotId bid
-      displayStatsQueue (minecraftAccountToHeader acc Nothing) stats
+      displayStatsQueue (minecraftAccountToHeader acc Nothing) queue stats
     Just (qName, Just n) -> do
       queue <- liftMaybe "*Bad queue name!*" =<< getQueueByName qName
       people <- queryLog [mysql|SELECT MinecraftAccount FROM `ranked_bow` JOIN `minecraft` ON `uuid` = `ranked_uuid`|]
       ac <- liftMaybe thePlayerDoesNotExistMessage $ minecraftAutocorrectGeneral people n
       stats <- getQueueStatsByUUID queue (mcUUID $ autocorrectAccount ac)
-      displayStatsQueue (minecraftAutocorrectToHeader ac) stats
+      displayStatsQueue (minecraftAutocorrectToHeader ac) queue stats
   where
-    getStatsByDiscord did = queryLog [mysql|SELECT RankedBowStats FROM `ranked_bow_stats` JOIN `account_discord` ON `account_id` = `ranked_bow_stats`.`account_id` WHERE `account_discord`.`discord_id` = did|]
-    getStatsByUUID uuid = queryLog [mysql|SELECT RankedBowStats FROM `ranked_bow_stats` JOIN `ranked_bow` ON `account_id` = `ranked_bow_stats`.`account_id` WHERE `ranked_uuid` = uuid|]
+    getStatsByDiscord did = filterStats <$> queryLog [mysql|SELECT RankedBowStats FROM `ranked_bow_stats` JOIN `account_discord` ON `account_id` = `ranked_bow_stats`.`account_id` WHERE `account_discord`.`discord_id` = did|]
+    getStatsByUUID uuid = filterStats <$> queryLog [mysql|SELECT RankedBowStats FROM `ranked_bow_stats` JOIN `ranked_bow` ON `account_id` = `ranked_bow_stats`.`account_id` WHERE `ranked_uuid` = uuid|]
     getQueueStatsByDiscord queue did = queryOnlyLog [mysql|SELECT RankedBowStats FROM `ranked_bow_stats` JOIN `account_discord` ON `account_id` = `ranked_bow_stats`.`account_id` WHERE `account_discord`.`discord_id` = did AND `queue` = queue|]
     getQueueStatsByUUID queue uuid = queryOnlyLog [mysql|SELECT RankedBowStats FROM `ranked_bow_stats` JOIN `ranked_bow` ON `account_id` = `ranked_bow_stats`.`account_id` WHERE `ranked_uuid` = uuid AND `queue` = queue|]
+    filterStats = filter (\s -> rankedWins s /= 0 || rankedLosses s /= 0) -- TODO: do this in SQL?
     displayStats header stats = do
       user <- envs envSender
       settings <- getSettingsFromSource src (userId user)
       respond $ header <> T.unlines (showRankedBowStats settings <$> stats)
-    displayStatsQueue header stats = do
+    displayStatsQueue header queue stats = do
       user <- envs envSender
       settings <- getSettingsFromSource src (userId user)
-      respond $ header <> maybe "*The player never played in this queue!*" (showRankedBowStats settings) stats
+      respond $ header <> showRankedBowStats settings (fromMaybe (defRankedBowStats queue) stats)

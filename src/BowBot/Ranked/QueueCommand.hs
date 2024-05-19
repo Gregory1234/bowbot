@@ -40,10 +40,6 @@ queueCommand = Command CommandInfo
       did <- userId <$> envs envSender
       bid <- liftMaybe youArentRegisteredMessage =<< getBowBotIdByDiscord did
       acc <- getOrMakeRankedAccount bid
-      stats <- getRankedBowStatsByBowBot queue bid
-      when (isNothing stats) $ do
-        r <- addRankedPlayerQueue queue bid
-        unless r $ throwError somethingWentWrongMessage
       r <- liftMaybe somethingWentWrongMessage =<< addToQueue 2 queue bid
       case r of
         AlreadyInQueue -> respond $ "*You are already in the " <> T.toUpper (queueName queue) <> " queue!*"
@@ -60,11 +56,6 @@ queueCommand = Command CommandInfo
       currentQueues <- getCurrentQueuesByBowBotId bid
       let queuesToJoin = map fst allQueues \\ currentQueues
       when (null queuesToJoin) $ throwError "*You are already in all queues!*"
-      for_ queuesToJoin $ \queue -> do
-        stats <- getRankedBowStatsByBowBot queue bid
-        when (isNothing stats) $ do
-          r <- addRankedPlayerQueue queue bid
-          unless r $ throwError somethingWentWrongMessage
       r <- addToQueueMany (map (, 2) queuesToJoin) bid
       case r of
         AddedToQueueMany vs -> do
