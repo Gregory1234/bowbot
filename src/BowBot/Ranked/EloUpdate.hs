@@ -22,8 +22,13 @@ calculateEloChanges (stats1, stats2) score = (eloChange player1win (rankedElo st
   where
     clampElo True = clamp (5, 25)
     clampElo False = clamp (-25, -5)
-    avgElo = (rankedElo stats1 + rankedElo stats2) `div` 2
-    eloChange win elo = clampElo win $ (if win then 15 else -15) - ((elo - avgElo) `quot` 20)
+    avgElo = (rankedElo stats1 + rankedElo stats2) `quot` 2
+    winDiff = abs $ rankedScore1 score - rankedScore2 score
+    eloChangeMod elo
+      | winDiff == 1 = elo `quot` 2
+      | winDiff == 3 = (elo * 3) `quot` 2
+      | otherwise = elo
+    eloChange win elo = clampElo win $ eloChangeMod $ (if win then 15 else -15) - ((elo - avgElo) `quot` 20)
     player1win = rankedScore1 score > rankedScore2 score
 
 applyEloChange :: RankedBowStats -> Integer -> Integer -> Integer -> RankedBowStats
