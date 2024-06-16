@@ -10,6 +10,7 @@ import BowBot.DB.Basic
 data PermissionLevel
   = BanLevel
   | DefaultLevel
+  | RankedModLevel
   | ModLevel
   | AdminLevel
   deriving (Eq, Ord, Enum, Bounded, Show)
@@ -18,10 +19,12 @@ data PermissionLevel
 instance MysqlEnum PermissionLevel where
   toMysqlEnum BanLevel = "ban"
   toMysqlEnum DefaultLevel = "default"
+  toMysqlEnum RankedModLevel = "rankedmod"
   toMysqlEnum ModLevel = "mod"
   toMysqlEnum AdminLevel = "admin"
   fromMysqlEnum "ban" = BanLevel
   fromMysqlEnum "default" = DefaultLevel
+  fromMysqlEnum "rankedmod" = RankedModLevel
   fromMysqlEnum "mod" = ModLevel
   fromMysqlEnum "admin" = AdminLevel
   fromMysqlEnum _ = error "Wrong permission level"

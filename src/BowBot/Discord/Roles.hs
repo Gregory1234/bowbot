@@ -18,6 +18,8 @@ import BowBot.Minecraft.Basic (UUID)
 import BowBot.Discord.SavedRoles
 import BowBot.Hypixel.Basic
 import Data.Ord (Down(..))
+import BowBot.Perms.Basic
+import BowBot.Discord.PermsRoles
 
 
 divisionTitleRolesInfo :: InfoType [(Integer, RoleId)]
@@ -104,6 +106,8 @@ applyRolesByBowBotId' (Just bid) gmems = do
   -- TODO: support smart casts for IS NOT NULL
   hypixelRoles :: [HypixelRole] <- queryLog [mysql|SELECT `hypixel_role` OVERRIDE HypixelRole FROM `minecraft` JOIN `account_minecraft` ON `minecraft_uuid` = `minecraft`.`uuid` WHERE `account_minecraft`.`account_id` = bid AND `hypixel_role` <> NULL|]
   for_ gmems $ \gmem -> do
+    perms <- traverse (getPermissionLevelByDiscord . userId) $ memberUser gmem
+    givePermsRoles gmem $ fromMaybe DefaultLevel perms
     giveSavedRoles gmem savedRoles (Just hypixelRoles)
     giveRolesDivisionTitle gmem (foldl' max 0 wins)
     giveRolesMember gmem (not $ null hypixelRoles)
@@ -130,6 +134,7 @@ applyRolesAll = do
   lb <- getHypixelBowLeaderboards
   -- TODO: support smart casts for IS NOT NULL
   savedRoles :: M.Map UserId [SavedRole] <- M.fromList <$> queryLog [mysql|SELECT `discord_id`, `roles` FROM `account` JOIN `account_discord` ON `account_id` = `account`.`id`|]
+  permissions :: M.Map UserId PermissionLevel <- M.fromList <$> queryLog [mysql|SELECT `discord_id`, `level` FROM `permissions`|]
   gid <- askInfo discordGuildIdInfo
   gmems <- discordGuildMembers gid
   roles :: [(UUID, HypixelRole)] <- queryLog [mysql|SELECT `uuid`, `hypixel_role` OVERRIDE HypixelRole FROM `minecraft` WHERE `hypixel_role` <> NULL|]
@@ -138,10 +143,12 @@ applyRolesAll = do
     let discord = maybe 0 userId (memberUser gmem)
     case accountMinecrafts M.!? discord of
       Nothing -> do
+        givePermsRoles gmem $ fromMaybe DefaultLevel (permissions M.!? discord)
         for_ (savedRoles M.!? discord) $ \r -> giveSavedRoles gmem r Nothing
         giveRolesMemberUnregistered gmem -- TODO: they might not be unregistered, this is a bad name
         giveIllegalRole gmem
       Just mcs -> do
+        givePermsRoles gmem $ fromMaybe DefaultLevel (permissions M.!? discord)
         let hypixelRoles = mapMaybe (`lookup` roles) mcs
         for_ (savedRoles M.!? discord) $ \r -> giveSavedRoles gmem r (Just hypixelRoles)
         giveRolesDivisionTitle gmem (foldl' max 0 (mapMaybe (fmap bowLbWins . (lb HM.!?)) mcs))

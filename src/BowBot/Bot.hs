@@ -48,6 +48,7 @@ import BowBot.Ranked.Detect
 import BowBot.Ranked.StatsCommand
 import BowBot.Ranked.LeaderboardCommand
 import BowBot.Ranked.ModCommands
+import BowBot.Discord.PermsRoles
 
 runBowBot :: IO ()
 runBowBot = do
@@ -89,6 +90,7 @@ backgroundMinutely mint = do
       updateBotData times
       announceMilestones
       updateSavedRolesAll
+      updatePermsAll
       applyRolesAll
     updateMinecraftAccountCache hour
     when (hour `mod` 8 == 0) clearLogs
@@ -153,6 +155,7 @@ eventHandler (GuildMemberUpdate gid roles usr newname) = do
     unless (null roles) $ do
       savedRoles <- savedRolesFromIds roles
       setSavedRolesByDiscord (userId usr) savedRoles
+      
 eventHandler (GuildMemberRemove gid usr) = do
   maingid <- askInfo discordGuildIdInfo
   when (gid == maingid && not (userIsBot usr)) $ do
@@ -224,7 +227,7 @@ commands =
   , rankedLeaderboardCommand rankedWinsLeaderboardType "rlbw"
   , rankedLeaderboardCommand rankedLossesLeaderboardType "rlbl"
   , rankedLeaderboardCommand rankedWlrLeaderboardType "rlbr"
-  , helpCommand commands DefaultLevel Nothing "rankedmod" "rankedmodhelp"
+  , helpCommand commands RankedModLevel Nothing "ranked" "rankedmodhelp"
   , delQueueCommand
   , abandonGameCommand
   , changeEloCommand
@@ -245,6 +248,7 @@ commands =
   , adminCommand 15 "clearlogs" "clear Bow Bot's logs" clearLogs
   , adminCommand 120 "rolesupdate" "update everyone's discord roles" $ do { updateHypixelRoles; applyRolesAll }
   , adminCommand 120 "savedrolesstore" "store everyone's saved roles" updateSavedRolesAll
+  , adminCommand 120 "setpermsbyroles" "set everyone's permissions using roles" updatePermsAll
   , adminCommand 15 "statusupdate" "update Bow Bot's discord status" updateDiscordStatus
   , quietAdminCommand 5 "throw" "throw an error" $ respond $ showt ((1 :: Integer) `div` 0)
   , quietAdminCommand 5 "time" "display Bow Bot's time" $ respond . pack =<< liftIO (getTime "Month: %m, Day: %d, Weekday: %u, Hour: %k, Minute: %M, Second %S")

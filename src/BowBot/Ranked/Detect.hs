@@ -11,8 +11,8 @@ import BowBot.Ranked.Report
 import Control.Concurrent
 import qualified Discord.Requests as R
 import BowBot.Ranked.EloUpdate
-import BowBot.Ranked.Queue
 import qualified Data.Text as T
+import BowBot.Discord.PermsRoles
 
 rankedScoreReportChannelInfo :: InfoType ChannelId
 rankedScoreReportChannelInfo = InfoType { infoName = "ranked_score_report_channel", infoDefault = 0, infoParse = first pack . readEither . unpack }

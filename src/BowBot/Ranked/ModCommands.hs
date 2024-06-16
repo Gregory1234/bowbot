@@ -6,8 +6,6 @@ import BowBot.Command
 import BowBot.DB.Basic
 import BowBot.Ranked.Queue
 import BowBot.Discord.Utils
-import Control.Monad.Except (ExceptT)
-import BowBot.BotData.Info
 import Control.Monad.Error.Class (throwError)
 import BowBot.Ranked.Game
 import BowBot.Minecraft.Basic
@@ -16,24 +14,13 @@ import BowBot.Command.Utils
 import BowBot.Account.Basic
 import BowBot.Ranked.EloUpdate
 
--- TODO: remake it using the permission system
-restrictToRankedMods :: ExceptT Text CommandHandler () -> ExceptT Text CommandHandler ()
-restrictToRankedMods body = do
-  did <- userId <$> envs envSender
-  modRole <- askInfo rankedModRoleInfo
-  guildId <- askInfo discordGuildIdInfo
-  guildMember <- liftMaybe somethingWentWrongMessage =<< getDiscordGuildMember guildId did
-  if modRole `elem` memberRoles guildMember
-    then body
-    else respond "*You are not a ranked mod!*"
-
 delQueueCommand :: Command
 delQueueCommand = Command CommandInfo
   { commandName = "delqueue"
-  , commandHelpEntries = [HelpEntry { helpUsage = "delqueue", helpDescription = "clear all Ranked Bow queues", helpGroup = "rankedmod" }]
-  , commandPerms = DefaultLevel
+  , commandHelpEntries = [HelpEntry { helpUsage = "delqueue", helpDescription = "clear all Ranked Bow queues", helpGroup = "ranked" }]
+  , commandPerms = RankedModLevel
   , commandTimeout = 15
-  } $ noArguments $ restrictToRankedMods $ do
+  } $ noArguments $ do
     void $ executeLog [mysql|UPDATE `ranked_bow_stats` SET `in_queue` = 0|]
     respond "*Cleared all ranked queues!*"
 
@@ -41,11 +28,11 @@ abandonGameCommand :: Command
 abandonGameCommand = Command CommandInfo
   { commandName = "abandongame"
   , commandHelpEntries = 
-    [ HelpEntry { helpUsage = "abandongame [number]", helpDescription = "abandon a game", helpGroup = "rankedmod" }
-    , HelpEntry { helpUsage = "abandongame [number] [player to punish] [punishment]", helpDescription = "abandon a game and give a player an elo punishment", helpGroup = "rankedmod" } ]
-  , commandPerms = DefaultLevel
+    [ HelpEntry { helpUsage = "abandongame [number]", helpDescription = "abandon a game", helpGroup = "ranked" }
+    , HelpEntry { helpUsage = "abandongame [number] [player to punish] [punishment]", helpDescription = "abandon a game and give a player an elo punishment", helpGroup = "ranked" } ]
+  , commandPerms = RankedModLevel
   , commandTimeout = 15
-  } $ oneOrThreeArguments $ \gameIdStr punishment -> restrictToRankedMods $ do
+  } $ oneOrThreeArguments $ \gameIdStr punishment -> do
     gameId <- liftMaybe "*Wrong number!*" (readMaybe $ unpack gameIdStr)
     game <- liftMaybe "*Game not found!*" =<< getRankedGameById gameId
     unless (rankedGameStatus game == GameActive) $ throwError "*That game is already completed!*"
@@ -69,10 +56,10 @@ abandonGameCommand = Command CommandInfo
 changeEloCommand :: Command
 changeEloCommand = Command CommandInfo
   { commandName = "changeelo"
-  , commandHelpEntries = [ HelpEntry { helpUsage = "changeelo [queue] [player] [change]", helpDescription = "change a player's elo", helpGroup = "rankedmod" } ]
-  , commandPerms = DefaultLevel
+  , commandHelpEntries = [ HelpEntry { helpUsage = "changeelo [queue] [player] [change]", helpDescription = "change a player's elo", helpGroup = "ranked" } ]
+  , commandPerms = RankedModLevel
   , commandTimeout = 15
-  } $ threeArguments $ \qName player eloChangeStr -> restrictToRankedMods $ do
+  } $ threeArguments $ \qName player eloChangeStr -> do
     queue <- liftMaybe "*Bad queue name!*" =<< getQueueByName qName
     eloChange <- case unpack eloChangeStr of
       ('+':(readMaybe -> Just elo)) -> return elo

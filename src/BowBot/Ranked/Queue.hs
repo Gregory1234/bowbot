@@ -8,13 +8,9 @@ import BowBot.Account.Basic
 import BowBot.BotData.Info
 import qualified Data.Text as T
 import qualified Data.Map as M
-import Data.Bifunctor (first)
 
 newtype QueueName = QueueName { queueName :: Text }
   deriving newtype (Show, Eq, Ord, ToMysqlSimple, FromMysqlSimple, ToMysql, FromMysql)
-
-rankedModRoleInfo :: InfoType RoleId
-rankedModRoleInfo = InfoType { infoName = "ranked_mod_role", infoDefault = 0, infoParse = first pack . readEither . unpack }
 
 rankedBowQueuesInfo :: InfoType [(QueueName, [Text])]
 rankedBowQueuesInfo = InfoType { infoName = "ranked_bow_queues", infoDefault = [], infoParse = \s -> for (T.lines s) $ \l -> case T.splitOn "->" l of [a, b] -> Right (QueueName a, T.splitOn "," b); _ -> Left "wrong format" }
